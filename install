@@ -1,0 +1,34 @@
+#!/bin/bash
+
+mv ~/.bash_profile ~/.bash_profile_bkp
+mv bash_profile ~/.bash_profile
+
+mv ~/.bashrc ~/.bashrc_bkp
+mv bashrc ~/.bashrc
+
+mv ~/.conkyrc ~/.conkyrc_bkp
+mv conkyrc ~/.conkyrc
+
+mv ~/.gitconfig ~/.gitconfig_bkp
+mv gitconfig ~/.gitconfig
+
+mv ~/.vimperatorrc ~/.vimperatorrc_bkp
+mv vimperatorrc ~/.vimperatorrc
+
+mv ~/.vimrc ~/.vimrc_bkp
+mv vimrc ~/.vimrc
+
+mv ~/.Xdefaults ~/.Xdefaults_bkp
+mv Xdefaults ~/.Xdefaults
+
+mv ~/.xinitrc ~/.xinitrc_bkp
+mv xinitrc ~/.xinitrc
+
+mv ~/.config/openbox/autostart.sh ~/.config/openbox/autostart.sh_bkp
+mv config/openbox/autostart.sh ~/.config/openbox/autostart.sh
+
+mv ~/.config/openbox/menu.xml ~/.config/openbox/menu.xml_bkp
+mv config/openbox/menu.xml ~/.config/openbox/menu.xml
+
+mv ~/.config/openbox/rc.xml ~/.config/openbox/rc.xml_bkp
+mv config/openbox/rc.xml ~/.config/openbox/rc.xml
