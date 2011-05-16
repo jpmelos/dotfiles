@@ -57,6 +57,7 @@
       <command>filezilla</command>
     </action>
   </item>
+  <menu id="libreoffice"/>
   <item label="Skype">
     <action name="Execute">
       <command>skype</command>
@@ -77,7 +78,6 @@
       <command>dia</command>
     </action>
   </item>
-  <menu id="libreoffice"/>
   <separator />
   <item label="Log Out">
     <action name="Exit">
