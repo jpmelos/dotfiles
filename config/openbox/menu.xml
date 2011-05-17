@@ -84,6 +84,12 @@
     </action>
   </item>
   <separator />
+  <item label="Wicd">
+    <action name="Execute">
+      <command>wicd-client -n</command>
+    </action>
+  </item>
+  <separator />
   <item label="Log Out">
     <action name="Exit">
       <prompt>yes</prompt>
