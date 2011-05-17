@@ -57,12 +57,17 @@
       <command>filezilla</command>
     </action>
   </item>
-  <menu id="libreoffice"/>
+  <item label="Deluge">
+    <action name="Execute">
+      <command>deluge</command>
+    </action>
+  </item>
   <item label="Skype">
     <action name="Execute">
       <command>skype</command>
     </action>
   </item>
+  <menu id="libreoffice"/>
   <item label="GIMP">
     <action name="Execute">
       <command>gimp</command>
