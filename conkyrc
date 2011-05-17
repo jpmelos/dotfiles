@@ -27,5 +27,29 @@ override_utf8_locale yes
 use_spacer yes
 
 TEXT
-${voffset 10}${color EAEAEA}${font GE Inspira:pixelsize=120}${time %H:%M}${font}${voffset -84}${offset 10}${color FFA300}${font GE Inspira:pixelsize=42}${time %d} ${voffset -15}${color EAEAEA}${font GE Inspira:pixelsize=22}${time  %B} ${time %Y}${font}${voffset 24}${font GE Inspira:pixelsize=58}${offset -148}${time %A}${font}
-${voffset 1}${offset 12}${font Ubuntu:pixelsize=10}${color FFA300}RAM ${offset 9}$color$mem / $memmax${offset 30}${color FFA300}CPU ${offset 9}$color${cpu cpu0}%${offset 9}${cpu cpu1}%${offset 30}${color FFA300}UPTIME$color${offset 9}${uptime}${offset 30}${color FFA300}BATTERY${offset 9}$color${battery_percent}%
+
+${voffset 10}${color EAEAEA}${font GE Inspira:pixelsize=120}
+${time %H:%M}
+${font}${voffset -84}${offset 10}${color FFA300}${font GE Inspira:pixelsize=42}
+${time %d}
+${voffset -15}${color EAEAEA}${font GE Inspira:pixelsize=22}
+${time  %B} ${time %Y}
+${font}${voffset 24}${font GE Inspira:pixelsize=58}${offset -148}
+${time %A}
+${font}${voffset 1}
+${offset 12}${font Ubuntu:pixelsize=10}${color FFA300}
+RAM
+${offset 9}$color
+$mem / $memmax
+${offset 30}${color FFA300}
+CPU
+${offset 9}$color${cpu cpu0}%${offset 9}
+${cpu cpu1}%
+${offset 30}${color FFA300}
+UPTIME
+$color${offset 9}
+${uptime}
+${offset 30}${color FFA300}
+BATTERY
+${offset 9}$color
+${battery_percent}%
