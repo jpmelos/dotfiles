@@ -1,4 +1,2 @@
-set gui=tabs
-
 nnoremap j 3j
 nnoremap k 3k
