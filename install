@@ -1,34 +1,34 @@
 #!/bin/bash
 
 mv ~/.bash_profile ~/.bash_profile_bkp
-mv bash_profile ~/.bash_profile
+cp bash_profile ~/.bash_profile
 
 mv ~/.bashrc ~/.bashrc_bkp
-mv bashrc ~/.bashrc
+cp bashrc ~/.bashrc
 
 mv ~/.conkyrc ~/.conkyrc_bkp
-mv conkyrc ~/.conkyrc
+cp conkyrc ~/.conkyrc
 
 mv ~/.gitconfig ~/.gitconfig_bkp
-mv gitconfig ~/.gitconfig
+cp gitconfig ~/.gitconfig
 
 mv ~/.vimperatorrc ~/.vimperatorrc_bkp
-mv vimperatorrc ~/.vimperatorrc
+cp vimperatorrc ~/.vimperatorrc
 
 mv ~/.vimrc ~/.vimrc_bkp
-mv vimrc ~/.vimrc
+cp vimrc ~/.vimrc
 
 mv ~/.Xdefaults ~/.Xdefaults_bkp
-mv Xdefaults ~/.Xdefaults
+cp Xdefaults ~/.Xdefaults
 
 mv ~/.xinitrc ~/.xinitrc_bkp
-mv xinitrc ~/.xinitrc
+cp xinitrc ~/.xinitrc
 
 mv ~/.config/openbox/autostart.sh ~/.config/openbox/autostart.sh_bkp
-mv config/openbox/autostart.sh ~/.config/openbox/autostart.sh
+cp config/openbox/autostart.sh ~/.config/openbox/autostart.sh
 
 mv ~/.config/openbox/menu.xml ~/.config/openbox/menu.xml_bkp
-mv config/openbox/menu.xml ~/.config/openbox/menu.xml
+cp config/openbox/menu.xml ~/.config/openbox/menu.xml
 
 mv ~/.config/openbox/rc.xml ~/.config/openbox/rc.xml_bkp
-mv config/openbox/rc.xml ~/.config/openbox/rc.xml
+cp config/openbox/rc.xml ~/.config/openbox/rc.xml
