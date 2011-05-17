@@ -269,15 +269,6 @@
       </action>
     </keybind>
     <!-- Keybindings for running applications -->
-    <keybind key="W-e">
-      <action name="Execute">
-        <startupnotify>
-          <enabled>true</enabled>
-          <name>Konqueror</name>
-        </startupnotify>
-        <command>kfmclient openProfile filemanagement</command>
-      </action>
-    </keybind>
     <keybind key="W-q">
       <action name="Execute">
         <startupnotify>
@@ -294,6 +285,24 @@
           <name>Firefox</name>
         </startupnotify>
         <command>firefox</command>
+      </action>
+    </keybind>
+    <keybind key="W-w">
+      <action name="Execute">
+        <startupnotify>
+          <enabled>true</enabled>
+          <name>Nautilus</name>
+        </startupnotify>
+        <command>nautilus</command>
+      </action>
+    </keybind>
+    <keybind key="W-s">
+      <action name="Execute">
+        <startupnotify>
+          <enabled>true</enabled>
+          <name>Wicd</name>
+        </startupnotify>
+        <command>wicd-client -n</command>
       </action>
     </keybind>
     <keybind key="W-x">
