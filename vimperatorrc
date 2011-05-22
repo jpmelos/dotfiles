@@ -1,7 +1,8 @@
 nnoremap j 3j
 nnoremap k 3k
 
-nm s :bmarks! -tags=start<cr>gTd
 nm S :bmarks! -tags=start<cr>
+nm s SgTd
 
 nm e :bmarks<cr>;o
+nm E t<cr>e
