@@ -1,6 +1,6 @@
 nnoremap j 3j
 nnoremap k 3k
 
-nm s ohttp://www.twitter.com, http://www.gmail.com, http://www.google.com/reader/view, http://www.facebook.com, http://www.torrentday.com/browse.php
+nm s :bmarks! -tags=start<cr>gTd
 
-nm S thttp://www.twitter.com, http://www.gmail.com, http://www.google.com/reader/view, http://www.facebook.com, http://www.torrentday.com/browse.php
+nm S :bmarks! -tags=start<cr>
