@@ -242,9 +242,6 @@
       <action name="ToggleShowDesktop"/>
     </keybind>
     <!-- Keybindings for windows -->
-    <keybind key="A-F2">
-      <action name="Iconify"/>
-    </keybind>
     <keybind key="A-F3">
       <action name="ToggleMaximizeFull"/>
     </keybind>
