@@ -93,6 +93,9 @@ au BufRead,BufNewFile *.c,*.cc,*.cpp,*.h set comments=sl:/*,mb:\ *,elx:\ */
 " automatically deletes trailing whitespaces before saving C/C++ files
 au BufWritePre *.c,*.cc,*.cpp*.h :%s/\s\+$//e
 
+" marks 80th column with red background
+au BufRead,BufNewFile *.c,*.cc,*.cpp*.h set colorcolumn=80
+
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " PYTHON SECTION
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -104,6 +107,9 @@ au BufRead,BufNewFile *.py,*.pyw syntax on
 
 " automatically deletes trailing whitespaces before saving Python files
 au BufWritePre *.py,*.pyw :%s/\s\+$//e
+
+" marks 80th column with red background
+au BufRead,BufNewFile *.py,*.pyw set colorcolumn=80
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " MAKEFILE SECTION
