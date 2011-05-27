@@ -94,7 +94,7 @@ au BufRead,BufNewFile *.c,*.cc,*.cpp,*.h set comments=sl:/*,mb:\ *,elx:\ */
 au BufWritePre *.c,*.cc,*.cpp*.h :%s/\s\+$//e
 
 " marks 80th column with red background
-au BufRead,BufNewFile *.c,*.cc,*.cpp*.h set colorcolumn=80
+au BufRead,BufNewFile *.c,*.cc,*.cpp*.h set colorcolumn=79
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " PYTHON SECTION
@@ -109,7 +109,7 @@ au BufRead,BufNewFile *.py,*.pyw syntax on
 au BufWritePre *.py,*.pyw :%s/\s\+$//e
 
 " marks 80th column with red background
-au BufRead,BufNewFile *.py,*.pyw set colorcolumn=80
+au BufRead,BufNewFile *.py,*.pyw set colorcolumn=79
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " MAKEFILE SECTION
