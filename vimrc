@@ -26,9 +26,6 @@ set wrap
 set linebreak
 set nolist
 
-" turn line numbers on
-set number
-
 " highlight matching braces
 set showmatch
 
@@ -81,6 +78,9 @@ set autoindent        " enable indentation of previous line on next
 " make trailing whitespace be flagged
 match BadWhitespace /\s\+$/
 
+" marks the 80th column with red
+set colorcolumn=80
+
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " C SECTION
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -93,23 +93,15 @@ au BufRead,BufNewFile *.c,*.cc,*.cpp,*.h set comments=sl:/*,mb:\ *,elx:\ */
 " automatically deletes trailing whitespaces before saving C/C++ files
 au BufWritePre *.c,*.cc,*.cpp*.h :%s/\s\+$//e
 
-" marks 80th column with red background
-au BufRead,BufNewFile *.c,*.cc,*.cpp*.h set colorcolumn=79
-
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " PYTHON SECTION
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
+" defines Python relevant works for smart indentation
 au BufRead,BufNewFile *.py,*.pyw set smartindent cinwords=if,elif,else,for,while,with,try,except,finally,def,class
-
-au BufRead,BufNewFile *.py,*.pyw let python_highlight_all=1
-au BufRead,BufNewFile *.py,*.pyw syntax on
 
 " automatically deletes trailing whitespaces before saving Python files
 au BufWritePre *.py,*.pyw :%s/\s\+$//e
-
-" marks 80th column with red background
-au BufRead,BufNewFile *.py,*.pyw set colorcolumn=79
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " MAKEFILE SECTION
@@ -117,3 +109,6 @@ au BufRead,BufNewFile *.py,*.pyw set colorcolumn=79
 
 " will not expand tabs when on a Makefile file
 au BufRead,BufNewFile Makefile* set noexpandtab
+
+" automatically deletes trailing whitespaces before saving Makefile files
+au BufWritePre Makefile* :%s/\s\+$//e
