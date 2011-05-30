@@ -44,7 +44,7 @@
   </item>
   <item label="Rxvt Unicode">
     <action name="Execute">
-      <command>urxvt</command>
+      <command>urxvt -e tmux</command>
     </action>
   </item>
   <item label="Nautilus">
