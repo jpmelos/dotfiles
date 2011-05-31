@@ -5,6 +5,5 @@ nm S :bmarks! -tags=start<cr>
 nm s SgTd
 
 nm e :bmarks -tags=reading<cr>;
-nm E t<cr>e
 
 nm a :bmark -tags=reading<cr>
