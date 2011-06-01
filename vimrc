@@ -68,9 +68,9 @@ set novisualbell      " don't blink
 set noerrorbells      " no noise
 set scrolloff=10      " minimal number of lines above and below cursor
 
-set tabstop=4         " tab width is 4 spaces
-set softtabstop=4     " tab width is 4 spaces
-set shiftwidth=4      " indent also with 4 spaces
+set tabstop=8         " tab width is 8 spaces
+set softtabstop=8     " tab width is 8 spaces
+set shiftwidth=8      " indent also with 8 spaces
 set noexpandtab       " will not expand tabs
 
 set autoindent        " enable indentation of previous line on next
