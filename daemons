@@ -1,0 +1,1 @@
+DAEMONS=(hwclock syslog-ng !network netfs crond dbus wicd sshd)
