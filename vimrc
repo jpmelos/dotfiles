@@ -12,6 +12,8 @@
 " GENERAL SECTION
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
+colorscheme koehler
+
 " set UFT-8 encoding
 set enc=utf-8
 set fenc=utf-8
