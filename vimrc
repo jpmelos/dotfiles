@@ -34,7 +34,7 @@ nmap <F2> :w<CR>
 imap <F2> <ESC>:w<CR>i
 
 " configure searching
-set hlsearch   " highlight searches
+set nohlsearch " does not highlight searches
 set incsearch  " incremental searching
 set ignorecase " ignore case when searching
 set smartcase  " unless it contais uppercase
