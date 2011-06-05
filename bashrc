@@ -12,3 +12,6 @@ alias ls='ls -F'
 alias halt='sudo halt'
 alias reboot='sudo reboot'
 alias list='ls -FhAls | less'
+
+tmux attach || tmux
+exit
