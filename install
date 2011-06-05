@@ -36,9 +36,6 @@ cp config/openbox/rc.xml ~/.config/openbox/rc.xml
 mv ~/.tmux.conf ~/.tmux.conf_bkp
 cp tmux.conf ~/.tmux.conf
 
-mv ~/.vim/colors/koehler.vim ~/.vim/colors/koehler.vim_bkp
-cp vim/colors/koehler.vim ~/.vim/colors/koehler.vim
-
 echo "===================="
 echo "Put daemons file in DAEMONS=(...) line in /etc/rc.conf."
 echo "===================="
