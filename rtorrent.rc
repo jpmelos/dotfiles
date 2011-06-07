@@ -1,0 +1,48 @@
+# General settings
+
+# The ip address the listening socket and outgoing connections is bound to
+bind = 0.0.0.0
+
+# Port range to use for listening
+port_range = 65101-65399
+
+# Start opening ports at a random position within the port range
+port_random = yes
+
+# Perform hash check on torrents that have finished downloading
+check_hash = yes
+
+# Download directory
+directory = /home/jpmelos/torrents
+
+# Session directory
+session = /home/jpmelos/torrents/.session
+
+# Encryption
+encryption = allow_incoming,enable_retry,prefer_plaintext
+
+# Watch for new torrents
+schedule = watch_directory,10,10,load_start=/home/jpmelos/torrents/\*.torrent
+
+# Stop torrents whose files were deleted
+schedule = untied_directory,5,5,stop_untied=
+
+# Resume torrents whose files were put back
+schedule = tied_directory,5,5,start_tied=
+
+# Close torrents when diskspace is low
+schedule = low_diskspace,5,60,close_low_diskspace=500M
+
+# Throttle settings
+
+# Global upload and download rate in KiB
+upload_rate = 50
+download_rate = 490
+
+# Maximum and minimum number of peers to connect to per torrent
+max_peers = 100
+
+# Tracker related settings
+
+# Connect to UDP trackers
+use_udp_trackers = yes
