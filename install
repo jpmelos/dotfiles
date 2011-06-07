@@ -32,7 +32,3 @@ cp config/openbox/rc.xml ~/.config/openbox/rc.xml
 
 mv ~/.tmux.conf ~/.tmux.conf_bkp
 cp tmux.conf ~/.tmux.conf
-
-echo "===================="
-echo "Put daemons file in DAEMONS=(...) line in /etc/rc.conf."
-echo "===================="
