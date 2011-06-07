@@ -27,4 +27,4 @@ settings = {
 };
 
 chatnets = { freenode = { type = "IRC"; }; };
-ignores = ( { level = "JOINS PARTS QUITS NICKS"; } );
+ignores = ( { level = "JOINS PARTS QUITS NICKS KICKS"; } );
