@@ -6,9 +6,6 @@ cp bash_profile ~/.bash_profile
 mv ~/.bashrc ~/.bashrc_bkp
 cp bashrc ~/.bashrc
 
-mv ~/.conkyrc ~/.conkyrc_bkp
-cp conkyrc ~/.conkyrc
-
 mv ~/.gitconfig ~/.gitconfig_bkp
 cp gitconfig ~/.gitconfig
 
