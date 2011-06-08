@@ -13,16 +13,16 @@ port_random = yes
 check_hash = yes
 
 # Download directory
-directory = /home/jpmelos/torrents
+directory = /media/JPMELOSEXT/torrents
 
 # Session directory
-session = /home/jpmelos/torrents/.session
+session = /media/JPMELOSEXT/torrents/.session
 
 # Encryption
 encryption = allow_incoming,enable_retry,prefer_plaintext
 
 # Watch for new torrents
-schedule = watch_directory,10,10,load_start=/home/jpmelos/torrents/\*.torrent
+schedule = watch_directory,10,10,load_start=/media/JPMELOSEXT/torrents/\*.torrent
 
 # Stop torrents whose files were deleted
 schedule = untied_directory,5,5,stop_untied=
