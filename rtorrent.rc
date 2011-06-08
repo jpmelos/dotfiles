@@ -40,8 +40,8 @@ upload_rate = 50
 download_rate = 490
 
 # Global slots for download and upload
-max_upload_global = 5
-max_download_global = 200
+max_upload_global = 8
+max_download_global = 50
 
 # Tracker related settings
 
