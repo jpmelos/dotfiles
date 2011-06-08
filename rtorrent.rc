@@ -49,4 +49,4 @@ max_downloads_global = 50
 use_udp_trackers = yes
 
 # DHT
-dht = disabled
+dht = disable
