@@ -39,10 +39,14 @@ schedule = low_diskspace,5,60,close_low_diskspace=500M
 upload_rate = 50
 download_rate = 490
 
-# Maximum and minimum number of peers to connect to per torrent
-max_peers = 100
+# Global slots for download and upload
+max_upload_global = 5
+max_download_global = 200
 
 # Tracker related settings
 
 # Connect to UDP trackers
 use_udp_trackers = yes
+
+# DHT
+dht = disabled
