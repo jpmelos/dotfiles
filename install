@@ -35,3 +35,6 @@ cp tmux.conf ~/.tmux.conf
 
 mv ~/.rtorrent.rc ~/.rtorrent.rc_bkp
 cp rtorrent.rc ~/.rtorrent.rc
+
+mv ~/.irssi/config ~/.irssi/config_bkp
+cp irssi/config ~/.irssi/config
