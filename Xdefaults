@@ -11,3 +11,6 @@ URxvt*colorUL: #86a2be
 URxvt*internalBorder: 2
 URxvt*scrollBar: false
 URxvt*borderLess: true
+
+! sets $TERM
+URxvt*termName: rxvt-unicode-256color
