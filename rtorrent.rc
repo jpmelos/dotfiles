@@ -35,13 +35,16 @@ schedule = low_diskspace,5,60,close_low_diskspace=500M
 
 # Throttle settings
 
+# Maximum peers per download
+max_peers = 25
+
 # Global upload and download rate in KiB
 upload_rate = 40
 download_rate = 300
 
 # Global slots for download and upload
-max_uploads_global = 8
-max_downloads_global = 50
+max_uploads_global = 14
+max_downloads_global = 2
 
 # Tracker related settings
 
