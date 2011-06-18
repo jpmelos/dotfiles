@@ -12,6 +12,8 @@ alias ls='ls -F'
 alias halt='sudo halt'
 alias reboot='sudo reboot'
 alias list='ls -FhAls | less'
+alias mv='mv -i'
+alias cp='cp -i'
 
 tmux attach || tmux
 exit
