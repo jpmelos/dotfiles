@@ -1,5 +1,3 @@
 dotfiles for ArchLinux configuration.
 
-Clone and run ./install to move all files to their places. This will create a backup copy before overwriting any files.
-
-Add daemons to DAEMONS=(...) line in /etc/rc.conf.
+packages: to be installed applications.
