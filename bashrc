@@ -18,5 +18,5 @@ fi
 
 # If in tmux
 if [[ -n $TMUX ]]; then
-	export TERM=rxvt-unicode-256color
+	export TERM=screen-256color
 fi
