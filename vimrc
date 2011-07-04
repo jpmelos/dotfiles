@@ -90,7 +90,7 @@ au BufRead,BufNewFile *.c,*.cc,*.cpp,*.h set cindent      " use C/C++ indentatio
 au BufRead,BufNewFile *.c,*.cc,*.cpp,*.h set comments=sl:/*,mb:\ *,elx:\ */
 
 " automatically deletes trailing whitespaces before saving C/C++ files
-au BufWritePre *.c,*.cc,*.cpp*.h :%s/\s\+$//e
+au BufWritePre *.c,*.cc,*.cpp,*.h :%s/\s\+$//e
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " PYTHON SECTION
