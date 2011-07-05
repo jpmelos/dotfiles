@@ -1,9 +1,15 @@
+" Configure navigation.
 nnoremap j 3j
 nnoremap k 3k
 
-nm S :bmarks! -tags=start<cr>
-nm s SgTd
+" Configure fast starting bookmarks.
+nm S :bmarks! -tags=start<cr> " Open but keep current tab.
+nm s SgTd " Open in current tab.
 
-nm e :bmarks -tags=reading<cr>;
+" Configure reading bookmarks.
+nm a :bmark -tags=reading<cr> " Add a reading bookmark.
+nm e :bmarks -tags=reading<cr>; " Display reading bookmarks.
 
-nm a :bmark -tags=reading<cr>
+" Configure once-a-day bookmarks.
+nm x :bmarks! -tags=once<cr> " Open but keep current tab.
+nm X :bmark -tags=once<cr> " Add a once-a-day bookmark.
