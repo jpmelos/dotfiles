@@ -7,6 +7,7 @@ alias reboot='sudo reboot'
 alias halt='sudo halt'
 alias cp='cp -i'
 alias mv='mv -i'
+alias cal='cal -3'
 
 umask 077
 
