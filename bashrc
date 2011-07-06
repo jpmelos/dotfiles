@@ -11,6 +11,12 @@ alias cal='cal -3'
 
 umask 077
 
+function setperm
+{
+	find . -type d -exec chmod 700 {} \;
+	find . -type f -exec chmod 600 {} \;
+}
+
 # If not in /dev/tty1 and not in tmux already, call tmux
 if [[ $(tty) != /dev/tty1 && -z $TMUX ]]; then
 	tmux || tmux attach
