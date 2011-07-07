@@ -19,7 +19,7 @@ function setperm
 
 # If not in /dev/tty1 and not in tmux already, call tmux
 if [[ $(tty) != /dev/tty1 && -z $TMUX ]]; then
-	tmux || tmux attach
+	tmux attach || tmux
 	exit
 fi
 
