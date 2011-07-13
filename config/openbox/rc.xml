@@ -290,15 +290,6 @@
         <command>firefox</command>
       </action>
     </keybind>
-    <keybind key="W-w">
-      <action name="Execute">
-        <startupnotify>
-          <enabled>true</enabled>
-          <name>Nautilus</name>
-        </startupnotify>
-        <command>nautilus</command>
-      </action>
-    </keybind>
     <keybind key="W-s">
       <action name="Execute">
         <startupnotify>
