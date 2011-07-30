@@ -1,6 +1,6 @@
 URxvt.background: #000000
 URxvt.foreground: #ffffff
-URxvt.font: xft:Mono:pixelsize=13
+URxvt.font: xft:Mono:pixelsize=12
 
 ! enabling clickable urls on the terminal
 URxvt*perl-ext-common: default,matcher
