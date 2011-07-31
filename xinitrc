@@ -1,3 +1,4 @@
+pidgin &
 setxkbmap br
 xdotool mousemove 9999 9999
 xset -dpms
