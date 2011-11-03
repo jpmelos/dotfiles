@@ -32,6 +32,9 @@ set showmatch
 " save file with <F2>
 nmap <F2> :w<CR>
 imap <F2> <ESC>:w<CR>i
+" navigate through display lines
+nmap j gj
+nmap k gk
 
 " configure searching
 set nohlsearch " does not highlight searches
