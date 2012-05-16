@@ -37,7 +37,7 @@ schedule = low_diskspace,5,60,close_low_diskspace=500M
 
 # Global upload and download rate in KiB
 upload_rate = 40
-download_rate = 490
+download_rate = 900
 
 # Tracker related settings
 
