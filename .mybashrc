@@ -22,8 +22,3 @@ if [[ $(tty) != /dev/tty1 && -z $TMUX ]]; then
 	tmux attach || tmux
 	exit
 fi
-
-# If in tmux
-#if [[ -n $TMUX ]]; then
-#	export TERM=screen-256color
-#fi
