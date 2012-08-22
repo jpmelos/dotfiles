@@ -12,11 +12,14 @@ servers = (
 channels = (
   { name = "##linux"; chatnet = "freenode"; autojoin = "Yes"; },
   { name = "##posix"; chatnet = "freenode"; autojoin = "Yes"; },
-  { name = "#archlinux"; chatnet = "freenode"; autojoin = "Yes"; },
-  { name = "#git"; chatnet = "freenode"; autojoin = "Yes"; },
   { name = "##c"; chatnet = "freenode"; autojoin = "Yes"; },
+  { name = "#python"; chatnet = "freenode"; autojoin = "Yes"; },
   { name = "#vim"; chatnet = "freenode"; autojoin = "Yes"; },
+  { name = "#gcc"; chatnet = "freenode"; autojoin = "Yes"; },
   { name = "#gdb"; chatnet = "freenode"; autojoin = "Yes"; }
+  { name = "#git"; chatnet = "freenode"; autojoin = "Yes"; },
+  { name = "#async"; chatnet = "freenode"; autojoin = "Yes"; },
+  { name = "#stoq"; chatnet = "freenode"; autojoin = "Yes"; },
 );
 
 settings = {
