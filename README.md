@@ -9,9 +9,4 @@ Add line
 
 to your `~/.bashrc` file to get working bash configuration.
 
-Copy all files with
-
-	cp * .* ~
-	cp .irssi ~ -r
-
-to install package of configuration.
+Copy all files and folders to your home as is to install package of configuration (except `.git/` and `README.md`).
