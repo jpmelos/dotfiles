@@ -16,10 +16,10 @@ channels = (
   { name = "#python"; chatnet = "freenode"; autojoin = "Yes"; },
   { name = "#vim"; chatnet = "freenode"; autojoin = "Yes"; },
   { name = "#gcc"; chatnet = "freenode"; autojoin = "Yes"; },
-  { name = "#gdb"; chatnet = "freenode"; autojoin = "Yes"; }
+  { name = "#gdb"; chatnet = "freenode"; autojoin = "Yes"; },
   { name = "#git"; chatnet = "freenode"; autojoin = "Yes"; },
   { name = "#async"; chatnet = "freenode"; autojoin = "Yes"; },
-  { name = "#stoq"; chatnet = "freenode"; autojoin = "Yes"; },
+  { name = "#stoq"; chatnet = "freenode"; autojoin = "Yes"; }
 );
 
 settings = {
@@ -28,6 +28,7 @@ settings = {
     user_name = "jpmelos";
     nick = "jpmelos";
   };
+  "fe-text" = { actlist_sort = "refnum"; };
 };
 
 chatnets = { freenode = { type = "IRC"; }; };
