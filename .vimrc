@@ -87,7 +87,8 @@ set colorcolumn=80
 " C SECTION
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
-au BufRead,BufNewFile *.c,*.cc,*.cpp,*.h set cindent      " use C/C++ indentation
+" use C/C++ indentation
+au BufRead,BufNewFile *.c,*.cc,*.cpp,*.h set cindent
 
 " set intelligent comments
 au BufRead,BufNewFile *.c,*.cc,*.cpp,*.h set comments=sl:/*,mb:\ *,elx:\ */
@@ -104,6 +105,12 @@ au BufRead,BufNewFile *.py,*.pyw set smartindent cinwords=if,elif,else,for,while
 
 " automatically deletes trailing whitespaces before saving Python files
 au BufWritePre *.py,*.pyw :%s/\s\+$//e
+
+" Python-specific indetation and tab rules
+au BufRead,BufNewFile *.py,*.pyw set tabstop=4         " tab width is 4 spaces
+au BufRead,BufNewFile *.py,*.pyw set softtabstop=4     " tab width is 4 spaces
+au BufRead,BufNewFile *.py,*.pyw set shiftwidth=4      " indent also with 4 spaces
+au BufRead,BufNewFile *.py,*.pyw set expandtab         " will expand tabs
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " MAKEFILE SECTION
