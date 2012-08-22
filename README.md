@@ -5,7 +5,7 @@ To view files, use `ls -a`.
 
 Add line
 
-	source .mybashrc
+	source ~/.mybashrc
 
 to your `~/.bashrc` file to get working bash configuration.
 
