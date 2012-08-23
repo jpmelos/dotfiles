@@ -9,4 +9,4 @@ Add line
 
 to your `~/.bashrc` file to get working bash configuration.
 
-Copy all files and folders to your home as is to install package of configuration (except `.git/` and `README.md`).
+Clone this repository to your home folder to install configuration.
