@@ -83,6 +83,9 @@ match BadWhitespace /\s\+$/
 " marks the 80th column with red
 set colorcolumn=80
 
+" always displays file name, current line and column number
+set laststatus=2
+
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " C SECTION
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
