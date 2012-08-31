@@ -3,3 +3,7 @@
 	email = jpmelos@jpmelos.com
 [core]
 	editor = vim
+[alias]
+	di = diff --color
+	pa = add --patch
+	ci = commit -s
