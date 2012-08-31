@@ -17,9 +17,3 @@ function setperm
 	find . -type d -exec chmod 755 {} \;
 	find . -type f -exec chmod 644 {} \;
 }
-
-# If not in /dev/tty1 and not in tmux already, call tmux
-if [[ $(tty) != /dev/tty1 && -z $TMUX ]]; then
-	tmux attach || tmux
-	exit
-fi
