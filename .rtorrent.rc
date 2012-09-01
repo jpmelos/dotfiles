@@ -45,4 +45,4 @@ download_rate = 900
 use_udp_trackers = yes
 
 # DHT
-dht = disable
+dht = off
