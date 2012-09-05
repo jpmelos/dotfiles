@@ -7,3 +7,4 @@
 	di = diff --color
 	pa = add --patch
 	ci = commit -s
+	st = status
