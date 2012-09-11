@@ -87,6 +87,9 @@ vnoremap <silent> # :<C-U>
 	\escape(@", '?\.*$^~['), '\_s\+', '\\_s\\+', 'g')<CR><CR>
 	\gV:call setreg('"', old_reg, old_regtype)<CR>
 
+" Set mouse to work in all modes.
+set mouse=a
+
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " LANGUAGES SECTION
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
