@@ -31,7 +31,7 @@ map <Up> <C-Y>
 map <Down> <C-E>
 
 " configure searching
-set nohlsearch " does not highlight searches
+set hls        " highlight searches
 set incsearch  " incremental searching
 set ignorecase " ignore case when searching...
 set smartcase  " unless it contais uppercase
