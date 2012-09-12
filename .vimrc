@@ -27,9 +27,6 @@ set showmatch
 nmap j gj
 nmap k gk
 
-map <Up> <C-Y>
-map <Down> <C-E>
-
 " configure searching
 set hls        " highlight searches
 set incsearch  " incremental searching
