@@ -8,7 +8,7 @@ alias halt='sudo halt'
 alias cp='cp -i'
 alias mv='mv -i'
 alias cal='cal -3'
-alias grep='grep --color=always'
+alias grep='grep --color=always --binary-files=without-match'
 
 umask 033
 
