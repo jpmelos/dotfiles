@@ -1,5 +1,5 @@
-" VIM Configuration File
-" Description: Optimized for C/C++ development.
+" Vim Configuration File
+" Description: Optimized for Makefile development.
 " Author: João Sampaio <jpmelos@jpmelos.com>
 
 set noexpandtab " will not expand tabs

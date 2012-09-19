@@ -1,4 +1,4 @@
-" VIM Configuration File
+" Vim Configuration File
 " Description: Optimized for Python development.
 " Author: João Sampaio <jpmelos@jpmelos.com>
 
