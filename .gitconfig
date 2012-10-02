@@ -8,3 +8,4 @@
 	pa = add --patch
 	ci = commit -s
 	st = status
+	ls = ls-tree -rt --name-only HEAD
