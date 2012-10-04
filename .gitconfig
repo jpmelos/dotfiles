@@ -27,3 +27,4 @@
 	ci = commit -s
 	st = status
 	ls = ls-tree -rt --name-only HEAD
+	bl = blame --show-stats -s
