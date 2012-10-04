@@ -5,8 +5,24 @@
 [core]
 	editor = vim
 
+[color]
+	ui = true
+	interactive = false
+
+[color "diff"]
+	meta = yellow
+	frag = yellow
+	old = red bold
+	new = blue bold
+	commit = red bold
+	whitespace = red red
+
+[color "status"]
+	added = green bold
+	changed = blue bold
+	untracked = red bold
+
 [alias]
-	di = diff --color
 	pa = add --patch
 	ci = commit -s
 	st = status
