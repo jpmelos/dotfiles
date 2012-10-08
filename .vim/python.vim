@@ -4,6 +4,8 @@
 
 " defines Python relevant works for smart indentation
 set smartindent cinwords=if,elif,else,for,while,with,try,except,finally,def,class
+" stops Vim from removing indentation before # comments
+inoremap # X<c-h>#
 
 " Python-specific indetation and tab rules
 set tabstop=4     " tab width is 4 spaces
