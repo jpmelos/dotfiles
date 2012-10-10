@@ -55,7 +55,9 @@ set showcmd           " show incomplete commands
 set novisualbell      " don't blink
 set noerrorbells      " no noise
 
-set scrolloff=10      " minimal number of lines above and below cursor
+" keeps cursor in the middle of the screen (unless you have a 2,000 lines high
+" screen, in such case call me because I want to see that)
+set scrolloff=999
 
 set autoindent        " enable indentation of previous line on next
 
