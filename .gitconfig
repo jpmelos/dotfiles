@@ -14,7 +14,7 @@
 	frag = yellow
 	old = red bold
 	new = blue bold
-	commit = red bold
+	commit = green bold
 	whitespace = red red
 
 [color "status"]
