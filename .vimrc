@@ -75,6 +75,9 @@ set cursorline
 " always displays file name, current line and column number
 set laststatus=2
 
+set wildmode=longest,list,full " filename auto-completion works bash-like
+set wildmenu " when hits to complete full name, shows list of filenames
+
 filetype on            " enables filetype detection
 filetype plugin on     " enables filetype specific plugins
 
