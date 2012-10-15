@@ -68,10 +68,6 @@ au BufWritePre *,*.* :%s/\s\+$//e " deletes trailing whites when saving files
 " marks the 80th column with red
 set colorcolumn=80
 
-" highlights current line
-hi CursorLine cterm=None ctermbg=darkgray
-set cursorline
-
 " always displays file name, current line and column number
 set laststatus=2
 
