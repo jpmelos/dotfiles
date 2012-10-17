@@ -3,8 +3,6 @@ EDITOR=/usr/bin/vim
 
 alias ls='ls -F --color=always'
 alias list='ls -FhAls --color=always | less -r'
-alias reboot='sudo reboot'
-alias halt='sudo halt'
 alias cp='cp -i'
 alias mv='mv -i'
 alias cal='cal -3'
