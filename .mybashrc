@@ -10,10 +10,10 @@ alias mv='mv -i'
 alias cal='cal -3'
 alias grep='grep --color=always --binary-files=without-match -n'
 
-umask 033
+umask 077
 
 function setperm
 {
-	find . -type d -exec chmod 755 {} \;
-	find . -type f -exec chmod 644 {} \;
+    find . -type d -exec chmod 700 {} \;
+    find . -type f -exec chmod 600 {} \;
 }
