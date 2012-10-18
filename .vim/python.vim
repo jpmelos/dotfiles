@@ -2,6 +2,9 @@
 " Description: Optimized for Python development.
 " Author: João Sampaio <jpmelos@jpmelos.com>
 
+" marks the 80th column with red
+set colorcolumn=80
+
 " defines Python relevant works for smart indentation
 set smartindent cinwords=if,elif,else,for,while,with,try,except,finally,def,class
 " stops Vim from removing indentation before # comments

@@ -2,6 +2,9 @@
 " Description: Optimized for C/C++ development.
 " Author: João Sampaio <jpmelos@jpmelos.com>
 
+" marks the 80th column with red
+set colorcolumn=80
+
 " use C/C++ indentation
 set cindent
 

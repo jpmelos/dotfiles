@@ -2,6 +2,9 @@
 " Description: Optimized for Web development.
 " Author: João Sampaio <jpmelos@jpmelos.com>
 
+" marks the 80th column with red
+set colorcolumn=80
+
 " tabs/spaces for indentation
 set tabstop=2     " tab width is 8 spaces
 set softtabstop=2 " tab width is 8 spaces
