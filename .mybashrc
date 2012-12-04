@@ -15,3 +15,12 @@ function setperm
     find . -type d -exec chmod 700 {} \;
     find . -type f -exec chmod 600 {} \;
 }
+
+function mypdflatex
+{
+    pdflatex $1
+    pdflatex $1
+    evince ${1%tex}pdf
+}
+
+alias pdflatex='mypdflatex'
