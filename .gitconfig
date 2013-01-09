@@ -11,7 +11,7 @@
 
 [alias]
 	pa = add --patch
-	ci = commit -s
+	ci = commit
 	st = status
 	ls = ls-tree -rt --name-only HEAD
 	bl = blame --show-stats -s
