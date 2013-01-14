@@ -10,11 +10,13 @@
 	interactive = false
 
 [alias]
+	am = commit --amend -v
 	bl = blame --show-stats -s
 	br = branch
-	ci = commit
+	ci = commit -v
 	co = checkout
 	del = branch -d
+	di = diff
 	pa = add --patch
 	ls = ls-tree -rt --name-only HEAD
 	pa = add --patch
