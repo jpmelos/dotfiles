@@ -46,10 +46,6 @@ set backspace=eol,start,indent
 " filetypes (for line feeds and carrige returns)
 set ffs=unix,dos,mac
 
-" highlights bad whitespaces: whitespaces after then last valid character in a
-" line or whitespaces in an empty line
-highlight BadWhitespace ctermbg=red guibg=red
-
 set showcmd           " show incomplete commands
 
 set novisualbell      " don't blink
@@ -60,10 +56,6 @@ set noerrorbells      " no noise
 set scrolloff=999
 
 set autoindent        " enable indentation of previous line on next
-
-" trailing whitespaces
-match BadWhitespace /\s\+$/       " make trailing whitespace be flagged
-au BufWritePre *,*.* :%s/\s\+$//e " deletes trailing whites when saving files
 
 " always displays file name, current line and column number
 set laststatus=2
