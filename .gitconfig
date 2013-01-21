@@ -10,7 +10,6 @@
 	interactive = false
 
 [alias]
-	am = commit --amend -v
 	bl = blame --show-stats -s
 	br = branch
 	ci = commit -v
