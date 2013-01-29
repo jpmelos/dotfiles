@@ -28,7 +28,6 @@ nmap j gj
 nmap k gk
 
 " configure searching
-set hls        " highlight searches
 set incsearch  " incremental searching
 set ignorecase " ignore case when searching...
 set smartcase  " unless it contais uppercase
