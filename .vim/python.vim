@@ -20,3 +20,6 @@ set expandtab     " will expand tabs into spaces
 highlight BadWhitespace ctermbg=red guibg=red
 match BadWhitespace /\s\+$/       " make trailing whitespace be flagged
 au BufWritePre *,*.* :%s/\s\+$//e " deletes trailing whites when saving files
+
+" Searches for classes and public methods.
+nmap t /^    def [^_]\\|^class<CR>
