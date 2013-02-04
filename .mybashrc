@@ -7,6 +7,7 @@ alias cp='cp -i'
 alias mv='mv -i'
 alias cal='cal -3'
 alias grep='grep --color=always --binary-files=without-match -n'
+alias less='less -r'
 alias stoqdev='cd ~/devel/stoq.launchpad.master/stoq; bzr stoq stoq.launchpad.master'
 
 umask 077
