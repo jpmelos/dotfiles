@@ -13,14 +13,6 @@ alias pdflatex='mypdflatex'
 alias flv2mp3='youtube-dl -t -x --audio-format mp3 --audio-quality 128k'
 alias rserv='sudo service apache2 restart'
 
-umask 077
-
-function setperm
-{
-    find . -type d -exec chmod 700 {} \;
-    find . -type f -exec chmod 600 {} \;
-}
-
 function mypdflatex
 {
     pdflatex $1
