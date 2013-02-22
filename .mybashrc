@@ -9,6 +9,9 @@ alias cal='cal -3'
 alias grep='grep --color=always --binary-files=without-match -n'
 alias less='less -r'
 alias stoqdev='cd ~/devel/stoq.launchpad.master/stoq; bzr stoq stoq.launchpad.master'
+alias pdflatex='mypdflatex'
+alias flv2mp3='youtube-dl -t -x --audio-format mp3 --audio-quality 128k'
+alias rserv='sudo service apache2 restart'
 
 umask 077
 
@@ -24,7 +27,3 @@ function mypdflatex
     pdflatex $1
     evince ${1%tex}pdf
 }
-
-alias pdflatex='mypdflatex'
-
-alias flv2mp3='youtube-dl -t -x --audio-format mp3 --audio-quality 128k'
