@@ -6,7 +6,7 @@
 	editor = vim
 
 [color]
-	ui = true
+	ui = always
 	interactive = false
 
 [alias]
