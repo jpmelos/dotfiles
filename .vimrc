@@ -53,6 +53,8 @@ set noerrorbells      " no noise
 " keeps cursor in the middle of the screen (unless you have a 2,000 lines high
 " screen, in such case call me because I want to see that)
 set scrolloff=999
+" allows for easily disabling this functionality
+map <F12> :let &scrolloff=999-&scrolloff<CR>
 
 set autoindent        " enable indentation of previous line on next
 
