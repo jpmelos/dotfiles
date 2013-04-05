@@ -1,6 +1,6 @@
 " VIM Configuration File
 " Description: Optimized for C/C++, Python and HTML/CSS development.
-" Author: João Sampaio <jpmelos@jpmelos.com>
+" Author: João Sampaio <jpmelos@gmail.com>
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " GENERAL SECTION
