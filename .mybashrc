@@ -12,6 +12,7 @@ alias stoqdev='cd ~/devel/stoq.launchpad.master/stoq; bzr stoq stoq.launchpad.ma
 alias pdflatex='mypdflatex'
 alias flv2mp3='youtube-dl -t -x --audio-format mp3 --audio-quality 128k'
 alias rserv='sudo service apache2 restart'
+alias vim='vim -O'
 
 function mypdflatex
 {
