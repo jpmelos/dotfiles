@@ -90,3 +90,4 @@ au BufEnter *.{py,pyw} source ~/.vim/python.vim
 au BufEnter {M,m}akefile* source ~/.vim/makefile.vim
 au BufEnter *.{htm,html,shtml,php} source ~/.vim/web.vim
 au BufEnter *.css source ~/.vim/css.vim
+au BufEnter *.rst source ~/.vim/rst.vim
