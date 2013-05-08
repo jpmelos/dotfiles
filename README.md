@@ -1,7 +1,7 @@
 dotfiles for Ubuntu configuration
 =================================
 
-To view files, use `ls -a`.
+Clone this repository to your home folder to install configuration.
 
 Add line
 
@@ -9,4 +9,7 @@ Add line
 
 to your `~/.bashrc` file to get working bash configuration.
 
-Clone this repository to your home folder to install configuration.
+If you want to update all your `~/devel/` git repositories once a day, add this
+line to your cron. Your github remote repositories must be named `github`.
+
+	@daily ~/update_github.sh ~/devel github
