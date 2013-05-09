@@ -1,0 +1,5 @@
+[gerrit]
+host=review.jpmelos.com
+port=29418
+project=dotfiles.git
+defaultbranch=master
