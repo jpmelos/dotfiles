@@ -10,6 +10,7 @@ Add line
 to your `~/.bashrc` file to get working bash configuration.
 
 If you want to update all your `~/devel/` git repositories once a day, add this
-line to your cron. Your github remote repositories must be named `github`.
+line to your cron. All repositories must have the same remote name. For
+example, `github`.
 
-	@daily ~/update_github.sh ~/devel github
+	@daily ~/update_remote.sh ~/devel <remote name>
