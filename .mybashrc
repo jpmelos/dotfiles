@@ -13,6 +13,7 @@ alias pdflatex='mypdflatex'
 alias flv2mp3='youtube-dl -t -x --audio-format mp3 --audio-quality 128k'
 alias rserv='sudo service apache2 restart'
 alias vim='vim -O'
+alias screen='screen -rd || screen'
 
 function mypdflatex
 {
