@@ -107,6 +107,9 @@ endfunction
 
 inoremap <TAB> <C-R>=Smart_TabComplete()<CR>
 
+" Turn paste mode on and off with F5
+set pastetoggle=<F5>
+
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " LANGUAGES SECTION
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
