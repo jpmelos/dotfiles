@@ -119,3 +119,4 @@ au BufEnter {M,m}akefile* source ~/.vim/makefile.vim
 au BufEnter *.{htm,html,shtml,php} source ~/.vim/web.vim
 au BufEnter *.css source ~/.vim/css.vim
 au BufEnter *.rst source ~/.vim/rst.vim
+au BufEnter *.tex source ~/.vim/tex.vim
