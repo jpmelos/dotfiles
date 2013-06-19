@@ -23,3 +23,6 @@
 	st = status
 	sh = show
 	shf = diff-tree --no-commit-id --name-only -r HEAD
+
+[stoq]
+        checkout = /home/jpmelos/devel
