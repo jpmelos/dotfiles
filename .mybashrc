@@ -8,14 +8,14 @@ alias mv='mv -i'
 alias cal='cal -3'
 alias grep='grep --color=always --binary-files=without-match -n'
 alias less='less -r'
-alias pdflatex='mypdflatex'
+alias p2l='mypdflatex'
 alias flv2mp3='youtube-dl -t -x --audio-format mp3 --audio-quality 128k'
 alias vim='vim -O'
 alias screen='screen -rd || screen'
 
 function mypdflatex
 {
-    pdftex $1
-    pdftex $1
+    pdflatex $1
+    pdflatex $1
     evince ${1%tex}pdf
 }
