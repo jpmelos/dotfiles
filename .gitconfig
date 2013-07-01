@@ -14,7 +14,7 @@
 	br = branch
 	ci = commit -v
 	co = checkout
-	del = branch -d
+	del = branch -D
 	di = diff
 	dst = diff --stat
 	pa = add --patch
@@ -22,6 +22,7 @@
 	st = status
 	sh = show
 	shf = diff-tree --no-commit-id --name-only -r HEAD
+	rb = rebase
 
 [stoq]
         checkout = /home/jpmelos/devel
