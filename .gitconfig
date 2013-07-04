@@ -10,7 +10,7 @@
 	interactive = false
 
 [alias]
-	bl = blame --show-stats -s
+	bl = blame --show-stats
 	br = branch
 	ci = commit -v
 	co = checkout
