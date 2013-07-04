@@ -7,3 +7,6 @@
 [submodule "syntastic"]
 	path = syntastic
 	url = https://github.com/scrooloose/syntastic
+[submodule "ctrlp.vim"]
+	path = ctrlp.vim
+	url = https://github.com/kien/ctrlp.vim
