@@ -17,6 +17,7 @@
 	del = branch -D
 	di = diff
 	dst = diff --stat
+	dcst = diff --cached --stat
 	pa = add --patch
 	ls = ls-tree -rt --name-only HEAD
 	st = status
