@@ -1,4 +1,4 @@
-dotfiles for Ubuntu configuration
+dotfiles for Debian configuration
 =================================
 
 Clone this repository to your home folder to install configuration.
