@@ -69,6 +69,7 @@ set wildmenu " when hits to complete full name, shows list of filenames
 
 filetype on            " enables filetype detection
 filetype plugin on     " enables filetype specific plugins
+filetype indent on     " enables filetype specific plugins
 
 " Search for selected text, forwards or backwards.
 vnoremap <silent> * :<C-U>
@@ -87,6 +88,11 @@ set mouse=a
 
 " Turn paste mode on and off with F5
 set pastetoggle=<F5>
+
+" CtrlP configuration
+let g:ctrlp_map = '<c-x>'
+let g:ctrlp_working_path_mode = 'ra'
+let g:ctrlp_user_command = ['.git', 'cd %s && git ls']
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " LANGUAGES SECTION
