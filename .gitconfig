@@ -19,7 +19,7 @@
 	dst = diff --stat
 	dcst = diff --cached --stat
 	pa = add --patch
-	ls = ls-tree -rt --name-only HEAD
+	ls = ls-files
 	st = status
 	sh = show
 	shf = diff-tree --no-commit-id --name-only -r HEAD
