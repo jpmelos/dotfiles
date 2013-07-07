@@ -5,10 +5,10 @@
 " marks the 80th column with red
 set colorcolumn=80
 
-" defines Python relevant works for smart indentation
-set smartindent cinwords=if,elif,else,for,while,with,try,except,finally,def,class
-" stops Vim from removing indentation before # comments
-inoremap # X<c-h>#
+" configure Vim to indent Python correctly (PEP8 compliant)
+let g:pyindent_open_paren = '&sw'
+let g:pyindent_nested_paren = '&sw'
+let g:pyindent_continue = '&sw'
 
 " Python-specific indetation and tab rules
 set tabstop=4     " tab width is 4 spaces
