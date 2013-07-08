@@ -10,3 +10,6 @@
 [submodule "riv.vim"]
 	path = riv.vim
 	url = https://github.com/Rykka/riv.vim.git
+[submodule "syntastic"]
+	path = syntastic
+	url = https://github.com/scrooloose/syntastic

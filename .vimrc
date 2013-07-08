@@ -6,8 +6,21 @@
 " GENERAL SECTION
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
+"----------------------------
 " Activates Pathogen
+" ---------------------------
+" These lines need to come together first in the file for Pathogen
+" to work correctly.
+"----------------------------
 execute pathogen#infect()
+execute pathogen#helptags()
+
+" enable filetype detection and use of plugins
+filetype plugin indent on
+
+" enable syntax highlighting
+syntax on
+"----------------------------
 
 " set UFT-8 encoding
 set enc=utf-8
@@ -38,8 +51,6 @@ set smartcase  " unless it contais uppercase
 " no backup file
 set nobackup
 
-" syntax highlighting
-syntax on
 set background=dark " terminal background dark, adapt colors
 
 " allow backspacing over everything
@@ -66,10 +77,6 @@ set laststatus=2
 
 set wildmode=longest,list,full " filename auto-completion works bash-like
 set wildmenu " when hits to complete full name, shows list of filenames
-
-filetype on            " enables filetype detection
-filetype plugin on     " enables filetype specific plugins
-filetype indent on     " enables filetype specific plugins
 
 " Search for selected text, forwards or backwards.
 vnoremap <silent> * :<C-U>
