@@ -24,6 +24,9 @@ au BufWritePre *,*.* :%s/\s\+$//e " deletes trailing whites when saving files
 " Searches for classes and public methods.
 nmap t /^    def [^_]\\|^class<CR>
 
+" stops Vim from removing indentation before # comments
+inoremap # X<c-h>#
+
 " -------------------------------
 " Syntastic configuration
 " -------------------------------
