@@ -7,3 +7,6 @@
 [submodule "ctrlp.vim"]
 	path = ctrlp.vim
 	url = https://github.com/kien/ctrlp.vim
+[submodule "riv.vim"]
+	path = riv.vim
+	url = https://github.com/Rykka/riv.vim.git

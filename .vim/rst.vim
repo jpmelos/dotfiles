@@ -11,9 +11,6 @@ set softtabstop=4 " tab width is 8 spaces
 set shiftwidth=4  " indent also with 8 spaces
 set noexpandtab     " will expand tabs into spaces
 
-" no syntax highlighting for .rst for now
-syntax off
-
 " trailing whitespaces
 highlight BadWhitespace ctermbg=red guibg=red
 match BadWhitespace /\s\+$/       " make trailing whitespace be flagged
