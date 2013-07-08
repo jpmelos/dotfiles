@@ -19,3 +19,9 @@
 [submodule "grep.vim"]
 	path = grep.vim
 	url = https://github.com/vim-scripts/grep.vim
+[submodule "vimprj"]
+	path = vimprj
+	url = https://github.com/vim-scripts/vimprj
+[submodule "DfrankUtil"]
+	path = DfrankUtil
+	url = https://github.com/vim-scripts/DfrankUtil
