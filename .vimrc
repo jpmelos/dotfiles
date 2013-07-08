@@ -121,7 +121,8 @@ let g:ctrlp_working_path_mode = 'ra'
 " -------------------------------
 " Make grep case-insensitive.
 let g:Grep_Default_Options = '-i --binary-files=without-match'
-let g:Grep_Skip_Files = 'tags'
+let g:Grep_Skip_Files = 'tags *.bak *~ *.pyc *.o *.obj *.uitest'
+let g:Grep_Skip_Dirs = '.bzr .git .hg .vimprj .repo'
 " -------------------------------
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
