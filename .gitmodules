@@ -16,3 +16,6 @@
 [submodule "python-mode"]
 	path = python-mode
 	url = https://github.com/klen/python-mode
+[submodule "grep.vim"]
+	path = grep.vim
+	url = https://github.com/vim-scripts/grep.vim

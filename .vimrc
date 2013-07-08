@@ -108,6 +108,14 @@ let g:ctrlp_user_command = ['.git', 'cd %s && git ls']
 let g:ctrlp_working_path_mode = 'ra'
 " -------------------------------
 
+" -------------------------------
+" grep.vim configuration
+" -------------------------------
+" Make grep case-insensitive.
+let g:Grep_Default_Options = '-i'
+let g:Grep_Skip_Files = 'tags'
+" -------------------------------
+
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " LANGUAGES SECTION
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
