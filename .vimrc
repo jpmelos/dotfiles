@@ -96,6 +96,10 @@ set mouse=a
 " Turn paste mode on and off with F5
 set pastetoggle=<F5>
 
+" Configure <Space> to open folds.
+nnoremap <silent> <Space> @=(foldlevel('.')?'za':"\<Space>")<CR>
+vnoremap <Space> zf
+
 " -------------------------------
 " CtrlP configuration
 " -------------------------------
