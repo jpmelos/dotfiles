@@ -100,6 +100,10 @@ set pastetoggle=<F5>
 nnoremap <silent> <Space> @=(foldlevel('.')?'za':"\<Space>")<CR>
 vnoremap <Space> zf
 
+" Some maps for easier tag navigation
+nnoremap [q :tprevious<CR>
+nnoremap ]q :tnext<CR>
+
 " -------------------------------
 " CtrlP configuration
 " -------------------------------
