@@ -23,3 +23,25 @@ au BufWritePre *,*.* :%s/\s\+$//e " deletes trailing whites when saving files
 
 " Searches for classes and public methods.
 nmap t /^    def [^_]\\|^class<CR>
+
+" -------------------------------
+" Syntastic configuration
+" -------------------------------
+" We don't want Syntastic do to Python checking, because python-mode is
+" already doing it for us. And it's much better.
+let g:syntastic_python_checkers=['']
+" -------------------------------
+
+" -------------------------------
+" python-mode configuration
+" -------------------------------
+" Use all available linters.
+let g:pymode_lint_checker = "pylint,pyflakes,pep8,pep257,mccabe"
+" Don't ignore any errors.
+let g:pymode_lint_ignore = ""
+" Don't show error window.
+let g:pymode_lint_cwindow = 0
+" Don't load Rope.
+let g:pymode_rope = 0
+" Disable loading breakpoints.
+let g:pymode_breakpoint = 1

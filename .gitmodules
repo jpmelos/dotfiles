@@ -13,3 +13,6 @@
 [submodule "syntastic"]
 	path = syntastic
 	url = https://github.com/scrooloose/syntastic
+[submodule "python-mode"]
+	path = python-mode
+	url = https://github.com/klen/python-mode

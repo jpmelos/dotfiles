@@ -6,12 +6,12 @@
 " GENERAL SECTION
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
-"----------------------------
+" ----------------------------
 " Activates Pathogen
 " ---------------------------
 " These lines need to come together first in the file for Pathogen
 " to work correctly.
-"----------------------------
+" ----------------------------
 execute pathogen#infect()
 execute pathogen#helptags()
 
@@ -20,7 +20,7 @@ filetype plugin indent on
 
 " enable syntax highlighting
 syntax on
-"----------------------------
+" ----------------------------
 
 " set UFT-8 encoding
 set enc=utf-8
@@ -96,10 +96,17 @@ set mouse=a
 " Turn paste mode on and off with F5
 set pastetoggle=<F5>
 
+" -------------------------------
 " CtrlP configuration
+" -------------------------------
+" Use ctrl-x for file search.
 let g:ctrlp_map = '<c-x>'
-let g:ctrlp_working_path_mode = 'ra'
+" Use this command for list of files to search.
 let g:ctrlp_user_command = ['.git', 'cd %s && git ls']
+" If don't find any list of files with command above, use first folder that
+" finds a .git folder or current folder.
+let g:ctrlp_working_path_mode = 'ra'
+" -------------------------------
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " LANGUAGES SECTION
