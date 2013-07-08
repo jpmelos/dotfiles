@@ -47,4 +47,4 @@ let g:pymode_lint_cwindow = 0
 " Don't load Rope.
 let g:pymode_rope = 0
 " Disable loading breakpoints.
-let g:pymode_breakpoint = 1
+let g:pymode_breakpoint = 0
