@@ -39,3 +39,8 @@ for file in `ls ~/.completion`
 do
 	source $file
 done
+
+# If logged in remotely, start screen.
+if [ ! -z "$SSH_CLIENT" ] && [ -z $WINDOW ]; then
+	screen -r
+fi
