@@ -35,9 +35,10 @@ GIT_PS1_SHOWUNTRACKEDFILES=1
 GIT_PS1_SHOWUPSTREAM="auto verbose git"
 
 # Sources all completion files.
-for file in `ls ~/.completion`
+COMPLETION_PWD=~/.completion/
+for file in `ls $COMPLETION_PWD`
 do
-	source $file
+	source $COMPLETION_PWD/$file
 done
 
 # If logged in remotely, start screen.
