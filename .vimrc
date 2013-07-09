@@ -47,11 +47,20 @@ nmap k gk
 set incsearch  " incremental searching
 set ignorecase " ignore case when searching...
 set smartcase  " unless it contais uppercase
+set hls        " highlight search results
+
+" clear highlight when refreshing.
+nnoremap <C-L> :nohls<CR><C-L>
+inoremap <C-L> <C-O>:nohls<CR>
 
 " no backup file
 set nobackup
 
-set background=dark " terminal background dark, adapt colors
+" terminal background dark, adapt colors
+set background=dark
+
+" show line numbers
+set number
 
 " allow backspacing over everything
 set backspace=eol,start,indent
@@ -103,6 +112,10 @@ vnoremap <Space> zf
 " Some maps for easier tag navigation
 nnoremap [q :tprevious<CR>
 nnoremap ]q :tnext<CR>
+
+" map leader to comma
+let mapleader = ','
+let g:mapleader = ','
 
 " -------------------------------
 " CtrlP configuration
