@@ -118,6 +118,14 @@ let mapleader = ','
 let g:mapleader = ','
 
 " -------------------------------
+" Syntastic configuration
+" -------------------------------
+" check files when open
+let g:syntastic_check_on_open = 1
+" don't check files when closing
+let g:syntastic_check_on_wq = 0
+
+" -------------------------------
 " CtrlP configuration
 " -------------------------------
 " Use ctrl-x for file search.
