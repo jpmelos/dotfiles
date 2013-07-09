@@ -13,7 +13,6 @@
 " to work correctly.
 " ----------------------------
 execute pathogen#infect()
-execute pathogen#helptags()
 
 " enable filetype detection and use of plugins
 filetype plugin indent on
