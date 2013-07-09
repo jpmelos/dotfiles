@@ -33,3 +33,9 @@ GIT_PS1_SHOWSTASHSTATE=1
 GIT_PS1_SHOWUNTRACKEDFILES=1
 # If I'm ahead, behind or diverge from remote
 GIT_PS1_SHOWUPSTREAM="auto verbose git"
+
+# Sources all completion files.
+for file in `ls ~/.completion`
+do
+	source $file
+done
