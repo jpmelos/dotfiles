@@ -28,3 +28,6 @@
 [submodule "indexer.tar.gz"]
 	path = indexer.tar.gz
 	url = https://github.com/vim-scripts/indexer.tar.gz
+[submodule "gundo.vim"]
+	path = gundo.vim
+	url = http://github.com/sjl/gundo.vim.git

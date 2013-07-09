@@ -146,6 +146,15 @@ let g:Grep_Skip_Files = 'tags *.bak *~ *.pyc *.o *.obj *.uitest'
 let g:Grep_Skip_Dirs = '.bzr .git .hg .vimprj .repo'
 " -------------------------------
 
+" -------------------------------
+" Gundo configuration
+" -------------------------------
+" add mapping for opening it
+nnoremap <F5> :GundoToggle<CR>
+" open on the left side
+let g:gundo_right = 0
+" -------------------------------
+
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " LANGUAGES SECTION
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
