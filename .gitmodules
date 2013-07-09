@@ -1,36 +1,36 @@
+[submodule ".vim/bundle/DfrankUtil"]
+	path = .vim/bundle/DfrankUtil
+	url = https://github.com/vim-scripts/DfrankUtil
+[submodule ".vim/bundle/ctrlp.vim"]
+	path = .vim/bundle/ctrlp.vim
+	url = https://github.com/kien/ctrlp.vim
+[submodule ".vim/bundle/grep.vim"]
+	path = .vim/bundle/grep.vim
+	url = https://github.com/vim-scripts/grep.vim
+[submodule ".vim/bundle/gundo.vim"]
+	path = .vim/bundle/gundo.vim
+	url = http://github.com/sjl/gundo.vim.git
+[submodule ".vim/bundle/indexer.tar.gz"]
+	path = .vim/bundle/indexer.tar.gz
+	url = https://github.com/vim-scripts/indexer.tar.gz
+[submodule ".vim/bundle/python-mode"]
+	path = .vim/bundle/python-mode
+	url = https://github.com/klen/python-mode
+[submodule ".vim/bundle/riv.vim"]
+	path = .vim/bundle/riv.vim
+	url = https://github.com/Rykka/riv.vim.git
+[submodule ".vim/bundle/syntastic"]
+	path = .vim/bundle/syntastic
+	url = https://github.com/scrooloose/syntastic
+[submodule ".vim/bundle/tcomment_vim"]
+	path = .vim/bundle/tcomment_vim
+	url = https://github.com/tomtom/tcomment_vim
+[submodule ".vim/bundle/vim-fugitive"]
+	path = .vim/bundle/vim-fugitive
+	url = https://github.com/tpope/vim-fugitive
 [submodule "vim-pathogen"]
 	path = vim-pathogen
 	url = https://github.com/tpope/vim-pathogen
-[submodule "vim-fugitive"]
-	path = vim-fugitive
-	url = https://github.com/tpope/vim-fugitive
-[submodule "ctrlp.vim"]
-	path = ctrlp.vim
-	url = https://github.com/kien/ctrlp.vim
-[submodule "riv.vim"]
-	path = riv.vim
-	url = https://github.com/Rykka/riv.vim.git
-[submodule "syntastic"]
-	path = syntastic
-	url = https://github.com/scrooloose/syntastic
-[submodule "python-mode"]
-	path = python-mode
-	url = https://github.com/klen/python-mode
-[submodule "grep.vim"]
-	path = grep.vim
-	url = https://github.com/vim-scripts/grep.vim
-[submodule "vimprj"]
-	path = vimprj
+[submodule ".vim/bundle/vimprj"]
+	path = .vim/bundle/vimprj
 	url = https://github.com/vim-scripts/vimprj
-[submodule "DfrankUtil"]
-	path = DfrankUtil
-	url = https://github.com/vim-scripts/DfrankUtil
-[submodule "indexer.tar.gz"]
-	path = indexer.tar.gz
-	url = https://github.com/vim-scripts/indexer.tar.gz
-[submodule "gundo.vim"]
-	path = gundo.vim
-	url = http://github.com/sjl/gundo.vim.git
-[submodule "tcomment_vim"]
-	path = tcomment_vim
-	url = https://github.com/tomtom/tcomment_vim
