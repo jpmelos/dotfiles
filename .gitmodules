@@ -31,3 +31,6 @@
 [submodule "gundo.vim"]
 	path = gundo.vim
 	url = http://github.com/sjl/gundo.vim.git
+[submodule "tcomment_vim"]
+	path = tcomment_vim
+	url = https://github.com/tomtom/tcomment_vim
