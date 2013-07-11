@@ -156,6 +156,19 @@ nnoremap <F5> :GundoToggle<CR>
 let g:gundo_right = 0
 " -------------------------------
 
+" -------------------------------
+" TagBar configuration
+" -------------------------------
+" add mapping for opening it
+nnoremap <F6> :TagbarToggle<CR>
+" close when tag selected
+let g:tagbar_autoclose = 1
+" focus when open
+let g:tagbar_autofocus = 1
+" indent by 1 space between levels
+let g:tagbar_indent = 1
+" -------------------------------
+
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " LANGUAGES SECTION
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
