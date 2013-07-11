@@ -45,3 +45,41 @@ done
 if [ ! -z "$SSH_CLIENT" ] && [ -z $WINDOW ]; then
 	screen -r
 fi
+
+# Function for creating vimprj projects that works with indexer.tar.gz Vim
+# plugin.
+function vimprj_init
+{
+	if [ -z "$1" ] || [ ! -d "$1" ]; then
+	    echo "fatal: $0 needs a directory path..."
+	    echo "usage: $0 <path> [project_name]"
+	    return 1
+	fi
+
+	PROJECT_PATH=$1
+	PROJECT_NAME=$2
+
+	VIMPRJ_PATH=$PROJECT_PATH/.vimprj
+
+	if [ -z "$PROJECT_NAME" ]; then
+	    PROJECT_NAME="project"
+	fi
+
+	# Create .vimprj directory
+	mkdir -p $VIMPRJ_PATH
+
+	# Generate .vimprj/my.vim
+	cat <<EOF > $VIMPRJ_PATH/my.vim
+if expand('%:t') != "COMMIT_EDITMSG" && expand('%:t') != "git-rebase-todo"
+  " specify our ".vimprj/.indexer_files"
+  let g:indexer_indexerListFilename = '.vimprj/.indexer_files'
+  set tags+=.vimprj/.indexer_files_tags/$PROJECT_NAME
+endif
+EOF
+
+	# Generate .vimprj/.indexer_files
+	cat <<EOF > $VIMPRJ_PATH/.indexer_files
+[$PROJECT_NAME]
+\$INDEXER_PROJECT_ROOT
+EOF
+}
