@@ -134,6 +134,8 @@ let g:ctrlp_user_command = ['.git', 'cd %s && git ls']
 " If don't find any list of files with command above, use first folder that
 " finds a .git folder or current folder.
 let g:ctrlp_working_path_mode = 'ra'
+" enable looking for tags
+let g:ctrlp_extensions = ['tag']
 " -------------------------------
 
 " -------------------------------
