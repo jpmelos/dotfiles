@@ -169,6 +169,14 @@ let g:tagbar_autofocus = 1
 let g:tagbar_indent = 1
 " -------------------------------
 
+" -------------------------------
+" Indexer configuration
+" -------------------------------
+" add mapping for re-indexing it
+nnoremap <F7> :IndexerRebuild<CR>
+inoremap <F7> <C-O>:IndexerRebuild<CR>
+" -------------------------------
+
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " LANGUAGES SECTION
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
