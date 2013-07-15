@@ -30,11 +30,6 @@ function install {
 	done
 }
 
-function reinstall {
-	uninstall
-	install
-}
-
 function pull {
 	uninstall
 	git pull $2 $3
