@@ -6,7 +6,7 @@ Clone this repository to your home folder to install configuration.
 Install
 -------
 
-To install these dotfiles, run the `./dotfiles.sh install` bash script. Check
+To install these dotfiles, run the ``./dotfiles.sh install`` bash script. Check
 the output to see what files might need to be verified.
 
 Add line::
@@ -22,7 +22,7 @@ to your `~/.myprofile` to get working bash configuration.
 Uninstall
 ---------
 
-To remove, run `dotfiles.sh uninstall`.
+To remove, run ``dotfiles.sh uninstall``.
 
 Remove the line::
 
@@ -37,15 +37,12 @@ from your `~/.profile` file.
 Additional Perks
 ----------------
 
-Besides `install` and `uninstall`, you can also do:
+Besides ``install`` and ``uninstall``, you can also ``pull``, which will
+uninstall, pull the repository, install the submodules and then install the
+dotfiles.
 
-	- reinstall: Reinstalls the dotfiles. Use with care, will wipe any
-	  change you made to the hard copies.
-	- pull: Will uninstall, pull the repository, install the submodules and
-	  then install.
-
-If you want to update all your `~/devel/` (or any other foder) git repositories
-once a day, add this line to your cron. All repositories must have the same
-remote name. For example, `github`::
+If you want to update all your ``~/devel/`` (or any other foder) git
+repositories once a day, add this line to your cron. All repositories must have
+the same remote name. For example, ``github``::
 
 	@daily ~/update_remote.sh ~/devel github

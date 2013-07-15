@@ -43,8 +43,6 @@ case $1 in
 		install ;;
 	"uninstall" )
 		uninstall ;;
-	"reinstall" )
-		reinstall ;;
 	"pull" )
 		pull ;;
 esac
