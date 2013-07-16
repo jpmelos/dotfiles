@@ -1,0 +1,4 @@
+# If logged in remotely, start screen.
+if [ ! -z "$SSH_CLIENT" ] && [ -z $WINDOW ]; then
+	screen -r || screen
+fi

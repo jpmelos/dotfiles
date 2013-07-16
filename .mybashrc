@@ -41,11 +41,6 @@ do
 	source $COMPLETION_PWD/$file
 done
 
-# If logged in remotely, start screen.
-if [ ! -z "$SSH_CLIENT" ] && [ -z $WINDOW ]; then
-	screen -r || screen
-fi
-
 # Function for creating vimprj projects that works with indexer.tar.gz Vim
 # plugin.
 function vimprj_init

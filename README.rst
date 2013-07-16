@@ -13,7 +13,11 @@ Add line::
 
 	source ~/.mybashrc
 
-to your `~/.bashrc` file to get working bash configuration.
+to your `~/.bashrc` file and add the line::
+
+	source ~/.myprofile
+
+to your `~/.myprofile` to get working bash configuration.
 
 Uninstall
 ---------
@@ -24,7 +28,11 @@ Remove the line::
 
 	source ~/.mybashrc
 
-from your `~/.bashrc` file.
+from your `~/.bashrc` file and the line::
+
+    source ~/.myprofile
+
+from your `~/.profile` file.
 
 Additional Perks
 ----------------
