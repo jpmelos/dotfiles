@@ -4,9 +4,6 @@ startup_message off
 # Turns off visual bell
 vbell off
 
-# Default scroll back
-defscrollback 5000
-
 # Set UTF-8 default
 setenv LC_CTYPE en_US.UTF-8
 defutf8 on
