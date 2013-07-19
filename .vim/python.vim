@@ -39,7 +39,7 @@ let g:syntastic_python_checkers=['']
 " python-mode configuration
 " -------------------------------
 " Use all available linters.
-let g:pymode_lint_checker = "pylint,pyflakes,pep8,pep257,mccabe"
+let g:pymode_lint_checker = "pylint,pyflakes,pep8,mccabe"
 " Don't ignore any errors.
 let g:pymode_lint_ignore = ""
 " Don't show error window.
