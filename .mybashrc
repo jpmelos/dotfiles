@@ -1,6 +1,6 @@
 # vim:ft=sh
 
-PS1='\[\e[1;32m\][\u@\h \W]\$\[\e[0m\] '
+PS1='$(__git_ps1 "(%s) ")\[\e[1;32m\][\u@\h \W]\$\[\e[0m\] '
 EDITOR=/usr/bin/vim
 
 alias ls='ls -F --color=always'
@@ -21,18 +21,6 @@ function mypdflatex
     pdflatex $1
     evince ${1%tex}pdf
 }
-
-# If I'm inside a git directory, show me:
-# What's my current branch
-PS1=$PS1'$(__git_ps1 "(%s) " '
-# If I have unstaged (*) and staged (+) changes
-GIT_PS1_SHOWDIRTYSTATE=1
-# If I have stashed ($) changes
-GIT_PS1_SHOWSTASHSTATE=1
-# If I have untracked files
-GIT_PS1_SHOWUNTRACKEDFILES=1
-# If I'm ahead, behind or diverge from remote
-GIT_PS1_SHOWUPSTREAM="auto verbose git"
 
 # Sources all completion files.
 COMPLETION_PWD=~/.completion/
