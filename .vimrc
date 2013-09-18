@@ -98,9 +98,6 @@ vnoremap <silent> # :<C-U>
 	\escape(@", '?\.*$^~['), '\_s\+', '\\_s\\+', 'g')<CR><CR>
 	\gV:call setreg('"', old_reg, old_regtype)<CR>
 
-" Set mouse to work in all modes.
-set mouse=a
-
 " Turn paste mode on and off with F5
 set pastetoggle=<F5>
 
