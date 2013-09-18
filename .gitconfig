@@ -27,4 +27,4 @@
 	pull = pull --rebase
 
 [stoq]
-        checkout = /home/jpmelos/devel
+	checkout = /home/jpmelos/devel
