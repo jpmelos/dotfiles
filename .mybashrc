@@ -1,6 +1,6 @@
 # vim:ft=sh
 
-PS1='$(__git_ps1 "(%s) ")\[\e[1;32m\][\u@\h \W]\$\[\e[0m\] '
+PS1='\[\e[1;32m\][\u@\h \W]\$\[\e[0m\] '
 EDITOR=/usr/bin/vim
 
 alias ls='ls -F --color=always'
