@@ -41,8 +41,9 @@ Besides ``install`` and ``uninstall``, you can also ``pull``, which will
 uninstall, pull the repository, install the submodules and then install the
 dotfiles.
 
-If you want to update all your ``~/devel/`` (or any other foder) git
-repositories once a day, add this line to your cron. All repositories must have
-the same remote name. For example, ``github``::
+If you want to upload all your ``~/devel/`` (or any other foder) git
+repositories once a day (in case you wish to keep some upstream updated), add
+this line to your cron. All repositories must have the same remote name. For
+example, ``github``::
 
 	@daily ~/update_remote.sh ~/devel github
