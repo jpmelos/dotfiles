@@ -17,7 +17,7 @@ to your `~/.bashrc` file and add the line::
 
 	source ~/.myprofile
 
-to your `~/.myprofile` to get working bash configuration.
+to your `~/.profile` to get working bash configuration.
 
 Uninstall
 ---------
