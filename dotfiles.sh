@@ -1,5 +1,6 @@
 # Only copy files in the repository, and from the first level, since we are
-# creating links.
+# creating links. All files in lower levels can be accessed through the links
+# to their parents.
 FILES_TO_COPY='git ls-tree --name-only HEAD'
 
 # These files will have a hard copy instead of a link, because their contents
@@ -30,6 +31,7 @@ function install {
 	done
 }
 
+# Arguments: $2 = remote repository, $3 = remote branch
 function pull {
 	uninstall
 	git pull $2 $3

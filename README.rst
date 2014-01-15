@@ -6,8 +6,9 @@ Clone this repository to your home folder to install configuration.
 Install
 -------
 
-To install these dotfiles, run the ``./dotfiles.sh install`` bash script. Check
-the output to see what files might need to be verified.
+To install these dotfiles, run the ``./dotfiles.sh install`` or ``./dotfiles.sh
+pull`` bash script. Check the output to see what files might need to be
+verified (for missing passwords, for example).
 
 Add line::
 
