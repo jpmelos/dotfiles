@@ -98,8 +98,8 @@ vnoremap <silent> # :<C-U>
 	\escape(@", '?\.*$^~['), '\_s\+', '\\_s\\+', 'g')<CR><CR>
 	\gV:call setreg('"', old_reg, old_regtype)<CR>
 
-" Turn paste mode on and off with F5
-set pastetoggle=<F5>
+" Turn paste mode on and off with F8
+set pastetoggle=<F8>
 
 " Configure <Space> to open folds.
 nnoremap <silent> <Space> @=(foldlevel('.')?'za':"\<Space>")<CR>
@@ -184,3 +184,4 @@ au BufEnter *.{htm,html,shtml,php} source ~/.vim/web.vim
 au BufEnter *.css source ~/.vim/css.vim
 au BufEnter *.rst source ~/.vim/rst.vim
 au BufEnter *.tex source ~/.vim/tex.vim
+au BufEnter *.sh source ~/.vim/sh.vim
