@@ -185,3 +185,4 @@ au BufEnter *.css source ~/.vim/css.vim
 au BufEnter *.rst source ~/.vim/rst.vim
 au BufEnter *.tex source ~/.vim/tex.vim
 au BufEnter *.sh source ~/.vim/sh.vim
+au BufEnter *.sql source ~/.vim/sql.vim
