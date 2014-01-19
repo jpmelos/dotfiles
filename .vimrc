@@ -101,6 +101,10 @@ vnoremap <silent> # :<C-U>
 " Turn paste mode on and off with F8
 set pastetoggle=<F8>
 
+" Turn wrap lines on and off with F10
+nnoremap <F10> :set wrap!<CR>
+inoremap <F10> <ESC>:set wrap!<CR>i
+
 " Configure <Space> to open folds.
 nnoremap <silent> <Space> @=(foldlevel('.')?'za':"\<Space>")<CR>
 vnoremap <Space> zf
