@@ -40,7 +40,9 @@ set showmatch
 " keyboard mappings
 " navigate through display lines
 nmap j gj
+vmap j gj
 nmap k gk
+vmap k gk
 
 " configure searching
 set incsearch  " incremental searching
