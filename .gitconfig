@@ -16,6 +16,7 @@
 	co = checkout
 	del = branch -D
 	di = diff
+	dic = diff --cached
 	dst = diff --stat
 	dcst = diff --cached --stat
 	pa = add --patch
