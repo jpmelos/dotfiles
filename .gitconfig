@@ -29,3 +29,5 @@
 
 [stoq]
 	checkout = /home/jpmelos/devel
+[push]
+	default = simple
