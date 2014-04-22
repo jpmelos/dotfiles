@@ -43,3 +43,6 @@
 [submodule ".vim/bundle/vim-haml"]
 	path = .vim/bundle/vim-haml
 	url = https://github.com/tpope/vim-haml
+[submodule ".vim/bundle/prolog.vim"]
+	path = .vim/bundle/prolog.vim
+	url = https://github.com/adimit/prolog.vim
