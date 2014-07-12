@@ -188,6 +188,7 @@ au BufEnter *.{py,pyw} source ~/.vim/python.vim
 au BufEnter {M,m}akefile* source ~/.vim/makefile.vim
 au BufEnter *.{htm,html,shtml,php} source ~/.vim/web.vim
 au BufEnter *.{css,scss} source ~/.vim/css.vim
+au BufEnter *.js source ~/.vim/js.vim
 au BufEnter *.rst source ~/.vim/rst.vim
 au BufEnter *.tex source ~/.vim/tex.vim
 au BufEnter *.sh source ~/.vim/sh.vim
