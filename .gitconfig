@@ -9,6 +9,17 @@
 	ui = always
 	interactive = false
 
+[color "diff"]
+	meta = white bold
+	frag = white
+	new = cyan bold
+	old = red bold
+
+[color "status"]
+	added = green
+	changed = cyan
+	untracked = red bold
+
 [alias]
 	bl = blame --show-stats
 	br = branch
