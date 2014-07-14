@@ -14,6 +14,7 @@ alias p2l='mypdflatex'
 alias flv2mp3='youtube-dl -t -x --audio-format mp3 --audio-quality 128k'
 alias screen='screen -rd || screen'
 alias tmux='tmux attach || tmux'
+alias vim="vim -O"
 
 function mypdflatex
 {
