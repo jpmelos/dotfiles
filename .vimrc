@@ -111,6 +111,9 @@ inoremap <F10> <ESC>:set wrap!<CR>i
 nnoremap <silent> <Space> @=(foldlevel('.')?'za':"\<Space>")<CR>
 vnoremap <Space> zf
 
+" Don't automatically fold on open
+set foldlevelstart=10
+
 " Some maps for easier tag navigation
 nnoremap [q :tprevious<CR>
 nnoremap ]q :tnext<CR>
