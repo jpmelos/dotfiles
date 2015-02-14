@@ -105,3 +105,9 @@ dockps()  {
 dps() { dockps "NAMES|IMAGE|STATUS|CREATED|COMMAND" $@; }
 dpsa() { dps -a $@; }
 dports() { dockps "NAMES|PORTS" $@; }
+
+# Reduce images.
+# Usage: redimg JPG ==> Reduce all JPG images (this is case-sensitive).
+redimg() {
+    for file in *.$1; do convert "$file" -resize 600 -quality 50 "$file"; done
+}
