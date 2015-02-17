@@ -102,7 +102,7 @@ dockps()  {
     PRINT();
   }' | less -FSX;
 }
-dps() { dockps "NAMES|IMAGE|STATUS|CREATED|COMMAND" $@; }
+dps() { dockps "ID|NAMES|IMAGE|STATUS|CREATED|COMMAND" $@; }
 dpsa() { dps -a $@; }
 dports() { dockps "NAMES|PORTS" $@; }
 
