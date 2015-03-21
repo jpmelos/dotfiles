@@ -112,3 +112,7 @@ dports() { dockps "NAMES|PORTS" $@; }
 redimg() {
     for file in *.$1; do convert "$file" -resize 600 -quality 50 "$file"; done
 }
+
+localserver() {
+    docker run --name localserver -v $PWD:/usr/share/nginx/html:ro -v $HOME/localserver.conf:/etc/nginx/conf.d/localserver.conf:ro --rm --privileged=true -p 80:80 nginx
+}
