@@ -110,7 +110,7 @@ dports() { dockps "NAMES|PORTS" $@; }
 # Reduce images.
 # Usage: redimg JPG ==> Reduce all JPG images (this is case-sensitive).
 redimg() {
-    for file in *.$1; do convert "$file" -resize 600 -quality 50 "$file"; done
+    for file in *.$1; do convert "$file" -resize 600 -quality 50 "$file"; composite -dissolve 30% -gravity southeast -quality 100 "$2" "$file" "$file"; done
 }
 
 localserver() {
