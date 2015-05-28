@@ -1,18 +1,9 @@
 " VIM Configuration File
-" Description: Optimized for C/C++, Python and HTML/CSS development.
 " Author: João Sampaio <jpmelos@gmail.com>
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " GENERAL SECTION
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
-" ----------------------------
-" Activates Pathogen
-" ---------------------------
-" These lines need to come together first in the file for Pathogen
-" to work correctly.
-" ----------------------------
-execute pathogen#infect()
 
 " enable filetype detection and use of plugins
 filetype plugin indent on
@@ -117,82 +108,3 @@ set foldlevelstart=10
 " Some maps for easier tag navigation
 nnoremap [q :tprevious<CR>
 nnoremap ]q :tnext<CR>
-
-" map leader to comma
-let mapleader = ','
-let g:mapleader = ','
-
-" -------------------------------
-" Syntastic configuration
-" -------------------------------
-" check files when open
-let g:syntastic_check_on_open = 1
-" don't check files when closing
-let g:syntastic_check_on_wq = 0
-
-" -------------------------------
-" CtrlP configuration
-" -------------------------------
-" Use ctrl-x for file search.
-let g:ctrlp_map = '<c-x>'
-" Use this command for list of files to search.
-let g:ctrlp_user_command = ['.git', 'cd %s && git ls']
-" If don't find any list of files with command above, use first folder that
-" finds a .git folder or current folder.
-let g:ctrlp_working_path_mode = 'ra'
-" enable looking for tags
-let g:ctrlp_extensions = ['tag']
-" -------------------------------
-
-" -------------------------------
-" grep.vim configuration
-" -------------------------------
-" Make grep case-insensitive.
-let g:Grep_Default_Options = '-i --binary-files=without-match'
-let g:Grep_Skip_Files = 'tags *.bak *~ *.pyc *.o *.obj *.uitest'
-let g:Grep_Skip_Dirs = '.bzr .git .hg .vimprj .repo'
-" -------------------------------
-
-" -------------------------------
-" Gundo configuration
-" -------------------------------
-" add mapping for opening it
-nnoremap <F5> :GundoToggle<CR>
-" open on the left side
-let g:gundo_right = 0
-" -------------------------------
-
-" -------------------------------
-" TagBar configuration
-" -------------------------------
-" add mapping for opening it
-nnoremap <F6> :TagbarToggle<CR>
-" close when tag selected
-let g:tagbar_autoclose = 1
-" focus when open
-let g:tagbar_autofocus = 1
-" indent by 1 space between levels
-let g:tagbar_indent = 1
-" -------------------------------
-
-" -------------------------------
-" Indexer configuration
-" -------------------------------
-" add mapping for re-indexing it
-nnoremap <F7> :IndexerRebuild<CR>
-inoremap <F7> <C-O>:IndexerRebuild<CR>
-" -------------------------------
-
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" LANGUAGES SECTION
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-au BufEnter *.{c,cc,cpp,h} source ~/.vim/c.vim
-au BufEnter *.{py,pyw} source ~/.vim/python.vim
-au BufEnter {M,m}akefile* source ~/.vim/makefile.vim
-au BufEnter *.{htm,html,shtml,php} source ~/.vim/web.vim
-au BufEnter *.{css,scss} source ~/.vim/css.vim
-au BufEnter *.js source ~/.vim/js.vim
-au BufEnter *.rst source ~/.vim/rst.vim
-au BufEnter *.tex source ~/.vim/tex.vim
-au BufEnter *.sh source ~/.vim/sh.vim
-au BufEnter *.sql source ~/.vim/sql.vim
