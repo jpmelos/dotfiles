@@ -1,7 +1,7 @@
 # vim:ft=sh
 
 PS1='\[\e[1;32m\][\u@\h \W]\$\[\e[0m\] '
-EDITOR=/usr/bin/vim
+EDITOR=$(which vim)
 export GREP_COLORS="fn=37"
 
 alias ls='ls -F --color=never'
@@ -11,56 +11,10 @@ alias mv='mv -i'
 alias cal='cal -3'
 alias grep='grep --color=always --binary-files=without-match -n'
 alias less='less -r'
-alias p2l='mypdflatex'
 alias flv2mp3='youtube-dl -t -x --audio-format mp3 --audio-quality 128k'
 alias screen='screen -rd || screen'
 alias tmux='tmux attach || tmux'
 alias vim="vim -O"
-
-function mypdflatex
-{
-    pdflatex $1
-    pdflatex $1
-    evince ${1%tex}pdf
-}
-
-dockps()  {
-  docker ps ${@:2} | awk '
-  NR==1{
-    FIRSTLINEWIDTH=length($0)
-    IDPOS=index($0,"CONTAINER ID");
-    IMAGEPOS=index($0,"IMAGE");
-    COMMANDPOS=index($0,"COMMAND");
-    CREATEDPOS=index($0,"CREATED");
-    STATUSPOS=index($0,"STATUS");
-    PORTSPOS=index($0,"PORTS");
-    NAMESPOS=index($0,"NAMES");
-    UPDATECOL();
-  }
-  function UPDATECOL () {
-    ID=substr($0,IDPOS,IMAGEPOS-IDPOS-1);
-    IMAGE=substr($0,IMAGEPOS,COMMANDPOS-IMAGEPOS-1);
-    COMMAND=substr($0,COMMANDPOS,CREATEDPOS-COMMANDPOS-1);
-    CREATED=substr($0,CREATEDPOS,STATUSPOS-CREATEDPOS-1);
-    STATUS=substr($0,STATUSPOS,PORTSPOS-STATUSPOS-1);
-    PORTS=substr($0,PORTSPOS,NAMESPOS-PORTSPOS-1);
-    NAMES=substr($0, NAMESPOS);
-  }
-  function PRINT () {
-    print '"${1//|/ }"';
-  }
-  NR==2{
-    NAMES=sprintf("%s%*s",NAMES,length($0)-FIRSTLINEWIDTH,"");
-    PRINT();
-  }
-  NR>1{
-    UPDATECOL();
-    PRINT();
-  }' | less -FSX;
-}
-dps() { dockps "ID|NAMES|IMAGE|STATUS|CREATED|COMMAND" $@; }
-dpsa() { dps -a $@; }
-dports() { dockps "NAMES|PORTS" $@; }
 
 # Reduce images.
 # Usage: redimg JPG ==> Reduce all JPG images (this is case-sensitive).

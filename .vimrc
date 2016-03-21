@@ -10,7 +10,6 @@ filetype plugin indent on
 
 " enable syntax highlighting
 syntax on
-" ----------------------------
 
 " set UFT-8 encoding
 set enc=utf-8
