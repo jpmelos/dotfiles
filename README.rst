@@ -1,4 +1,4 @@
-dotfiles for Debian configuration
+dotfiles for Fedora configuration
 =================================
 
 Clone this repository to your home folder to install configuration.
@@ -6,4 +6,4 @@ Clone this repository to your home folder to install configuration.
 Install
 -------
 
-To install these dotfiles, run the ``python 3.5 dotfiles.py`` script.
+To install these dotfiles, run the ``python3 dotfiles.py`` script.
