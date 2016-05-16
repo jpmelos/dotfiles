@@ -40,5 +40,7 @@ for item in files:
         else:
                 copy(item, HOME_DIR)
 
+copy('Preferences.sublime-settings', join(getenv('HOME'), '.config/sublime-text-3/Packages/User'))
+
 source('bashrc')
 source('bash_profile')
