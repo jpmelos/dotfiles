@@ -11,34 +11,37 @@ HOME_DIR = getenv('HOME')
 BASE_DIR = dirname(abspath(__file__))
 
 
-def run(command, *args, **kwargs):
-        return proc_run(split(command), stderr=DEVNULL, universal_newlines=True, *args, **kwargs)
+files = [
+    ('.fonts', '.fonts'),
+    ('.gitconfig', '.gitconfig'),
+    ('localserver.conf', 'localserver.conf'),
+    ('.mybashrc', '.mybashrc'),
+    ('.mybash_profile', '.mybash_profile'),
+    ('Preferences.sublime-settings', '.config/sublime-text-3/Packages/User/Preferences.sublime-settings'),
+    ('HTML.sublime-settings', '.config/sublime-text-3/Packages/User/HTML.sublime-settings'),
+    ('Sass.sublime-settings', '.config/sublime-text-3/Packages/User/Sass.sublime-settings'),
+    ('.tmux.conf', '.tmux.conf'),
+    ('.vimrc', '.vimrc'),
+]
 
 
 def source(filename):
-        SOURCE = 'source ~/.my{filename}'.format(filename=filename)
-        with open(join(HOME_DIR, '.{filename}'.format(filename=filename)), mode='r') as fp:
-                content = fp.read()
-        if SOURCE not in content:
-                with open(join(HOME_DIR, '.{filename}'.format(filename=filename)), mode='a') as fp:
-                        fp.write('\n' + SOURCE + '\n')
+    SOURCE = 'source ~/.my{filename}'.format(filename=filename)
+    with open(join(HOME_DIR, '.{filename}'.format(filename=filename)), mode='r') as fp:
+        content = fp.read()
+    if SOURCE not in content:
+        with open(join(HOME_DIR, '.{filename}'.format(filename=filename)), mode='a') as fp:
+            fp.write('\n' + SOURCE + '\n')
 
-
-run('git pull')
-run('git submodule init')
-run('git submodule update')
-
-ls = run('git ls-tree --name-only HEAD')
-files = ls.strip().split('\n')
 
 for item in files:
-        if isdir(item):
-                HOME_COPY = join(HOME_DIR, item)
-                if exists(HOME_COPY):
-                        rmtree(HOME_COPY)
-                copytree(item, HOME_COPY)
-        else:
-                copy(item, HOME_DIR)
+    HOME_COPY = join(HOME_DIR, item[1])
+    if isdir(item[0]):
+        if exists(HOME_COPY):
+            rmtree(HOME_COPY)
+        copytree(item[0], HOME_COPY)
+    else:
+        copy(item[0], HOME_COPY)
 
 copy('Preferences.sublime-settings', join(getenv('HOME'), '.config/sublime-text-3/Packages/User'))
 
