@@ -20,6 +20,7 @@ files = [
     ('Preferences.sublime-settings', '.config/sublime-text-3/Packages/User/Preferences.sublime-settings'),
     ('HTML.sublime-settings', '.config/sublime-text-3/Packages/User/HTML.sublime-settings'),
     ('Sass.sublime-settings', '.config/sublime-text-3/Packages/User/Sass.sublime-settings'),
+    ('JavaScript.sublime-settings', '.config/sublime-text-3/Packages/User/JavaScript.sublime-settings'),
     ('.tmux.conf', '.tmux.conf'),
     ('.vimrc', '.vimrc'),
 ]
