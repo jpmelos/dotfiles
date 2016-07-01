@@ -21,6 +21,8 @@ files = [
     ('HTML.sublime-settings', '.config/sublime-text-3/Packages/User/HTML.sublime-settings'),
     ('Sass.sublime-settings', '.config/sublime-text-3/Packages/User/Sass.sublime-settings'),
     ('JavaScript.sublime-settings', '.config/sublime-text-3/Packages/User/JavaScript.sublime-settings'),
+    ('JSON.sublime-settings', '.config/sublime-text-3/Packages/User/JSON.sublime-settings'),
+    ('Python.sublime-settings', '.config/sublime-text-3/Packages/User/Python.sublime-settings'),
     ('.tmux.conf', '.tmux.conf'),
     ('.vimrc', '.vimrc'),
 ]
@@ -43,8 +45,6 @@ for item in files:
         copytree(item[0], HOME_COPY)
     else:
         copy(item[0], HOME_COPY)
-
-copy('Preferences.sublime-settings', join(getenv('HOME'), '.config/sublime-text-3/Packages/User'))
 
 source('bashrc')
 source('bash_profile')
