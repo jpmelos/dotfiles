@@ -1,8 +1,23 @@
 # vim:ft=sh
 
+# Changes command prompt
 PS1='\[\e[1;32m\][\u@\h \W]\$\[\e[0m\] '
+
+# Sets default editor for various commands
 EDITOR=$(which vim)
+
+# Make grep and other commands show more colors
 export GREP_COLORS="fn=37"
+
+# Prepends time to each command in history
+export HISTTIMEFORMAT="%d/%m/%y %T"
+# Avoids duplicate commands in history
+export HISTCONTROL=ignoredups:erasedups
+# Append to history file, instead of rewriting it
+shopt -s histappend
+# Updates history after every command
+export PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a;
+                       history -c; history -r"
 
 alias ls='ls -F --color=never'
 alias list='ls -FhAls --color=never | less -r'
@@ -19,9 +34,39 @@ alias vim="vim -O"
 # Reduce images.
 # Usage: redimg JPG ==> Reduce all JPG images (this is case-sensitive).
 redimg() {
-    for file in *.$1; do convert "$file" -resize 600 -quality 50 "$file"; composite -dissolve 30% -gravity southeast -quality 100 "$2" "$file" "$file"; done
+    for file in *.$1; do
+        convert "$file" -resize 600 -quality 50 "$file"
+	composite -dissolve 30% -gravity southeast -quality 100 "$2" "$file" "$file"
+    done
 }
 
+# Serves current working dir in 0.0.0.0:80
 localserver() {
-    docker run --name localserver -v $PWD:/usr/share/nginx/html:ro -v $HOME/localserver.conf:/etc/nginx/conf.d/localserver.conf:ro --rm --privileged=true -p 80:80 nginx
+    docker run \
+        --rm \
+        --name localserver \
+        -v $PWD:/usr/share/nginx/html:ro \
+        -v $HOME/localserver.conf:/etc/nginx/conf.d/localserver.conf:ro \
+        --privileged=true \
+        -p 80:80 \
+        nginx
+}
+
+
+# Runs a command and show all files modified by it, comparing date of last
+# modification. So, there might be false positives, but still a pretty good
+# idea.
+supervise() {
+    NOW="$(date "+%F %T.%N")"
+    sleep 1
+    $@
+    find . -newermt "$NOW"
+}
+
+# Remove colors from input
+nocolors() {
+    FILTER="s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]//g"
+    while read -r line; do
+        echo "$line" | sed -r "$FILTER"
+    done
 }
