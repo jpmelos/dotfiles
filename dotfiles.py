@@ -14,7 +14,8 @@ files = [
     '.gitconfig',
     'localserver.conf',
     '.mybashrc',
-    '.mybash_profile',
+    '.myprofile',
+    ('.myprofile', '.mybash_profile'),
     '.tmux.conf',
     '.vimrc',
 
