@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from shutil import copy, copytree, rmtree
-from os import getenv
+from os import getenv, makedirs
 from os.path import dirname, abspath, isdir, join, exists
 
 
@@ -46,16 +46,20 @@ for item in files:
             rmtree(HOME_COPY)
         copytree(ITEM_NAME, HOME_COPY)
     else:
+        makedirs(dirname(HOME_COPY), exist_ok=True)
         copy(ITEM_NAME, HOME_COPY)
 
 
 def source(filename, dest):
     SOURCE = 'source ~/{filename}'.format(filename=filename)
-    with open(join(HOME_DIR, '{dest}'.format(dest=dest)), mode='r') as fp:
-        content = fp.read()
-    if SOURCE not in content:
-        with open(join(HOME_DIR, '{dest}'.format(dest=dest)), mode='a') as fp:
-            fp.write('\n' + SOURCE + '\n')
+    dest_file = join(HOME_DIR, dest)
+    if exists(dest_file):
+        with open(dest_file, mode='r') as fp:
+            content = fp.read()
+        if SOURCE not in content:
+            with open(dest_file, mode='a') as fp:
+                fp.write('\n' + SOURCE + '\n')
 
 source('.mybashrc', '.bashrc')
+source('.myprofile', '.profile')
 source('.mybash_profile', '.bash_profile')
