@@ -71,6 +71,9 @@ set scrolloff=999
 map <F12> :let &scrolloff=999-&scrolloff<CR>
 
 set autoindent        " enable indentation of previous line on next
+set shiftwidth=4      " tab stops are 4 spaces
+set tabstop=4         " tab stops are 4 spaces
+set expandtab         " tab stops are spaces
 
 " always displays file name, current line and column number
 set laststatus=2
