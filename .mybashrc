@@ -30,6 +30,7 @@ alias flv2mp3='youtube-dl -t -x --audio-format mp3 --audio-quality 128k'
 alias screen='screen -rd || screen'
 alias tmux='tmux attach || tmux'
 alias vim="vim -O"
+alias tail="tail -f"
 
 # Reduce images.
 # Usage: redimg JPG ==> Reduce all JPG images (this is case-sensitive).
