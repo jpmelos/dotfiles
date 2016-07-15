@@ -32,6 +32,8 @@ files = [
      '.config/sublime-text-3/Packages/User/JSON.sublime-settings'),
     ('Python.sublime-settings',
      '.config/sublime-text-3/Packages/User/Python.sublime-settings'),
+    ('PHP.sublime-settings',
+     '.config/sublime-text-3/Packages/User/PHP.sublime-settings'),
 ]
 
 for item in files:
