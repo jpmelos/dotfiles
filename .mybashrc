@@ -10,7 +10,7 @@ EDITOR=$(which vim)
 export GREP_COLORS="fn=37"
 
 # Prepends time to each command in history
-export HISTTIMEFORMAT="%d/%m/%y %T"
+export HISTTIMEFORMAT="%d/%m/%y %T "
 # Avoids duplicate commands in history
 export HISTCONTROL=ignoredups:erasedups
 # Append to history file, instead of rewriting it
