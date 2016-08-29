@@ -23,7 +23,7 @@
 [alias]
 	bl = blame --show-stats
 	br = branch
-	ci = commit -vs
+	ci = commit -v
 	co = checkout
 	del = branch -D
 	di = diff
