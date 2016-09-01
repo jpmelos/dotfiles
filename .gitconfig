@@ -1,42 +1,42 @@
 [user]
-	name = João Sampaio
-	email = jpmelos@gmail.com
+    name = João Sampaio
+    email = jpmelos@gmail.com
 
 [core]
-	editor = vim
+    editor = vim
 
 [color]
-	ui = always
-	interactive = false
+    ui = always
+    interactive = false
 
 [color "diff"]
-	meta = white bold
-	frag = white
-	new = cyan bold
-	old = red bold
+    meta = white bold
+    frag = white
+    new = cyan bold
+    old = red bold
 
 [color "status"]
-	added = green
-	changed = cyan
-	untracked = red bold
+    added = green
+    changed = cyan
+    untracked = red bold
 
 [alias]
-	bl = blame --show-stats
-	br = branch
-	ci = commit -v
-	co = checkout
-	del = branch -D
-	di = diff
-	dic = diff --cached
-	dst = diff --stat
-	dcst = diff --cached --stat
-	pa = add --patch
-	ls = ls-files
-	st = status -u
-	sh = show
-	shf = diff-tree --no-commit-id --name-only -r HEAD
-	rb = rebase
-	pull = pull --rebase
+    bl = blame --show-stats
+    br = branch
+    ci = commit -v
+    co = checkout
+    del = branch -D
+    di = diff
+    dic = diff --cached
+    dst = diff --stat
+    dcst = diff --cached --stat
+    pa = add --patch
+    ls = ls-files
+    st = status -u
+    sh = show
+    shf = diff-tree --no-commit-id --name-only -r HEAD
+    rb = rebase
+    pull = pull --rebase
 
 [push]
-	default = simple
+    default = simple
