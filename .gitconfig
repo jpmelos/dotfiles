@@ -24,6 +24,7 @@
     bl = blame --show-stats
     br = branch
     ci = commit -v
+    cle = clean -dfx
     co = checkout
     del = branch -D
     di = diff
