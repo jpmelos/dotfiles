@@ -32,6 +32,10 @@ alias tmux='tmux attach || tmux'
 alias vim="vim -O"
 alias tail="tail -f"
 
+dico() {
+    git diff $(git status -s --porcelain | \grep -v "^ D" | \grep -v \.test\.html | \grep -v \.test\.txt | cut -b4-)
+}
+
 # Reduce images.
 # Usage: redimg JPG ==> Reduce all JPG images (this is case-sensitive).
 redimg() {
