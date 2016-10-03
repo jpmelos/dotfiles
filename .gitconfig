@@ -37,7 +37,7 @@
     sh = show
     shf = diff-tree --no-commit-id --name-only -r HEAD
     rb = rebase
-    pull = pull --rebase
+    pu = pull --rebase
 
 [push]
     default = simple
