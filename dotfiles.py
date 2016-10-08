@@ -1,12 +1,11 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.4
 
-from shutil import copy, copytree, rmtree
-from os import getenv, makedirs
-from os.path import dirname, abspath, isdir, join, exists
+import os
+import shutil
 
 
-HOME_DIR = getenv('HOME')
-BASE_DIR = dirname(abspath(__file__))
+HOME_DIR = os.environ['HOME']
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 files = [
@@ -41,24 +40,24 @@ files = [
 for item in files:
     if isinstance(item, tuple):
         ITEM_NAME = item[0]
-        HOME_COPY = join(HOME_DIR, item[1])
+        HOME_COPY = os.path.join(HOME_DIR, item[1])
     else:
         ITEM_NAME = item
-        HOME_COPY = join(HOME_DIR, item)
+        HOME_COPY = os.path.join(HOME_DIR, item)
 
-    if isdir(ITEM_NAME):
-        if exists(HOME_COPY):
-            rmtree(HOME_COPY)
-        copytree(ITEM_NAME, HOME_COPY)
+    if os.path.isdir(ITEM_NAME):
+        if os.path.exists(HOME_COPY):
+            shutil.rmtree(HOME_COPY)
+        shutil.copytree(ITEM_NAME, HOME_COPY)
     else:
-        makedirs(dirname(HOME_COPY), exist_ok=True)
-        copy(ITEM_NAME, HOME_COPY)
+        os.makedirs(os.path.dirname(HOME_COPY), exist_ok=True)
+        shutil.copy(ITEM_NAME, HOME_COPY)
 
 
 def source(filename, dest):
     SOURCE = 'source ~/{filename}'.format(filename=filename)
-    dest_file = join(HOME_DIR, dest)
-    if exists(dest_file):
+    dest_file = os.path.join(HOME_DIR, dest)
+    if os.path.exists(dest_file):
         with open(dest_file, mode='r') as fp:
             content = fp.read()
         if SOURCE not in content:
