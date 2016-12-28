@@ -30,5 +30,6 @@
   "show_line_endings": true,
   "translate_tabs_to_spaces": true,
   "tree_animation_enabled": false,
-  "trim_trailing_white_space_on_save": true
+  "trim_trailing_white_space_on_save": true,
+  "detect_indentation": false
 }
