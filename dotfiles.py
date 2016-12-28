@@ -35,6 +35,8 @@ files = [
      '.config/sublime-text-3/Packages/User/PHP.sublime-settings'),
     ('Shell-Unix-Generic.sublime-settings',
      '.config/sublime-text-3/Packages/User/Shell-Unix-Generic.sublime-settings'),
+    ('project_manager.sublime-settings',
+     '.config/sublime-text-3/Packages/User/project_manager.sublime-settings'),
 ]
 
 for item in files:
