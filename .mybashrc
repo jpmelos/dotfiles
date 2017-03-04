@@ -19,21 +19,21 @@ shopt -s histappend
 export PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a;
                        history -c; history -r"
 
-alias ls='ls -F --color=never'
-alias list='ls -FhAls --color=never | less -r'
-alias cp='cp -i'
-alias mv='mv -i'
 alias cal='cal -3'
+alias cp='cp -i'
 alias grep='grep --color=always --binary-files=without-match -n'
 alias less='less -r'
-alias flv2mp3='youtube-dl -t -x --audio-format mp3 --audio-quality 128k'
+alias list='ls -FhAls --color=never | less -r'
+alias ls='ls -F --color=never'
+alias mv='mv -i'
 alias screen='screen -rd || screen'
+alias tail="tail -f"
 alias tmux='tmux attach || tmux'
 alias vim="vim -O"
-alias tail="tail -f"
 
+# Shows git diff, excluding deleted files.
 dico() {
-    git diff $(git status -s --porcelain | \grep -v "^ D" | \grep -v \.test\.html | \grep -v \.test\.txt | cut -b4-)
+    git diff $(git status -s --porcelain | \grep -v "^ D" | cut -b4-)
 }
 
 # Reduce images.

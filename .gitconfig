@@ -26,18 +26,19 @@
     ci = commit -v
     cle = clean -dfx
     co = checkout
+    dcst = diff --cached --stat
     del = branch -D
     di = diff
     dic = diff --cached
     dst = diff --stat
-    dcst = diff --cached --stat
-    pa = add --patch
     ls = ls-files
-    st = status -u
+    mg = merge --no-ff
+    pa = add --patch
+    pu = pull --rebase
+    rb = rebase
     sh = show
     shf = diff-tree --no-commit-id --name-only -r HEAD
-    rb = rebase
-    pu = pull --rebase
+    st = status -u
 
 [push]
     default = simple

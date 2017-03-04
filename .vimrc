@@ -59,7 +59,9 @@ set backspace=eol,start,indent
 " filetypes (for line feeds and carrige returns)
 set ffs=unix,dos,mac
 
-set showcmd           " show incomplete commands
+" show details about commands (like how many chars are selected in visual
+" mode)
+set showcmd
 
 set novisualbell      " don't blink
 set noerrorbells      " no noise
@@ -104,9 +106,4 @@ inoremap <F10> <ESC>:set wrap!<CR>i
 nnoremap <silent> <Space> @=(foldlevel('.')?'za':"\<Space>")<CR>
 vnoremap <Space> zf
 
-" Don't automatically fold on open
-set foldlevelstart=10
-
-" Some maps for easier tag navigation
-nnoremap [q :tprevious<CR>
-nnoremap ]q :tnext<CR>
+set nofoldenable    " disable folding

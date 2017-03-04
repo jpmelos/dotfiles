@@ -1,5 +1,5 @@
-dotfiles for Fedora configuration
-=================================
+dotfiles
+========
 
 Clone this repository to your home folder to install configuration.
 
