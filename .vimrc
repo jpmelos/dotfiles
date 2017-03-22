@@ -107,3 +107,6 @@ nnoremap <silent> <Space> @=(foldlevel('.')?'za':"\<Space>")<CR>
 vnoremap <Space> zf
 
 set nofoldenable    " disable folding
+
+" remove trailing whitespaces before saving
+autocmd BufWritePre * %s/\s\+$//e
