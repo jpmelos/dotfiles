@@ -29,10 +29,10 @@ set showmatch
 
 " keyboard mappings
 " navigate through display lines
-nmap j gj
-vmap j gj
-nmap k gk
-vmap k gk
+nnoremap j gj
+vnoremap j gj
+nnoremap k gk
+vnoremap k gk
 
 " configure searching
 set incsearch  " incremental searching
@@ -70,12 +70,14 @@ set noerrorbells      " no noise
 " screen, in such case call me because I want to see that)
 set scrolloff=999
 " allows for easily disabling this functionality
-map <F12> :let &scrolloff=999-&scrolloff<CR>
+noremap <F12> :let &scrolloff=999-&scrolloff<CR>
 
 set autoindent        " enable indentation of previous line on next
 set shiftwidth=4      " tab stops are 4 spaces
 set tabstop=4         " tab stops are 4 spaces
 set expandtab         " tab stops are spaces
+
+set colorcolumn=80    " highlight 79th column
 
 " always displays file name, current line and column number
 set laststatus=2
@@ -105,8 +107,6 @@ inoremap <F10> <ESC>:set wrap!<CR>i
 " Configure <Space> to open folds.
 nnoremap <silent> <Space> @=(foldlevel('.')?'za':"\<Space>")<CR>
 vnoremap <Space> zf
-
-set nofoldenable    " disable folding
 
 " remove trailing whitespaces before saving
 autocmd BufWritePre * %s/\s\+$//e
