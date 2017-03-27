@@ -69,9 +69,9 @@ set scrolloff=999
 set autoindent        " enable indentation of previous line on next
 set shiftwidth=4      " tab stops are 4 spaces
 set tabstop=4         " tab stops are 4 spaces
-set expandtab         " tab stops are spaces
+set expandtab         " tab stops become spaces
 
-set colorcolumn=80    " highlight 79th column
+set colorcolumn=80    " highlight 80th column
 
 " always displays file name, current line and column number
 set laststatus=2
