@@ -1,12 +1,11 @@
-#!/usr/bin/env python3.4
+#!/usr/bin/env python3.5
 
 import os
+import shlex
 import shutil
-
+import subprocess
 
 HOME_DIR = os.environ['HOME']
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
 
 files = [
     '.fonts',
@@ -57,15 +56,29 @@ for item in files:
 
 
 def source(filename, dest):
-    SOURCE = 'source ~/{filename}'.format(filename=filename)
+    SOURCE_LINE = 'source ~/{filename}'.format(filename=filename)
     dest_file = os.path.join(HOME_DIR, dest)
     if os.path.exists(dest_file):
         with open(dest_file, mode='r') as fp:
             content = fp.read()
-        if SOURCE not in content:
+        if SOURCE_LINE not in content:
             with open(dest_file, mode='a') as fp:
-                fp.write('\n' + SOURCE + '\n')
+                fp.write('\n' + SOURCE_LINE + '\n')
 
 source('.mybashrc', '.bashrc')
 source('.myprofile', '.profile')
 source('.mybash_profile', '.bash_profile')
+
+
+class CommandFailed(Exception):
+    pass
+
+
+def run(command, *args, **kwargs):
+    if subprocess.run(shlex.split(command), *args, **kwargs).returncode != 0:
+        raise CommandFailed(command)
+
+VUNDLE_DIR = os.path.join(HOME_DIR, '.vim/bundle/Vundle.vim')
+if not os.path.exists(VUNDLE_DIR):
+    run('git clone https://github.com/gmarik/Vundle.vim.git '
+        '{}'.format(HOME_DIR))

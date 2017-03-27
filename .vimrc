@@ -2,22 +2,48 @@
 " Author: João Sampaio <jpmelos@gmail.com>
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" VUNDLE SETUP
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+set nocompatible              " required
+filetype off                  " required
+
+" set the runtime path to include Vundle and initialize
+set rtp+=~/.vim/bundle/Vundle.vim
+call vundle#begin()
+
+" let Vundle manage Vundle, this is required
+Plugin 'gmarik/Vundle.vim'
+
+" Add all your plugins here (note older versions of Vundle used Bundle
+" instead of Plugin)
+Plugin 'tmhedberg/SimpylFold'
+Plugin 'Valloric/YouCompleteMe'
+Plugin 'jnurmine/Zenburn'
+Plugin 'scrooloose/nerdtree'
+Plugin 'kien/ctrlp.vim'
+
+" All of your Plugins must be added before the following line
+call vundle#end()            " required
+
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " BASIC SETTINGS
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
-" mappings default leader
-let mapleader = ','
-
 " enable filetype detection and use of plugins
 filetype plugin indent on
+
+" mappings default leader
+let mapleader = ','
 
 " enable syntax highlighting
 syntax on
 
 " set UFT-8 encoding
-set enc=utf-8
-set fenc=utf-8
-set tenc=utf-8
+set encoding=utf-8
+set fileencoding=utf-8
+set termencoding=utf-8
 
 " disable vi compatibility
 set nocompatible
@@ -53,7 +79,7 @@ set number
 set backspace=eol,start,indent
 
 " define line feeds and carrige returns
-set ffs=unix,dos,mac
+set fileformats=unix,dos,mac
 
 " show details about commands (like how many chars are selected in visual
 " mode)
@@ -67,8 +93,9 @@ set noerrorbells      " no noise
 set scrolloff=999
 
 set autoindent        " enable indentation of previous line on next
-set shiftwidth=4      " tab stops are 4 spaces
 set tabstop=4         " tab stops are 4 spaces
+set softtabstop=4     " tab stops are 4 spaces
+set shiftwidth=4      " tab stops are 4 spaces
 set expandtab         " tab stops become spaces
 
 set colorcolumn=80    " highlight 80th column
@@ -79,8 +106,22 @@ set laststatus=2
 set wildmode=longest,list,full " filename auto-completion works bash-like
 set wildmenu " when hits to complete full name, shows list of filenames
 
-" Turn paste mode on and off with F8
+" turn paste mode on and off with F8
 set pastetoggle=<F8>
+
+" new splits goes to the right and below
+set splitright
+set splitbelow
+
+" ignore __pycache__ and .pyc files
+set wildignore+=*/__pycache__/*,*.pyc
+
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" COLOR SCHEME
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+colorscheme zenburn
 
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -93,13 +134,23 @@ vnoremap j gj
 nnoremap k gk
 vnoremap k gk
 
+" navigate through splits
+nnoremap <C-J> <C-W><C-J>
+nnoremap <C-K> <C-W><C-K>
+nnoremap <C-L> <C-W><C-L>
+nnoremap <C-H> <C-W><C-H>
+
 " move lines in a file
 nnoremap - ddp
 nnoremap _ ddkkp
 
+" quickly navigate to start and end of lines
+nnoremap H 0
+nnoremap L $
+
 " clear highlight when refreshing.
-nnoremap <C-L> :nohls<CR><C-L>
-inoremap <C-L> <C-O>:nohls<CR>
+nnoremap <C-C> :nohls<CR><C-L>
+inoremap <C-C> <C-O>:nohls<CR>
 
 " allows for easily disabling this functionality
 noremap <F12> :let &scrolloff=999-&scrolloff<CR>
@@ -116,6 +167,9 @@ vnoremap <silent> # :<C-U>
 	\escape(@", '?\.*$^~['), '\_s\+', '\\_s\\+', 'g')<CR><CR>
 	\gV:call setreg('"', old_reg, old_regtype)<CR>
 
+" fast fold toggle
+nnoremap <Space> za
+
 " uppercase current word
 nnoremap <C-U> viwU<ESC>
 inoremap <C-U> <ESC>viwU<ESC>ea
@@ -123,10 +177,6 @@ inoremap <C-U> <ESC>viwU<ESC>ea
 " allows quick editing and sourcing my .vimrc
 nnoremap <leader>ev :vsplit $MYVIMRC<CR>
 nnoremap <leader>sv :source $MYVIMRC<CR>:nohls<CR>
-
-" quickly navigate to start and end of lines
-nnoremap H 0
-nnoremap L $
 
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -151,4 +201,49 @@ augroup general_commands
 
     " remove trailing whitespaces before saving
     autocmd BufWritePre * %s/\s\+$//e
+
+    " for full-stack development
+    au BufNewFile,BufRead *.html, *.css, *.js
+        \ set tabstop=2
+        \ set softtabstop=2
+        \ set shiftwidth=2
+
 augroup END
+
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" NERDTREE CONFIGURATION
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+noremap <F9> :NERDTreeToggle<CR>
+
+augroup nerdtree
+    autocmd!
+
+    autocmd StdinReadPre * let s:std_in=1
+
+    " close NERDtree automatically if it's the only thing open
+    autocmd BufEnter * if (winnr("$") == 1 && exists("b:NERDTree") && b:NERDTree.isTabTree()) | q | endif
+
+augroup END
+
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" TOGGLE ALL FOLDS
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+function! ToggleAllFolds()
+    if !exists("b:all_folds_collapsed")
+        let b:all_folds_collapsed = 1
+    endif
+
+    if b:all_folds_collapsed
+        execute ":normal! zR"
+        let b:all_folds_collapsed = 0
+    else
+        execute ":normal! zM"
+        let b:all_folds_collapsed = 1
+    endif
+endfunction
+
+nnoremap <Leader><Space> :call ToggleAllFolds()<CR>
