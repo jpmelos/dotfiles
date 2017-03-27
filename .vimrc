@@ -2,9 +2,10 @@
 " Author: João Sampaio <jpmelos@gmail.com>
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" GENERAL SECTION
+" BASIC SETTINGS
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
+" mappings default leader
 let mapleader = ','
 
 " enable filetype detection and use of plugins
@@ -21,33 +22,23 @@ set tenc=utf-8
 " disable vi compatibility
 set nocompatible
 
-" wrap lines to window fit
+" wrap lines to fit in window
 set wrap
-set nolist
+
+" break words intelligently
 set linebreak
+
+" do not show white chars like tabs and end-of-lines
+set nolist
 
 " highlight matching braces
 set showmatch
-
-" navigate through display lines
-nnoremap j gj
-vnoremap j gj
-nnoremap k gk
-vnoremap k gk
-
-" move lines in a file
-nnoremap - ddp
-nnoremap _ ddkkp
 
 " configure searching
 set incsearch  " incremental searching
 set ignorecase " ignore case when searching...
 set smartcase  " unless it contais uppercase
 set hls        " highlight search results
-
-" clear highlight when refreshing.
-nnoremap <C-L> :nohls<CR><C-L>
-inoremap <C-L> <C-O>:nohls<CR>
 
 " no backup file
 set nobackup
@@ -61,7 +52,7 @@ set number
 " allow backspacing over everything
 set backspace=eol,start,indent
 
-" filetypes (for line feeds and carrige returns)
+" define line feeds and carrige returns
 set ffs=unix,dos,mac
 
 " show details about commands (like how many chars are selected in visual
@@ -74,8 +65,6 @@ set noerrorbells      " no noise
 " keeps cursor in the middle of the screen (unless you have a 2,000 lines high
 " screen, in such case call me because I want to see that)
 set scrolloff=999
-" allows for easily disabling this functionality
-noremap <F12> :let &scrolloff=999-&scrolloff<CR>
 
 set autoindent        " enable indentation of previous line on next
 set shiftwidth=4      " tab stops are 4 spaces
@@ -90,6 +79,31 @@ set laststatus=2
 set wildmode=longest,list,full " filename auto-completion works bash-like
 set wildmenu " when hits to complete full name, shows list of filenames
 
+" Turn paste mode on and off with F8
+set pastetoggle=<F8>
+
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" MAPPINGS
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+" navigate through display lines
+nnoremap j gj
+vnoremap j gj
+nnoremap k gk
+vnoremap k gk
+
+" move lines in a file
+nnoremap - ddp
+nnoremap _ ddkkp
+
+" clear highlight when refreshing.
+nnoremap <C-L> :nohls<CR><C-L>
+inoremap <C-L> <C-O>:nohls<CR>
+
+" allows for easily disabling this functionality
+noremap <F12> :let &scrolloff=999-&scrolloff<CR>
+
 " Search for selected text, forwards or backwards.
 vnoremap <silent> * :<C-U>
 	\let old_reg=getreg('"')<Bar>let old_regtype=getregtype('"')<CR>
@@ -102,20 +116,6 @@ vnoremap <silent> # :<C-U>
 	\escape(@", '?\.*$^~['), '\_s\+', '\\_s\\+', 'g')<CR><CR>
 	\gV:call setreg('"', old_reg, old_regtype)<CR>
 
-" Turn paste mode on and off with F8
-set pastetoggle=<F8>
-
-" Turn wrap lines on and off with F10
-nnoremap <F10> :set wrap!<CR>
-inoremap <F10> <ESC>:set wrap!<CR>i
-
-" Configure <Space> to open folds.
-nnoremap <silent> <Space> @=(foldlevel('.')?'za':"\<Space>")<CR>
-vnoremap <Space> zf
-
-" remove trailing whitespaces before saving
-autocmd BufWritePre * %s/\s\+$//e
-
 " uppercase current word
 nnoremap <C-U> viwU<ESC>
 inoremap <C-U> <ESC>viwU<ESC>ea
@@ -127,3 +127,28 @@ nnoremap <leader>sv :source $MYVIMRC<CR>:nohls<CR>
 " quickly navigate to start and end of lines
 nnoremap H 0
 nnoremap L $
+
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" STATUS LINE
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+set statusline=\ %f\  " file name
+set statusline+=-\  " separator
+set statusline+=FileType:\  " label
+set statusline+=%y "file type
+set statusline+=\ %m%r " shows modified file or read-only
+set statusline+=%= " change side
+set statusline+=%5l/%L\  " show current line/total lines
+
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" AUTO COMMANDS
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+augroup general_commands
+    autocmd!
+
+    " remove trailing whitespaces before saving
+    autocmd BufWritePre * %s/\s\+$//e
+augroup END
