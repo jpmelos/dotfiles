@@ -5,6 +5,8 @@
 " GENERAL SECTION
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
+let mapleader = ','
+
 " enable filetype detection and use of plugins
 filetype plugin indent on
 
@@ -27,12 +29,15 @@ set linebreak
 " highlight matching braces
 set showmatch
 
-" keyboard mappings
 " navigate through display lines
 nnoremap j gj
 vnoremap j gj
 nnoremap k gk
 vnoremap k gk
+
+" move lines in a file
+nnoremap - ddp
+nnoremap _ ddkkp
 
 " configure searching
 set incsearch  " incremental searching
@@ -110,3 +115,15 @@ vnoremap <Space> zf
 
 " remove trailing whitespaces before saving
 autocmd BufWritePre * %s/\s\+$//e
+
+" uppercase current word
+nnoremap <C-U> viwU<ESC>
+inoremap <C-U> <ESC>viwU<ESC>ea
+
+" allows quick editing and sourcing my .vimrc
+nnoremap <leader>ev :vsplit $MYVIMRC<CR>
+nnoremap <leader>sv :source $MYVIMRC<CR>:nohls<CR>
+
+" quickly navigate to start and end of lines
+nnoremap H 0
+nnoremap L $
