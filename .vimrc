@@ -136,8 +136,8 @@ nnoremap L $
 set statusline=\ %f\  " file name
 set statusline+=-\  " separator
 set statusline+=FileType:\  " label
-set statusline+=%y "file type
-set statusline+=\ %m%r " shows modified file or read-only
+set statusline+=%y\  "file type
+set statusline+=%m%r\  " shows modified file or read-only
 set statusline+=%= " change side
 set statusline+=%5l/%L\  " show current line/total lines
 
