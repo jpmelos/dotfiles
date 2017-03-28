@@ -184,6 +184,9 @@ inoremap <C-U> <ESC>viwU<ESC>ea
 nnoremap <leader>ev :vsplit $MYVIMRC<CR>
 nnoremap <leader>sv :source $MYVIMRC<CR>:nohls<CR>
 
+" toggle search
+nnoremap <F5> /\v
+
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " STATUS LINE
