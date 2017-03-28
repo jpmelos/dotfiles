@@ -81,4 +81,4 @@ def run(command, *args, **kwargs):
 VUNDLE_DIR = os.path.join(HOME_DIR, '.vim/bundle/Vundle.vim')
 if not os.path.exists(VUNDLE_DIR):
     run('git clone https://github.com/gmarik/Vundle.vim.git '
-        '{}'.format(HOME_DIR))
+        '{}'.format(VUNDLE_DIR))
