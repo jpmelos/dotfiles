@@ -69,9 +69,6 @@ set ignorecase " ignore case when searching...
 set smartcase  " unless it contais uppercase
 set hls        " highlight search results
 
-" no backup file
-set nobackup
-
 " terminal background dark, adapt colors
 set background=dark
 
@@ -121,6 +118,11 @@ set wildignore+=*/__pycache__/*,*.pyc,*/.git/*
 
 " look for tags in parent directories
 set tags=./tags;,tags;
+
+" save temporary files to a default directory
+set backupdir=~/.vim/backup//
+set directory=~/.vim/swap//
+set undodir=~/.vim/undo//
 
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -212,10 +214,7 @@ augroup general_commands
     autocmd BufWritePre * %s/\s\+$//e
 
     " for full-stack development
-    au BufNewFile,BufRead *.html, *.css, *.js
-        \ set tabstop=2
-        \ set softtabstop=2
-        \ set shiftwidth=2
+    au BufNewFile,BufRead *.html,*.css,*.js set tabstop=2 softtabstop=2 shiftwidth=2
 
 augroup END
 
