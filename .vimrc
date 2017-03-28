@@ -117,6 +117,9 @@ set splitbelow
 " ignore __pycache__ and .pyc files
 set wildignore+=*/__pycache__/*,*.pyc
 
+" look for tags in parent directories
+set tags=./tags;,tags;
+
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " COLOR SCHEME
