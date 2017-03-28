@@ -1,8 +1,5 @@
 # vim:ft=sh
 
-# Changes command prompt
-PS1='\[\e[1;32m\][\u@\h \W]\$\[\e[0m\] '
-
 # Sets default editor for various commands
 EDITOR=$(which vim)
 
