@@ -5,7 +5,10 @@ import shlex
 import shutil
 import subprocess
 
-HOME_DIR = os.environ['HOME']
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
+HOME_DIR = os.path.expanduser('~')
+DEVEL_DIR = os.path.join(HOME_DIR, 'devel')
 
 files = [
     '.fonts',
@@ -38,21 +41,32 @@ files = [
      '.config/sublime-text-3/Packages/User/project_manager.sublime-settings'),
 ]
 
-for item in files:
-    if isinstance(item, tuple):
-        ITEM_NAME = item[0]
-        HOME_COPY = os.path.join(HOME_DIR, item[1])
-    else:
-        ITEM_NAME = item
-        HOME_COPY = os.path.join(HOME_DIR, item)
 
-    if os.path.isdir(ITEM_NAME):
-        if os.path.exists(HOME_COPY):
-            shutil.rmtree(HOME_COPY)
-        shutil.copytree(ITEM_NAME, HOME_COPY)
-    else:
-        os.makedirs(os.path.dirname(HOME_COPY), exist_ok=True)
-        shutil.copy(ITEM_NAME, HOME_COPY)
+class CommandFailed(Exception):
+    pass
+
+
+def run(command, *args, **kwargs):
+    if subprocess.run(shlex.split(command), *args, **kwargs).returncode != 0:
+        raise CommandFailed(command)
+
+
+def copy_configuration_files_and_dirs():
+    for item in files:
+        if isinstance(item, tuple):
+            ITEM_NAME = item[0]
+            HOME_COPY = os.path.join(HOME_DIR, item[1])
+        else:
+            ITEM_NAME = item
+            HOME_COPY = os.path.join(HOME_DIR, item)
+
+        if os.path.isdir(ITEM_NAME):
+            if os.path.exists(HOME_COPY):
+                shutil.rmtree(HOME_COPY)
+            shutil.copytree(ITEM_NAME, HOME_COPY)
+        else:
+            os.makedirs(os.path.dirname(HOME_COPY), exist_ok=True)
+            shutil.copy(ITEM_NAME, HOME_COPY)
 
 
 def source(filename, dest):
@@ -65,20 +79,20 @@ def source(filename, dest):
             with open(dest_file, mode='a') as fp:
                 fp.write('\n' + SOURCE_LINE + '\n')
 
+
+copy_configuration_files_and_dirs()
 source('.mybashrc', '.bashrc')
 source('.myprofile', '.profile')
 source('.mybash_profile', '.bash_profile')
-
-
-class CommandFailed(Exception):
-    pass
-
-
-def run(command, *args, **kwargs):
-    if subprocess.run(shlex.split(command), *args, **kwargs).returncode != 0:
-        raise CommandFailed(command)
 
 VUNDLE_DIR = os.path.join(HOME_DIR, '.vim/bundle/Vundle.vim')
 if not os.path.exists(VUNDLE_DIR):
     run('git clone https://github.com/gmarik/Vundle.vim.git '
         '{}'.format(VUNDLE_DIR))
+
+os.chdir(DEVEL_DIR)
+GNOME_TERMINAL_COLORS_DIR = os.path.join(DEVEL_DIR, 'gnome-terminal-colors')
+if not os.path.exists(GNOME_TERMINAL_COLORS_DIR):
+    run('git clone git@github.com:jpmelos/gnome-terminal-colors')
+os.chdir(GNOME_TERMINAL_COLORS_DIR)
+run('bash install.sh')
