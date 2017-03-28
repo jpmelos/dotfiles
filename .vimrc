@@ -193,7 +193,7 @@ set statusline+=FileType:\  " label
 set statusline+=%y\  "file type
 set statusline+=%m%r\  " shows modified file or read-only
 set statusline+=%= " change side
-set statusline+=%5l/%L\  " show current line/total lines
+set statusline+=%3c,%5l/%L\  " show current column, current line/total lines
 
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
