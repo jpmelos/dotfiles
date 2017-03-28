@@ -117,7 +117,7 @@ set splitright
 set splitbelow
 
 " ignore __pycache__ and .pyc files
-set wildignore+=*/__pycache__/*,*.pyc
+set wildignore+=*/__pycache__/*,*.pyc,*/.git/*
 
 " look for tags in parent directories
 set tags=./tags;,tags;
@@ -256,3 +256,32 @@ function! ToggleAllFolds()
 endfunction
 
 nnoremap <Leader><Space> :call ToggleAllFolds()<CR>
+
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" GREP OPERATOR
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+nnoremap <leader>g :set operatorfunc=<SID>GrepOperator<cr>g@
+vnoremap <leader>g :<c-u>call <SID>GrepOperator(visualmode())<cr>
+
+function! s:GrepOperator(type)
+    let saved_unnamed_register = @@
+
+    if a:type ==# 'v'
+        normal! `<v`>y
+    elseif a:type ==# 'char'
+        normal! `[v`]y
+    else
+        return
+    endif
+
+    silent execute "grep! --exclude-dir=.git --binary-files=without-match -R " . shellescape(@@) . " ."
+	redraw!
+    copen
+
+    let @@ = saved_unnamed_register
+endfunction
+
+nnoremap <Leader>n :cnext<CR>
+nnoremap <Leader>b :cprevious<CR>
