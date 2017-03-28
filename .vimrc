@@ -19,10 +19,12 @@ Plugin 'gmarik/Vundle.vim'
 " instead of Plugin)
 Plugin 'tmhedberg/SimpylFold'
 Plugin 'Valloric/YouCompleteMe'
-Plugin 'jnurmine/Zenburn'
 Plugin 'scrooloose/nerdtree'
 Plugin 'ctrlpvim/ctrlp.vim'
 Plugin 'embear/vim-localvimrc'
+
+" color schemes
+Plugin 'jnurmine/Zenburn'
 
 " All of your Plugins must be added before the following line
 call vundle#end()            " required
