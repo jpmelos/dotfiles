@@ -94,5 +94,5 @@ os.chdir(DEVEL_DIR)
 GNOME_TERMINAL_COLORS_DIR = os.path.join(DEVEL_DIR, 'gnome-terminal-colors')
 if not os.path.exists(GNOME_TERMINAL_COLORS_DIR):
     run('git clone git@github.com:jpmelos/gnome-terminal-colors')
-os.chdir(GNOME_TERMINAL_COLORS_DIR)
-run('bash install.sh')
+    os.chdir(GNOME_TERMINAL_COLORS_DIR)
+    run('bash install.sh')
