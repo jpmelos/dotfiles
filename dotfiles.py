@@ -69,6 +69,14 @@ def copy_configuration_files_and_dirs():
             shutil.copy(ITEM_NAME, HOME_COPY)
 
 
+def create_vim_subdirs():
+    VIM_DIR = os.path.expanduser('~/.vim')
+    VIM_SUBDIRS = ['backup', 'swap', 'undo']
+
+    for directory in VIM_SUBDIRS:
+        os.makedirs(os.path.join(VIM_DIR, directory), exist_ok=True)
+
+
 def source(filename, dest):
     SOURCE_LINE = 'source ~/{filename}'.format(filename=filename)
     dest_file = os.path.join(HOME_DIR, dest)
@@ -84,6 +92,8 @@ copy_configuration_files_and_dirs()
 source('.mybashrc', '.bashrc')
 source('.myprofile', '.profile')
 source('.mybash_profile', '.bash_profile')
+
+create_vim_subdirs()
 
 VUNDLE_DIR = os.path.join(HOME_DIR, '.vim/bundle/Vundle.vim')
 if not os.path.exists(VUNDLE_DIR):
