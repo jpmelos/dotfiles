@@ -31,14 +31,24 @@
     di = diff
     dic = diff --cached
     dst = diff --stat
+    fe = fetch --prune
+    gr = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr)
     ls = ls-files
     mg = merge --no-ff
     pa = add --patch
     pu = pull --rebase
     rb = rebase
+    sa = stash save --include-untracked
     sh = show
     shf = diff-tree --no-commit-id --name-only -r HEAD
     st = status -u
+
+[status]
+    showUntrackedFiles = all
+
+[merge]
+    ff = false
+    conflictStyle = diff3
 
 [push]
     default = simple
