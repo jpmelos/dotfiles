@@ -77,3 +77,11 @@ nocolors() {
 showpackages() {
     comm -23 <(apt-mark showmanual | sort -u) <(gzip -dc /var/log/installer/initial-status.gz | sed -n 's/^Package: //p' | sort -u)
 }
+
+export VIRTUAL_ENV_DISABLE_PROMPT=1
+cd
+if [[ -n $(which python3.6) && ! -d ~/.myvenv ]]; then
+    python3.6 -m venv myvenv
+fi
+source myvenv/bin/activate
+cd - > /dev/null
