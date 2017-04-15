@@ -11,7 +11,6 @@ HOME_DIR = os.path.expanduser('~')
 DEVEL_DIR = os.path.join(HOME_DIR, 'devel')
 
 files = [
-    '.fonts',
     '.gitconfig',
     'localserver.conf',
     '.mybashrc',
