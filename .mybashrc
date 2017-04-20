@@ -87,3 +87,5 @@ if [[ -n $(which python3.6) && ! -d ~/.myvenv ]]; then
 fi
 source myvenv/bin/activate
 cd - > /dev/null
+
+alias activate='source ~/myvenv/bin/activate'
