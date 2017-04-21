@@ -28,6 +28,18 @@ call vundle#end()            " required
 
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" COLORS
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+" popup menu with clearer colors
+highlight Pmenu ctermfg=Black ctermbg=White
+highlight PmenuSel ctermfg=Black ctermbg=LightGray
+
+" enable syntax highlighting
+syntax on
+
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " BASIC SETTINGS
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
@@ -36,9 +48,6 @@ filetype plugin indent on
 
 " mappings default leader
 let mapleader = ','
-
-" enable syntax highlighting
-syntax on
 
 " set UFT-8 encoding
 set encoding=utf-8
