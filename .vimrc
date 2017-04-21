@@ -23,9 +23,6 @@ Plugin 'scrooloose/nerdtree'
 Plugin 'ctrlpvim/ctrlp.vim'
 Plugin 'embear/vim-localvimrc'
 
-" color schemes
-Plugin 'jnurmine/Zenburn'
-
 " All of your Plugins must be added before the following line
 call vundle#end()            " required
 
@@ -126,13 +123,6 @@ set undodir=~/.vim/undo//
 
 " autoclose YouCompleteMe helper window
 let g:ycm_autoclose_preview_window_after_completion=1
-
-
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" COLOR SCHEME
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
-colorscheme zenburn
 
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
