@@ -82,10 +82,13 @@ showpackages() {
 }
 
 cd
-if [[ -n $(which python3.6) && ! -d ~/.myvenv ]]; then
+if [[ -n $(which python3.6) && ! -d ~/myvenv ]]; then
     python3.6 -m venv myvenv
+    source myvenv/bin/activate
+    pip install -U pip setuptools
+else
+    source myvenv/bin/activate
 fi
-source myvenv/bin/activate
 cd - > /dev/null
 
 alias activate='source ~/myvenv/bin/activate'
