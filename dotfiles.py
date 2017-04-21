@@ -5,7 +5,8 @@ import shlex
 import shutil
 import subprocess
 
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
+HERE = os.path.dirname(os.path.abspath(__file__))
+os.chdir(HERE)
 
 HOME_DIR = os.path.expanduser('~')
 DEVEL_DIR = os.path.join(HOME_DIR, 'devel')
@@ -18,26 +19,7 @@ files = [
     ('.myprofile', '.mybash_profile'),
     '.tmux.conf',
     '.vimrc',
-
-    # Sublime Text files
-    ('sublime-text/Preferences.sublime-settings',
-     '.config/sublime-text-3/Packages/User/Preferences.sublime-settings'),
-    ('sublime-text/HTML.sublime-settings',
-     '.config/sublime-text-3/Packages/User/HTML.sublime-settings'),
-    ('sublime-text/Sass.sublime-settings',
-     '.config/sublime-text-3/Packages/User/Sass.sublime-settings'),
-    ('sublime-text/JavaScript.sublime-settings',
-     '.config/sublime-text-3/Packages/User/JavaScript.sublime-settings'),
-    ('sublime-text/JSON.sublime-settings',
-     '.config/sublime-text-3/Packages/User/JSON.sublime-settings'),
-    ('sublime-text/Python.sublime-settings',
-     '.config/sublime-text-3/Packages/User/Python.sublime-settings'),
-    ('sublime-text/PHP.sublime-settings',
-     '.config/sublime-text-3/Packages/User/PHP.sublime-settings'),
-    ('sublime-text/Shell-Unix-Generic.sublime-settings',
-     '.config/sublime-text-3/Packages/User/Shell-Unix-Generic.sublime-settings'),
-    ('sublime-text/project_manager.sublime-settings',
-     '.config/sublime-text-3/Packages/User/project_manager.sublime-settings'),
+    ('sublime-text', '.config/sublime-text-3/Packages/User'),
 ]
 
 
@@ -53,19 +35,20 @@ def run(command, *args, **kwargs):
 def copy_configuration_files_and_dirs():
     for item in files:
         if isinstance(item, tuple):
-            ITEM_NAME = item[0]
-            HOME_COPY = os.path.join(HOME_DIR, item[1])
+            ITEM_PATH = os.path.join(HERE, item[0])
+            HOME_PATH = os.path.join(HOME_DIR, item[1])
         else:
-            ITEM_NAME = item
-            HOME_COPY = os.path.join(HOME_DIR, item)
+            ITEM_PATH = os.path.join(HERE, item)
+            HOME_PATH = os.path.join(HOME_DIR, item)
 
-        if os.path.isdir(ITEM_NAME):
-            if os.path.exists(HOME_COPY):
-                shutil.rmtree(HOME_COPY)
-            shutil.copytree(ITEM_NAME, HOME_COPY)
-        else:
-            os.makedirs(os.path.dirname(HOME_COPY), exist_ok=True)
-            shutil.copy(ITEM_NAME, HOME_COPY)
+        if os.path.exists(HOME_PATH):
+            if os.path.isdir(HOME_PATH) and not os.path.islink(HOME_PATH):
+                shutil.rmtree(HOME_PATH)
+            else:
+                os.remove(HOME_PATH)
+
+        os.makedirs(os.path.dirname(HOME_PATH), exist_ok=True)
+        os.symlink(ITEM_PATH, HOME_PATH)
 
 
 def create_vim_subdirs():
@@ -96,12 +79,4 @@ create_vim_subdirs()
 
 VUNDLE_DIR = os.path.join(HOME_DIR, '.vim/bundle/Vundle.vim')
 if not os.path.exists(VUNDLE_DIR):
-    run('git clone https://github.com/gmarik/Vundle.vim.git '
-        '{}'.format(VUNDLE_DIR))
-
-os.chdir(DEVEL_DIR)
-GNOME_TERMINAL_COLORS_DIR = os.path.join(DEVEL_DIR, 'gnome-terminal-colors')
-if not os.path.exists(GNOME_TERMINAL_COLORS_DIR):
-    run('git clone git@github.com:jpmelos/gnome-terminal-colors')
-    os.chdir(GNOME_TERMINAL_COLORS_DIR)
-    run('bash install.sh')
+    run('git clone https://github.com/gmarik/Vundle.vim.git {}'.format(VUNDLE_DIR))
