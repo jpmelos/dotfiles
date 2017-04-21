@@ -37,15 +37,6 @@ dico() {
     git diff $(git status -s --porcelain | \grep -v "^ D" | cut -b4-)
 }
 
-# Reduce images.
-# Usage: redimg JPG ==> Reduce all JPG images (this is case-sensitive).
-redimg() {
-    for file in *.$1; do
-        convert "$file" -resize 600 -quality 50 "$file"
-	composite -dissolve 30% -gravity southeast -quality 100 "$2" "$file" "$file"
-    done
-}
-
 # Serves current working dir in 0.0.0.0:80
 localserver() {
     docker run \
