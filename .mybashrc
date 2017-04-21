@@ -72,14 +72,18 @@ showpackages() {
     comm -23 <(apt-mark showmanual | sort -u) <(gzip -dc /var/log/installer/initial-status.gz | sed -n 's/^Package: //p' | sort -u)
 }
 
-cd
-if [[ -n $(which python3.6) && ! -d ~/myvenv ]]; then
-    python3.6 -m venv myvenv
-    source myvenv/bin/activate
-    pip install -U pip setuptools
-else
-    source myvenv/bin/activate
-fi
-cd - > /dev/null
+if [[ -n $(which python3.6) ]]; then
+    cd
+    if [[ ! -d ~/myvenv ]]; then
+        python3.6 -m venv myvenv
+        source myvenv/bin/activate
+        pip install -U pip setuptools
+    else
+        source myvenv/bin/activate
+    fi
+    cd - > /dev/null
 
-alias activate='source ~/myvenv/bin/activate'
+    alias activate='source ~/myvenv/bin/activate'
+else
+    echo "Install Python 3.6 to enable default virtual environment"
+fi
