@@ -4,7 +4,7 @@
 PS1='\[\e[1;32m\][\u@\h \W]\$\[\e[0m\] '
 
 # Sets default editor for various commands
-EDITOR=$(which vim)
+export EDITOR=$(which vim)
 
 # Make grep and other commands show more colors
 export GREP_COLORS="fn=37"
