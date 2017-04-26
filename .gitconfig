@@ -47,7 +47,6 @@
     showUntrackedFiles = all
 
 [merge]
-    ff = false
     conflictStyle = diff3
 
 [push]
