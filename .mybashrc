@@ -24,6 +24,7 @@ export PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a;
 
 alias cal='cal -3'
 alias cp='cp -i'
+alias dc='docker-compose'
 alias grep='grep --color=always --binary-files=without-match -n'
 alias less='less -r'
 alias list='ls -FhAls --color=never | less -r'
