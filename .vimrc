@@ -193,6 +193,8 @@ nnoremap <leader>sv :source $MYVIMRC<CR>:nohls<CR>
 " toggle search
 nnoremap <F5> /\v
 
+nnoremap <F4> :bw<CR>
+
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " STATUS LINE
