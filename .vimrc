@@ -105,8 +105,6 @@ set softtabstop=4     " tab stops are 4 spaces
 set shiftwidth=4      " tab stops are 4 spaces
 set expandtab         " tab stops become spaces
 
-set colorcolumn=120   " highlight max column
-
 " always displays file name, current line and column number
 set laststatus=2
 
