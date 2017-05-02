@@ -34,7 +34,7 @@ alias screen='screen -rd || screen'
 alias tail="tail -f"
 alias tmux='tmux attach || tmux'
 alias vim="vim -O"
-alias pytags="ctags --languages=python -R ."
+alias webtags="ctags --languages=python,javascript -R $1"
 
 # Shows git diff, excluding deleted files.
 dico() {
