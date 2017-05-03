@@ -226,15 +226,14 @@ augroup END
 " NERDTREE CONFIGURATION
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
-noremap <F9> :NERDTreeToggle<CR>
+noremap <F9> :NERDTreeToggle<CR><C-W>=
 
 augroup nerdtree
     autocmd!
 
+    " Automatically open NERDTree if Vim opens with no file
     autocmd StdinReadPre * let s:std_in=1
-
-    " close NERDtree automatically if it's the only thing open
-    autocmd BufEnter * if (winnr("$") == 1 && exists("b:NERDTree") && b:NERDTree.isTabTree()) | q | endif
+    autocmd VimEnter * if argc() == 0 && !exists("s:std_in") | NERDTree | endif
 
 augroup END
 
