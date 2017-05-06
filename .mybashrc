@@ -22,6 +22,7 @@ shopt -s histappend
 export PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a;
                        history -c; history -r"
 
+alias activate='source ~/myvenv/bin/activate'
 alias cal='cal -3'
 alias cp='cp -i'
 alias dc='docker-compose'
@@ -76,18 +77,36 @@ showpackages() {
     comm -23 <(apt-mark showmanual | sort -u) <(gzip -dc /var/log/installer/initial-status.gz | sed -n 's/^Package: //p' | sort -u)
 }
 
-if [[ -n $(which python3.6) ]]; then
-    cd
-    if [[ ! -d ~/myvenv ]]; then
-        python3.6 -m venv myvenv
-        source myvenv/bin/activate
-        pip install -U pip setuptools
-    else
-        source myvenv/bin/activate
+CURRENT_PWD=$PWD
+while [[ "$PWD" != "/" ]]; do
+    if [[ "${PWD##*/}" == *_local ]]; then
+        source venv/bin/activate
+        cd $CURRENT_PWD
+        unset CURRENT_PWD
+        VENV_SET=1
+        break
     fi
-    cd - > /dev/null
 
-    alias activate='source ~/myvenv/bin/activate'
+    cd ..
+done
+
+if [[ -z $VENV_SET ]]; then
+    cd $CURRENT_PWD
+    unset CURRENT_PWD
+
+    if [[ -n $(which python3.6) ]]; then
+        cd
+        if [[ ! -d myvenv ]]; then
+            python3.6 -m venv myvenv
+            source myvenv/bin/activate
+            pip install -U pip setuptools
+        else
+            source myvenv/bin/activate
+        fi
+        cd - > /dev/null
+    else
+        echo "Install Python 3.6 to enable default virtual environment"
+    fi
 else
-    echo "Install Python 3.6 to enable default virtual environment"
+    unset VENV_SET
 fi
