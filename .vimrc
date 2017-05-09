@@ -23,6 +23,7 @@ Plugin 'scrooloose/nerdtree'
 Plugin 'ctrlpvim/ctrlp.vim'
 Plugin 'embear/vim-localvimrc'
 Plugin 'tpope/vim-fugitive'
+Plugin 'ap/vim-buftabline'
 
 " All of your Plugins must be added before the following line
 call vundle#end()            " required
@@ -132,6 +133,9 @@ set undodir=~/.vim/undo//
 " autoclose YouCompleteMe helper window
 let g:ycm_autoclose_preview_window_after_completion=1
 
+" allow hidden buffers
+set hidden
+
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " MAPPINGS
@@ -144,10 +148,10 @@ nnoremap k gk
 vnoremap k gk
 
 " navigate through splits
-nnoremap <C-J> <C-W><C-J>
-nnoremap <C-K> <C-W><C-K>
-nnoremap <C-L> <C-W><C-L>
-nnoremap <C-H> <C-W><C-H>
+nnoremap <C-J> <C-W>j
+nnoremap <C-K> <C-W>k
+nnoremap <C-L> <C-W>l
+nnoremap <C-H> <C-W>h
 
 " move lines in a file
 nnoremap - ddp
@@ -190,7 +194,12 @@ nnoremap <leader>sv :source $MYVIMRC<CR>:nohls<CR>
 " toggle search
 nnoremap <F5> /\v
 
+" close buffers
 nnoremap <F4> :bw<CR>
+
+" navigate through "virtual tabs" by vim-buftabline
+nnoremap <C-N> :bprev<CR>
+nnoremap <C-M> :bnext<CR>
 
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
