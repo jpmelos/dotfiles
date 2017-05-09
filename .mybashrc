@@ -31,11 +31,11 @@ alias less='less -r'
 alias list='ls -FhAls --color=never | less -r'
 alias ls='ls -F --color=never'
 alias mv='mv -i'
+alias pytags="ctags --languages=python -R $1"
 alias screen='screen -rd || screen'
 alias tail="tail -f"
 alias tmux='tmux attach || tmux'
 alias vim="vim -O"
-alias webtags="ctags --languages=python,javascript -R $1"
 
 # Shows git diff, excluding deleted files.
 dico() {
