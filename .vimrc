@@ -217,7 +217,7 @@ augroup general_commands
     autocmd BufWritePre * %s/\s\+$//e
 
     " for full-stack development
-    au BufNewFile,BufRead *.html,*.css,*.js set tabstop=2 softtabstop=2 shiftwidth=2
+    au BufNewFile,BufRead *.html,*.css,*.js,*.jsx set tabstop=2 softtabstop=2 shiftwidth=2
 
 augroup END
 
