@@ -237,7 +237,7 @@ augroup END
 " NERDTREE CONFIGURATION
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
-noremap <F9> :NERDTreeToggle<CR><C-W>=
+noremap <F9> :NERDTreeToggle<CR>
 
 augroup nerdtree
     autocmd!
