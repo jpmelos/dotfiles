@@ -80,11 +80,13 @@ showpackages() {
 CURRENT_PWD=$PWD
 while [[ "$PWD" != "/" ]]; do
     if [[ "${PWD##*/}" == *_local ]]; then
-        source venv/bin/activate
-        cd $CURRENT_PWD
-        unset CURRENT_PWD
-        VENV_SET=1
-        break
+        if [[ -d "venv" ]]; then
+            source venv/bin/activate
+            cd $CURRENT_PWD
+            unset CURRENT_PWD
+            VENV_SET=1
+            break
+        fi
     fi
 
     cd ..
