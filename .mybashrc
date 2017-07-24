@@ -22,7 +22,6 @@ shopt -s histappend
 export PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a;
                        history -c; history -r"
 
-alias activate='source ~/myvenv/bin/activate'
 alias cal='cal -3'
 alias cp='cp -i'
 alias dc='docker-compose'
@@ -75,6 +74,13 @@ nocolors() {
 
 showpackages() {
     comm -23 <(apt-mark showmanual | sort -u) <(gzip -dc /var/log/installer/initial-status.gz | sed -n 's/^Package: //p' | sort -u)
+}
+
+cleandocker() {
+    docker rm -f $(docker ps -aq)
+    docker rmi $(docker images -aqf dangling=true)
+    docker volume rm $(docker volume ls -q)
+    docker network rm $(docker network ls -q)
 }
 
 CURRENT_PWD=$PWD
