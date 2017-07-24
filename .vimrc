@@ -294,6 +294,3 @@ function! s:GrepOperator(type)
 
     let @@ = saved_unnamed_register
 endfunction
-
-nnoremap <Leader>n :cnext<CR>
-nnoremap <Leader>b :cprevious<CR>
