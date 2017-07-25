@@ -78,9 +78,13 @@ showpackages() {
 
 cleandocker() {
     docker rm -f $(docker ps -aq)
-    docker rmi $(docker images -aqf dangling=true)
+    cleanimages
     docker volume rm $(docker volume ls -q)
     docker network rm $(docker network ls -q)
+}
+
+cleanimages() {
+    docker rmi $(docker images -aqf dangling=true)
 }
 
 CURRENT_PWD=$PWD
