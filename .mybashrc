@@ -54,9 +54,9 @@ localserver() {
 }
 
 
-# Runs a command and show all files modified by it, comparing date of last
-# modification. So, there might be false positives, but still a pretty good
-# idea.
+# Runs a command and show all files modified by it in the current directory,
+# comparing date of last modification. So, there might be false positives,
+# but still a pretty good idea.
 supervise() {
     NOW="$(date "+%F %T.%N")"
     sleep 1
@@ -72,10 +72,12 @@ nocolors() {
     done
 }
 
+# Show all manually installed packages.
 showpackages() {
     comm -23 <(apt-mark showmanual | sort -u) <(gzip -dc /var/log/installer/initial-status.gz | sed -n 's/^Package: //p' | sort -u)
 }
 
+# Deletes all unused Docker entities created by users.
 cleandocker() {
     docker rm -f $(docker ps -aq)
     cleanimages
@@ -83,10 +85,12 @@ cleandocker() {
     docker network rm $(docker network ls -q)
 }
 
+# Delete all dangling Docker images.
 cleanimages() {
     docker rmi $(docker images -aqf dangling=true)
 }
 
+# Activates the first Python venv contained in a *_local directory.
 CURRENT_PWD=$PWD
 while [[ "$PWD" != "/" ]]; do
     if [[ "${PWD##*/}" == *_local ]]; then
@@ -102,6 +106,7 @@ while [[ "$PWD" != "/" ]]; do
     cd ..
 done
 
+# If no venv set, activate the default myvenv from $HOME.
 if [[ -z $VENV_SET ]]; then
     cd $CURRENT_PWD
     unset CURRENT_PWD
