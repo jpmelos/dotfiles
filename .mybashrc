@@ -79,15 +79,12 @@ showpackages() {
 
 # Deletes all unused Docker entities created by users.
 cleandocker() {
-    docker rm -f $(docker ps -aq)
-    cleanimages
-    docker volume rm $(docker volume ls -q)
-    docker network rm $(docker network ls -q)
+    docker system prune
 }
 
 # Delete all dangling Docker images.
 cleanimages() {
-    docker rmi $(docker images -aqf dangling=true)
+    docker image prune
 }
 
 # Activates the first Python venv contained in a *_local directory.
