@@ -13,8 +13,8 @@ DEVEL_DIR = os.path.join(HOME_DIR, 'devel')
 
 files = [
     '.gitconfig',
-    'localserver.conf',
     '.mybashrc',
+    ('localserver.conf', 'nginx/localserver.conf'),
     '.myprofile',
     ('.myprofile', '.mybash_profile'),
     '.tmux.conf',
