@@ -1,4 +1,6 @@
 # vim:ft=sh
+#
+# We are going to use $HOME =~ ^/Users.* as a nice heuristic to detect MacOS.
 
 # For better colors in Vim.
 export TERM=xterm-256color
@@ -35,6 +37,11 @@ alias screen='screen -rd || screen'
 alias tail="tail -f"
 alias tmux='tmux attach || tmux'
 alias vim="vim -O"
+
+if [[ $HOME =~ ^/Users.* ]]; then
+    alias list='ls -FhAls | less -r'
+    alias ls='ls -F'
+fi
 
 # Shows git diff, excluding deleted files.
 dico() {
