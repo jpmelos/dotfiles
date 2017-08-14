@@ -39,9 +39,6 @@ call vundle#end()            " required
 highlight Pmenu ctermfg=Black ctermbg=White
 highlight PmenuSel ctermfg=Black ctermbg=LightGray
 
-" strings in more readable color
-hi String ctermfg=Yellow
-
 " enable syntax highlighting
 syntax on
 
@@ -250,6 +247,8 @@ augroup nerdtree
     autocmd VimEnter * if argc() == 0 && !exists("s:std_in") | NERDTree | endif
 
 augroup END
+
+let NERDTreeShowHidden=1
 
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
