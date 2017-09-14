@@ -232,6 +232,14 @@ augroup general_commands
 
 augroup END
 
+augroup python_syntax
+    autocmd!
+
+    " remove file keyword from syntax
+    autocmd BufNewFile,BufRead *.py syn keyword noHi file
+
+augroup END
+
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " NERDTREE CONFIGURATION
