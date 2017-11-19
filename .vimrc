@@ -76,6 +76,9 @@ set ignorecase " ignore case when searching...
 set smartcase  " unless it contais uppercase
 set hls        " highlight search results
 
+" terminal background dark, adapt colors
+set background=dark
+
 " show line numbers
 set number
 
