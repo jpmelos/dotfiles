@@ -1,5 +1,13 @@
 " VIM Configuration File
 " Author: João Sampaio <jpmelos@gmail.com>
+"
+" F mappings already used:
+" F4: Close current buffer
+" F5: Search
+" F6<2,4,8>: Set tabs to 2, 4, or 8.
+" F8: Paste toggle
+" F9: Toggle NERDTree
+" F12: Keep cursor centered in screen
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " VUNDLE SETUP
@@ -226,7 +234,7 @@ augroup general_commands
     autocmd BufWritePre * %s/\s\+$//e
 
     " for full-stack development
-    au BufNewFile,BufRead *.html,*.css,*.js,*.jsx set tabstop=2 softtabstop=2 shiftwidth=2
+    " au BufNewFile,BufRead *.html,*.css,*.js,*.jsx set tabstop=2 softtabstop=2 shiftwidth=2
 
 augroup END
 
@@ -309,3 +317,12 @@ endfunction
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 map <Leader>a :call SyntaxAttr()<CR>
+
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" SET INDENT QUICKLY
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+nnoremap <F6>2 :set tabstop=2 softtabstop=2 shiftwidth=2<CR>
+nnoremap <F6>4 :set tabstop=4 softtabstop=4 shiftwidth=4<CR>
+nnoremap <F6>8 :set tabstop=8 softtabstop=8 shiftwidth=8<CR>
