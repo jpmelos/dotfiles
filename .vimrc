@@ -5,6 +5,7 @@
 " F4: Close current buffer
 " F5: Search
 " F6<2,4,8>: Set tabs to 2, 4, or 8.
+" F7: Open file in GitHub
 " F8: Paste toggle
 " F9: Toggle NERDTree
 " F12: Keep cursor centered in screen
@@ -35,6 +36,8 @@ Plugin 'ap/vim-buftabline'
 Plugin 'pangloss/vim-javascript'
 Plugin 'mxw/vim-jsx'
 Plugin 'vim-scripts/SyntaxAttr.vim'
+Plugin 'tyru/open-browser.vim'
+Plugin 'tyru/open-browser-github.vim'
 
 " All of your Plugins must be added before the following line
 call vundle#end()            " required
@@ -208,6 +211,9 @@ nnoremap <F4> :bw<CR>
 " navigate through "virtual tabs" by vim-buftabline
 nnoremap <C-N> :bprev<CR>
 nnoremap <C-M> :bnext<CR>
+
+nnoremap <F7> :OpenGithubFile<CR>
+vnoremap <F7> :OpenGithubFile<CR>
 
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
