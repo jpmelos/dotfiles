@@ -147,6 +147,9 @@ let g:ycm_autoclose_preview_window_after_completion=1
 " allow hidden buffers
 set hidden
 
+" set fold to start open
+set foldlevelstart=20
+
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " MAPPINGS
