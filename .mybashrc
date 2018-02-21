@@ -99,6 +99,12 @@ cleanimages() {
     docker image prune
 }
 
+# Add ~/bin to PATH (this has to come before activating virtualenvs)
+if [[ ! -d ~/bin ]]; then
+    mkdir ~/bin
+fi
+export PATH=~/bin:$PATH
+
 # Activates the first Python venv contained in a *_local directory.
 CURRENT_PWD=$PWD
 while [[ "$PWD" != "/" ]]; do
