@@ -6,9 +6,9 @@
 " F5: Search
 " F6<2,4,8>: Set tabs to 2, 4, or 8.
 " F7: Open file in GitHub
-" F8: Paste toggle
+" F8: Toggle paste mode
 " F9: Toggle NERDTree
-" F12: Keep cursor centered in screen
+" F12: Toggle cursor centered in screen
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " VUNDLE SETUP
@@ -265,15 +265,6 @@ augroup END
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 noremap <F9> :NERDTreeToggle<CR>
-
-augroup nerdtree
-    autocmd!
-
-    " Automatically open NERDTree if Vim opens with no file
-    autocmd StdinReadPre * let s:std_in=1
-    autocmd VimEnter * if argc() == 0 && !exists("s:std_in") | NERDTree | endif
-
-augroup END
 
 let NERDTreeShowHidden=1
 
