@@ -51,9 +51,10 @@ call vundle#end()            " required
 highlight Pmenu ctermfg=Black ctermbg=White
 highlight PmenuSel ctermfg=Black ctermbg=LightGray
 
-" strings and numbers in more readable color
+" Write things in more readable colors against dark backgrounds
 hi String ctermfg=Yellow
 hi pythonNumber ctermfg=Green
+hi makeCommands ctermfg=Green
 
 " enable syntax highlighting
 syntax on
