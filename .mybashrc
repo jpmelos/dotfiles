@@ -34,10 +34,11 @@ alias ls='ls -F --color=never'
 alias mv='mv -i'
 alias pytags="ctags --languages=python -R $1"
 alias screen='screen -rd || screen'
-alias tail="tail -f"
+alias tail='tail -f'
 alias tmux='tmux attach || tmux'
-alias vim="vim -O"
+alias vim='vim -O'
 
+# We are going to use $HOME =~ ^/Users.* as a nice heuristic to detect MacOS.
 if [[ $HOME =~ ^/Users.* ]]; then
     alias list='ls -FhAls | less -r'
     alias ls='ls -F'
@@ -105,40 +106,18 @@ if [[ ! -d ~/bin ]]; then
 fi
 export PATH=~/bin:$PATH
 
-# Activates the first Python venv contained in a *_local directory.
-CURRENT_PWD=$PWD
-while [[ "$PWD" != "/" ]]; do
-    if [[ "${PWD##*/}" == *_local ]]; then
-        if [[ -d "venv" ]]; then
-            source venv/bin/activate
-            cd $CURRENT_PWD
-            unset CURRENT_PWD
-            VENV_SET=1
-            break
-        fi
-    fi
-
-    cd ..
-done
-
-# If no venv set, activate the default myvenv from $HOME.
-if [[ -z $VENV_SET ]]; then
-    cd $CURRENT_PWD
-    unset CURRENT_PWD
-
-    if [[ -n $(which python3.6) ]]; then
-        cd
-        if [[ ! -d myvenv ]]; then
-            python3.6 -m venv myvenv
-            source myvenv/bin/activate
-            pip install -U pip setuptools
-        else
-            source myvenv/bin/activate
-        fi
-        cd - > /dev/null
+# Activate default virtualenv myvenv
+if [[ -n $(which python3.6) ]]; then
+    cd
+    if [[ ! -d myvenv ]]; then
+        python3.6 -m venv myvenv
+        source myvenv/bin/activate
+        pip install -U pip setuptools wheel
+        pip install -r basicvenv.txt
     else
-        echo "Install Python 3.6 to enable default virtual environment"
+        source myvenv/bin/activate
     fi
+    cd - > /dev/null
 else
-    unset VENV_SET
+    echo "Install Python 3.6 to enable default virtual environment"
 fi

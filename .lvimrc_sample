@@ -1,4 +1,4 @@
-" do stuff you want to do on every buffer enter event
+" do stuff you want to do on every "buffer enter" event
 
 " guard to end loading if it has been loaded for the currently edited file
 if g:localvimrc_sourced_once_for_file
