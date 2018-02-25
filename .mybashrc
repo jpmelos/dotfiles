@@ -51,19 +51,24 @@ dico() {
 
 # Serves current working dir in 0.0.0.0:80
 localserver() {
+    RANDOM_PORT=$(( $RANDOM % 16385 + 49152 ))
+
     if [[ ! -d /tmp/nginx ]]; then
         cp -RL ~/nginx /tmp
     fi
 
+    echo "Connect to localhost:$RANDOM_PORT"
     docker run \
         --rm \
         -ti \
         --name localserver \
         -v "$PWD:/usr/share/nginx/html:ro" \
         -v "/tmp/nginx:/copy_on_start:ro" \
-        -p 27386:80 \
+        -p $RANDOM_PORT:80 \
         --entrypoint bash \
         nginx -c "cp /copy_on_start/localserver.conf /etc/nginx/nginx.conf; nginx"
+
+    unset RANDOM_PORT
 }
 
 
