@@ -138,8 +138,8 @@ set splitbelow
 " ignore __pycache__ and .pyc files
 set wildignore+=*/__pycache__/*,*.pyc,*/.git/*
 
-" look for tags in parent directories
-set tags=./tags;,tags;
+" look for tags in current directory and all the way up to the root
+set tags=tags;/
 
 " save temporary files to a default directory
 set backupdir=~/.vim/backup//
