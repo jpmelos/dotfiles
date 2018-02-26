@@ -1,3 +1,2 @@
 awscli
 docker-compose
-pipenv
