@@ -118,7 +118,7 @@ if [[ -n $(which python3.6) ]]; then
         python3.6 -m venv myvenv
         source myvenv/bin/activate
         pip install -U pip setuptools wheel
-        pip install -r basicvenv.txt
+        pip install -r .basicvenv.txt
     else
         source myvenv/bin/activate
     fi
