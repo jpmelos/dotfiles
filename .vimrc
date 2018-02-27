@@ -55,6 +55,7 @@ hi PmenuSel ctermfg=Black ctermbg=LightGray
 hi String ctermfg=Yellow
 hi pythonNumber ctermfg=Green
 hi makeCommands ctermfg=Green
+hi javaBoolean ctermfg=14 cterm=bold
 
 " enable syntax highlighting
 syntax on
