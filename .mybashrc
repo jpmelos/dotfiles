@@ -54,8 +54,9 @@ localserver() {
     RANDOM_PORT=$(( $RANDOM % 16385 + 49152 ))
 
     if [[ ! -d /tmp/nginx ]]; then
-        cp -RL ~/nginx /tmp
+        mkdir /tmp/nginx
     fi
+    cp ~/.localserver.conf /tmp/nginx/localserver.conf
 
     echo "Connect to localhost:$RANDOM_PORT"
     docker run \
