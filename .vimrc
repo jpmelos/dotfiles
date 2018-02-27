@@ -48,8 +48,8 @@ call vundle#end()            " required
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 " popup menu with clearer colors
-highlight Pmenu ctermfg=Black ctermbg=White
-highlight PmenuSel ctermfg=Black ctermbg=LightGray
+hi Pmenu ctermfg=Black ctermbg=White
+hi PmenuSel ctermfg=Black ctermbg=LightGray
 
 " Write things in more readable colors against dark backgrounds
 hi String ctermfg=Yellow
