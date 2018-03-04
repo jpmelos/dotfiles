@@ -106,11 +106,10 @@ cleanimages() {
     docker image prune
 }
 
-# Add ~/bin to PATH (this has to come before activating virtualenvs)
+# Create ~/bin
 if [[ ! -d ~/bin ]]; then
     mkdir ~/bin
 fi
-export PATH=~/bin:$PATH
 
 # Activate default virtualenv myvenv
 if [[ -n $(which python3.6) ]]; then
