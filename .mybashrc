@@ -58,7 +58,7 @@ localserver() {
     fi
     cp ~/.localserver.conf /tmp/nginx/localserver.conf
 
-    echo "Connect to localhost:$RANDOM_PORT"
+    echo "Connect to http://localhost:$RANDOM_PORT"
     docker run \
         --rm \
         -ti \
@@ -115,20 +115,4 @@ update() {
 # Create ~/bin
 if [[ ! -d ~/bin ]]; then
     mkdir ~/bin
-fi
-
-# Activate default virtualenv myvenv
-if [[ -n $(which python3.6) ]]; then
-    cd
-    if [[ ! -d myvenv ]]; then
-        python3.6 -m venv myvenv
-        source myvenv/bin/activate
-        pip install -U pip setuptools wheel
-        pip install -r .basicvenv.txt
-    else
-        source myvenv/bin/activate
-    fi
-    cd - > /dev/null
-else
-    echo "Install Python 3.6 to enable default virtual environment"
 fi
