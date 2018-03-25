@@ -20,6 +20,7 @@ files = [
     '.tmux.conf',
     '.vimrc',
     ('sublime-text', '.config/sublime-text-3/Packages/User'),
+    '.basicvenv.txt',
 ]
 
 
