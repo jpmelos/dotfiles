@@ -2,6 +2,8 @@
 " Author: João Sampaio <jpmelos@gmail.com>
 "
 " F mappings already used:
+" F2: Remove trailing spaces
+" F3: <available>
 " F4: Close current buffer
 " F5: Search
 " F6<2,4,8>: Set tabs to 2, 4, or 8.
@@ -224,6 +226,8 @@ nnoremap <C-M> :bnext<CR>
 nnoremap <F7> :OpenGithubFile<CR>
 vnoremap <F7> :OpenGithubFile<CR>
 
+nnoremap <F2> :%s/\s\+$//e<CR>
+
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " STATUS LINE
@@ -241,17 +245,6 @@ set statusline+=%3c,%5l/%L\  " show current column, current line/total lines
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " AUTO COMMANDS
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
-augroup general_commands
-    autocmd!
-
-    " remove trailing whitespaces before saving
-    autocmd BufWritePre * %s/\s\+$//e
-
-    " for full-stack development
-    " au BufNewFile,BufRead *.html,*.css,*.js,*.jsx set tabstop=2 softtabstop=2 shiftwidth=2
-
-augroup END
 
 augroup python_syntax
     autocmd!
