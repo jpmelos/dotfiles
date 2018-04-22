@@ -154,3 +154,7 @@ workon() {
         cd -
     fi
 }
+
+delv() {
+    rm -rf ~/venvs/$1
+}
