@@ -132,3 +132,25 @@ if [[ -n $(which python3.6) ]]; then
 else
     echo "Install Python 3.6 to enable default virtual environment"
 fi
+
+workon() {
+    if [[ -z $1 ]]; then
+        . ~/myvenv/bin/activate
+    else
+        if [[ ! -d ~/venvs ]]; then
+            mkdir ~/venvs
+        fi
+
+        cd ~/venvs
+
+        if [[ ! -d $1 ]]; then
+            python3 -m venv $1
+            . $1/bin/activate
+            pip install -U setuptools pip
+        else
+            . $1/bin/activate
+        fi
+
+        cd -
+    fi
+}
