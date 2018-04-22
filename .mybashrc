@@ -151,8 +151,12 @@ workon() {
             . $1/bin/activate
         fi
 
-        cd -
+        cd - > /dev/null
     fi
+}
+
+lsenv() {
+    ls ~/venvs
 }
 
 delv() {
