@@ -14,9 +14,9 @@ DEVEL_DIR = os.path.join(HOME_DIR, 'devel')
 files = [
     '.gitconfig',
     '.mybashrc',
-    '.localserver.conf',
+    ('.mybashrc', '.mybash_profile'),
     '.myprofile',
-    ('.myprofile', '.mybash_profile'),
+    '.localserver.conf',
     '.tmux.conf',
     '.vimrc',
     ('sublime-text', '.config/sublime-text-3/Packages/User'),
