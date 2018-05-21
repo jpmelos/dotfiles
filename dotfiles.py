@@ -11,6 +11,11 @@ os.chdir(HERE)
 HOME_DIR = os.path.expanduser('~')
 DEVEL_DIR = os.path.join(HOME_DIR, 'devel')
 
+IS_LINUX = HOME_DIR.startswith('/home')
+IS_MACOS = HOME_DIR.startswith('/Users')
+if not IS_LINUX and not IS_MACOS:
+    raise Exception("Couldn't recognize your OS.")
+
 files = [
     ('gitconfig', '.gitconfig'),
     ('mybashrc', '.mybashrc'),
@@ -109,9 +114,10 @@ PYENV_VIRTUALENV_DIR = os.path.join(PYENV_DIR, 'plugins', 'pyenv-virtualenv')
 if not os.path.exists(PYENV_DIR):
     run('git clone https://github.com/pyenv/pyenv {}'.format(PYENV_DIR))
     run('git clone https://github.com/pyenv/pyenv-virtualenv {}'.format(PYENV_VIRTUALENV_DIR))
-    run('rm -rf {} {}'.format(
-        os.path.join(HOME_DIR, '.local', 'bin'),
-        os.path.join(HOME_DIR, '.local', 'lib'),
-    ))
+    if IS_LINUX:
+        run('rm -rf {} {}'.format(
+            os.path.join(HOME_DIR, '.local', 'bin'),
+            os.path.join(HOME_DIR, '.local', 'lib'),
+        ))
 
     run('bash install_pyenv.sh')
