@@ -91,8 +91,8 @@ def source(filename, dest, not_found_ok=False):
 
 # Sets up the home directory and the dotfiles
 copy_configuration_files_and_dirs()
-source('.mybashrc', '.bashrc', not_found_ok=True)
 source('.myprofile', '.profile', not_found_ok=True)
+source('.mybashrc', '.bashrc', not_found_ok=True)
 source('.mybash_profile', '.bash_profile', not_found_ok=True)
 
 # Prepares the vim environment
