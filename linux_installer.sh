@@ -1,5 +1,5 @@
 sudo apt-get update
-sudo apt-get install git build-essentials cmake
+sudo apt-get install git build-essential cmake
 
 mkdir -p ~/devel
 cd ~/devel
