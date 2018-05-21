@@ -100,6 +100,7 @@ create_vim_subdirs()
 VUNDLE_DIR = os.path.join(HOME_DIR, '.vim/bundle/Vundle.vim')
 if not os.path.exists(VUNDLE_DIR):
     run('git clone https://github.com/gmarik/Vundle.vim {}'.format(VUNDLE_DIR))
+    run('vim +PluginInstall +qa')
     run('bash install_ycm.sh')
 
 # Installs pyenv and pyenv-virtualenv, and the default myvenv
