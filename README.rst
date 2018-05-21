@@ -1,9 +1,7 @@
 dotfiles
 ========
 
-Clone this repository to your home folder to install configuration.
+Installation
+------------
 
-Install
--------
-
-To install these dotfiles, install Python 3.6 first and then run ``./dotfiles.py``.
+To install these dotfiles, run ``./dotfiles.py`` in a system that has Python 2.7 installed (most Linux boxes and MacOS comes with it by default).
