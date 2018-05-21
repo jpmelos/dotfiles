@@ -29,8 +29,6 @@ alias cp='cp -i'
 alias dc='docker-compose'
 alias grep='grep --color=always --exclude-dir=.git --binary-files=without-match -n'
 alias less='less -r'
-alias list='ls -FhAls --color=never | less -r'
-alias ls='ls -F --color=never'
 alias mv='mv -i'
 alias pytags="ctags --languages=python -R $1"
 alias screen='screen -rd || screen'
@@ -38,11 +36,22 @@ alias tail='tail -f'
 alias tmux='tmux attach || tmux'
 alias vim='vim -O'
 
+alias list='ls -FhAls --color=never | less -r'
+alias ls='ls -F --color=never'
 # We are going to use $HOME =~ ^/Users.* as a nice heuristic to detect MacOS.
 if [[ $HOME =~ ^/Users.* ]]; then
     alias list='ls -FhAls | less -r'
     alias ls='ls -F'
 fi
+
+# Create ~/bin
+mkdir -p ~/bin
+
+# Set up pyenv
+export PYENV_ROOT="$HOME/.pyenv"
+export PATH="$PYENV_ROOT/bin:$PATH"
+eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
 
 # Shows git diff, excluding deleted files.
 dico() {
@@ -96,23 +105,8 @@ showpackages() {
     comm -23 <(apt-mark showmanual | sort -u) <(gzip -dc /var/log/installer/initial-status.gz | sed -n 's/^Package: //p' | sort -u)
 }
 
-# Deletes all unused Docker entities created by users.
-cleandocker() {
-    docker system prune
-}
-
-# Delete all dangling Docker images.
-cleanimages() {
-    docker image prune
-}
-
 update() {
     sudo apt-get update
     sudo apt-get -y dist-upgrade
     sudo apt-get -y autoremove
 }
-
-# Create ~/bin
-if [[ ! -d ~/bin ]]; then
-    mkdir ~/bin
-fi

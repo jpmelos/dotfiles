@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.6
+#!/usr/bin/env python2.7
 
 import os
 import shlex
@@ -12,15 +12,13 @@ HOME_DIR = os.path.expanduser('~')
 DEVEL_DIR = os.path.join(HOME_DIR, 'devel')
 
 files = [
-    '.gitconfig',
-    '.mybashrc',
-    ('.mybashrc', '.mybash_profile'),
-    '.myprofile',
-    '.localserver.conf',
-    '.tmux.conf',
-    '.vimrc',
-    ('sublime-text', '.config/sublime-text-3/Packages/User'),
-    '.basicvenv.txt',
+    ('gitconfig', '.gitconfig'),
+    ('mybashrc', '.mybashrc'),
+    ('mybashrc', '.mybash_profile'),
+    ('myprofile', '.myprofile'),
+    ('localserver.conf', '.localserver.conf'),
+    ('tmux.conf', '.tmux.conf'),
+    ('vimrc', '.vimrc'),
 ]
 
 
@@ -29,27 +27,36 @@ class CommandFailed(Exception):
 
 
 def run(command, *args, **kwargs):
-    if subprocess.run(shlex.split(command), *args, **kwargs).returncode != 0:
+    if subprocess.call(shlex.split(command), *args, **kwargs) != 0:
         raise CommandFailed(command)
 
 
 def copy_configuration_files_and_dirs():
     for item in files:
         if isinstance(item, tuple):
-            ITEM_PATH = os.path.join(HERE, item[0])
-            HOME_PATH = os.path.join(HOME_DIR, item[1])
+            source = item[0]
+            destination = item[1]
+        elif isinstance(item, str):
+            source = item
+            destination = item
         else:
-            ITEM_PATH = os.path.join(HERE, item)
-            HOME_PATH = os.path.join(HOME_DIR, item)
+            raise TypeError("Items in 'files' must be strings or tuples")
 
-        if os.path.exists(HOME_PATH):
-            if os.path.isdir(HOME_PATH) and not os.path.islink(HOME_PATH):
-                shutil.rmtree(HOME_PATH)
+        item_path = os.path.join(HERE, source)
+        home_path = os.path.join(HOME_DIR, destination)
+
+        if os.path.exists(home_path):
+            if os.path.isdir(home_path) and not os.path.islink(home_path):
+                shutil.rmtree(home_path)
             else:
-                os.remove(HOME_PATH)
+                os.remove(home_path)
 
-        os.makedirs(os.path.dirname(HOME_PATH), exist_ok=True)
-        os.symlink(ITEM_PATH, HOME_PATH)
+        try:
+            os.makedirs(os.path.dirname(home_path))
+        except os.error:
+            # Directory already exists, we can continue
+            pass
+        os.symlink(item_path, home_path)
 
 
 def create_vim_subdirs():
@@ -57,27 +64,52 @@ def create_vim_subdirs():
     VIM_SUBDIRS = ['backup', 'swap', 'undo']
 
     for directory in VIM_SUBDIRS:
-        os.makedirs(os.path.join(VIM_DIR, directory), exist_ok=True)
+        try:
+            os.makedirs(os.path.join(VIM_DIR, directory))
+        except os.error:
+            # Directory already exists
+            pass
 
 
-def source(filename, dest):
+def append_to_file(line, dest, not_found_ok=False):
+    if os.path.exists(dest):
+        with open(dest, mode='r') as fp:
+            content = fp.read()
+        if line not in content:
+            with open(dest, mode='a') as fp:
+                fp.write('\n' + line + '\n')
+    else:
+        if not not_found_ok:
+            raise IOError('{} not found'.format(dest))
+
+
+def source(filename, dest, not_found_ok=False):
     SOURCE_LINE = 'source ~/{filename}'.format(filename=filename)
     dest_file = os.path.join(HOME_DIR, dest)
-    if os.path.exists(dest_file):
-        with open(dest_file, mode='r') as fp:
-            content = fp.read()
-        if SOURCE_LINE not in content:
-            with open(dest_file, mode='a') as fp:
-                fp.write('\n' + SOURCE_LINE + '\n')
+    append_to_file(SOURCE_LINE, dest_file, not_found_ok=not_found_ok)
 
 
+# Sets up the home directory and the dotfiles
 copy_configuration_files_and_dirs()
-source('.mybashrc', '.bashrc')
-source('.myprofile', '.profile')
-source('.mybash_profile', '.bash_profile')
+source('.mybashrc', '.bashrc', not_found_ok=True)
+source('.myprofile', '.profile', not_found_ok=True)
+source('.mybash_profile', '.bash_profile', not_found_ok=True)
 
+# Prepares the vim environment
 create_vim_subdirs()
-
 VUNDLE_DIR = os.path.join(HOME_DIR, '.vim/bundle/Vundle.vim')
 if not os.path.exists(VUNDLE_DIR):
-    run('git clone https://github.com/gmarik/Vundle.vim.git {}'.format(VUNDLE_DIR))
+    run('git clone https://github.com/gmarik/Vundle.vim {}'.format(VUNDLE_DIR))
+
+# Installs pyenv and pyenv-virtualenv, and the default myvenv
+PYENV_DIR = os.path.join(HOME_DIR, '.pyenv')
+PYENV_VIRTUALENV_DIR = os.path.join(PYENV_DIR, 'plugins', 'pyenv-virtualenv')
+if not os.path.exists(PYENV_DIR):
+    run('git clone https://github.com/pyenv/pyenv {}'.format(PYENV_DIR))
+    run('git clone https://github.com/pyenv/pyenv-virtualenv {}'.format(PYENV_VIRTUALENV_DIR))
+    run('rm -rf {} {}'.format(
+        os.path.join(HOME_DIR, '.local', 'bin'),
+        os.path.join(HOME_DIR, '.local', 'lib'),
+    ))
+
+    run('bash install_pyenv.sh')
