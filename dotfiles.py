@@ -50,7 +50,7 @@ def copy_configuration_files_and_dirs():
         item_path = os.path.join(HERE, source)
         home_path = os.path.join(HOME_DIR, destination)
 
-        if os.path.exists(home_path):
+        if os.path.lexists(home_path):
             if os.path.isdir(home_path) and not os.path.islink(home_path):
                 shutil.rmtree(home_path)
             else:
