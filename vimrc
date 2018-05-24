@@ -3,8 +3,8 @@
 "
 " F mappings already used:
 " F2: Remove trailing spaces
-" F3: <available>
-" F4: Close current buffer
+" F3: Close current buffer and close window
+" F4: Close current buffer but keep window
 " F5: Search
 " F6<2,4,8>: Set tabs to 2, 4, or 8.
 " F7: Open file in GitHub
@@ -218,6 +218,7 @@ nnoremap <leader>sv :source $MYVIMRC<CR>:nohls<CR>
 nnoremap <F5> /\v
 
 " close buffers
+nnoremap <F3> :bw<CR>
 nnoremap <F4> :BW<CR>
 
 " navigate through "virtual tabs" by vim-buftabline
