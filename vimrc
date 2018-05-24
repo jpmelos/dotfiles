@@ -31,6 +31,7 @@ Plugin 'gmarik/Vundle.vim'
 Plugin 'tmhedberg/SimpylFold'
 Plugin 'Valloric/YouCompleteMe'
 Plugin 'scrooloose/nerdtree'
+Plugin 'qpkorr/vim-bufkill'
 Plugin 'ctrlpvim/ctrlp.vim'
 Plugin 'embear/vim-localvimrc'
 Plugin 'tpope/vim-fugitive'
@@ -217,7 +218,7 @@ nnoremap <leader>sv :source $MYVIMRC<CR>:nohls<CR>
 nnoremap <F5> /\v
 
 " close buffers
-nnoremap <F4> :bw<CR>
+nnoremap <F4> :BW<CR>
 
 " navigate through "virtual tabs" by vim-buftabline
 nnoremap <C-N> :bprev<CR>
