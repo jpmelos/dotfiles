@@ -261,7 +261,7 @@ augroup END
 
 noremap <F9> :NERDTreeToggle<CR>
 
-let NERDTreeShowHidden=1
+let NERDTreeShowHidden = 1
 
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
