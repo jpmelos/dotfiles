@@ -44,6 +44,12 @@ if [[ $HOME =~ ^/Users.* ]]; then
     alias ls='ls -F'
 fi
 
+# We are going to use $HOME =~ ^/Users.* as a nice heuristic to detect MacOS.
+if [[ $HOME =~ ^/Users.* ]]; then
+    source /usr/local/etc/bash_completion.d/git-prompt.sh
+    source /usr/local/etc/bash_completion.d/git-completion.bash
+fi
+
 # Create ~/bin
 mkdir -p ~/bin
 
