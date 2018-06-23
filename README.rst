@@ -6,7 +6,7 @@ Installation on Linux
 
 To install these dotfiles on Linux, run::
 
-    wget -qO - https://raw.githubusercontent.com/jpmelos/dotfiles/master/linux_installer.sh | bash
+    wget -qO - https://raw.githubusercontent.com/jpmelos/dotfiles/master/scripts/linux_installer.sh | bash
 
 Installation on MacOS
 ---------------------
