@@ -4,4 +4,3 @@ flake8
 flake8-blind-except
 flake8-print
 ipython
-pipenv
