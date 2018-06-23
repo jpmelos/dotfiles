@@ -18,5 +18,5 @@ sudo update-alternatives --set gdm3.css /usr/share/gnome-shell/theme/gnome-shell
 mkdir -p ~/devel
 cd ~/devel
 git clone https://github.com/jpmelos/dotfiles
-cd dotfiles
+cd dotfiles/scripts
 python dotfiles.py

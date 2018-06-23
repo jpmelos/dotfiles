@@ -6,6 +6,8 @@ import shutil
 import subprocess
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+DOTFILES = os.path.join(os.path.dirname(HERE), 'dotfiles')
+
 os.chdir(HERE)
 
 HOME_DIR = os.path.expanduser('~')
@@ -47,7 +49,7 @@ def copy_configuration_files_and_dirs():
         else:
             raise TypeError("Items in 'files' must be strings or tuples")
 
-        item_path = os.path.join(HERE, source)
+        item_path = os.path.join(DOTFILES, source)
         home_path = os.path.join(HOME_DIR, destination)
 
         if os.path.lexists(home_path):
@@ -65,7 +67,7 @@ def copy_configuration_files_and_dirs():
 
 
 def create_vim_subdirs():
-    VIM_DIR = os.path.expanduser('~/.vim')
+    VIM_DIR = os.path.join(HOME_DIR, '.vim')
     VIM_SUBDIRS = ['backup', 'swap', 'undo']
 
     for directory in VIM_SUBDIRS:

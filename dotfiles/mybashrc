@@ -119,23 +119,23 @@ update() {
 }
 
 # Prints external IP address
-function get_ext_ip() {
+get_ext_ip() {
   curl ifconfig.co
 }
 
 # Fetches a bogus file, printing the current download transfer speed
-function test_dl_speed() {
+test_dl_speed() {
   wget -O /dev/null http://speedtest.wdc01.softlayer.com/downloads/test500.zip
 }
 
 # Get size of directories in current dir
-function size_dirs() {
+size_dirs() {
     for d in * ; do
         echo "$d:" $(du -ch "$d" 2>/dev/null | tail -1)
     done
 }
 
 # Search for string recursively in current dir
-function cgrep() {
+cgrep() {
     grep --exclude-dir .git -InHiR "$*" ./* 2>/dev/null
 }
