@@ -20,6 +20,7 @@ if not IS_LINUX and not IS_MACOS:
 
 files = [
     ('gitconfig', '.gitconfig'),
+    ('gitignore-global', '.gitignore'),
     ('mybashrc', '.mybashrc'),
     ('mybashrc', '.mybash_profile'),
     ('myprofile', '.myprofile'),
