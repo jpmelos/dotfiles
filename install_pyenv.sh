@@ -22,3 +22,9 @@ pyenv global myvenv
 # Update and install default venv packages
 pip install -U setuptools pip
 pip install -r ~/devel/dotfiles/myvenv.txt
+
+# Install dotfiles environment
+cd ~/devel/dotfiles
+pyenv virtualenv 2.7.15 dotfiles
+pyenv local dotfiles
+pip install -U setuptools pip
