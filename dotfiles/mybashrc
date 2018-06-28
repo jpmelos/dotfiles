@@ -120,12 +120,12 @@ update() {
 
 # Prints external IP address
 get_ext_ip() {
-  curl ifconfig.co
+    curl ifconfig.co
 }
 
 # Fetches a bogus file, printing the current download transfer speed
 test_dl_speed() {
-  wget -O /dev/null http://speedtest.wdc01.softlayer.com/downloads/test500.zip
+    wget -O /dev/null http://speedtest.wdc01.softlayer.com/downloads/test500.zip
 }
 
 # Get size of directories in current dir
