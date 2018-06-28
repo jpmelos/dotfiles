@@ -139,3 +139,10 @@ size_dirs() {
 cgrep() {
     grep --exclude-dir .git -InHiR "$*" ./* 2>/dev/null
 }
+
+# Clear Docker environment in respect to currently running containers
+docker_clean() {
+    docker rm $(docker ps -aq)
+    docker rmi $(docker images -aq)
+    docker volume rm $(docker volume ls -q)
+}
