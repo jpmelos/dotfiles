@@ -27,7 +27,7 @@ export PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a;
 alias cal='cal -3'
 alias cp='cp -i'
 alias dc='docker-compose'
-alias grep='grep --color=always --exclude-dir=.git --binary-files=without-match -n'
+alias grep='grep --color=always --exclude-dir=.git --binary-files=without-match -InHiR'
 alias less='less -r'
 alias mv='mv -i'
 alias pytags="ctags --languages=python -R $1"
@@ -133,11 +133,6 @@ size_dirs() {
     for d in * ; do
         echo "$d:" $(du -ch "$d" 2>/dev/null | tail -1)
     done
-}
-
-# Search for string recursively in current dir
-cgrep() {
-    grep --exclude-dir .git -InHiR "$*" ./* 2>/dev/null
 }
 
 # Clear Docker environment in respect to currently running containers
