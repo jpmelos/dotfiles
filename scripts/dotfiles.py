@@ -124,3 +124,6 @@ if not os.path.exists(PYENV_DIR):
         ))
 
     run('bash install_pyenv.sh')
+
+print('Additional steps: ')
+print('Silence the terminal bell by adding "set bell-style none" to your /etc/inputrc')

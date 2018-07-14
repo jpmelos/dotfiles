@@ -113,8 +113,7 @@ set fileformats=unix,dos,mac
 " mode)
 set showcmd
 
-set novisualbell      " don't blink
-set noerrorbells      " no noise
+set visualbell        " no bell
 
 " keeps cursor in the middle of the screen (unless you have a 2,000 lines high
 " screen, in such case call me because I want to see that)
