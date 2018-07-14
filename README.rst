@@ -4,9 +4,9 @@ dotfiles
 Installation on Linux
 ---------------------
 
-To install these dotfiles on Linux, run::
+To install these dotfiles on Ubuntu, run::
 
-    wget -qO - https://raw.githubusercontent.com/jpmelos/dotfiles/master/scripts/linux_installer.sh | bash
+    wget -qO - https://raw.githubusercontent.com/jpmelos/dotfiles/master/scripts/ubuntu_installer.sh | bash
 
 Installation on MacOS
 ---------------------
