@@ -44,11 +44,8 @@ if [[ $HOME =~ ^/Users.* ]]; then
     alias ls='ls -F'
 fi
 
-# We are going to use $HOME =~ ^/Users.* as a nice heuristic to detect MacOS.
-if [[ $HOME =~ ^/Users.* ]]; then
-    source /usr/local/etc/bash_completion.d/git-prompt.sh
-    source /usr/local/etc/bash_completion.d/git-completion.bash
-fi
+source ~/.git-prompt.sh
+source ~/.git-completion.bash
 
 # Create ~/bin
 mkdir -p ~/bin
@@ -140,4 +137,13 @@ docker_clean() {
     docker rm $(docker ps -aq)
     docker rmi $(docker images -aq)
     docker volume rm $(docker volume ls -q)
+}
+
+git-submodules() {
+    for repo in $(awk '{print $2}' <(git submodule)); do
+        cd ${repo}
+        echo "** ${repo}"
+        eval $@
+        cd .. > /dev/null
+    done
 }

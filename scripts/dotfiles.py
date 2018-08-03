@@ -97,6 +97,23 @@ def source(filename, dest, not_found_ok=False):
     append_to_file(SOURCE_LINE, dest_file, not_found_ok=not_found_ok)
 
 
+def get_git_prompt_and_autocompletion():
+    GIT_DIR = os.path.join(DEVEL_DIR, 'git')
+
+    if not os.path.exists(GIT_DIR):
+        os.chdir(DEVEL_DIR)
+        run('git clone https://github.com/git/git')
+        os.chdir(GIT_DIR)
+        shutil.copyfile(
+            os.path.join('contrib', 'completion', 'git-prompt.sh'),
+            os.path.join(HOME_DIR, '.git-prompt.sh'),
+        )
+        shutil.copyfile(
+            os.path.join('contrib', 'completion', 'git-completion.bash'),
+            os.path.join(HOME_DIR, '.git-completion.bash'),
+        )
+
+
 # Sets up the home directory and the dotfiles
 copy_configuration_files_and_dirs()
 source('.myprofile', '.profile', not_found_ok=True)
@@ -124,6 +141,8 @@ if not os.path.exists(PYENV_DIR):
         ))
 
     run('bash install_pyenv.sh')
+
+get_git_prompt_and_autocompletion()
 
 print('Additional steps: ')
 print('Silence the terminal bell by adding "set bell-style none" to your /etc/inputrc')
