@@ -151,7 +151,7 @@ git-submodules() {
 stealth() {
     cd $HOME/vpns/${@:-default}
     bash start_vpn.sh
-    sudo openvpn --config conf.conf
+    sudo openvpn --mute-replay-warnings --config conf.conf
     bash stop_vpn.sh
     cd - > /dev/null 2> /dev/null
 }
