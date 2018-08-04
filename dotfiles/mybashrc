@@ -147,3 +147,7 @@ git-submodules() {
         cd .. > /dev/null
     done
 }
+
+stealth() {
+    sudo openvpn --config "~/vpns/${@:-default}/conf.conf"
+}

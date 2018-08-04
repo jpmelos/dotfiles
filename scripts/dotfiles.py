@@ -145,4 +145,5 @@ if not os.path.exists(PYENV_DIR):
 get_git_prompt_and_autocompletion()
 
 print('Additional steps: ')
-print('Silence the terminal bell by adding "set bell-style none" to your /etc/inputrc')
+print('* Silence the terminal bell by adding "set bell-style none" to your /etc/inputrc')
+print("* Configure your default VPN by adding the files needed in a subfolder in ~/vpns and renaming the start file to conf.conf. IMPORTANT: update the default DNS to the default VPN's DNS")
