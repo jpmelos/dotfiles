@@ -15,7 +15,7 @@ DEVEL_DIR = os.path.join(HOME_DIR, 'devel')
 
 IS_LINUX = HOME_DIR.startswith('/home')
 IS_MACOS = HOME_DIR.startswith('/Users')
-if not IS_LINUX and not IS_MACOS:
+if IS_LINUX == IS_MACOS:
     raise Exception("Couldn't recognize your OS.")
 
 files = [
@@ -146,4 +146,4 @@ get_git_prompt_and_autocompletion()
 
 print('Additional steps: ')
 print('* Silence the terminal bell by adding "set bell-style none" to your /etc/inputrc')
-print("* Configure your default VPN by adding the files needed in a subfolder in ~/vpns and renaming the start file to conf.conf. IMPORTANT: update the default DNS to the default VPN's DNS")
+print('* Configure your default VPN by adding the files needed in a subfolder in ~/vpns and renaming the start file to conf.conf, having a bootstrap file as start_vpn.sh and a destruction file as stop_vpn.sh.')
