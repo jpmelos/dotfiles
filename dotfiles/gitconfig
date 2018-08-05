@@ -33,10 +33,10 @@
     di = diff
     dic = diff --cached
     dst = diff --stat
-    fe = fetch --prune
+    fe = fetch --all --prune
     gr = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr)
     ls = ls-files
-    mg = merge --no-ff
+    mg = merge
     pa = add --patch
     pu = pull --rebase
     rb = rebase

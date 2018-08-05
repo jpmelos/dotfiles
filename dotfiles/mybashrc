@@ -1,6 +1,4 @@
 # vim:ft=sh
-#
-# We are going to use $HOME =~ ^/Users.* as a nice heuristic to detect MacOS.
 
 # For better colors in Vim.
 export TERM=xterm-256color
@@ -21,20 +19,24 @@ export HISTCONTROL=ignoredups:erasedups
 # Append to history file, instead of rewriting it
 shopt -s histappend
 # Updates history after every command
-export PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a;
-                       history -c; history -r"
+export PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a; history -c; history -r"
+
+alias vim='vim -O'
 
 alias cal='cal -3'
+
 alias cp='cp -i'
-alias dc='docker-compose'
-alias grep='grep --color=always --exclude-dir=.git --binary-files=without-match -InHiR'
-alias less='less -r'
 alias mv='mv -i'
-alias pytags="ctags --languages=python -R $1"
-alias screen='screen -rd || screen'
+
+alias dc='docker-compose'
+
+alias grep='grep --color=always --exclude-dir=.git --binary-files=without-match -InHiR'
+
+alias less='less -r'
 alias tail='tail -f'
+
 alias tmux='tmux attach || tmux'
-alias vim='vim -O'
+alias screen='screen -rd || screen'
 
 alias list='ls -FhAls --color=never | less -r'
 alias ls='ls -F --color=never'
@@ -44,10 +46,11 @@ if [[ $HOME =~ ^/Users.* ]]; then
     alias ls='ls -F'
 fi
 
+# Install the git prompt command (__git_ps1) and autocompletions
 source ~/.git-prompt.sh
 source ~/.git-completion.bash
 
-# Create ~/bin
+# Create ~/bin, so we can put executables there and not need to restart the terminal
 mkdir -p ~/bin
 
 # Set up pyenv
@@ -57,33 +60,50 @@ eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 
 # Shows git diff, excluding deleted files.
-dico() {
+git-dico() {
     git diff $(git status -s --porcelain | \grep -v "^ D" | cut -b4-)
 }
 
-# Serves current working dir in 0.0.0.0:80
+# Runs a command in all submodules of a repository
+git-submodules() {
+    for repo in $(awk '{print $2}' <(git submodule)); do
+        cd ${repo}
+        echo "** ${repo}"
+        eval $@
+        cd .. > /dev/null
+    done
+}
+
+# Serves current working dir to your network
+# This is a DANGEROUS command, anyone who knows your IP (or is scanning for
+# vulnerable IP and ports on the Internet) could download your data, if you
+# provide this with a public interface or 0.0.0.0.
+# Use with care.
 localserver() {
     RANDOM_PORT=$(( $RANDOM % 16385 + 49152 ))
+    ADDR_PORT="${1:-127.0.0.1}:${2:-$RANDOM_PORT}"
 
     if [[ ! -d /tmp/nginx ]]; then
         mkdir /tmp/nginx
     fi
     cp ~/.localserver.conf /tmp/nginx/localserver.conf
 
-    echo "Connect to localhost:$RANDOM_PORT"
+    docker pull nginx:1.15.2
+
+    echo "Connect to $ADDR_PORT"
     docker run \
         --rm \
         -ti \
         --name localserver \
         -v "$PWD:/usr/share/nginx/html:ro" \
         -v "/tmp/nginx:/copy_on_start:ro" \
-        -p $RANDOM_PORT:80 \
+        -v "/tmp/nginx-logs:/var/log/nginx" \
+        -p "$ADDR_PORT:80" \
         --entrypoint bash \
-        nginx -c "cp /copy_on_start/localserver.conf /etc/nginx/nginx.conf; nginx"
+        nginx:1.15.2 -c "cp /copy_on_start/localserver.conf /etc/nginx/nginx.conf; nginx"
 
-    unset RANDOM_PORT
+    unset ADDR_PORT
 }
-
 
 # Runs a command and show all files modified by it in the current directory,
 # comparing date of last modification. So, there might be false positives,
@@ -95,59 +115,47 @@ supervise() {
     find . -newermt "$NOW"
 }
 
-# Remove colors from input
-nocolors() {
-    FILTER="s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]//g"
-    while read -r line; do
-        echo "$line" | sed -r "$FILTER"
-    done
+# Return the running distro
+detect-os() {
+    echo $(. /etc/os-release; echo $NAME)
 }
 
-# Show all manually installed packages.
-showpackages() {
-    comm -23 <(apt-mark showmanual | sort -u) <(gzip -dc /var/log/installer/initial-status.gz | sed -n 's/^Package: //p' | sort -u)
-}
-
-# Updates Ubuntu packages
+# Updates system packages
 update() {
-    sudo apt-get update
-    sudo apt-get -y dist-upgrade
-    sudo apt-get -y autoremove
+    if [[ $(detect-os) == "Ubuntu" ]]; then
+        sudo apt-get update
+        sudo apt-get -y dist-upgrade
+        sudo apt-get -y autoremove
+    elif [[ $(detect-os) == "Fedora" ]]; then
+        sudo dnf upgrade --refresh
+    fi
 }
 
 # Prints external IP address
-get_ext_ip() {
+get-external-ip() {
     curl ifconfig.co
 }
 
 # Fetches a bogus file, printing the current download transfer speed
-test_dl_speed() {
+test-download-speed() {
     wget -O /dev/null http://speedtest.wdc01.softlayer.com/downloads/test500.zip
 }
 
 # Get size of directories in current dir
-size_dirs() {
+size-dirs() {
     for d in * ; do
-        echo "$d:" $(du -ch "$d" 2>/dev/null | tail -1)
+        echo "$d:" $(du -ch "$d" 2> /dev/null | tail -1)
     done
 }
 
 # Clear Docker environment in respect to currently running containers
-docker_clean() {
+docker-clean() {
     docker rm $(docker ps -aq)
     docker rmi $(docker images -aq)
     docker volume rm $(docker volume ls -q)
 }
 
-git-submodules() {
-    for repo in $(awk '{print $2}' <(git submodule)); do
-        cd ${repo}
-        echo "** ${repo}"
-        eval $@
-        cd .. > /dev/null
-    done
-}
-
+# Activates your VPN
 stealth() {
     cd $HOME/vpns/${@:-default}
     bash start_vpn.sh
