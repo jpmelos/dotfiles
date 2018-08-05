@@ -117,7 +117,9 @@ def get_latest_version(versions, version_regex, for_minors=None):
         if match:
             valid_versions.append(
                 Version(
-                    int(match.group("major")), int(match.group("minor")), int(match.group("revision")),
+                    int(match.group("major")),
+                    int(match.group("minor")),
+                    int(match.group("revision")),
                 )
             )
 
@@ -236,9 +238,13 @@ def clone_dotfiles():
 
 def add_known_ssh_hosts():
     # TODO: Add GitLab and BitBucket SSH hosts
-    with open(os.path.join(dotfiles_dir, 'references', 'github.key'), 'r') as github_file:
+    with open(
+        os.path.join(dotfiles_dir, "references", "github.key"), "r"
+    ) as github_file:
         github_key = github_file.read()
-    append_to_file('{}\n'.format(github_key), os.path.join(home_dir, '.ssh', 'known_hosts'))
+    append_to_file(
+        "{}\n".format(github_key), os.path.join(home_dir, ".ssh", "known_hosts")
+    )
 
 
 def copy_configuration_files_and_dirs():
@@ -252,7 +258,7 @@ def copy_configuration_files_and_dirs():
         else:
             raise TypeError("Items in 'files' must be strings or tuples")
 
-        item_path = os.path.join(dotfiles_dir, 'dotfiles', source)
+        item_path = os.path.join(dotfiles_dir, "dotfiles", source)
         home_path = os.path.join(home_dir, destination)
 
         if os.path.lexists(home_path):
@@ -329,24 +335,28 @@ def install_pyenv():
         latest_pyenv_version = get_latest_version(
             output.split("\n"), pyenv_version_regex
         )
-        latest_pyenv_version = 'v{}.{}.{}'.format(
+        latest_pyenv_version = "v{}.{}.{}".format(
             latest_pyenv_version.major,
             latest_pyenv_version.minor,
             latest_pyenv_version.revision,
         )
-        print('Detected latest version of pyenv as {}'.format(latest_pyenv_version))
+        print("Detected latest version of pyenv as {}".format(latest_pyenv_version))
 
     with change_dir(pyenv_virtualenv_dir):
         output = run_for_output("git tag")
         latest_pyenv_virtualenv_version = get_latest_version(
             output.split("\n"), pyenv_version_regex
         )
-        latest_pyenv_virtualenv_version = 'v{}.{}.{}'.format(
+        latest_pyenv_virtualenv_version = "v{}.{}.{}".format(
             latest_pyenv_virtualenv_version.major,
             latest_pyenv_virtualenv_version.minor,
             latest_pyenv_virtualenv_version.revision,
         )
-        print('Detected latest version of pyenv-virtualenv as {}'.format(latest_pyenv_virtualenv_version))
+        print(
+            "Detected latest version of pyenv-virtualenv as {}".format(
+                latest_pyenv_virtualenv_version
+            )
+        )
 
     python_versions_dir = os.path.join(
         pyenv_dir, "plugins", "python-build", "share", "python-build"
@@ -359,10 +369,14 @@ def install_pyenv():
             for_minors=((2, 7), (3, 5), (3, 6), (3, 7)),
         )
         latest_python_versions = [
-            '{}.{}.{}'.format(version.major, version.minor, version.revision)
+            "{}.{}.{}".format(version.major, version.minor, version.revision)
             for version in latest_python_versions
         ]
-        print('Detected latest Python versions as: {}'.format(', '.join(latest_python_versions)))
+        print(
+            "Detected latest Python versions as: {}".format(
+                ", ".join(latest_python_versions)
+            )
+        )
 
     run(
         "bash dotfiles/scripts/install_pyenv.sh {} {} {}".format(
