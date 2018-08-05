@@ -1,6 +1,10 @@
 awscli
+black
 docker-compose
 flake8
 flake8-blind-except
 flake8-print
 ipython
+isort
+pydocstyle
+pylint
