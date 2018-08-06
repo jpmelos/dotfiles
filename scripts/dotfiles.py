@@ -48,6 +48,11 @@ def create_dir(dir_name):
     os.makedirs(dir_name, exist_ok=True)
 
 
+def delete_dir(dir_name):
+    if os.path.isdir(dir_name) and not os.path.islink(dir_name):
+        shutil.rmtree(dir_name)
+
+
 @contextlib.contextmanager
 def change_dir(dir_name):
     old_dir = os.getcwd()
@@ -332,8 +337,8 @@ def install_pyenv():
         git_clone(pyenv_repo, pyenv_dir)
         git_clone(pyenv_virtualenv_repo, pyenv_virtualenv_dir)
         if detected_os in ["Ubuntu", "Fedora"]:
-            shutil.rmtree(os.path.join(home_dir, ".local", "bin"))
-            shutil.rmtree(os.path.join(home_dir, ".local", "lib"))
+            delete_dir(os.path.join(home_dir, ".local", "bin"))
+            delete_dir(os.path.join(home_dir, ".local", "lib"))
 
     with change_dir(pyenv_dir):
         output = run_for_output("git tag")
