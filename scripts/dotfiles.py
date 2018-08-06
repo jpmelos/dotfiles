@@ -308,6 +308,8 @@ def get_git_prompt_and_autocompletion():
     git_repo = "https://github.com/git/git"
 
     if not os.path.exists(git_dir):
+        # TODO: Don't clone the entire git repo for this
+        # Get it from the GitHub directly from the raw URL
         git_clone(git_repo)
         with change_dir(git_dir):
             shutil.copyfile(
@@ -398,6 +400,7 @@ def install_pyenv():
 
 
 def list_additional_steps():
+    # TODO: Automate these steps
     print("Additional steps: ")
     print(
         '* Silence the terminal bell by adding "set bell-style none" to '
@@ -426,6 +429,7 @@ steps = [
     install_pyenv,
     # TODO: Install and configure Docker
     # TODO: Install VLC media player
+    # TODO: Install Chrome
     list_additional_steps,
 ]
 
