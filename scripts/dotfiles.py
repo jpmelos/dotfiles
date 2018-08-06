@@ -415,6 +415,7 @@ steps = [
     get_git_prompt_and_autocompletion,
     install_pyenv,
     # TODO: Install and configure Docker
+    # TODO: Install VLC media player
     list_additional_steps,
 ]
 
