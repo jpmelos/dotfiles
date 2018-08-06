@@ -242,6 +242,7 @@ def add_known_ssh_hosts():
     github_key_path = os.path.join(dotfiles_dir, "references", "github.key")
 
     if not os.path.exists(known_hosts_path):
+        create_dir(os.path.dirname(known_hosts_path))
         with open(known_hosts_path, 'w+'):
             # Just need to create the file
             pass
