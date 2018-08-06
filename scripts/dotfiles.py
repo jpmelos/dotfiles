@@ -238,13 +238,17 @@ def clone_dotfiles():
 
 def add_known_ssh_hosts():
     # TODO: Add GitLab and BitBucket SSH hosts
-    with open(
-        os.path.join(dotfiles_dir, "references", "github.key"), "r"
-    ) as github_file:
+    known_hosts_path = os.path.join(home_dir, '.ssh', 'known_hosts')
+    github_key_path = os.path.join(dotfiles_dir, "references", "github.key")
+
+    if not os.path.exists(known_hosts_path):
+        with open(known_hosts_path, 'w'):
+            # Just need to create the file
+            pass
+
+    with open(github_key_path, "r") as github_file:
         github_key = github_file.read()
-    append_to_file(
-        "{}\n".format(github_key), os.path.join(home_dir, ".ssh", "known_hosts")
-    )
+    append_to_file("{}\n".format(github_key), known_hosts_path)
 
 
 def copy_configuration_files_and_dirs():
