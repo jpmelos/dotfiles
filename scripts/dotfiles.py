@@ -414,6 +414,7 @@ steps = [
     prepare_vim,
     get_git_prompt_and_autocompletion,
     install_pyenv,
+    # TODO: Install and configure Docker
     list_additional_steps,
 ]
 
