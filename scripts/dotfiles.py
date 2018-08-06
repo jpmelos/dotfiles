@@ -64,16 +64,16 @@ def change_dir(dir_name):
 
 
 def detect_os():
-    os_key = "NAME"
-    lookup = "{}=".format(os_key)
-    trim_name_len = len(lookup)
+    os_regex = re.compile(r'^NAME="?(?P<name>\w+)"?$')
 
     name_found = None
     with open("/etc/os-release") as fp:
         lines = fp.read().split("\n")
     for line in lines:
-        if line.startswith(lookup):
-            name_found = line[trim_name_len:]
+        match = os_regex.match(line)
+        if match:
+            name_found = match.group("name")
+            break
 
     if name_found in ["Ubuntu", "Fedora"]:
         return name_found
@@ -173,6 +173,7 @@ def _install_ubuntu_packages():
         "tk-dev",
         "libdb-dev",
         "zlib1g-dev",
+        "libffi-dev",
     ]
 
     run("sudo apt-get update")
@@ -243,12 +244,12 @@ def clone_dotfiles():
 
 def add_known_ssh_hosts():
     # TODO: Add GitLab and BitBucket SSH hosts
-    known_hosts_path = os.path.join(home_dir, '.ssh', 'known_hosts')
+    known_hosts_path = os.path.join(home_dir, ".ssh", "known_hosts")
     github_key_path = os.path.join(dotfiles_dir, "references", "github.key")
 
     if not os.path.exists(known_hosts_path):
         create_dir(os.path.dirname(known_hosts_path))
-        with open(known_hosts_path, 'w+'):
+        with open(known_hosts_path, "w+"):
             # Just need to create the file
             pass
 
@@ -299,6 +300,9 @@ def prepare_vim():
     if not os.path.exists(vundle_dir):
         git_clone(vundle_repo, vundle_dir)
         run("vim +PluginInstall +qa")
+        # After invoking Vim, sometimes the terminal gets garbled.
+        # See if calling 'reset' solves the issue. This only happened
+        # in Fedora so far.
         with change_dir(os.path.join(vim_dir, "bundle", "YouCompleteMe")):
             run("python install.py")
 
@@ -352,7 +356,6 @@ def install_pyenv():
             latest_pyenv_version.minor,
             latest_pyenv_version.revision,
         )
-        print("Detected latest version of pyenv as {}".format(latest_pyenv_version))
 
     with change_dir(pyenv_virtualenv_dir):
         output = run_for_output("git tag")
@@ -363,11 +366,6 @@ def install_pyenv():
             latest_pyenv_virtualenv_version.major,
             latest_pyenv_virtualenv_version.minor,
             latest_pyenv_virtualenv_version.revision,
-        )
-        print(
-            "Detected latest version of pyenv-virtualenv as {}".format(
-                latest_pyenv_virtualenv_version
-            )
         )
 
     python_versions_dir = os.path.join(
@@ -384,11 +382,6 @@ def install_pyenv():
             "{}.{}.{}".format(version.major, version.minor, version.revision)
             for version in latest_python_versions
         ]
-        print(
-            "Detected latest Python versions as: {}".format(
-                ", ".join(latest_python_versions)
-            )
-        )
 
     run(
         "bash dotfiles/scripts/install_pyenv.sh {} {} {}".format(
@@ -415,6 +408,9 @@ def list_additional_steps():
     print("Restart your terminal.")
 
 
+# TODO: Verify each step and see if they work when run consecutive times,
+# and after a long time when versions changed and need to be updated or
+# reinstalled.
 steps = [
     # TODO: Add SSH key to GitHub, GitLab and BitBucket.
     install_packages,
@@ -427,9 +423,11 @@ steps = [
     prepare_vim,
     get_git_prompt_and_autocompletion,
     install_pyenv,
-    # TODO: Install and configure Docker
+    # TODO: Install Docker
     # TODO: Install VLC media player
     # TODO: Install Chrome
+    # TODO: Install PyCharm
+    # TODO: Install VPN
     list_additional_steps,
 ]
 
