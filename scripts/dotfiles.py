@@ -9,8 +9,6 @@ import subprocess
 import sys
 
 exit = object()
-stdout = None
-stderr = None
 
 dotfiles_list = [
     ("gitconfig", ".gitconfig"),
@@ -24,24 +22,6 @@ dotfiles_list = [
 ]
 
 Version = namedtuple("Version", ["major", "minor", "revision"])
-
-
-@contextlib.contextmanager
-def capture_stdout():
-    global stdout
-    global stderr
-
-    original_stdout = sys.stdout
-    original_stderr = sys.stderr
-
-    sys.stdout = stdout = StringIO()
-    sys.stderr = stderr = StringIO()
-
-    try:
-        yield
-    finally:
-        sys.stdout = original_stdout
-        sys.stderr = original_stderr
 
 
 def create_dir(dir_name):
