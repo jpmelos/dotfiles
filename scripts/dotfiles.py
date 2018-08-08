@@ -288,22 +288,19 @@ def prepare_vim():
 
 
 def get_git_prompt_and_autocompletion():
-    git_dir = os.path.join(devel_dir, "git")
-    git_repo = "https://github.com/git/git"
+    git_version_regex = re.compile(r'^git version (?P<version>\d+\.\d+\.\d+)$')
+    git_file_path = "https://raw.githubusercontent.com/git/git/v{}/contrib/completion/{}"
+    git_files = ['git-completion.bash', 'git-prompt.sh']
 
-    if not os.path.exists(git_dir):
-        # TODO: Don't clone the entire git repo for this
-        # Get it from the GitHub directly from the raw URL
-        git_clone(git_repo)
-        with change_dir(git_dir):
-            shutil.copyfile(
-                os.path.join("contrib", "completion", "git-prompt.sh"),
-                os.path.join(home_dir, ".git-prompt.sh"),
-            )
-            shutil.copyfile(
-                os.path.join("contrib", "completion", "git-completion.bash"),
-                os.path.join(home_dir, ".git-completion.bash"),
-            )
+    output = run_for_output('git --version')
+    match = git_version_regex.match(output)
+    version = match.group('version')
+
+    for file in git_files:
+        git_file_path = git_file_path.format(version, file)
+        file_contents = run_for_output('wget -qO - {}'.format(git_file_path))
+        with open(os.path.join(home_dir, '.{}'.format(file)), 'w') as fp:
+            fp.write(file_contents)
 
 
 def install_pyenv():
