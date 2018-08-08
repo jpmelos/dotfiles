@@ -297,8 +297,8 @@ def get_git_prompt_and_autocompletion():
     version = match.group('version')
 
     for file in git_files:
-        git_file_path = git_file_path.format(version, file)
-        file_contents = run_for_output('wget -qO - {}'.format(git_file_path))
+        file_path = git_file_path.format(version, file)
+        file_contents = run_for_output('wget -qO - {}'.format(file_path))
         with open(os.path.join(home_dir, '.{}'.format(file)), 'w') as fp:
             fp.write(file_contents)
 
