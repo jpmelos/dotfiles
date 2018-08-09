@@ -224,9 +224,10 @@ def create_devel_dir():
 def _generate_ssh_key():
     global ssh_key
 
-    key_path = os.path.join(home_dir, '.ssh', 'id_rsa.pub')
+    priv_key_path = os.path.join(home_dir, '.ssh', 'id_rsa')
+    pub_key_path = os.path.join(home_dir, '.ssh', 'id_rsa.pub')
     if not os.path.exists(key_path):
-        run('ssh-keygen -N ""')
+        run('ssh-keygen -N "" -f {}'.format(priv_key_path))
     with open(key_path, 'r') as key:
         ssh_key = key.read().strip()
 
