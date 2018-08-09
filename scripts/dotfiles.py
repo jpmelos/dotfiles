@@ -10,17 +10,6 @@ import sys
 
 exit = object()
 
-dotfiles_list = [
-    ("gitconfig", ".gitconfig"),
-    ("gitignore-global", ".gitignore"),
-    ("localserver.conf", ".localserver.conf"),
-    ("mybashrc", ".mybash_profile"),
-    ("mybashrc", ".mybashrc"),
-    ("myprofile", ".myprofile"),
-    ("tmux.conf", ".tmux.conf"),
-    ("vimrc", ".vimrc"),
-]
-
 Version = namedtuple("Version", ["major", "minor", "revision"])
 
 
@@ -241,6 +230,17 @@ def add_known_ssh_hosts():
 
 
 def copy_configuration_files_and_dirs():
+    dotfiles_list = [
+        ("gitconfig", ".gitconfig"),
+        ("gitignore-global", ".gitignore"),
+        ("localserver.conf", ".localserver.conf"),
+        ("mybashrc", ".mybash_profile"),
+        ("mybashrc", ".mybashrc"),
+        ("myprofile", ".myprofile"),
+        ("tmux.conf", ".tmux.conf"),
+        ("vimrc", ".vimrc"),
+    ]
+
     for item in dotfiles_list:
         if isinstance(item, tuple):
             source = item[0]
