@@ -235,7 +235,7 @@ def _generate_ssh_key():
 def _send_ssh_key_to_github():
     ssh_key_title = information['ssh_key_title']
 
-    run('python3 -m pip install --user --upgrade pygithub')
+    run('{} -m pip install --user --upgrade pygithub'.format(sys.executable))
 
     importlib.invalidate_caches()
     Github = importlib.import_module('github').Github
