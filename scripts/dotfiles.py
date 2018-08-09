@@ -1,6 +1,7 @@
 from collections import namedtuple
 from io import StringIO
 import contextlib
+import importlib
 import os
 import re
 import shlex
@@ -8,9 +9,18 @@ import shutil
 import subprocess
 import sys
 
-exit = object()
+
+class Exit(Exception):
+    pass
+
 
 Version = namedtuple("Version", ["major", "minor", "revision"])
+
+information = {
+    'github_token': None,
+    'ssh_key_title': None,
+}
+ssh_key = None
 
 
 def create_dir(dir_name):
@@ -119,6 +129,16 @@ devel_dir = os.path.join(home_dir, "devel")
 dotfiles_dir = os.path.join(devel_dir, "dotfiles")
 
 
+def get_information():
+    for key, default in information.items():
+        prompt = (
+            key
+            if default is None else
+            '{} [{}]'.format(key, default)
+        )
+        information[key] = input('{} = '.format(prompt))
+
+
 def _install_ubuntu_packages():
     ubuntu_packages = [
         "gnome-shell",
@@ -201,14 +221,51 @@ def create_devel_dir():
     os.chdir(devel_dir)
 
 
-def clone_dotfiles():
-    dotfiles_repo = "https://github.com/jpmelos/dotfiles"
+def _generate_ssh_key():
+    global ssh_key
 
-    if not os.path.exists(dotfiles_dir):
-        git_clone(dotfiles_repo, dotfiles_dir)
-        with change_dir(dotfiles_dir):
-            run("git remote rm origin")
-            run("git remote add origin git@github.com:jpmelos/dotfiles.git")
+    key_path = os.path.join(home_dir, '.ssh', 'id_rsa.pub')
+    if not os.path.exists(key_path):
+        run('ssh-keygen -N ""')
+    with open(key_path, 'r') as key:
+        ssh_key = key.read().strip()
+
+
+def _send_ssh_key_to_github():
+    ssh_key_title = information['ssh_key_title']
+
+    run('python3 -m pip install --user --upgrade pygithub')
+
+    importlib.invalidate_caches()
+    Github = importlib.import_module('github').Github
+
+    gh = Github(information['github_token'])
+
+    existing_keys = gh.get_user().get_keys()
+    for key in existing_keys:
+        if key.title == ssh_key_title:
+            key.delete()
+            break
+
+    gh.get_user().create_key(
+        information['ssh_key_title'],
+        ssh_key,
+    )
+
+
+def _send_ssh_key_to_gitlab():
+    pass
+
+
+def _send_ssh_key_to_bitbucket():
+    pass
+
+
+def broadcast_ssh_keys():
+    _generate_ssh_key()
+    _send_ssh_key_to_github()
+    _send_ssh_key_to_gitlab()
+    _send_ssh_key_to_bitbucket()
 
 
 def add_known_ssh_hosts():
@@ -227,6 +284,13 @@ def add_known_ssh_hosts():
             keys = key_file.read().split("\n")
         for key in keys:
             append_to_file("{}\n".format(key), known_hosts_path)
+
+
+def clone_dotfiles():
+    dotfiles_repo = "git@github.com:jpmelos/dotfiles"
+
+    if not os.path.exists(dotfiles_dir):
+        git_clone(dotfiles_repo, dotfiles_dir)
 
 
 def copy_configuration_files_and_dirs():
@@ -393,12 +457,13 @@ def list_additional_steps():
 # and after a long time when versions changed and need to be updated or
 # reinstalled.
 steps = [
-    # TODO: Add SSH key to GitHub, GitLab and BitBucket.
+    get_information,
     install_packages,
     setup_os,
     create_devel_dir,
-    clone_dotfiles,
+    broadcast_ssh_keys,
     add_known_ssh_hosts,
+    clone_dotfiles,
     copy_configuration_files_and_dirs,
     source_dotfiles,
     prepare_vim,
@@ -415,8 +480,9 @@ steps = [
 
 def run_steps():
     for step_function in steps:
-        next_action = step_function()
-        if next_action is exit:
+        try:
+            step_function()
+        except Exit:
             break
 
 
