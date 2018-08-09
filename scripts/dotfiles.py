@@ -223,9 +223,8 @@ def clone_dotfiles():
 
 
 def add_known_ssh_hosts():
-    # TODO: Add GitLab and BitBucket SSH hosts
     known_hosts_path = os.path.join(home_dir, ".ssh", "known_hosts")
-    github_key_path = os.path.join(dotfiles_dir, "references", "github.key")
+    key_filenames = ["github.key", "gitlab.key", "bitbucket.key"]
 
     if not os.path.exists(known_hosts_path):
         create_dir(os.path.dirname(known_hosts_path))
@@ -233,9 +232,12 @@ def add_known_ssh_hosts():
             # Just need to create the file
             pass
 
-    with open(github_key_path, "r") as github_file:
-        github_key = github_file.read()
-    append_to_file("{}\n".format(github_key), known_hosts_path)
+    for filename in key_filenames:
+        path = os.path.join(devel_dir, "references", filename)
+        with open(path, "r") as key_file:
+            keys = key_file.read().split("\n")
+        for key in keys:
+            append_to_file("{}\n".format(key), known_hosts_path)
 
 
 def copy_configuration_files_and_dirs():
@@ -288,18 +290,20 @@ def prepare_vim():
 
 
 def get_git_prompt_and_autocompletion():
-    git_version_regex = re.compile(r'^git version (?P<version>\d+\.\d+\.\d+)$')
-    git_file_path = "https://raw.githubusercontent.com/git/git/v{}/contrib/completion/{}"
-    git_files = ['git-completion.bash', 'git-prompt.sh']
+    git_version_regex = re.compile(r"^git version (?P<version>\d+\.\d+\.\d+)$")
+    git_file_path = (
+        "https://raw.githubusercontent.com/git/git/v{}/contrib/completion/{}"
+    )
+    git_files = ["git-completion.bash", "git-prompt.sh"]
 
-    output = run_for_output('git --version')
+    output = run_for_output("git --version")
     match = git_version_regex.match(output)
-    version = match.group('version')
+    version = match.group("version")
 
     for file in git_files:
         file_path = git_file_path.format(version, file)
-        file_contents = run_for_output('wget -qO - {}'.format(file_path))
-        with open(os.path.join(home_dir, '.{}'.format(file)), 'w') as fp:
+        file_contents = run_for_output("wget -qO - {}".format(file_path))
+        with open(os.path.join(home_dir, ".{}".format(file)), "w") as fp:
             fp.write(file_contents)
 
 
