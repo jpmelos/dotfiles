@@ -153,6 +153,7 @@ def _install_ubuntu_packages():
         "cmake",
         "git",
         "vim",
+        "vlc",
         "openvpn",
         "network-manager-openvpn-gnome",
         "python",
@@ -182,6 +183,7 @@ def _install_fedora_packages():
         "cmake",
         "git",
         "vim",
+        "vlc",
         "python2",
         "python2-devel",
         "python3",
@@ -571,7 +573,6 @@ steps = [
     get_git_prompt_and_autocompletion,
     install_pyenv,
     install_docker,
-    # TODO: Install VLC media player
     # TODO: Install Chrome
     # TODO: Install PyCharm
     # TODO: Install VPN
