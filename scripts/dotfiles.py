@@ -579,6 +579,11 @@ def list_additional_steps():
         "your /etc/inputrc."
     )
     print(
+        '* Stop NetworkManager from updating /etc/resolv.conf by '
+        'adding "dns=none" to "[main]" section in '
+        '/etc/NetworkManager/NetworkManager.conf'
+    )
+    print(
         "* Configure your default VPN by adding the files needed in a "
         "subfolder in ~/vpns and renaming the start file to conf.conf, "
         "having a bootstrap file as start_vpn.sh and a destruction "
