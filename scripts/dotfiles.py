@@ -1,7 +1,9 @@
 from collections import namedtuple
 from io import StringIO
+from urllib.request import urlopen, Request
 import contextlib
 import importlib
+import json
 import os
 import re
 import shlex
@@ -14,12 +16,13 @@ class Exit(Exception):
     pass
 
 
+class APIError(Exception):
+    pass
+
+
 Version = namedtuple("Version", ["major", "minor", "revision"])
 
-information = {
-    'github_token': None,
-    'ssh_key_title': None,
-}
+information = {"github_token": None, "ssh_key_title": None}
 ssh_key = None
 
 
@@ -119,6 +122,7 @@ def get_latest_version(versions, version_regex, for_minors=None):
         revision = version
         if minor not in versions or versions[minor] < revision:
             versions[minor] = revision
+
     return versions.values()
 
 
@@ -127,16 +131,17 @@ detected_os = detect_os()
 home_dir = os.path.expanduser("~")
 devel_dir = os.path.join(home_dir, "devel")
 dotfiles_dir = os.path.join(devel_dir, "dotfiles")
+ssh_dir = os.path.join(home_dir, ".ssh")
 
 
 def get_information():
+    global information
+
     for key, default in information.items():
-        prompt = (
-            key
-            if default is None else
-            '{} [{}]'.format(key, default)
-        )
-        information[key] = input('{} = '.format(prompt))
+        prompt = key if default is None else "{} [{}]".format(key, default)
+        value = input("{} = ".format(prompt))
+        if value:
+            information[key] = value
 
 
 def _install_ubuntu_packages():
@@ -224,34 +229,56 @@ def create_devel_dir():
 def _generate_ssh_key():
     global ssh_key
 
-    priv_key_path = os.path.join(home_dir, '.ssh', 'id_rsa')
-    pub_key_path = os.path.join(home_dir, '.ssh', 'id_rsa.pub')
-    if not os.path.exists(key_path):
+    priv_key_path = os.path.join(ssh_dir, "id_rsa")
+    pub_key_path = os.path.join(ssh_dir, "id_rsa.pub")
+    if not os.path.exists(priv_key_path):
         run('ssh-keygen -N "" -f {}'.format(priv_key_path))
-    with open(key_path, 'r') as key:
+    with open(pub_key_path, "r") as key:
         ssh_key = key.read().strip()
 
 
+def _delete_github_ssh_key(url, headers):
+    delete_req = Request(url, headers=headers, method="DELETE")
+    with urlopen(delete_req) as response:
+        if response.getcode() != 204:
+            raise APIError("Failed to delete GitHub key")
+
+
 def _send_ssh_key_to_github():
-    ssh_key_title = information['ssh_key_title']
+    global ssh_key
 
-    run('{} -m pip install --user --upgrade pygithub'.format(sys.executable))
+    ssh_key_title = information["ssh_key_title"]
+    authorization = "token {}".format(information["github_token"])
+    headers = {
+        "Authorization": authorization,
+        "Content-Type": "application/json; charset=utf-8",
+    }
 
-    importlib.invalidate_caches()
-    Github = importlib.import_module('github').Github
+    github_base_url = "https://api.github.com"
+    keys_resource = "{}/user/keys".format(github_base_url)
 
-    gh = Github(information['github_token'])
+    get_keys_req = Request(keys_resource, headers=headers)
 
-    existing_keys = gh.get_user().get_keys()
-    for key in existing_keys:
-        if key.title == ssh_key_title:
-            key.delete()
+    with urlopen(get_keys_req) as response:
+        if response.getcode() != 200:
+            raise APIError("Error getting GitHub keys")
+        keys = json.loads(response.read().strip())
+    for key in keys:
+        if key["title"] == ssh_key_title:
+            if key["key"] == ssh_key:
+                return
+            _delete_github_ssh_key(key["url"], headers)
             break
 
-    gh.get_user().create_key(
-        information['ssh_key_title'],
-        ssh_key,
+    add_key_req = Request(
+        keys_resource,
+        data=json.dumps({"title": ssh_key_title, "key": ssh_key}).encode("utf-8"),
+        headers=headers,
+        method="POST",
     )
+    with urlopen(add_key_req) as response:
+        if response.getcode() != 201:
+            raise APIError("Failed to create GitHub key")
 
 
 def _send_ssh_key_to_gitlab():
@@ -270,26 +297,26 @@ def broadcast_ssh_keys():
 
 
 def add_known_ssh_hosts():
-    known_hosts_path = os.path.join(home_dir, ".ssh", "known_hosts")
+    known_hosts_path = os.path.join(ssh_dir, "known_hosts")
+    file_urls = 'https://raw.githubusercontent.com/jpmelos/dotfiles/master/references/{}'
     key_filenames = ["github.key", "gitlab.key", "bitbucket.key"]
 
     if not os.path.exists(known_hosts_path):
         create_dir(os.path.dirname(known_hosts_path))
-        with open(known_hosts_path, "w+"):
+        with open(known_hosts_path, "w"):
             # Just need to create the file
             pass
 
     for filename in key_filenames:
-        path = os.path.join(devel_dir, "references", filename)
-        with open(path, "r") as key_file:
-            keys = key_file.read().split("\n")
+        url = file_urls.format(filename)
+        file_contents = run_for_output("wget -qO - {}".format(url))
+        keys = file_contents.split("\n")
         for key in keys:
             append_to_file("{}\n".format(key), known_hosts_path)
 
 
 def clone_dotfiles():
     dotfiles_repo = "git@github.com:jpmelos/dotfiles"
-
     if not os.path.exists(dotfiles_dir):
         git_clone(dotfiles_repo, dotfiles_dir)
 
@@ -347,9 +374,10 @@ def prepare_vim():
     if not os.path.exists(vundle_dir):
         git_clone(vundle_repo, vundle_dir)
         run("vim +PluginInstall +qa")
-        # After invoking Vim, sometimes the terminal gets garbled.
-        # See if calling 'reset' solves the issue. This only happened
-        # in Fedora so far.
+        # TODO: Fix garbled terminal after Vim
+        # After invoking Vim, sometimes the terminal gets
+        # garbled. See if calling 'reset' solves the issue.
+        # This only happened in Fedora so far.
         with change_dir(os.path.join(vim_dir, "bundle", "YouCompleteMe")):
             run("python install.py")
 
@@ -366,6 +394,9 @@ def get_git_prompt_and_autocompletion():
     version = match.group("version")
 
     for file in git_files:
+        if os.path.join(home_dir, ".{}".format(file)):
+            continue
+
         file_path = git_file_path.format(version, file)
         file_contents = run_for_output("wget -qO - {}".format(file_path))
         with open(os.path.join(home_dir, ".{}".format(file)), "w") as fp:
@@ -393,6 +424,7 @@ def install_pyenv():
             delete_dir(os.path.join(home_dir, ".local", "lib"))
 
     with change_dir(pyenv_dir):
+        run("git pull")
         output = run_for_output("git tag")
         latest_pyenv_version = get_latest_version(
             output.split("\n"), pyenv_version_regex
@@ -404,6 +436,7 @@ def install_pyenv():
         )
 
     with change_dir(pyenv_virtualenv_dir):
+        run("git pull")
         output = run_for_output("git tag")
         latest_pyenv_virtualenv_version = get_latest_version(
             output.split("\n"), pyenv_version_regex
