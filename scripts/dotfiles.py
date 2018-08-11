@@ -217,7 +217,14 @@ def _setup_ubuntu():
 
 
 def _setup_fedora():
-    pass
+    fedora_version = run_for_output("rpm -E %fedora").strip()
+    run(
+        "sudo dnf install "
+        "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-{0}.noarch.rpm "
+        "https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-{0}.noarch.rpm".format(
+            fedora_version
+        )
+    )
 
 
 def setup_os():
@@ -540,6 +547,30 @@ def install_docker():
         _general_docker_post_install_for_linux()
 
 
+def _install_dropbox_on_fedora():
+    run("sudo dnf -y install nautilus-dropbox")
+
+
+def _install_dropbox_on_ubuntu():
+    dropbox_deb_file = os.path.join(home_dir, "dropbox.deb")
+    run(
+        "wget -qO {} "
+        "https://linux.dropbox.com/packages/ubuntu/nautilus-dropbox_2015.10.28_all.deb".format(
+            dropbox_deb_file
+        )
+    )
+    run("sudo dpkg -i {}".format(dropbox_deb_file))
+    os.remove(dropbox_deb_file)
+
+
+def install_dropbox():
+    dropbox_installers = {
+        "Fedora": _install_dropbox_on_fedora,
+        "Ubuntu": _install_dropbox_on_ubuntu,
+    }
+    dropbox_installers[detected_os]()
+
+
 def list_additional_steps():
     # TODO: Automate these steps
     print("Additional steps: ")
@@ -570,6 +601,7 @@ steps = [
     get_git_prompt_and_autocompletion,
     install_pyenv,
     install_docker,
+    install_dropbox,
     # TODO: Install VPN
     list_additional_steps,
 ]
