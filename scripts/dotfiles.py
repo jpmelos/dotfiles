@@ -265,7 +265,9 @@ def _send_ssh_key_to_github():
         keys = json.loads(response.read().strip())
     for key in keys:
         if key["title"] == ssh_key_title:
-            if key["key"] == ssh_key:
+            local_relevant_key = ssh_key.split(" ")[1]
+            github_relevant_key = key["key"].split(" ")[1]
+            if local_relevant_key == github_relevant_key:
                 return
             _delete_github_ssh_key(key["url"], headers)
             break
@@ -298,7 +300,9 @@ def broadcast_ssh_keys():
 
 def add_known_ssh_hosts():
     known_hosts_path = os.path.join(ssh_dir, "known_hosts")
-    file_urls = 'https://raw.githubusercontent.com/jpmelos/dotfiles/master/references/{}'
+    file_urls = (
+        "https://raw.githubusercontent.com/jpmelos/dotfiles/master/references/{}"
+    )
     key_filenames = ["github.key", "gitlab.key", "bitbucket.key"]
 
     if not os.path.exists(known_hosts_path):
@@ -424,6 +428,8 @@ def install_pyenv():
             delete_dir(os.path.join(home_dir, ".local", "lib"))
 
     with change_dir(pyenv_dir):
+        run("git checkout master")
+        run("git fetch --all")
         run("git pull")
         output = run_for_output("git tag")
         latest_pyenv_version = get_latest_version(
@@ -436,6 +442,8 @@ def install_pyenv():
         )
 
     with change_dir(pyenv_virtualenv_dir):
+        run("git checkout master")
+        run("git fetch --all")
         run("git pull")
         output = run_for_output("git tag")
         latest_pyenv_virtualenv_version = get_latest_version(
