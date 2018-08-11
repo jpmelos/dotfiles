@@ -556,9 +556,6 @@ def list_additional_steps():
     print("Restart your terminal.")
 
 
-# TODO: Verify each step and see if they work when run consecutive times,
-# and after a long time when versions changed and need to be updated or
-# reinstalled.
 steps = [
     get_information,
     install_packages,
@@ -573,8 +570,6 @@ steps = [
     get_git_prompt_and_autocompletion,
     install_pyenv,
     install_docker,
-    # TODO: Install Chrome
-    # TODO: Install PyCharm
     # TODO: Install VPN
     list_additional_steps,
 ]
