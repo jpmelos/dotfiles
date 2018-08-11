@@ -2,8 +2,10 @@ from collections import namedtuple
 from io import StringIO
 from urllib.request import urlopen, Request
 import contextlib
+import getpass
 import importlib
 import json
+import logging
 import os
 import re
 import shlex
@@ -264,11 +266,12 @@ def _send_ssh_key_to_github():
             raise APIError("Error getting GitHub keys")
         keys = json.loads(response.read().strip())
     for key in keys:
+        local_relevant_key = ssh_key.split(" ")[1]
+        github_relevant_key = key["key"].split(" ")[1]
+        if local_relevant_key == github_relevant_key:
+            return
+    for key in keys:
         if key["title"] == ssh_key_title:
-            local_relevant_key = ssh_key.split(" ")[1]
-            github_relevant_key = key["key"].split(" ")[1]
-            if local_relevant_key == github_relevant_key:
-                return
             _delete_github_ssh_key(key["url"], headers)
             break
 
@@ -479,6 +482,62 @@ def install_pyenv():
     )
 
 
+def _install_docker_on_fedora():
+    run("sudo dnf -y install dnf-plugins-core")
+    run(
+        "sudo dnf config-manager "
+        "--add-repo "
+        "https://download.docker.com/linux/fedora/docker-ce.repo"
+    )
+    run("sudo dnf -y install docker-ce")
+    run("sudo systemctl enable docker")
+
+
+def _install_docker_on_ubuntu():
+    run("sudo apt-get update")
+    run(
+        "sudo apt-get -y install "
+        "apt-transport-https "
+        "ca-certificates "
+        "curl "
+        "software-properties-common"
+    )
+    run(
+        "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | "
+        "sudo apt-key add -"
+    )
+
+    ubuntu_release = run_for_output("lsb_release -cs").strip()
+    run(
+        "sudo add-apt-repository "
+        '"deb [arch=amd64] https://download.docker.com/linux/ubuntu '
+        '{} stable"'.format(ubuntu_release)
+    )
+    run("sudo apt-get update")
+    run("sudo apt-get -y install docker-ce")
+
+
+def _general_docker_post_install_for_linux():
+    groups_database = run_for_output("getent group").split("\n")
+    groups_components = [components.split(":") for components in groups_database]
+    groups = [component[0] for component in groups_components]
+    if "docker" in groups:
+        return
+
+    run("sudo groupadd docker")
+    run("sudo usermod -aG docker {}".format(getpass.getuser()))
+
+
+def install_docker():
+    docker_installers = {
+        "Fedora": _install_docker_on_fedora,
+        "Ubuntu": _install_docker_on_ubuntu,
+    }
+    docker_installers[detected_os]()
+    if detected_os in ["Fedora", "Ubuntu"]:
+        _general_docker_post_install_for_linux()
+
+
 def list_additional_steps():
     # TODO: Automate these steps
     print("Additional steps: ")
@@ -511,7 +570,7 @@ steps = [
     prepare_vim,
     get_git_prompt_and_autocompletion,
     install_pyenv,
-    # TODO: Install Docker
+    install_docker,
     # TODO: Install VLC media player
     # TODO: Install Chrome
     # TODO: Install PyCharm
