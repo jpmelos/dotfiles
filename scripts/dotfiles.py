@@ -571,17 +571,26 @@ def install_dropbox():
     dropbox_installers[detected_os]()
 
 
+def install_network_configs():
+    network_manager_reference = os.path.join(
+        dotfiles_dir, "references", "NetworkManager.conf"
+    )
+    network_manager_config = os.path.join(
+        os.sep, "etc", "NetworkManager", "NetworkManager.conf"
+    )
+    run("sudo cp {} {}".format(network_manager_reference, network_manager_config))
+
+    resolv_conf_reference = os.path.join(dotfiles_dir, "references", "resolv.conf")
+    resolv_conf_path = os.path.join(os.sep, "etc", "resolv.conf")
+    run("sudo cp {} {}".format(resolv_conf_reference, resolv_conf_path))
+
+
 def list_additional_steps():
     # TODO: Automate these steps
     print("Additional steps: ")
     print(
         '* Silence the terminal bell by adding "set bell-style none" to '
         "your /etc/inputrc."
-    )
-    print(
-        '* Stop NetworkManager from updating /etc/resolv.conf by '
-        'adding "dns=none" to "[main]" section in '
-        '/etc/NetworkManager/NetworkManager.conf'
     )
     print(
         "* Configure your default VPN by adding the files needed in a "
@@ -607,6 +616,7 @@ steps = [
     install_pyenv,
     install_docker,
     install_dropbox,
+    install_network_configs,
     # TODO: Install VPN
     list_additional_steps,
 ]
