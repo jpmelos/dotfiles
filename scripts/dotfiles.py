@@ -573,7 +573,7 @@ def install_dropbox():
     dropbox_installers[detected_os]()
 
 
-def install_network_configs():
+def _install_fedora_network_configs():
     network_manager_reference = os.path.join(
         dotfiles_dir, "references", "NetworkManager.conf"
     )
@@ -582,9 +582,39 @@ def install_network_configs():
     )
     run("sudo cp {} {}".format(network_manager_reference, network_manager_config))
 
+    run('sudo systemctl restart NetworkManager')
+
     resolv_conf_reference = os.path.join(dotfiles_dir, "references", "resolv.conf")
     resolv_conf_path = os.path.join(os.sep, "etc", "resolv.conf")
     run("sudo cp {} {}".format(resolv_conf_reference, resolv_conf_path))
+
+    iptables_reference = os.path.join(dotfiles_dir, 'references', 'iptables')
+    iptables_config_path = os.path.join(os.sep, 'etc', 'sysconfig', 'iptables')
+    run('sudo cp {} {}'.format(iptables_reference, iptables_config_path))
+
+    ip6tables_reference = os.path.join(dotfiles_dir, 'references', 'ip6tables')
+    ip6tables_config_path = os.path.join(os.sep, 'etc', 'sysconfig', 'ip6tables')
+    run('sudo cp {} {}'.format(ip6tables_reference, ip6tables_config_path))
+
+    run('sudo systemctl disable firewalld.service')
+    run('sudo systemctl enable iptables.service')
+    run('sudo systemctl enable ip6tables.service')
+
+    run('sudo systemctl stop firewalld')
+    run('sudo systemctl restart iptables')
+    run('sudo systemctl restart ip6tables')
+
+
+def _install_ubuntu_network_configs():
+    pass
+
+
+def install_network_configs():
+    network_config_installers = {
+        "Fedora": _install_fedora_network_configs,
+        "Ubuntu": _install_ubuntu_network_configs,
+    }
+    network_config_installers[detected_os]()
 
 
 def list_additional_steps():
