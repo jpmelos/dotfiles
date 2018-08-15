@@ -583,16 +583,26 @@ def _install_fedora_network_configs():
     network_manager_reference = os.path.join(
         dotfiles_dir, "references", "NetworkManager.conf"
     )
-    network_manager_config = os.path.join(
+    network_manager_config_path = os.path.join(
         os.sep, "etc", "NetworkManager", "NetworkManager.conf"
     )
-    run("sudo cp {} {}".format(network_manager_reference, network_manager_config))
+
+    with open(network_manager_config_path, 'r') as fp:
+        network_manager_config = fp.read()
+    if 'dns=none' in network_manager_config:
+        return
+
+    run("sudo cp {} {}".format(network_manager_reference, network_manager_config_path))
 
     run('sudo systemctl restart NetworkManager')
 
     resolv_conf_reference = os.path.join(dotfiles_dir, "references", "resolv.conf")
     resolv_conf_path = os.path.join(os.sep, "etc", "resolv.conf")
     run("sudo cp {} {}".format(resolv_conf_reference, resolv_conf_path))
+
+    iptables_status = run_for_output('sudo service iptables status')
+    if 'Active: active' in iptables_status:
+        return
 
     iptables_reference = os.path.join(dotfiles_dir, 'references', 'iptables')
     iptables_config_path = os.path.join(os.sep, 'etc', 'sysconfig', 'iptables')
@@ -609,6 +619,8 @@ def _install_fedora_network_configs():
     run('sudo systemctl stop firewalld')
     run('sudo systemctl restart iptables')
     run('sudo systemctl restart ip6tables')
+
+    run('sudo service docker restart')
 
 
 def _install_ubuntu_network_configs():
