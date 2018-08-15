@@ -24,7 +24,7 @@ class APIError(Exception):
 
 Version = namedtuple("Version", ["major", "minor", "revision"])
 
-information = {"github_token": None, "ssh_key_title": None, 'mullvad_number': None}
+information = {"github_token": None, "ssh_key_title": None, "mullvad_number": None}
 ssh_key = None
 
 
@@ -308,10 +308,10 @@ def _send_ssh_key_to_bitbucket():
 def broadcast_ssh_keys():
     _generate_ssh_key()
 
-    if information['ssh_key_title'] is None:
+    if information["ssh_key_title"] is None:
         return
 
-    if information['github_token'] is not None:
+    if information["github_token"] is not None:
         _send_ssh_key_to_github()
 
     _send_ssh_key_to_gitlab()
@@ -587,40 +587,40 @@ def _install_fedora_network_configs():
         os.sep, "etc", "NetworkManager", "NetworkManager.conf"
     )
 
-    with open(network_manager_config_path, 'r') as fp:
+    with open(network_manager_config_path, "r") as fp:
         network_manager_config = fp.read()
-    if 'dns=none' in network_manager_config:
+    if "dns=none" in network_manager_config:
         return
 
     run("sudo cp {} {}".format(network_manager_reference, network_manager_config_path))
 
-    run('sudo systemctl restart NetworkManager')
+    run("sudo systemctl restart NetworkManager")
 
     resolv_conf_reference = os.path.join(dotfiles_dir, "references", "resolv.conf")
     resolv_conf_path = os.path.join(os.sep, "etc", "resolv.conf")
     run("sudo cp {} {}".format(resolv_conf_reference, resolv_conf_path))
 
-    iptables_status = run_for_output('sudo service iptables status')
-    if 'Active: active' in iptables_status:
+    iptables_status = run_for_output("sudo service iptables status")
+    if "Active: active" in iptables_status:
         return
 
-    iptables_reference = os.path.join(dotfiles_dir, 'references', 'iptables')
-    iptables_config_path = os.path.join(os.sep, 'etc', 'sysconfig', 'iptables')
-    run('sudo cp {} {}'.format(iptables_reference, iptables_config_path))
+    iptables_reference = os.path.join(dotfiles_dir, "references", "iptables")
+    iptables_config_path = os.path.join(os.sep, "etc", "sysconfig", "iptables")
+    run("sudo cp {} {}".format(iptables_reference, iptables_config_path))
 
-    ip6tables_reference = os.path.join(dotfiles_dir, 'references', 'ip6tables')
-    ip6tables_config_path = os.path.join(os.sep, 'etc', 'sysconfig', 'ip6tables')
-    run('sudo cp {} {}'.format(ip6tables_reference, ip6tables_config_path))
+    ip6tables_reference = os.path.join(dotfiles_dir, "references", "ip6tables")
+    ip6tables_config_path = os.path.join(os.sep, "etc", "sysconfig", "ip6tables")
+    run("sudo cp {} {}".format(ip6tables_reference, ip6tables_config_path))
 
-    run('sudo systemctl disable firewalld.service')
-    run('sudo systemctl enable iptables.service')
-    run('sudo systemctl enable ip6tables.service')
+    run("sudo systemctl disable firewalld.service")
+    run("sudo systemctl enable iptables.service")
+    run("sudo systemctl enable ip6tables.service")
 
-    run('sudo systemctl stop firewalld')
-    run('sudo systemctl restart iptables')
-    run('sudo systemctl restart ip6tables')
+    run("sudo systemctl stop firewalld")
+    run("sudo systemctl restart iptables")
+    run("sudo systemctl restart ip6tables")
 
-    run('sudo service docker restart')
+    run("sudo service docker restart")
 
 
 def _install_ubuntu_network_configs():
@@ -636,31 +636,31 @@ def install_network_configs():
 
 
 def install_mullvad():
-    if information['mullvad_number'] is None:
+    if information["mullvad_number"] is None:
         return
 
-    mullvad_dir = os.path.join(dotfiles_dir, 'references', 'mullvad')
+    mullvad_dir = os.path.join(dotfiles_dir, "references", "mullvad")
     mullvad_files = [
-        'conf.conf',
-        'mullvad_ca.crt',
-        'mullvad_crl.pem',
-        'mullvad_userpass.txt',
-        'resolv.conf',
-        'start_vpn.sh',
-        'stop_vpn.sh',
+        "conf.conf",
+        "mullvad_ca.crt",
+        "mullvad_crl.pem",
+        "mullvad_userpass.txt",
+        "resolv.conf",
+        "start_vpn.sh",
+        "stop_vpn.sh",
     ]
-    mullvad_vpn_dir = os.path.join(home_dir, 'vpns', 'default')
+    mullvad_vpn_dir = os.path.join(home_dir, "vpns", "default")
     create_dir(os.path.join(mullvad_vpn_dir))
 
     for file in mullvad_files:
         reference_file_path = os.path.join(mullvad_dir, file)
         vpn_dir_path = os.path.join(mullvad_vpn_dir, file)
-        run('cp {} {}'.format(reference_file_path, vpn_dir_path))
+        run("cp {} {}".format(reference_file_path, vpn_dir_path))
 
-    with open(os.path.join(mullvad_vpn_dir, 'mullvad_userpass.txt'), 'r') as fp:
+    with open(os.path.join(mullvad_vpn_dir, "mullvad_userpass.txt"), "r") as fp:
         content = fp.read()
-    with open(os.path.join(mullvad_vpn_dir, 'mullvad_userpass.txt'), 'w') as fp:
-        fp.write(content.replace('mullvad_number', information['mullvad_number']))
+    with open(os.path.join(mullvad_vpn_dir, "mullvad_userpass.txt"), "w") as fp:
+        fp.write(content.replace("mullvad_number", information["mullvad_number"]))
 
 
 def list_additional_steps():
