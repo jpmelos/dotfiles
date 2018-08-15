@@ -24,7 +24,7 @@ class APIError(Exception):
 
 Version = namedtuple("Version", ["major", "minor", "revision"])
 
-information = {"github_token": None, "ssh_key_title": None}
+information = {"github_token": None, "ssh_key_title": None, 'mullvad_number': None}
 ssh_key = None
 
 
@@ -307,7 +307,13 @@ def _send_ssh_key_to_bitbucket():
 
 def broadcast_ssh_keys():
     _generate_ssh_key()
-    _send_ssh_key_to_github()
+
+    if information['ssh_key_title'] is None:
+        return
+
+    if information['github_token'] is not None:
+        _send_ssh_key_to_github()
+
     _send_ssh_key_to_gitlab()
     _send_ssh_key_to_bitbucket()
 
@@ -617,6 +623,34 @@ def install_network_configs():
     network_config_installers[detected_os]()
 
 
+def install_mullvad():
+    if information['mullvad_number'] is None:
+        return
+
+    mullvad_dir = os.path.join(dotfiles_dir, 'references', 'mullvad')
+    mullvad_files = [
+        'conf.conf',
+        'mullvad_ca.crt',
+        'mullvad_crl.pem',
+        'mullvad_userpass.txt',
+        'resolv.conf',
+        'start_vpn.sh',
+        'stop_vpn.sh',
+    ]
+    mullvad_vpn_dir = os.path.join(home_dir, 'vpns', 'default')
+    create_dir(os.path.join(mullvad_vpn_dir))
+
+    for file in mullvad_files:
+        reference_file_path = os.path.join(mullvad_dir, file)
+        vpn_dir_path = os.path.join(mullvad_vpn_dir, file)
+        run('cp {} {}'.format(reference_file_path, vpn_dir_path))
+
+    with open(os.path.join(mullvad_vpn_dir, 'mullvad_userpass.txt'), 'r') as fp:
+        content = fp.read()
+    with open(os.path.join(mullvad_vpn_dir, 'mullvad_userpass.txt'), 'w') as fp:
+        fp.write(content.replace('mullvad_number', information['mullvad_number']))
+
+
 def list_additional_steps():
     # TODO: Automate these steps
     print("Additional steps: ")
@@ -649,7 +683,7 @@ steps = [
     install_docker,
     install_dropbox,
     install_network_configs,
-    # TODO: Install VPN
+    install_mullvad,
     list_additional_steps,
 ]
 
