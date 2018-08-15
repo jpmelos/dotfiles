@@ -1,5 +1,5 @@
 sudo cp resolv.conf-orig /etc/resolv.conf
-rm resolv.conf-orig
+rm -f resolv.conf-orig
 
 sudo iptables -D INPUT -i tun0 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 sudo iptables -D INPUT -i wlp2s0 -s 192.168.0.0/24 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT

@@ -65,16 +65,19 @@ def detect_os():
     raise Exception("Can't detect the OS")
 
 
-def run(command, *args, **kwargs):
+def run(command, check_errors=True, *args, **kwargs):
     completed_process = subprocess.run(
         shlex.split(command), universal_newlines=True, *args, **kwargs
     )
-    completed_process.check_returncode()
+    if check_errors:
+        completed_process.check_returncode()
     return completed_process
 
 
 def run_for_output(command):
-    return run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE).stdout
+    return run(
+        command, check_errors=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    ).stdout
 
 
 def git_clone(repo, dest=""):
@@ -589,38 +592,38 @@ def _install_fedora_network_configs():
 
     with open(network_manager_config_path, "r") as fp:
         network_manager_config = fp.read()
-    if "dns=none" in network_manager_config:
-        return
+    if "dns=none" not in network_manager_config:
+        run(
+            "sudo cp {} {}".format(
+                network_manager_reference, network_manager_config_path
+            )
+        )
 
-    run("sudo cp {} {}".format(network_manager_reference, network_manager_config_path))
+        run("sudo systemctl restart NetworkManager")
 
-    run("sudo systemctl restart NetworkManager")
-
-    resolv_conf_reference = os.path.join(dotfiles_dir, "references", "resolv.conf")
-    resolv_conf_path = os.path.join(os.sep, "etc", "resolv.conf")
-    run("sudo cp {} {}".format(resolv_conf_reference, resolv_conf_path))
+        resolv_conf_reference = os.path.join(dotfiles_dir, "references", "resolv.conf")
+        resolv_conf_path = os.path.join(os.sep, "etc", "resolv.conf")
+        run("sudo cp {} {}".format(resolv_conf_reference, resolv_conf_path))
 
     iptables_status = run_for_output("sudo service iptables status")
-    if "Active: active" in iptables_status:
-        return
+    if "Active: active" not in iptables_status:
+        iptables_reference = os.path.join(dotfiles_dir, "references", "iptables")
+        iptables_config_path = os.path.join(os.sep, "etc", "sysconfig", "iptables")
+        run("sudo cp {} {}".format(iptables_reference, iptables_config_path))
 
-    iptables_reference = os.path.join(dotfiles_dir, "references", "iptables")
-    iptables_config_path = os.path.join(os.sep, "etc", "sysconfig", "iptables")
-    run("sudo cp {} {}".format(iptables_reference, iptables_config_path))
+        ip6tables_reference = os.path.join(dotfiles_dir, "references", "ip6tables")
+        ip6tables_config_path = os.path.join(os.sep, "etc", "sysconfig", "ip6tables")
+        run("sudo cp {} {}".format(ip6tables_reference, ip6tables_config_path))
 
-    ip6tables_reference = os.path.join(dotfiles_dir, "references", "ip6tables")
-    ip6tables_config_path = os.path.join(os.sep, "etc", "sysconfig", "ip6tables")
-    run("sudo cp {} {}".format(ip6tables_reference, ip6tables_config_path))
+        run("sudo systemctl disable firewalld.service")
+        run("sudo systemctl enable iptables.service")
+        run("sudo systemctl enable ip6tables.service")
 
-    run("sudo systemctl disable firewalld.service")
-    run("sudo systemctl enable iptables.service")
-    run("sudo systemctl enable ip6tables.service")
+        run("sudo systemctl stop firewalld")
+        run("sudo systemctl restart iptables")
+        run("sudo systemctl restart ip6tables")
 
-    run("sudo systemctl stop firewalld")
-    run("sudo systemctl restart iptables")
-    run("sudo systemctl restart ip6tables")
-
-    run("sudo service docker restart")
+        run("sudo service docker restart")
 
 
 def _install_ubuntu_network_configs():
