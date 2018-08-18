@@ -182,6 +182,15 @@ def _install_ubuntu_packages():
 
 
 def _install_fedora_packages():
+    fedora_version = run_for_output("rpm -E %fedora").strip()
+    run(
+        "sudo dnf install "
+        "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-{0}.noarch.rpm "
+        "https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-{0}.noarch.rpm".format(
+            fedora_version
+        )
+    )
+
     fedora_packages = [
         "gcc",
         "cmake",
@@ -222,14 +231,7 @@ def _setup_ubuntu():
 
 
 def _setup_fedora():
-    fedora_version = run_for_output("rpm -E %fedora").strip()
-    run(
-        "sudo dnf install "
-        "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-{0}.noarch.rpm "
-        "https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-{0}.noarch.rpm".format(
-            fedora_version
-        )
-    )
+    pass
 
 
 def setup_os():
@@ -247,17 +249,18 @@ def _generate_ssh_key():
 
     priv_key_path = os.path.join(ssh_dir, "id_rsa")
     pub_key_path = os.path.join(ssh_dir, "id_rsa.pub")
-    if not os.path.exists(priv_key_path):
-        run('ssh-keygen -N "" -f {}'.format(priv_key_path))
+
+    if os.path.exists(priv_key_path):
+        return
+
+    run('ssh-keygen -N "" -f {}'.format(priv_key_path))
     with open(pub_key_path, "r") as key:
         ssh_key = key.read().strip()
 
 
 def _delete_github_ssh_key(url, headers):
     delete_req = Request(url, headers=headers, method="DELETE")
-    with urlopen(delete_req) as response:
-        if response.getcode() != 204:
-            raise APIError("Failed to delete GitHub key")
+    urlopen(delete_req)
 
 
 def _send_ssh_key_to_github():
@@ -276,14 +279,13 @@ def _send_ssh_key_to_github():
     get_keys_req = Request(keys_resource, headers=headers)
 
     with urlopen(get_keys_req) as response:
-        if response.getcode() != 200:
-            raise APIError("Error getting GitHub keys")
         keys = json.loads(response.read().strip())
     for key in keys:
         local_relevant_key = ssh_key.split(" ")[1]
         github_relevant_key = key["key"].split(" ")[1]
         if local_relevant_key == github_relevant_key:
             return
+
     for key in keys:
         if key["title"] == ssh_key_title:
             _delete_github_ssh_key(key["url"], headers)
@@ -295,9 +297,7 @@ def _send_ssh_key_to_github():
         headers=headers,
         method="POST",
     )
-    with urlopen(add_key_req) as response:
-        if response.getcode() != 201:
-            raise APIError("Failed to create GitHub key")
+    urlopen(add_key_req)
 
 
 def _send_ssh_key_to_gitlab():
@@ -339,13 +339,17 @@ def add_known_ssh_hosts():
         file_contents = run_for_output("wget -qO - {}".format(url))
         keys = file_contents.split("\n")
         for key in keys:
-            append_to_file("{}\n".format(key), known_hosts_path)
+            stripped_key = key.strip()
+            if stripped_key:
+                append_to_file("{}\n".format(stripped_key), known_hosts_path)
 
 
 def clone_dotfiles():
     dotfiles_repo = "git@github.com:jpmelos/dotfiles"
-    if not os.path.exists(dotfiles_dir):
-        git_clone(dotfiles_repo, dotfiles_dir)
+    if os.path.exists(dotfiles_dir):
+        return
+
+    git_clone(dotfiles_repo, dotfiles_dir)
 
 
 def copy_configuration_files_and_dirs():
@@ -398,15 +402,17 @@ def prepare_vim():
     for directory in vim_subdirs:
         create_dir(os.path.join(vim_dir, directory))
 
-    if not os.path.exists(vundle_dir):
-        git_clone(vundle_repo, vundle_dir)
-        run("vim +PluginInstall +qa")
-        # TODO: Fix garbled terminal after Vim
-        # After invoking Vim, sometimes the terminal gets
-        # garbled. See if calling 'reset' solves the issue.
-        # This only happened in Fedora so far.
-        with change_dir(os.path.join(vim_dir, "bundle", "YouCompleteMe")):
-            run("python install.py")
+    if os.path.exists(vundle_dir):
+        return
+
+    git_clone(vundle_repo, vundle_dir)
+    run("vim +PluginInstall +qa")
+    # TODO: Fix garbled terminal after Vim
+    # After invoking Vim, sometimes the terminal gets
+    # garbled. See if calling 'reset' solves the issue.
+    # This only happened in Fedora so far.
+    with change_dir(os.path.join(vim_dir, "bundle", "YouCompleteMe")):
+        run("python install.py")
 
 
 def get_git_prompt_and_autocompletion():
@@ -421,7 +427,8 @@ def get_git_prompt_and_autocompletion():
     version = match.group("version")
 
     for file in git_files:
-        if os.path.join(home_dir, ".{}".format(file)):
+        file_path = os.path.join(home_dir, ".{}".format(file))
+        if os.path.exists(file_path):
             continue
 
         file_path = git_file_path.format(version, file)
@@ -554,6 +561,7 @@ def install_docker():
         "Ubuntu": _install_docker_on_ubuntu,
     }
     docker_installers[detected_os]()
+
     if detected_os in ["Fedora", "Ubuntu"]:
         _general_docker_post_install_for_linux()
 
@@ -672,12 +680,6 @@ def list_additional_steps():
     print(
         '* Silence the terminal bell by adding "set bell-style none" to '
         "your /etc/inputrc."
-    )
-    print(
-        "* Configure your default VPN by adding the files needed in a "
-        "subfolder in ~/vpns and renaming the start file to conf.conf, "
-        "having a bootstrap file as start_vpn.sh and a destruction "
-        "file as stop_vpn.sh."
     )
     print("Restart your terminal.")
 
