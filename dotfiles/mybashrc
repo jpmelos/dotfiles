@@ -30,7 +30,8 @@ alias mv='mv -i'
 
 alias dc='docker-compose'
 
-alias grep='grep --color=always --exclude-dir=.git --binary-files=without-match -InHiR'
+alias grep='grep --color=always --exclude-dir=.git --binary-files=without-match -InHR'
+alias igrep='grep --color=always --exclude-dir=.git --binary-files=without-match -InHiR'
 
 alias less='less -r'
 alias tail='tail -f'
