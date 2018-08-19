@@ -303,6 +303,11 @@ def _send_ssh_key_to_github():
     urlopen(add_key_req)
 
 
+def _delete_bitbucket_ssh_key(url, headers):
+    delete_req = Request(url, headers=headers, method="DELETE")
+    urlopen(delete_req)
+
+
 def _send_ssh_key_to_bitbucket():
     global ssh_key
 
@@ -329,6 +334,11 @@ def _send_ssh_key_to_bitbucket():
         github_relevant_key = key["key"].split(" ")[1]
         if local_relevant_key == github_relevant_key:
             return
+
+    for key in keys:
+        if key["label"] == ssh_key_title:
+            _delete_bitbucket_ssh_key(key["links"]['self']['href'], headers)
+            break
 
     add_key_req = Request(
         keys_resource,
