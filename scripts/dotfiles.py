@@ -1,6 +1,7 @@
 from collections import namedtuple
 from io import StringIO
 from urllib.request import urlopen, Request
+import base64
 import contextlib
 import getpass
 import importlib
@@ -18,13 +19,17 @@ class Exit(Exception):
     pass
 
 
-class APIError(Exception):
-    pass
-
-
 Version = namedtuple("Version", ["major", "minor", "revision"])
 
-information = {"github_token": None, "ssh_key_title": None, "mullvad_number": None}
+information = {
+    "ssh_key_title": None,
+
+    "github_token": None,
+    "bitbucket_username": None,
+    "bitbucket_token": None,
+
+    "mullvad_number": None,
+}
 ssh_key = None
 
 
@@ -250,10 +255,8 @@ def _generate_ssh_key():
     priv_key_path = os.path.join(ssh_dir, "id_rsa")
     pub_key_path = os.path.join(ssh_dir, "id_rsa.pub")
 
-    if os.path.exists(priv_key_path):
-        return
-
-    run('ssh-keygen -N "" -f {}'.format(priv_key_path))
+    if not os.path.exists(priv_key_path):
+        run('ssh-keygen -N "" -f {}'.format(priv_key_path))
     with open(pub_key_path, "r") as key:
         ssh_key = key.read().strip()
 
@@ -293,7 +296,43 @@ def _send_ssh_key_to_github():
 
     add_key_req = Request(
         keys_resource,
-        data=json.dumps({"title": ssh_key_title, "key": ssh_key}).encode("utf-8"),
+        data=json.dumps({"title": ssh_key_title, "key": ssh_key}).encode(),
+        headers=headers,
+        method="POST",
+    )
+    urlopen(add_key_req)
+
+
+def _send_ssh_key_to_bitbucket():
+    global ssh_key
+
+    ssh_key_title = information["ssh_key_title"]
+    username = information['bitbucket_username']
+    token = '{}:{}'.format(username, information['bitbucket_token'])
+    authorization = "Basic {}".format(
+        base64.b64encode(token.encode()).decode()
+    )
+    headers = {
+        "Authorization": authorization,
+        "Content-Type": "application/json; charset=utf-8",
+    }
+
+    base_url = "https://api.bitbucket.org/2.0"
+    keys_resource = "{}/users/{}/ssh-keys".format(base_url, username)
+
+    get_keys_req = Request(keys_resource, headers=headers)
+
+    with urlopen(get_keys_req) as response:
+        keys = json.loads(response.read().strip())['values']
+    for key in keys:
+        local_relevant_key = ssh_key.split(" ")[1]
+        github_relevant_key = key["key"].split(" ")[1]
+        if local_relevant_key == github_relevant_key:
+            return
+
+    add_key_req = Request(
+        keys_resource,
+        data=json.dumps({'label': ssh_key_title, "key": ssh_key}).encode(),
         headers=headers,
         method="POST",
     )
@@ -301,10 +340,6 @@ def _send_ssh_key_to_github():
 
 
 def _send_ssh_key_to_gitlab():
-    pass
-
-
-def _send_ssh_key_to_bitbucket():
     pass
 
 
@@ -316,9 +351,9 @@ def broadcast_ssh_keys():
 
     if information["github_token"] is not None:
         _send_ssh_key_to_github()
-
+    if information["bitbucket_token"] is not None:
+        _send_ssh_key_to_bitbucket()
     _send_ssh_key_to_gitlab()
-    _send_ssh_key_to_bitbucket()
 
 
 def add_known_ssh_hosts():
