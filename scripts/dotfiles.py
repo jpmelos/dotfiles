@@ -27,6 +27,7 @@ information = {
     "github_token": None,
     "bitbucket_username": None,
     "bitbucket_token": None,
+    'gitlab_token': None,
 
     "mullvad_number": None,
 }
@@ -285,8 +286,8 @@ def _send_ssh_key_to_github():
         keys = json.loads(response.read().strip())
     for key in keys:
         local_relevant_key = ssh_key.split(" ")[1]
-        github_relevant_key = key["key"].split(" ")[1]
-        if local_relevant_key == github_relevant_key:
+        remote_relevant_key = key["key"].split(" ")[1]
+        if local_relevant_key == remote_relevant_key:
             return
 
     for key in keys:
@@ -331,8 +332,8 @@ def _send_ssh_key_to_bitbucket():
         keys = json.loads(response.read().strip())['values']
     for key in keys:
         local_relevant_key = ssh_key.split(" ")[1]
-        github_relevant_key = key["key"].split(" ")[1]
-        if local_relevant_key == github_relevant_key:
+        remote_relevant_key = key["key"].split(" ")[1]
+        if local_relevant_key == remote_relevant_key:
             return
 
     for key in keys:
@@ -349,8 +350,46 @@ def _send_ssh_key_to_bitbucket():
     urlopen(add_key_req)
 
 
+def _delete_gitlab_ssh_key(url, headers):
+    delete_req = Request(url, headers=headers, method="DELETE")
+    urlopen(delete_req)
+
+
 def _send_ssh_key_to_gitlab():
-    pass
+    global ssh_key
+
+    ssh_key_title = information["ssh_key_title"]
+    authorization = information['gitlab_token']
+    headers = {
+        "Private-Token": authorization,
+        "Content-Type": "application/json; charset=utf-8",
+    }
+
+    base_url = "https://gitlab.com/api/v4"
+    keys_resource = "{}/user/keys".format(base_url)
+
+    get_keys_req = Request(keys_resource, headers=headers)
+
+    with urlopen(get_keys_req) as response:
+        keys = json.loads(response.read().strip())
+    for key in keys:
+        local_relevant_key = ssh_key.split(" ")[1]
+        remote_relevant_key = key["key"].split(" ")[1]
+        if local_relevant_key == remote_relevant_key:
+            return
+
+    for key in keys:
+        if key["title"] == ssh_key_title:
+            _delete_gitlab_ssh_key('{}/{}'.format(keys_resource, key['id']), headers)
+            break
+
+    add_key_req = Request(
+        keys_resource,
+        data=json.dumps({'title': ssh_key_title, "key": ssh_key}).encode(),
+        headers=headers,
+        method="POST",
+    )
+    urlopen(add_key_req)
 
 
 def broadcast_ssh_keys():
@@ -363,7 +402,8 @@ def broadcast_ssh_keys():
         _send_ssh_key_to_github()
     if information["bitbucket_token"] is not None:
         _send_ssh_key_to_bitbucket()
-    _send_ssh_key_to_gitlab()
+    if information['gitlab_token'] is not None:
+        _send_ssh_key_to_gitlab()
 
 
 def add_known_ssh_hosts():
