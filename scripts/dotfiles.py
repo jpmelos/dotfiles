@@ -290,11 +290,6 @@ def _generate_ssh_key():
         ssh_key = key.read().strip()
 
 
-def _delete_github_ssh_key(url, headers):
-    delete_req = Request(url, headers=headers, method="DELETE")
-    urlopen(delete_req)
-
-
 def _send_ssh_key_to_github():
     global ssh_key
 
@@ -320,7 +315,8 @@ def _send_ssh_key_to_github():
 
     for key in keys:
         if key["title"] == ssh_key_title:
-            _delete_github_ssh_key(key["url"], headers)
+            delete_req = Request(key["url"], headers=headers, method="DELETE")
+            urlopen(delete_req)
             break
 
     add_key_req = Request(
@@ -330,11 +326,6 @@ def _send_ssh_key_to_github():
         method="POST",
     )
     urlopen(add_key_req)
-
-
-def _delete_bitbucket_ssh_key(url, headers):
-    delete_req = Request(url, headers=headers, method="DELETE")
-    urlopen(delete_req)
 
 
 def _send_ssh_key_to_bitbucket():
@@ -364,7 +355,10 @@ def _send_ssh_key_to_bitbucket():
 
     for key in keys:
         if key["label"] == ssh_key_title:
-            _delete_bitbucket_ssh_key(key["links"]["self"]["href"], headers)
+            delete_req = Request(
+                key["links"]["self"]["href"], headers=headers, method="DELETE"
+            )
+            urlopen(delete_req)
             break
 
     add_key_req = Request(
@@ -374,11 +368,6 @@ def _send_ssh_key_to_bitbucket():
         method="POST",
     )
     urlopen(add_key_req)
-
-
-def _delete_gitlab_ssh_key(url, headers):
-    delete_req = Request(url, headers=headers, method="DELETE")
-    urlopen(delete_req)
 
 
 def _send_ssh_key_to_gitlab():
@@ -406,7 +395,12 @@ def _send_ssh_key_to_gitlab():
 
     for key in keys:
         if key["title"] == ssh_key_title:
-            _delete_gitlab_ssh_key("{}/{}".format(keys_resource, key["id"]), headers)
+            delete_req = Request(
+                "{}/{}".format(keys_resource, key["id"]),
+                headers=headers,
+                method="DELETE",
+            )
+            urlopen(delete_req)
             break
 
     add_key_req = Request(
@@ -671,6 +665,9 @@ def _general_docker_post_install_for_linux():
 
 
 def install_docker():
+    if os.path.exists(os.sep, "var", "lib", "docker"):
+        return
+
     docker_installers = {
         "Fedora": _install_docker_on_fedora,
         "Ubuntu": _install_docker_on_ubuntu,
