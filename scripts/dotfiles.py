@@ -625,6 +625,10 @@ def _install_docker_on_fedora():
 
 
 def _install_docker_on_ubuntu():
+    docker_gpg_key_path = os.path.join(
+        home_dir, 'docker_repository_gpg_key',
+    )
+
     run("sudo apt-get update")
     run(
         "sudo apt-get -y install "
@@ -634,9 +638,11 @@ def _install_docker_on_ubuntu():
         "software-properties-common"
     )
     run(
-        "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | "
-        "sudo apt-key add -"
+        "curl -fsSL https://download.docker.com/linux/ubuntu/gpg "
+        "-o {}".format(docker_gpg_key_path)
     )
+    run("sudo apt-key add {}".format(docker_gpg_key_path))
+    os.remove(docker_gpg_key_path)
 
     ubuntu_release = run_for_output("lsb_release -cs").strip()
     run(
