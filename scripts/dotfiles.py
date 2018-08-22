@@ -244,28 +244,24 @@ def install_packages():
 
 def _setup_ubuntu():
     apt_automatic_updates_path = os.path.join(
-        os.sep, 'etc', 'apt', 'apt.conf.d', '10periodic',
+        os.sep, "etc", "apt", "apt.conf.d", "10periodic"
     )
-    automatic_update_config = 'APT::Periodic::Update-Package-Lists'
-    starting_chmod = '644'
-    needed_chmod = '666'
+    automatic_update_config = "APT::Periodic::Update-Package-Lists"
+    starting_chmod = "644"
+    needed_chmod = "666"
 
-    run('sudo chmod {} {}'.format(
-        needed_chmod, apt_automatic_updates_path,
-    ))
+    run("sudo chmod {} {}".format(needed_chmod, apt_automatic_updates_path))
 
-    with open(apt_automatic_updates_path, 'r') as fp:
+    with open(apt_automatic_updates_path, "r") as fp:
         content = fp.read()
-    with open(apt_automatic_updates_path, 'w') as fp:
+    with open(apt_automatic_updates_path, "w") as fp:
         for line in content:
             if line.startswith(automatic_update_config):
                 fp.write('{} "0";\n'.format(automatic_update_config))
                 continue
             fp.write(line)
 
-    run('sudo chmod {} {}'.format(
-        starting_chmod, apt_automatic_updates_path,
-    ))
+    run("sudo chmod {} {}".format(starting_chmod, apt_automatic_updates_path))
 
 
 def _setup_fedora():
@@ -636,9 +632,7 @@ def _install_docker_on_fedora():
 
 
 def _install_docker_on_ubuntu():
-    docker_gpg_key_path = os.path.join(
-        home_dir, 'docker_repository_gpg_key',
-    )
+    docker_gpg_key_path = os.path.join(home_dir, "docker_repository_gpg_key")
 
     run("sudo apt-get update")
     run(
@@ -693,6 +687,13 @@ def _install_dropbox_on_fedora():
 
 def _install_dropbox_on_ubuntu():
     dropbox_deb_file = os.path.join(home_dir, "dropbox.deb")
+
+    run(
+        "sudo apt-get install -y "
+        "libpango1.0-0 libpangox-1.0-0 python-cairo "
+        "python-gobject-2 python-gtk2"
+    )
+
     run(
         "wget -qO {} "
         "https://linux.dropbox.com/packages/ubuntu/dropbox_2015.10.28_amd64.deb".format(
