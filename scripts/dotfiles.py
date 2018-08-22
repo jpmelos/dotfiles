@@ -172,6 +172,7 @@ def _install_ubuntu_packages():
         "fonts-tuffy",
         "tv-fonts",
         "fonts-inconsolata",
+        "iptables-persistent",
         "openvpn",
         "network-manager-openvpn-gnome",
         "python",
@@ -681,7 +682,7 @@ def install_dropbox():
     dropbox_installers[detected_os]()
 
 
-def _install_fedora_network_configs():
+def _install_network_manager():
     network_manager_reference = os.path.join(
         dotfiles_dir, "references", "NetworkManager.conf"
     )
@@ -703,6 +704,10 @@ def _install_fedora_network_configs():
         resolv_conf_reference = os.path.join(dotfiles_dir, "references", "resolv.conf")
         resolv_conf_path = os.path.join(os.sep, "etc", "resolv.conf")
         run("sudo cp {} {}".format(resolv_conf_reference, resolv_conf_path))
+
+
+def _install_fedora_network_configs():
+    _install_network_manager()
 
     iptables_status = run_for_output("sudo service iptables status")
     if "Active: active" not in iptables_status:
@@ -726,7 +731,17 @@ def _install_fedora_network_configs():
 
 
 def _install_ubuntu_network_configs():
-    pass
+    _install_network_manager()
+
+    iptables_reference = os.path.join(dotfiles_dir, "references", "iptables")
+    iptables_config_path = os.path.join(os.sep, "etc", "iptables", "rules.v4")
+    run("sudo cp {} {}".format(iptables_reference, iptables_config_path))
+
+    ip6tables_reference = os.path.join(dotfiles_dir, "references", "ip6tables")
+    iptables_config_path = os.path.join(os.sep, "etc", "iptables", "rules.v6")
+    run("sudo cp {} {}".format(ip6tables_reference, ip6tables_config_path))
+
+    run("sudo service docker restart")
 
 
 def install_network_configs():
