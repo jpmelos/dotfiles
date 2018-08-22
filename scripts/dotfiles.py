@@ -768,7 +768,7 @@ def _install_ubuntu_network_configs():
     run("sudo cp {} {}".format(iptables_reference, iptables_config_path))
 
     ip6tables_reference = os.path.join(dotfiles_dir, "references", "ip6tables")
-    iptables_config_path = os.path.join(os.sep, "etc", "iptables", "rules.v6")
+    ip6tables_config_path = os.path.join(os.sep, "etc", "iptables", "rules.v6")
     run("sudo cp {} {}".format(ip6tables_reference, ip6tables_config_path))
 
     run("sudo service docker restart")
