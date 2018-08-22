@@ -247,6 +247,12 @@ def _setup_ubuntu():
         os.sep, 'etc', 'apt', 'apt.conf.d', '10periodic',
     )
     automatic_update_config = 'APT::Periodic::Update-Package-Lists'
+    starting_chmod = '644'
+    needed_chmod = '666'
+
+    run('sudo chmod {} {}'.format(
+        needed_chmod, apt_automatic_updates_path,
+    ))
 
     with open(apt_automatic_updates_path, 'r') as fp:
         content = fp.read()
@@ -255,6 +261,10 @@ def _setup_ubuntu():
             if line.startswith(automatic_update_config):
                 fp.write('{} "0"\n'.format(automatic_update_config))
             fp.write(line)
+
+    run('sudo chmod {} {}'.format(
+        starting_chmod, apt_automatic_updates_path,
+    ))
 
 
 def _setup_fedora():
