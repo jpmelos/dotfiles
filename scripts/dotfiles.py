@@ -243,7 +243,18 @@ def install_packages():
 
 
 def _setup_ubuntu():
-    pass
+    apt_automatic_updates_path = os.path.join(
+        os.sep, 'etc', 'apt', 'apt.conf.d', '10periodic',
+    )
+    automatic_update_config = 'APT::Periodic::Update-Package-Lists'
+
+    with open(apt_automatic_updates_path, 'r') as fp:
+        content = fp.read()
+    with open(apt_automatic_updates_path, 'w') as fp:
+        for line in content:
+            if line.startswith(automatic_update_config):
+                fp.write('{} "0"\n'.format(automatic_update_config))
+            fp.write(line)
 
 
 def _setup_fedora():
