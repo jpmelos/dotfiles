@@ -259,7 +259,8 @@ def _setup_ubuntu():
     with open(apt_automatic_updates_path, 'w') as fp:
         for line in content:
             if line.startswith(automatic_update_config):
-                fp.write('{} "0"\n'.format(automatic_update_config))
+                fp.write('{} "0";\n'.format(automatic_update_config))
+                continue
             fp.write(line)
 
     run('sudo chmod {} {}'.format(
@@ -694,7 +695,7 @@ def _install_dropbox_on_ubuntu():
     dropbox_deb_file = os.path.join(home_dir, "dropbox.deb")
     run(
         "wget -qO {} "
-        "https://linux.dropbox.com/packages/ubuntu/nautilus-dropbox_2015.10.28_all.deb".format(
+        "https://linux.dropbox.com/packages/ubuntu/dropbox_2015.10.28_amd64.deb".format(
             dropbox_deb_file
         )
     )
