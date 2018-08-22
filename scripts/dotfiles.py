@@ -173,6 +173,7 @@ def _install_ubuntu_packages():
         "tv-fonts",
         "fonts-inconsolata",
         "iptables-persistent",
+        "net-tools",
         "openvpn",
         "network-manager-openvpn-gnome",
         "python",
