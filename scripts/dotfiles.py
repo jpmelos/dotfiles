@@ -665,7 +665,8 @@ def _general_docker_post_install_for_linux():
 
 
 def install_docker():
-    if os.path.exists(os.sep, "var", "lib", "docker"):
+    docker_data_dir = os.path.join(os.sep, "var", "lib", "docker")
+    if os.path.exists(docker_data_dir):
         return
 
     docker_installers = {
