@@ -253,7 +253,7 @@ def _setup_ubuntu():
     run("sudo chmod {} {}".format(needed_chmod, apt_automatic_updates_path))
 
     with open(apt_automatic_updates_path, "r") as fp:
-        content = fp.read()
+        content = fp.readlines()
     with open(apt_automatic_updates_path, "w") as fp:
         for line in content:
             if line.startswith(automatic_update_config):
