@@ -731,13 +731,16 @@ def _install_network_manager():
 
         run("sudo systemctl restart NetworkManager")
 
-        resolv_conf_reference = os.path.join(dotfiles_dir, "references", "resolv.conf")
-        resolv_conf_path = os.path.join(os.sep, "etc", "resolv.conf")
-        run("sudo cp {} {}".format(resolv_conf_reference, resolv_conf_path))
+
+def _install_resolvconf():
+    resolv_conf_reference = os.path.join(dotfiles_dir, "references", "resolv.conf")
+    resolv_conf_path = os.path.join(os.sep, "etc", "resolv.conf")
+    run("sudo cp {} {}".format(resolv_conf_reference, resolv_conf_path))
 
 
 def _install_fedora_network_configs():
     _install_network_manager()
+    _install_resolvconf()
 
     iptables_status = run_for_output("sudo service iptables status")
     if "Active: active" not in iptables_status:
@@ -761,7 +764,11 @@ def _install_fedora_network_configs():
 
 
 def _install_ubuntu_network_configs():
+    run('sudo systemctl disable systemd-resolved.service')
+    run('sudo service systemd-resolved stop')
+
     _install_network_manager()
+    _install_resolvconf()
 
     iptables_reference = os.path.join(dotfiles_dir, "references", "iptables")
     iptables_config_path = os.path.join(os.sep, "etc", "iptables", "rules.v4")
