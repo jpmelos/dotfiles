@@ -245,6 +245,11 @@ def install_packages():
 def _setup_ubuntu():
     # TODO: Make Gnome the default option for window manager
     # TODO: Diff initial and final Gnome settings and automate
+    run (
+        'sudo update-alternatives --set gdm3.css '
+        '/usr/share/gnome-shell/theme/gnome-shell.css'
+    )
+
     apt_automatic_updates_path = os.path.join(
         os.sep, "etc", "apt", "apt.conf.d", "10periodic"
     )
