@@ -251,14 +251,26 @@ def install_packages():
     package_installers[detected_os]()
 
 
-def _setup_ubuntu():
-    # TODO: Make Gnome the default option for window manager
-    # TODO: Diff initial and final Gnome settings and automate
+def _set_default_gdm_style():
     run(
         "sudo update-alternatives --set gdm3.css "
         "/usr/share/gnome-shell/theme/gnome-shell.css"
     )
 
+
+def _set_terminal_settings():
+    terminal_settings_path = os.path.join(
+        dotfiles_dir, 'references', 'terminal-settings.conf',
+    )
+    with open(terminal_settings_path, 'rb') as fp:
+        run(
+            'dconf load /org/gnome/terminal/legacy/profiles:/:{}/'
+            .format('b1dcc9dd-5262-4d8d-a863-c897e6d979b9'),
+            input=fp.read(),
+        )
+
+
+def _disable_ubuntu_automatic_updates():
     apt_automatic_updates_path = os.path.join(
         os.sep, "etc", "apt", "apt.conf.d", "10periodic"
     )
@@ -278,6 +290,14 @@ def _setup_ubuntu():
             fp.write(line)
 
     run("sudo chmod {} {}".format(starting_chmod, apt_automatic_updates_path))
+
+
+def _setup_ubuntu():
+    # TODO: Make Gnome the default option for window manager
+    # TODO: Diff initial and final Gnome settings and automate
+    _set_default_gdm_style()
+    _set_terminal_settings()
+    _disable_ubuntu_automatic_updates()
 
 
 def _setup_fedora():
