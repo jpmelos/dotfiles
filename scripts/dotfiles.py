@@ -155,13 +155,17 @@ def get_information():
 
 def _install_ubuntu_packages():
     ubuntu_packages = [
-        "gnome-shell",
+        # Desktop
+        "gnome-session",
+        # Development tools
         "build-essential",
         "cmake",
         "git",
         "vim",
-        "vlc",
         "tmux",
+        # Audio and video
+        "vlc",
+        # Fonts
         "ttf-mscorefonts-installer",
         "fonts-cantarell",
         "lmodern",
@@ -172,10 +176,12 @@ def _install_ubuntu_packages():
         "fonts-tuffy",
         "tv-fonts",
         "fonts-inconsolata",
+        # Networking
         "iptables-persistent",
         "net-tools",
         "openvpn",
         "network-manager-openvpn-gnome",
+        # Python dependencies
         "python",
         "python-dev",
         "python3",
@@ -208,12 +214,15 @@ def _install_fedora_packages():
     )
 
     fedora_packages = [
+        # Development tools
         "gcc",
         "cmake",
         "git",
         "vim",
-        "vlc",
         "tmux",
+        # Audio and video
+        "vlc",
+        # Python dependencies
         "python2",
         "python2-devel",
         "python3",
