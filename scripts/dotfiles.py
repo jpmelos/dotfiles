@@ -749,6 +749,9 @@ def _install_network_manager():
 def _install_resolvconf():
     resolv_conf_reference = os.path.join(dotfiles_dir, "references", "resolv.conf")
     resolv_conf_path = os.path.join(os.sep, "etc", "resolv.conf")
+
+    if os.path.islink(resolv_conf_path):
+        run('sudo rm {}'.format(resolv_conf_path))
     run("sudo cp {} {}".format(resolv_conf_reference, resolv_conf_path))
 
 
