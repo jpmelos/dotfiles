@@ -254,9 +254,9 @@ def install_packages():
 def _setup_ubuntu():
     # TODO: Make Gnome the default option for window manager
     # TODO: Diff initial and final Gnome settings and automate
-    run (
-        'sudo update-alternatives --set gdm3.css '
-        '/usr/share/gnome-shell/theme/gnome-shell.css'
+    run(
+        "sudo update-alternatives --set gdm3.css "
+        "/usr/share/gnome-shell/theme/gnome-shell.css"
     )
 
     apt_automatic_updates_path = os.path.join(
@@ -778,8 +778,8 @@ def _install_fedora_network_configs():
 
 
 def _install_ubuntu_network_configs():
-    run('sudo systemctl disable systemd-resolved.service')
-    run('sudo service systemd-resolved stop')
+    run("sudo systemctl disable systemd-resolved.service")
+    run("sudo service systemd-resolved stop")
 
     _install_network_manager()
     _install_resolvconf()
