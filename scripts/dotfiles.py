@@ -260,12 +260,13 @@ def _set_default_gdm_style():
 
 def _set_terminal_settings():
     terminal_settings_path = os.path.join(
-        dotfiles_dir, 'references', 'terminal-settings.conf',
+        dotfiles_dir, "references", "terminal-settings.conf"
     )
-    with open(terminal_settings_path, 'r') as fp:
+    with open(terminal_settings_path, "r") as fp:
         run(
-            'dconf load /org/gnome/terminal/legacy/profiles:/:{}/'
-            .format('b1dcc9dd-5262-4d8d-a863-c897e6d979b9'),
+            "dconf load /org/gnome/terminal/legacy/profiles:/:{}/".format(
+                "b1dcc9dd-5262-4d8d-a863-c897e6d979b9"
+            ),
             input=fp.read(),
         )
 
@@ -771,7 +772,7 @@ def _install_resolvconf():
     resolv_conf_path = os.path.join(os.sep, "etc", "resolv.conf")
 
     if os.path.islink(resolv_conf_path):
-        run('sudo rm {}'.format(resolv_conf_path))
+        run("sudo rm {}".format(resolv_conf_path))
     run("sudo cp {} {}".format(resolv_conf_reference, resolv_conf_path))
 
 
