@@ -156,15 +156,6 @@ docker-clean() {
     docker volume rm $(docker volume ls -q)
 }
 
-# Activates your VPN
-stealth() {
-    cd $HOME/vpns/${@:-default}
-    bash start_vpn.sh
-    sudo openvpn --mute-replay-warnings --config conf.conf
-    bash stop_vpn.sh
-    cd - > /dev/null 2> /dev/null
-}
-
 # List all Gnome settings
 list-gnome-settings() {
     for schema in $(gsettings list-schemas | sort); do
@@ -174,3 +165,30 @@ list-gnome-settings() {
         done
     done
 }
+
+# Disables any traffic not using your VPN
+start-stealth() {
+    cd $HOME/vpns/${@:-default}
+    bash start_vpn.sh
+    cd - > /dev/null 2> /dev/null
+}
+
+# Activates your VPN
+vpn-client() {
+    cd $HOME/vpns/${@:-default}
+    sudo openvpn --mute-replay-warnings --config conf.conf
+    cd - > /dev/null 2> /dev/null
+}
+
+# Allows traffic through your ISP again
+end-stealth() {
+    cd $HOME/vpns/${@:-default}
+    bash stop_vpn.sh
+    cd - > /dev/null 2> /dev/null
+}
+
+# To use a VPN, do:
+# $ start-stealth <vpn-name>
+# $ vpn-client <vpn-name>
+# $ end-stealth <vpn-name>
+# Leave off <vpn-name> if using the VPN named "default"
