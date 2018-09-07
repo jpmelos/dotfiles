@@ -838,8 +838,8 @@ def install_mullvad():
         "mullvad_crl.pem",
         "mullvad_userpass.txt",
         "resolv.conf",
-        "start_vpn.sh",
-        "stop_vpn.sh",
+        "start_firewall.sh",
+        "stop_firewall.sh",
     ]
     mullvad_vpn_dir = os.path.join(home_dir, "vpns", "default")
     create_dir(os.path.join(mullvad_vpn_dir))
