@@ -170,6 +170,7 @@ list-gnome-settings() {
 start-stealth() {
     cd $HOME/vpns/${@:-default}
     bash start_vpn.sh
+    sudo iptables -S
     cd - > /dev/null 2> /dev/null
 }
 
@@ -184,6 +185,7 @@ vpn-client() {
 end-stealth() {
     cd $HOME/vpns/${@:-default}
     bash stop_vpn.sh
+    sudo iptables -S
     cd - > /dev/null 2> /dev/null
 }
 
