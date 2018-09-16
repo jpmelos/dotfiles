@@ -189,6 +189,24 @@ end-stealth() {
     cd - > /dev/null 2> /dev/null
 }
 
+# Use in case things get screwed up
+reset-network() {
+    sudo iptables -X
+
+    sudo iptables -P INPUT DROP
+    sudo iptables -P FORWARD DROP
+    sudo iptables -P OUTPUT DROP
+
+    sudo iptables -A INPUT -m conntrack --ctstate INVALID -j DROP
+    sudo iptables -A INPUT -i lo -j ACCEPT
+    sudo iptables -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+
+    sudo iptables -A OUTPUT -o lo -j ACCEPT
+    sudo iptables -A OUTPUT -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
+
+    sudo cp ~/devel/dotfiles/references/resolv.conf /etc/resolv.conf
+}
+
 # To use a VPN, do:
 # $ start-stealth <vpn-name>
 # $ vpn-client <vpn-name>
