@@ -166,6 +166,15 @@ list-gnome-settings() {
     done
 }
 
+# Show all components of your PATH as a list
+show-path() {
+    while IFS=':' read -ra PARTS; do
+        for part in "${PARTS[@]}"; do
+            echo $part
+        done
+    done <<< "$PATH"
+}
+
 # Disables any traffic not using your VPN
 start-stealth() {
     cd $HOME/vpns/${@:-default}
