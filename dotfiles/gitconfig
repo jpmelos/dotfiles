@@ -39,6 +39,7 @@
     mg = merge
     pa = add --patch
     pu = pull --rebase
+    puf = push --force-with-lease
     rb = rebase
     sa = stash save --include-untracked
     sh = show
