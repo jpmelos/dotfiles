@@ -47,6 +47,11 @@ if [[ $HOME =~ ^/Users.* ]]; then
     alias ls='ls -F'
 fi
 
+alias untar='tar -zxvf'
+
+# Allows downloading something, but resume if it goes south
+alias wget='wget -c'
+
 # Install the git prompt command (__git_ps1) and autocompletions
 source ~/.git-prompt.sh
 source ~/.git-completion.bash
