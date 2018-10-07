@@ -65,6 +65,22 @@ export PATH="$PYENV_ROOT/bin:$PATH"
 eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 
+# Next two functions:
+# Mounts an ISO: mount-iso file.iso dir/
+# Unmounts an ISO: unmount-iso dir/
+mount-iso() {
+    if [[ ! -d "$2" ]]; then
+        mkdir "$2"
+    fi
+
+    sudo mount -o loop -t iso9660 "$1" "$2"
+}
+
+unmount-iso() {
+    sudo umount "$1"
+    rm -r "$1"
+}
+
 # Shows git diff, excluding deleted files.
 git-dico() {
     git diff $(git status -s --porcelain | \grep -v "^ D" | cut -b4-)
