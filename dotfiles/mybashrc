@@ -190,6 +190,11 @@ list-gnome-settings() {
     done
 }
 
+# Get a time id
+time-id() {
+    date +%Y%m%d%H%M%S
+}
+
 # Disables any traffic not using your VPN
 start-stealth() {
     cd $HOME/vpns/${@:-default}
