@@ -249,3 +249,19 @@ show-path() {
         echo $part
     done
 }
+
+# Usage: run-until TIME-ID "command"
+run-until() {
+    END=$(expr $1 + 0)
+    shift
+
+    while true; do
+        CURRENT=$(date +%Y%m%d%H%M%S)
+
+        if [[ $(expr $CURRENT + 0) > $END ]]; then
+            break
+        fi
+
+        $*
+    done
+}
