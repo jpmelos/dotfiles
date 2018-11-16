@@ -12,6 +12,7 @@
 " F9: Toggle NERDTree
 " F12: Toggle cursor centered in screen
 
+
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " VUNDLE SETUP
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -62,6 +63,9 @@ hi javaBoolean ctermfg=14 cterm=bold
 
 " enable syntax highlighting
 syntax on
+
+" for .sh files, always presume bash
+let g:is_bash=1
 
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
