@@ -111,9 +111,7 @@ localserver() {
     if [[ ! -d /tmp/nginx ]]; then
         mkdir /tmp/nginx
     fi
-    cp ~/.localserver.conf /tmp/nginx/localserver.conf
-
-    docker pull nginx:1.15.2
+    \cp ~/.localserver.conf /tmp/nginx/localserver.conf
 
     echo "Connect to $ADDR_PORT"
     docker run \
