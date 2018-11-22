@@ -1,4 +1,3 @@
-sudo cp /etc/resolv.conf resolv.conf-orig
 sudo cp resolv.conf /etc/resolv.conf
 
 sudo iptables -D INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
