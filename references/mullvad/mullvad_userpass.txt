@@ -1,2 +1,2 @@
-mullvad_number
+mullvad_account
 m

@@ -1,23 +1,14 @@
 from collections import namedtuple
-from io import StringIO
 from urllib.request import urlopen, Request
 import base64
 import contextlib
 import getpass
-import importlib
 import json
-import logging
 import os
 import re
 import shlex
 import shutil
 import subprocess
-import sys
-
-
-class Exit(Exception):
-    pass
-
 
 Version = namedtuple("Version", ["major", "minor", "revision"])
 
@@ -27,7 +18,7 @@ information = {
     "bitbucket_username": None,
     "bitbucket_token": None,
     "gitlab_token": None,
-    "mullvad_number": None,
+    "mullvad_account": None,
 }
 ssh_key = None
 
@@ -51,24 +42,6 @@ def change_dir(dir_name):
         os.chdir(old_dir)
 
 
-def detect_os():
-    os_regex = re.compile(r'^NAME="?(?P<name>\w+)"?$')
-
-    name_found = None
-    with open("/etc/os-release") as fp:
-        lines = fp.read().split("\n")
-    for line in lines:
-        match = os_regex.match(line)
-        if match:
-            name_found = match.group("name")
-            break
-
-    if name_found in ["Ubuntu", "Fedora"]:
-        return name_found
-
-    raise Exception("Can't detect the OS")
-
-
 def run(command, check_errors=True, *args, **kwargs):
     completed_process = subprocess.run(
         shlex.split(command), universal_newlines=True, *args, **kwargs
@@ -88,22 +61,18 @@ def git_clone(repo, dest=""):
     run("git clone {} {}".format(repo, dest))
 
 
-def append_to_file(line, dest, not_found_ok=False):
-    if os.path.exists(dest):
-        with open(dest, mode="r") as fp:
-            content = fp.read()
-        if line.strip() not in content:
-            with open(dest, mode="a") as fp:
-                fp.write(line)
-    else:
-        if not not_found_ok:
-            raise Exception("{} not found".format(dest))
+def append_to_file(dest, line):
+    with open(dest, mode="r") as fp:
+        content = fp.read()
+    if line.strip() not in content:
+        with open(dest, mode="a") as fp:
+            fp.write(line)
 
 
-def source(filename, dest, not_found_ok=False):
-    source_line = "\nsource ~/{filename}\n".format(filename=filename)
+def source(filename, dest):
     dest_file = os.path.join(home_dir, dest)
-    append_to_file(source_line, dest_file, not_found_ok=not_found_ok)
+    source_line = "\nsource ~/{filename}\n".format(filename=filename)
+    append_to_file(dest_file, source_line)
 
 
 def get_latest_version(versions, version_regex, for_minors=None):
@@ -128,14 +97,11 @@ def get_latest_version(versions, version_regex, for_minors=None):
         if minor not in for_minors:
             continue
 
-        revision = version
-        if minor not in versions or versions[minor] < revision:
-            versions[minor] = revision
+        if minor not in versions or versions[minor] < version:
+            versions[minor] = version
 
     return versions.values()
 
-
-detected_os = detect_os()
 
 home_dir = os.path.expanduser("~")
 devel_dir = os.path.join(home_dir, "devel")
@@ -153,8 +119,8 @@ def get_information():
             information[key] = value
 
 
-def _install_ubuntu_packages():
-    ubuntu_packages = [
+def install_packages():
+    packages = [
         # Desktop
         "gnome-session",
         # Development tools
@@ -200,55 +166,7 @@ def _install_ubuntu_packages():
     ]
 
     run("sudo apt-get update")
-    run("sudo apt-get install -y {}".format(" ".join(ubuntu_packages)))
-
-
-def _install_fedora_packages():
-    fedora_version = run_for_output("rpm -E %fedora").strip()
-    run(
-        "sudo dnf install "
-        "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-{0}.noarch.rpm "
-        "https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-{0}.noarch.rpm".format(
-            fedora_version
-        )
-    )
-
-    fedora_packages = [
-        # Development tools
-        "gcc",
-        "cmake",
-        "git",
-        "vim",
-        "tmux",
-        # Audio and video
-        "vlc",
-        # Python dependencies
-        "python2",
-        "python2-devel",
-        "python3",
-        "python3-devel",
-        "readline-devel",
-        "ncurses-devel",
-        "openssl-devel",
-        "gdbm-devel",
-        "sqlite-devel",
-        "sqlite2-devel",
-        "zlib-devel",
-        "bzip2-devel",
-        "tk-devel",
-        "libdb-devel",
-        "libffi-devel",
-    ]
-
-    run("sudo dnf install -y {}".format(" ".join(fedora_packages)))
-
-
-def install_packages():
-    package_installers = {
-        "Ubuntu": _install_ubuntu_packages,
-        "Fedora": _install_fedora_packages,
-    }
-    package_installers[detected_os]()
+    run("sudo apt-get install -y {}".format(" ".join(packages)))
 
 
 def _set_default_gdm_style():
@@ -293,21 +211,12 @@ def _disable_ubuntu_automatic_updates():
     run("sudo chmod {} {}".format(starting_chmod, apt_automatic_updates_path))
 
 
-def _setup_ubuntu():
+def setup_os():
     # TODO: Make Gnome the default option for window manager
     # TODO: Diff initial and final Gnome settings and automate
     _set_default_gdm_style()
     _set_terminal_settings()
     _disable_ubuntu_automatic_updates()
-
-
-def _setup_fedora():
-    pass
-
-
-def setup_os():
-    os_setup_functions = {"Ubuntu": _setup_ubuntu, "Fedora": _setup_fedora}
-    os_setup_functions[detected_os]()
 
 
 def create_devel_dir():
@@ -472,9 +381,7 @@ def add_known_ssh_hosts():
 
     if not os.path.exists(known_hosts_path):
         create_dir(os.path.dirname(known_hosts_path))
-        with open(known_hosts_path, "w"):
-            # Just need to create the file
-            pass
+        os.mknod(known_hosts_path)
 
     for filename in key_filenames:
         url = file_urls.format(filename)
@@ -483,7 +390,7 @@ def add_known_ssh_hosts():
         for key in keys:
             stripped_key = key.strip()
             if stripped_key:
-                append_to_file("{}\n".format(stripped_key), known_hosts_path)
+                append_to_file(known_hosts_path, "{}\n".format(stripped_key))
 
 
 def clone_dotfiles():
@@ -530,9 +437,9 @@ def copy_configuration_files_and_dirs():
 
 
 def source_dotfiles():
-    source(".myprofile", ".profile", not_found_ok=True)
-    source(".mybashrc", ".bashrc", not_found_ok=True)
-    source(".mybash_profile", ".bash_profile", not_found_ok=True)
+    source(".myprofile", ".profile")
+    source(".mybashrc", ".bashrc")
+    source(".mybash_profile", ".bash_profile")
 
 
 def prepare_vim():
@@ -549,10 +456,6 @@ def prepare_vim():
 
     git_clone(vundle_repo, vundle_dir)
     run("vim +PluginInstall +qa")
-    # TODO: Fix garbled terminal after Vim
-    # After invoking Vim, sometimes the terminal gets
-    # garbled. See if calling 'reset' solves the issue.
-    # This only happened in Fedora so far.
     with change_dir(os.path.join(vim_dir, "bundle", "YouCompleteMe")):
         run("python install.py")
 
@@ -595,9 +498,8 @@ def install_pyenv():
     if not os.path.exists(pyenv_dir):
         git_clone(pyenv_repo, pyenv_dir)
         git_clone(pyenv_virtualenv_repo, pyenv_virtualenv_dir)
-        if detected_os in ["Ubuntu", "Fedora"]:
-            delete_dir(os.path.join(home_dir, ".local", "bin"))
-            delete_dir(os.path.join(home_dir, ".local", "lib"))
+        delete_dir(os.path.join(home_dir, ".local", "bin"))
+        delete_dir(os.path.join(home_dir, ".local", "lib"))
 
     with change_dir(pyenv_dir):
         run("git checkout master")
@@ -651,18 +553,11 @@ def install_pyenv():
     )
 
 
-def _install_docker_on_fedora():
-    run("sudo dnf -y install dnf-plugins-core")
-    run(
-        "sudo dnf config-manager "
-        "--add-repo "
-        "https://download.docker.com/linux/fedora/docker-ce.repo"
-    )
-    run("sudo dnf -y install docker-ce")
-    run("sudo systemctl enable docker")
+def install_docker():
+    docker_data_dir = os.path.join(os.sep, "var", "lib", "docker")
+    if os.path.exists(docker_data_dir):
+        return
 
-
-def _install_docker_on_ubuntu():
     docker_gpg_key_path = os.path.join(home_dir, "docker_repository_gpg_key")
 
     run("sudo apt-get update")
@@ -689,8 +584,6 @@ def _install_docker_on_ubuntu():
     run("sudo apt-get update")
     run("sudo apt-get -y install docker-ce")
 
-
-def _general_docker_post_install_for_linux():
     groups_database = run_for_output("getent group").split("\n")
     groups_components = [components.split(":") for components in groups_database]
     groups = [component[0] for component in groups_components]
@@ -701,26 +594,7 @@ def _general_docker_post_install_for_linux():
     run("sudo usermod -aG docker {}".format(getpass.getuser()))
 
 
-def install_docker():
-    docker_data_dir = os.path.join(os.sep, "var", "lib", "docker")
-    if os.path.exists(docker_data_dir):
-        return
-
-    docker_installers = {
-        "Fedora": _install_docker_on_fedora,
-        "Ubuntu": _install_docker_on_ubuntu,
-    }
-    docker_installers[detected_os]()
-
-    if detected_os in ["Fedora", "Ubuntu"]:
-        _general_docker_post_install_for_linux()
-
-
-def _install_dropbox_on_fedora():
-    run("sudo dnf -y install nautilus-dropbox")
-
-
-def _install_dropbox_on_ubuntu():
+def install_dropbox():
     dropbox_deb_file = os.path.join(home_dir, "dropbox.deb")
 
     run(
@@ -737,14 +611,6 @@ def _install_dropbox_on_ubuntu():
     )
     run("sudo dpkg -i {}".format(dropbox_deb_file))
     os.remove(dropbox_deb_file)
-
-
-def install_dropbox():
-    dropbox_installers = {
-        "Fedora": _install_dropbox_on_fedora,
-        "Ubuntu": _install_dropbox_on_ubuntu,
-    }
-    dropbox_installers[detected_os]()
 
 
 def _install_network_manager():
@@ -776,32 +642,7 @@ def _install_resolvconf():
     run("sudo cp {} {}".format(resolv_conf_reference, resolv_conf_path))
 
 
-def _install_fedora_network_configs():
-    _install_network_manager()
-    _install_resolvconf()
-
-    iptables_status = run_for_output("sudo service iptables status")
-    if "Active: active" not in iptables_status:
-        iptables_reference = os.path.join(dotfiles_dir, "references", "iptables")
-        iptables_config_path = os.path.join(os.sep, "etc", "sysconfig", "iptables")
-        run("sudo cp {} {}".format(iptables_reference, iptables_config_path))
-
-        ip6tables_reference = os.path.join(dotfiles_dir, "references", "ip6tables")
-        ip6tables_config_path = os.path.join(os.sep, "etc", "sysconfig", "ip6tables")
-        run("sudo cp {} {}".format(ip6tables_reference, ip6tables_config_path))
-
-        run("sudo systemctl disable firewalld.service")
-        run("sudo systemctl enable iptables.service")
-        run("sudo systemctl enable ip6tables.service")
-
-        run("sudo systemctl stop firewalld")
-        run("sudo systemctl restart iptables")
-        run("sudo systemctl restart ip6tables")
-
-        run("sudo service docker restart")
-
-
-def _install_ubuntu_network_configs():
+def install_network_configs():
     run("sudo systemctl disable systemd-resolved.service")
     run("sudo service systemd-resolved stop")
 
@@ -819,20 +660,12 @@ def _install_ubuntu_network_configs():
     run("sudo service docker restart")
 
 
-def install_network_configs():
-    network_config_installers = {
-        "Fedora": _install_fedora_network_configs,
-        "Ubuntu": _install_ubuntu_network_configs,
-    }
-    network_config_installers[detected_os]()
-
-
 def install_mullvad():
-    if information["mullvad_number"] is None:
+    if information["mullvad_account"] is None:
         return
 
     mullvad_dir = os.path.join(dotfiles_dir, "references", "mullvad")
-    mullvad_files = [
+    mullvad_symlinked_files = [
         "conf.conf",
         "mullvad_ca.crt",
         "mullvad_crl.pem",
@@ -844,15 +677,18 @@ def install_mullvad():
     mullvad_vpn_dir = os.path.join(home_dir, "vpns", "default")
     create_dir(os.path.join(mullvad_vpn_dir))
 
-    for file in mullvad_files:
+    for file in mullvad_symlinked_files:
         reference_file_path = os.path.join(mullvad_dir, file)
         vpn_dir_path = os.path.join(mullvad_vpn_dir, file)
-        run("cp {} {}".format(reference_file_path, vpn_dir_path))
+        os.symlink(reference_file_path, vpn_dir_path)
 
-    with open(os.path.join(mullvad_vpn_dir, "mullvad_userpass.txt"), "r") as fp:
+    userpass_file_reference_path = os.path.join(mullvad_dir, 'mullvad_userpass.txt')
+    userpass_vpn_dir_path = os.path.join(mullvad_vpn_dir, 'mullvad_userpass.txt')
+    run("cp {} {}".format(userpass_file_reference_path, userpass_vpn_dir_path))
+    with open(userpass_vpn_dir_path, "r") as fp:
         content = fp.read()
-    with open(os.path.join(mullvad_vpn_dir, "mullvad_userpass.txt"), "w") as fp:
-        fp.write(content.replace("mullvad_number", information["mullvad_number"]))
+    with open(userpass_vpn_dir_path, "w") as fp:
+        fp.write(content.replace("mullvad_account", information["mullvad_account"]))
 
 
 def list_additional_steps():
@@ -865,33 +701,28 @@ def list_additional_steps():
     print("Restart your terminal.")
 
 
-steps = [
-    get_information,
-    install_packages,
-    setup_os,
-    create_devel_dir,
-    broadcast_ssh_keys,
-    add_known_ssh_hosts,
-    clone_dotfiles,
-    copy_configuration_files_and_dirs,
-    source_dotfiles,
-    prepare_vim,
-    get_git_prompt_and_autocompletion,
-    install_pyenv,
-    install_docker,
-    install_dropbox,
-    install_network_configs,
-    install_mullvad,
-    list_additional_steps,
-]
-
-
 def run_steps():
+    steps = [
+        get_information,
+        install_packages,
+        setup_os,
+        create_devel_dir,
+        broadcast_ssh_keys,
+        add_known_ssh_hosts,
+        clone_dotfiles,
+        copy_configuration_files_and_dirs,
+        source_dotfiles,
+        prepare_vim,
+        get_git_prompt_and_autocompletion,
+        install_pyenv,
+        install_docker,
+        install_dropbox,
+        install_network_configs,
+        install_mullvad,
+        list_additional_steps,
+    ]
     for step_function in steps:
-        try:
-            step_function()
-        except Exit:
-            break
+        step_function()
 
 
 if __name__ == "__main__":
