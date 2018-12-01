@@ -8,3 +8,5 @@ sudo iptables -A INPUT -p udp -m udp -i wlp2s0 -s 185.65.135.143 --sport 1302 -m
 
 sudo iptables -A OUTPUT -o tun0 -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
 sudo iptables -A OUTPUT -p udp -m udp -o wlp2s0 -d 185.65.135.143 --dport 1302 -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
+
+sudo iptables -S

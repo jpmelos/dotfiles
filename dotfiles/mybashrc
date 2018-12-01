@@ -195,25 +195,17 @@ time-id() {
 
 # Disables any traffic not using your VPN
 start-stealth() {
-    cd $HOME/vpns/${@:-default}
-    bash start_firewall.sh
-    sudo iptables -S
-    cd - > /dev/null 2> /dev/null
+    (cd $HOME/vpns/${@:-default} && bash start_firewall.sh)
 }
 
 # Activates your VPN
 vpn-client() {
-    cd $HOME/vpns/${@:-default}
-    sudo openvpn --mute-replay-warnings --config conf.conf
-    cd - > /dev/null 2> /dev/null
+    (cd $HOME/vpns/${@:-default} && sudo openvpn --mute-replay-warnings --config conf.conf)
 }
 
 # Allows traffic through your ISP again
 end-stealth() {
-    cd $HOME/vpns/${@:-default}
-    bash stop_firewall.sh
-    sudo iptables -S
-    cd - > /dev/null 2> /dev/null
+    (cd $HOME/vpns/${@:-default} && bash stop_firewall.sh)
 }
 
 # Use in case things get screwed up

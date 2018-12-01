@@ -8,3 +8,5 @@ sudo iptables -D OUTPUT -p udp -m udp -o wlp2s0 -d 185.65.135.143 --dport 1302 -
 
 sudo iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 sudo iptables -A OUTPUT -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
+
+sudo iptables -S
