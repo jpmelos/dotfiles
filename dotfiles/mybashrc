@@ -253,3 +253,19 @@ run-until() {
         $*
     done
 }
+
+# Commands to make debugging against MySQL easier.
+# Assumes user and password are root, which is good enough for
+# local development of most applications
+mysql_set_log() {
+    mysql -h db -u root -proot -e "SET GLOBAL GENERAL_LOG = 1"
+    mysql -h db -u root -proot -e "SET GLOBAL LOG_OUTPUT = 'TABLE'"
+}
+
+mysql_queries() {
+    mysql -h db -u root -proot -e "SELECT * FROM mysql.general_log WHERE command_type = 'Query' AND LOWER(argument) NOT LIKE '%general_log%' AND LOWER(argument) NOT LIKE '%version_comment%' \G"
+}
+
+mysql_truncate_queries() {
+    mysql -h db -u root -proot -e "TRUNCATE TABLE mysql.general_log"
+}
