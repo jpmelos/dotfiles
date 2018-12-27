@@ -99,6 +99,11 @@ git-submodules() {
     done
 }
 
+# Resets the date of the latest commit
+git-reset-date() {
+    GIT_COMMITTER_DATE="$(date)" git commit --amend --no-edit --date "$(date)"
+}
+
 # Serves current working dir to your network
 # This is a DANGEROUS command, anyone who knows your IP (or is scanning for
 # vulnerable IP and ports on the Internet) could download your data, if you
