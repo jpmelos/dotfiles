@@ -265,3 +265,13 @@ mysql_queries() {
 mysql_truncate_queries() {
     mysql -h db -u root -proot -e "TRUNCATE TABLE mysql.general_log"
 }
+
+# Quality checks for directories or files
+# Add .isort.cfg and config.cfg to the project
+pyquality() {
+    for path in "$@"; do
+        black --line-length 120 "$path"
+        isort -rc "$path"
+        flake8 "$path"
+    done
+}
