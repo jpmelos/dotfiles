@@ -84,11 +84,6 @@ unmount-iso() {
     rm -r "$1"
 }
 
-# Shows git diff, excluding deleted files.
-git-dico() {
-    git diff $(git status -s --porcelain | \grep -v "^ D" | cut -b4-)
-}
-
 # Runs a command in all submodules of a repository
 git-submodules() {
     for repo in $(awk '{print $2}' <(git submodule)); do
@@ -150,13 +145,9 @@ detect-os() {
 
 # Updates system packages
 update() {
-    if [[ $(detect-os) == "Ubuntu" ]]; then
-        sudo apt-get --allow-releaseinfo-change update
-        sudo apt-get -y dist-upgrade
-        sudo apt-get -y autoremove
-    elif [[ $(detect-os) == "Fedora" ]]; then
-        sudo dnf upgrade --refresh
-    fi
+    sudo apt-get --allow-releaseinfo-change update
+    sudo apt-get -y dist-upgrade
+    sudo apt-get -y autoremove
 }
 
 # Prints external IP address
