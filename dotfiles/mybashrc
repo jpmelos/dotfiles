@@ -12,6 +12,9 @@ export PATH=$HOME/bin:$PATH
 # Sets default editor for various commands
 export EDITOR=$(which vim)
 
+# Default options for less
+export LESS="-XRFS"
+
 # Make grep and other commands show more colors
 export GREP_COLORS="fn=37"
 
