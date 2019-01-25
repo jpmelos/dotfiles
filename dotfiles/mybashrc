@@ -253,6 +253,10 @@ run-until() {
 # Commands to make debugging against MySQL easier.
 # Assumes user and password are root, which is good enough for
 # local development of most applications
+
+# Common use cases:
+# - mysql_queries | grep -E "(INSERT|DELETE|insert|delete)" > out.sql; mysql_truncate_queries
+
 mysql_set_log() {
     mysql -h db -u root -proot -e "SET GLOBAL GENERAL_LOG = 1"
     mysql -h db -u root -proot -e "SET GLOBAL LOG_OUTPUT = 'TABLE'"
