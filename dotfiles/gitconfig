@@ -41,6 +41,9 @@
     pu = pull --rebase
     puf = push --force-with-lease
     rb = rebase
+    rba = rebase --abort
+    rbc = rebase --continue
+    rbs = rebase --skip
     sa = stash save --include-untracked
     sh = show
     shf = diff-tree --no-commit-id --name-only -r HEAD
