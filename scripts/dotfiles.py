@@ -16,8 +16,8 @@ information = {
     "ssh_key_title": None,
     "github_token": None,
     "bitbucket_username": None,
-    "bitbucket_token": None,
-    "gitlab_token": None,
+    "bitbucket_token": None,  # With account:write permission
+    "gitlab_token": None,  # With api access
     "mullvad_account": None,
 }
 ssh_key = None
@@ -406,11 +406,12 @@ def copy_configuration_files_and_dirs():
         ("gitconfig", ".gitconfig"),
         ("gitignore-global", ".gitignore"),
         ("localserver.conf", ".localserver.conf"),
-        ("mybashrc", ".mybash_profile"),
-        ("mybashrc", ".mybashrc"),
-        ("myprofile", ".myprofile"),
         ("tmux.conf", ".tmux.conf"),
         ("vimrc", ".vimrc"),
+        # mybashrc section
+        ("mybashrc", ".mybash_profile"),
+        ("mybashrc", ".mybashrc"),
+        ("mybashrc", ".myprofile"),
     ]
 
     for item in dotfiles_list:

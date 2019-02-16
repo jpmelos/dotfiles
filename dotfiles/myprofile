@@ -1,7 +1,0 @@
-# vim:ft=sh
-
-# If logged in remotely, start tmux.
-if [ ! -z "$SSH_CLIENT" ] && [ -z "$TMUX" ]; then
-	tmux attach || tmux
-	exit
-fi
