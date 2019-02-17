@@ -45,6 +45,7 @@ Plugin 'tpope/vim-fugitive'
 
 " General programming plugins
 Plugin 'Valloric/YouCompleteMe'
+Plugin 'vim-scripts/ShowTrailingWhitespace'
 
 " Python plugins
 Plugin 'tmhedberg/SimpylFold'
