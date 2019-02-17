@@ -29,19 +29,30 @@ Plugin 'gmarik/Vundle.vim'
 
 " Add all your plugins here (note older versions of Vundle used Bundle
 " instead of Plugin)
-Plugin 'tmhedberg/SimpylFold'
-Plugin 'Valloric/YouCompleteMe'
-Plugin 'scrooloose/nerdtree'
-Plugin 'qpkorr/vim-bufkill'
-Plugin 'ctrlpvim/ctrlp.vim'
-Plugin 'embear/vim-localvimrc'
-Plugin 'tpope/vim-fugitive'
-Plugin 'ap/vim-buftabline'
-Plugin 'pangloss/vim-javascript'
-Plugin 'mxw/vim-jsx'
+
+" Vim plugins
 Plugin 'vim-scripts/SyntaxAttr.vim'
+Plugin 'embear/vim-localvimrc'
+
+" File navigation plugins
+Plugin 'scrooloose/nerdtree'
+Plugin 'ctrlpvim/ctrlp.vim'
 Plugin 'tyru/open-browser.vim'
 Plugin 'tyru/open-browser-github.vim'
+
+" Git plugins
+Plugin 'tpope/vim-fugitive'
+
+" General programming plugins
+Plugin 'Valloric/YouCompleteMe'
+
+" Python plugins
+Plugin 'tmhedberg/SimpylFold'
+Plugin 'vim-scripts/indentpython.vim'
+
+" JavaScript plugins
+Plugin 'pangloss/vim-javascript'
+Plugin 'mxw/vim-jsx'
 
 " All of your Plugins must be added before the following line
 call vundle#end()            " required
@@ -156,9 +167,6 @@ set undodir=~/.vim/undo//
 " autoclose YouCompleteMe helper window
 let g:ycm_autoclose_preview_window_after_completion=1
 
-" allow hidden buffers
-set hidden
-
 " set fold to start open
 set foldlevelstart=20
 
@@ -254,7 +262,7 @@ set statusline+=%3c,%5l/%L\  " show current column, current line/total lines
 augroup python_syntax
     autocmd!
 
-    " remove file keyword from syntax
+    " remove `file` keyword from syntax
     autocmd BufNewFile,BufRead *.py syn keyword noHi file
 
 augroup END
