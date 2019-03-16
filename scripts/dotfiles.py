@@ -219,24 +219,17 @@ def create_devel_dir():
     os.chdir(devel_dir)
 
 
-ssh_key = None
-
-
 def _generate_ssh_key():
-    global ssh_key
-
     priv_key_path = os.path.join(ssh_dir, "id_rsa")
     pub_key_path = os.path.join(ssh_dir, "id_rsa.pub")
 
     if not os.path.exists(priv_key_path):
         run('ssh-keygen -N "" -f {}'.format(priv_key_path))
     with open(pub_key_path, "r") as key:
-        ssh_key = key.read().strip()
+        return key.read().strip()
 
 
-def _send_ssh_key_to_github():
-    global ssh_key
-
+def _send_ssh_key_to_github(ssh_key):
     ssh_key_title = config['github']["ssh_key_title"]
     authorization = "token {}".format(config['github']["token"])
     headers = {
@@ -272,9 +265,7 @@ def _send_ssh_key_to_github():
     urlopen(add_key_req)
 
 
-def _send_ssh_key_to_bitbucket():
-    global ssh_key
-
+def _send_ssh_key_to_bitbucket(ssh_key):
     ssh_key_title = config['bitbucket']["ssh_key_title"]
     username = config['bitbucket']["username"]
     token = "{}:{}".format(username, config['bitbucket']["token"])
@@ -314,9 +305,7 @@ def _send_ssh_key_to_bitbucket():
     urlopen(add_key_req)
 
 
-def _send_ssh_key_to_gitlab():
-    global ssh_key
-
+def _send_ssh_key_to_gitlab(ssh_key):
     ssh_key_title = config['gitlab']["ssh_key_title"]
     authorization = config['gitlab']["token"]
     headers = {
@@ -357,10 +346,10 @@ def _send_ssh_key_to_gitlab():
 
 
 def broadcast_ssh_keys():
-    _generate_ssh_key()
-    _send_ssh_key_to_github()
-    _send_ssh_key_to_bitbucket()
-    _send_ssh_key_to_gitlab()
+    ssh_key = _generate_ssh_key()
+    _send_ssh_key_to_github(ssh_key)
+    _send_ssh_key_to_bitbucket(ssh_key)
+    _send_ssh_key_to_gitlab(ssh_key)
 
 
 def add_known_ssh_hosts():
