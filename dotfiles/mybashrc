@@ -18,9 +18,6 @@ export PATH=$HOME/bin:$PATH
 # Sets default editor for various commands
 export EDITOR=$(which vim)
 
-# Default options for less
-export LESS="-XRFS"
-
 # Make grep and other commands show more colors
 export GREP_COLORS="fn=37"
 
@@ -53,23 +50,15 @@ alias screen='screen -rd || screen'
 
 alias list='ls -FhAls --color=never | less -r'
 alias ls='ls -F --color=never'
-# We are going to use $HOME =~ ^/Users.* as a nice heuristic to detect MacOS.
-if [[ $HOME =~ ^/Users.* ]]; then
-    alias list='ls -FhAls | less -r'
-    alias ls='ls -F'
-fi
 
 alias untar='tar -zxvf'
 
-# Allows downloading something, but resume if it goes south
+# Allows resume if it goes south
 alias wget='wget -c'
 
 # Install the git prompt command (__git_ps1) and autocompletions
 source ~/.git-prompt.sh
 source ~/.git-completion.bash
-
-# Create ~/bin, so we can put executables there and not need to restart the terminal
-mkdir -p ~/bin
 
 # Set up pyenv
 export PYENV_ROOT="$HOME/.pyenv"
@@ -77,9 +66,7 @@ export PATH="$PYENV_ROOT/bin:$PATH"
 eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 
-# Next two functions:
 # Mounts an ISO: mount-iso file.iso dir/
-# Unmounts an ISO: unmount-iso dir/
 mount-iso() {
     if [[ ! -d "$2" ]]; then
         mkdir "$2"
@@ -88,6 +75,7 @@ mount-iso() {
     sudo mount -o loop -t iso9660 "$1" "$2"
 }
 
+# Unmounts an ISO: unmount-iso dir/
 unmount-iso() {
     sudo umount "$1"
     rm -r "$1"
@@ -147,11 +135,6 @@ supervise() {
     find . -newermt "$NOW"
 }
 
-# Return the running distro
-detect-os() {
-    echo $(. /etc/os-release; echo $NAME)
-}
-
 # Updates system packages
 update() {
     sudo apt-get --allow-releaseinfo-change update
@@ -176,7 +159,7 @@ size-dirs() {
     done
 }
 
-# Clear Docker environment in respect to currently running containers
+# Clear Docker environment
 docker-clean() {
     docker system prune -a --volumes
 }
@@ -226,6 +209,7 @@ reset-network() {
     sudo iptables -A OUTPUT -o lo -j ACCEPT
     sudo iptables -A OUTPUT -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
 
+    # Resets DNS server
     sudo cp ~/devel/dotfiles/references/resolv.conf /etc/resolv.conf
 }
 
@@ -281,10 +265,17 @@ mysql_truncate_queries() {
 
 # Quality checks for directories or files
 # Add .isort.cfg and config.cfg to the project
+# Common use case:
+# - find . -name '*.py' -exec pyquality {} \;
 pyquality() {
     for path in "$@"; do
         black --line-length 120 "$path"
         isort -rc "$path"
         flake8 "$path"
     done
+}
+
+# Re-source this file
+rdot() {
+    source ~/.mybashrc
 }

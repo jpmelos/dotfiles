@@ -45,7 +45,6 @@ Plugin 'tpope/vim-fugitive'
 
 " General programming plugins
 Plugin 'Valloric/YouCompleteMe'
-Plugin 'vim-scripts/ShowTrailingWhitespace'
 
 " Python plugins
 Plugin 'tmhedberg/SimpylFold'
@@ -345,5 +344,5 @@ nnoremap <F6>8 :set tabstop=8 softtabstop=8 shiftwidth=8<CR>
 " PYTHON VIRTUALENVS
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
-"python with virtualenv support
+" python with virtualenv support
 silent !bash $VIRTUAL_ENV/bin/activate
