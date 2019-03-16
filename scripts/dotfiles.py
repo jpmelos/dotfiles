@@ -1,4 +1,5 @@
 from collections import namedtuple
+from configparser import SafeConfigParser
 from urllib.request import urlopen, Request
 import base64
 import contextlib
@@ -9,18 +10,15 @@ import re
 import shlex
 import shutil
 import subprocess
+import sys
 
-Version = namedtuple("Version", ["major", "minor", "revision"])
+if sys.version_info[0:2] != (3, 6):
+    raise Exception('Must be using Python 3.6')
 
-information = {
-    "ssh_key_title": None,
-    "github_token": None,
-    "bitbucket_username": None,
-    "bitbucket_token": None,  # With account:write permission
-    "gitlab_token": None,  # With api access
-    "mullvad_account": None,
-}
-ssh_key = None
+config = SafeConfigParser()
+config_file_path = os.path.expanduser('~/.dotfiles_config')
+if not config.read([config_file_path]):
+    raise Exception('Did not find configuration file')
 
 
 def create_dir(dir_name):
@@ -76,6 +74,8 @@ def source(filename, dest):
 
 
 def get_latest_version(versions, version_regex, for_minors=None):
+    Version = namedtuple("Version", ["major", "minor", "revision"])
+
     valid_versions = []
     for version in versions:
         match = version_regex.match(version)
@@ -104,32 +104,25 @@ def get_latest_version(versions, version_regex, for_minors=None):
 
 
 home_dir = os.path.expanduser("~")
+
 devel_dir = os.path.join(home_dir, "devel")
 dotfiles_dir = os.path.join(devel_dir, "dotfiles")
+
 ssh_dir = os.path.join(home_dir, ".ssh")
-
-
-def get_information():
-    global information
-
-    for key, default in information.items():
-        prompt = key if default is None else "{} [{}]".format(key, default)
-        value = input("{} = ".format(prompt))
-        if value:
-            information[key] = value
 
 
 def install_packages():
     packages = [
         # Desktop
-        "gnome-session",
+        "tmux",
+        "i3",
+        # Utils
+        "vim",
         # Development tools
         "build-essential",
         "cmake",
         "git",
-        "vim",
-        "tmux",
-        # Audio and video
+        # Entertainment
         "vlc",
         # Fonts
         "ttf-mscorefonts-installer",
@@ -143,10 +136,13 @@ def install_packages():
         "tv-fonts",
         "fonts-inconsolata",
         # Networking
-        "iptables-persistent",
+        "openresolv",
         "net-tools",
         "openvpn",
         "network-manager-openvpn-gnome",
+        "wireguard",
+        "wireguard-dkms",
+        "wireguard-tools",
         # Python dependencies
         "python",
         "python-dev",
@@ -212,8 +208,7 @@ def _disable_ubuntu_automatic_updates():
 
 
 def setup_os():
-    # TODO: Make Gnome the default option for window manager
-    # TODO: Diff initial and final Gnome settings and automate
+    # TODO: Make i3 the default window manager option
     _set_default_gdm_style()
     _set_terminal_settings()
     _disable_ubuntu_automatic_updates()
@@ -222,6 +217,9 @@ def setup_os():
 def create_devel_dir():
     create_dir(devel_dir)
     os.chdir(devel_dir)
+
+
+ssh_key = None
 
 
 def _generate_ssh_key():
@@ -239,8 +237,8 @@ def _generate_ssh_key():
 def _send_ssh_key_to_github():
     global ssh_key
 
-    ssh_key_title = information["ssh_key_title"]
-    authorization = "token {}".format(information["github_token"])
+    ssh_key_title = config['github']["ssh_key_title"]
+    authorization = "token {}".format(config['github']["token"])
     headers = {
         "Authorization": authorization,
         "Content-Type": "application/json; charset=utf-8",
@@ -277,9 +275,9 @@ def _send_ssh_key_to_github():
 def _send_ssh_key_to_bitbucket():
     global ssh_key
 
-    ssh_key_title = information["ssh_key_title"]
-    username = information["bitbucket_username"]
-    token = "{}:{}".format(username, information["bitbucket_token"])
+    ssh_key_title = config['bitbucket']["ssh_key_title"]
+    username = config['bitbucket']["username"]
+    token = "{}:{}".format(username, config['bitbucket']["token"])
     authorization = "Basic {}".format(base64.b64encode(token.encode()).decode())
     headers = {
         "Authorization": authorization,
@@ -319,8 +317,8 @@ def _send_ssh_key_to_bitbucket():
 def _send_ssh_key_to_gitlab():
     global ssh_key
 
-    ssh_key_title = information["ssh_key_title"]
-    authorization = information["gitlab_token"]
+    ssh_key_title = config['gitlab']["ssh_key_title"]
+    authorization = config['gitlab']["token"]
     headers = {
         "Private-Token": authorization,
         "Content-Type": "application/json; charset=utf-8",
@@ -360,16 +358,9 @@ def _send_ssh_key_to_gitlab():
 
 def broadcast_ssh_keys():
     _generate_ssh_key()
-
-    if information["ssh_key_title"] is None:
-        return
-
-    if information["github_token"] is not None:
-        _send_ssh_key_to_github()
-    if information["bitbucket_token"] is not None:
-        _send_ssh_key_to_bitbucket()
-    if information["gitlab_token"] is not None:
-        _send_ssh_key_to_gitlab()
+    _send_ssh_key_to_github()
+    _send_ssh_key_to_bitbucket()
+    _send_ssh_key_to_gitlab()
 
 
 def add_known_ssh_hosts():
@@ -408,6 +399,7 @@ def copy_configuration_files_and_dirs():
         ("localserver.conf", ".localserver.conf"),
         ("tmux.conf", ".tmux.conf"),
         ("vimrc", ".vimrc"),
+        ('i3_config', '.i3/config'),
         # mybashrc section
         ("mybashrc", ".mybash_profile"),
         ("mybashrc", ".mybashrc"),
@@ -596,6 +588,9 @@ def install_docker():
 
 
 def install_dropbox():
+    if os.path.isdir(os.path.expanduser('~'), 'Dropbox'):
+        return
+
     dropbox_deb_file = os.path.join(home_dir, "dropbox.deb")
 
     run(
@@ -662,9 +657,6 @@ def install_network_configs():
 
 
 def install_mullvad():
-    if information["mullvad_account"] is None:
-        return
-
     mullvad_dir = os.path.join(dotfiles_dir, "references", "mullvad")
     mullvad_symlinked_files = [
         "conf.conf",
@@ -689,7 +681,7 @@ def install_mullvad():
     with open(userpass_vpn_dir_path, "r") as fp:
         content = fp.read()
     with open(userpass_vpn_dir_path, "w") as fp:
-        fp.write(content.replace("mullvad_account", information["mullvad_account"]))
+        fp.write(content.replace("mullvad_account", config['mullvad']["account"]))
 
 
 def list_additional_steps():
@@ -704,7 +696,6 @@ def list_additional_steps():
 
 def run_steps():
     steps = [
-        get_information,
         install_packages,
         setup_os,
         create_devel_dir,
