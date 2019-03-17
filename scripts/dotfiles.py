@@ -112,7 +112,7 @@ def install_packages():
     packages = [
         # Desktop
         "tmux",
-        "i3",
+        "gnome-session",
         # Utils
         "vim",
         # Development tools
