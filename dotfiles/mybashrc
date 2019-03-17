@@ -186,12 +186,12 @@ start-stealth() {
 
 # Activates your VPN
 start-client() {
-    wg-quick up mvwg
+    wg-quick up ${@:-default}
 }
 
 # Deactivates your VPN
 stop-client() {
-    wg-quick down mvwg
+    wg-quick down ${@:-default}
 }
 
 # Allows traffic through your ISP again

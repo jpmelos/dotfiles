@@ -680,7 +680,7 @@ def install_mullvad():
 
     mullvad_servers_url = 'https://api.mullvad.net/public/relays/wireguard/v1/'
     wireguard_private_key = os.path.join(os.path.expanduser('~'), '.wg-priv-key')
-    vpn_conf_file = 'mvwg.conf'
+    vpn_conf_file = 'default.conf'
 
     servers_request = Request(mullvad_servers_url)
     with urlopen(servers_request) as request:
