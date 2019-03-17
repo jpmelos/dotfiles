@@ -1,7 +1,3 @@
-from collections import namedtuple
-from configparser import SafeConfigParser
-from urllib.parse import urlencode
-from urllib.request import urlopen, Request
 import base64
 import contextlib
 import getpass
@@ -14,14 +10,18 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+from collections import namedtuple
+from configparser import SafeConfigParser
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 if sys.version_info[0:2] != (3, 6):
-    raise Exception('Must be using Python 3.6')
+    raise Exception("Must be using Python 3.6")
 
 config = SafeConfigParser()
-config_file_path = os.path.expanduser('~/.dotfiles_config')
+config_file_path = os.path.expanduser("~/.dotfiles_config")
 if not config.read([config_file_path]):
-    raise Exception('Did not find configuration file')
+    raise Exception("Did not find configuration file")
 
 
 def create_dir(dir_name):
@@ -44,9 +44,7 @@ def change_dir(dir_name):
 
 
 def run(command, check_errors=True, *args, **kwargs):
-    completed_process = subprocess.run(
-        shlex.split(command), universal_newlines=True, *args, **kwargs
-    )
+    completed_process = subprocess.run(shlex.split(command), universal_newlines=True, *args, **kwargs)
     if check_errors:
         completed_process.check_returncode()
     return completed_process
@@ -54,8 +52,7 @@ def run(command, check_errors=True, *args, **kwargs):
 
 def run_for_output(command, *args, **kwargs):
     return run(
-        command, check_errors=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        *args, **kwargs,
+        command, check_errors=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE, *args, **kwargs
     ).stdout.strip()
 
 
@@ -85,11 +82,7 @@ def get_latest_version(versions, version_regex, for_minors=None):
         match = version_regex.match(version)
         if match:
             valid_versions.append(
-                Version(
-                    int(match.group("major")),
-                    int(match.group("minor")),
-                    int(match.group("revision")),
-                )
+                Version(int(match.group("major")), int(match.group("minor")), int(match.group("revision")))
             )
 
     if not for_minors:
@@ -169,29 +162,20 @@ def install_packages():
 
 
 def _set_default_gdm_style():
-    run(
-        "sudo update-alternatives --set gdm3.css "
-        "/usr/share/gnome-shell/theme/gnome-shell.css"
-    )
+    run("sudo update-alternatives --set gdm3.css /usr/share/gnome-shell/theme/gnome-shell.css")
 
 
 def _set_terminal_settings():
-    terminal_settings_path = os.path.join(
-        dotfiles_dir, "references", "terminal-settings.conf"
-    )
+    terminal_settings_path = os.path.join(dotfiles_dir, "references", "terminal-settings.conf")
     with open(terminal_settings_path, "r") as fp:
         run(
-            "dconf load /org/gnome/terminal/legacy/profiles:/:{}/".format(
-                "b1dcc9dd-5262-4d8d-a863-c897e6d979b9"
-            ),
+            "dconf load /org/gnome/terminal/legacy/profiles:/:{}/".format("b1dcc9dd-5262-4d8d-a863-c897e6d979b9"),
             input=fp.read(),
         )
 
 
 def _disable_ubuntu_automatic_updates():
-    apt_automatic_updates_path = os.sep + os.path.join(
-        "etc", "apt", "apt.conf.d", "10periodic"
-    )
+    apt_automatic_updates_path = os.sep + os.path.join("etc", "apt", "apt.conf.d", "10periodic")
     automatic_update_config = "APT::Periodic::Update-Package-Lists"
     starting_chmod = "644"
     needed_chmod = "666"
@@ -233,12 +217,9 @@ def _generate_ssh_key():
 
 
 def _send_ssh_key_to_github(ssh_key):
-    ssh_key_title = config['github']["ssh_key_title"]
-    authorization = "token {}".format(config['github']["token"])
-    headers = {
-        "Authorization": authorization,
-        "Content-Type": "application/json; charset=utf-8",
-    }
+    ssh_key_title = config["github"]["ssh_key_title"]
+    authorization = "token {}".format(config["github"]["token"])
+    headers = {"Authorization": authorization, "Content-Type": "application/json; charset=utf-8"}
 
     github_base_url = "https://api.github.com"
     keys_resource = "{}/user/keys".format(github_base_url)
@@ -269,14 +250,11 @@ def _send_ssh_key_to_github(ssh_key):
 
 
 def _send_ssh_key_to_bitbucket(ssh_key):
-    ssh_key_title = config['bitbucket']["ssh_key_title"]
-    username = config['bitbucket']["username"]
-    token = "{}:{}".format(username, config['bitbucket']["token"])
+    ssh_key_title = config["bitbucket"]["ssh_key_title"]
+    username = config["bitbucket"]["username"]
+    token = "{}:{}".format(username, config["bitbucket"]["token"])
     authorization = "Basic {}".format(base64.b64encode(token.encode()).decode())
-    headers = {
-        "Authorization": authorization,
-        "Content-Type": "application/json; charset=utf-8",
-    }
+    headers = {"Authorization": authorization, "Content-Type": "application/json; charset=utf-8"}
 
     base_url = "https://api.bitbucket.org/2.0"
     keys_resource = "{}/users/{}/ssh-keys".format(base_url, username)
@@ -293,9 +271,7 @@ def _send_ssh_key_to_bitbucket(ssh_key):
 
     for key in keys:
         if key["label"] == ssh_key_title:
-            delete_req = Request(
-                key["links"]["self"]["href"], headers=headers, method="DELETE"
-            )
+            delete_req = Request(key["links"]["self"]["href"], headers=headers, method="DELETE")
             urlopen(delete_req)
             break
 
@@ -309,12 +285,9 @@ def _send_ssh_key_to_bitbucket(ssh_key):
 
 
 def _send_ssh_key_to_gitlab(ssh_key):
-    ssh_key_title = config['gitlab']["ssh_key_title"]
-    authorization = config['gitlab']["token"]
-    headers = {
-        "Private-Token": authorization,
-        "Content-Type": "application/json; charset=utf-8",
-    }
+    ssh_key_title = config["gitlab"]["ssh_key_title"]
+    authorization = config["gitlab"]["token"]
+    headers = {"Private-Token": authorization, "Content-Type": "application/json; charset=utf-8"}
 
     base_url = "https://gitlab.com/api/v4"
     keys_resource = "{}/user/keys".format(base_url)
@@ -331,11 +304,7 @@ def _send_ssh_key_to_gitlab(ssh_key):
 
     for key in keys:
         if key["title"] == ssh_key_title:
-            delete_req = Request(
-                "{}/{}".format(keys_resource, key["id"]),
-                headers=headers,
-                method="DELETE",
-            )
+            delete_req = Request("{}/{}".format(keys_resource, key["id"]), headers=headers, method="DELETE")
             urlopen(delete_req)
             break
 
@@ -357,9 +326,7 @@ def broadcast_ssh_keys():
 
 def add_known_ssh_hosts():
     known_hosts_path = os.path.join(ssh_dir, "known_hosts")
-    file_urls = (
-        "https://raw.githubusercontent.com/jpmelos/dotfiles/master/references/{}"
-    )
+    file_urls = "https://raw.githubusercontent.com/jpmelos/dotfiles/master/references/{}"
     key_filenames = ["github.key", "gitlab.key", "bitbucket.key"]
 
     if not os.path.exists(known_hosts_path):
@@ -391,7 +358,7 @@ def copy_configuration_files_and_dirs():
         ("localserver.conf", ".localserver.conf"),
         ("tmux.conf", ".tmux.conf"),
         ("vimrc", ".vimrc"),
-        ('i3_config', '.i3/config'),
+        ("i3_config", ".i3/config"),
         # mybashrc section
         ("mybashrc", ".mybash_profile"),
         ("mybashrc", ".mybashrc"),
@@ -446,9 +413,7 @@ def prepare_vim():
 
 def get_git_prompt_and_autocompletion():
     git_version_regex = re.compile(r"^git version (?P<version>\d+\.\d+\.\d+)$")
-    git_file_path = (
-        "https://raw.githubusercontent.com/git/git/v{}/contrib/completion/{}"
-    )
+    git_file_path = "https://raw.githubusercontent.com/git/git/v{}/contrib/completion/{}"
     git_files = ["git-completion.bash", "git-prompt.sh"]
 
     output = run_for_output("git --version")
@@ -472,12 +437,8 @@ def install_pyenv():
     pyenv_dir = os.path.join(home_dir, ".pyenv")
     pyenv_virtualenv_dir = os.path.join(pyenv_dir, "plugins", "pyenv-virtualenv")
 
-    pyenv_version_regex = re.compile(
-        r"^v(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)$"
-    )
-    python_version_regex = re.compile(
-        r"^(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)$"
-    )
+    pyenv_version_regex = re.compile(r"^v(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)$")
+    python_version_regex = re.compile(r"^(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)$")
 
     if not os.path.exists(pyenv_dir):
         git_clone(pyenv_repo, pyenv_dir)
@@ -490,51 +451,38 @@ def install_pyenv():
         run("git fetch --all")
         run("git pull")
         output = run_for_output("git tag")
-        latest_pyenv_version = get_latest_version(
-            output.split("\n"), pyenv_version_regex
-        )
+        latest_pyenv_version = get_latest_version(output.split("\n"), pyenv_version_regex)
         latest_pyenv_version = "v{}.{}.{}".format(
-            latest_pyenv_version.major,
-            latest_pyenv_version.minor,
-            latest_pyenv_version.revision,
+            latest_pyenv_version.major, latest_pyenv_version.minor, latest_pyenv_version.revision
         )
-        run('git checkout {}'.format(latest_pyenv_version))
+        run("git checkout {}".format(latest_pyenv_version))
 
     with change_dir(pyenv_virtualenv_dir):
         run("git checkout master")
         run("git fetch --all")
         run("git pull")
         output = run_for_output("git tag")
-        latest_pyenv_virtualenv_version = get_latest_version(
-            output.split("\n"), pyenv_version_regex
-        )
+        latest_pyenv_virtualenv_version = get_latest_version(output.split("\n"), pyenv_version_regex)
         latest_pyenv_virtualenv_version = "v{}.{}.{}".format(
             latest_pyenv_virtualenv_version.major,
             latest_pyenv_virtualenv_version.minor,
             latest_pyenv_virtualenv_version.revision,
         )
-        run('git checkout {}'.format(latest_pyenv_virtualenv_version))
+        run("git checkout {}".format(latest_pyenv_virtualenv_version))
 
-    python_versions_dir = os.path.join(
-        pyenv_dir, "plugins", "python-build", "share", "python-build"
-    )
+    python_versions_dir = os.path.join(pyenv_dir, "plugins", "python-build", "share", "python-build")
     with change_dir(python_versions_dir):
         output = run_for_output("ls")
         latest_python_versions = get_latest_version(
-            output.split("\n"),
-            python_version_regex,
-            for_minors=((2, 7), (3, 5), (3, 6), (3, 7)),
+            output.split("\n"), python_version_regex, for_minors=((2, 7), (3, 5), (3, 6), (3, 7))
         )
         latest_python_versions = [
-            "{}.{}.{}".format(version.major, version.minor, version.revision)
-            for version in latest_python_versions
+            "{}.{}.{}".format(version.major, version.minor, version.revision) for version in latest_python_versions
         ]
 
     run(
         "bash dotfiles/scripts/install_pyenv.sh {} {} {}".format(
-            latest_pyenv_version,
-            latest_pyenv_virtualenv_version,
-            " ".join(latest_python_versions),
+            latest_pyenv_version, latest_pyenv_virtualenv_version, " ".join(latest_python_versions)
         )
     )
 
@@ -547,17 +495,8 @@ def install_docker():
     docker_gpg_key_path = os.path.join(home_dir, "docker_repository_gpg_key")
 
     run("sudo apt-get update")
-    run(
-        "sudo apt-get -y install "
-        "apt-transport-https "
-        "ca-certificates "
-        "curl "
-        "software-properties-common"
-    )
-    run(
-        "curl -fsSL https://download.docker.com/linux/ubuntu/gpg "
-        "-o {}".format(docker_gpg_key_path)
-    )
+    run("sudo apt-get -y install apt-transport-https ca-certificates curl software-properties-common")
+    run("curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o {}".format(docker_gpg_key_path))
     run("sudo apt-key add {}".format(docker_gpg_key_path))
     os.remove(docker_gpg_key_path)
 
@@ -581,43 +520,26 @@ def install_docker():
 
 
 def install_dropbox():
-    if os.path.isdir(os.path.join(os.path.expanduser('~'), 'Dropbox')):
+    if os.path.isdir(os.path.join(os.path.expanduser("~"), "Dropbox")):
         return
 
     dropbox_deb_file = os.path.join(home_dir, "dropbox.deb")
 
-    run(
-        "sudo apt-get install -y "
-        "libpango1.0-0 libpangox-1.0-0 python-cairo "
-        "python-gobject-2 python-gtk2"
-    )
+    run("sudo apt-get install -y libpango1.0-0 libpangox-1.0-0 python-cairo python-gobject-2 python-gtk2")
 
-    run(
-        "wget -qO {} "
-        "https://linux.dropbox.com/packages/ubuntu/dropbox_2015.10.28_amd64.deb".format(
-            dropbox_deb_file
-        )
-    )
+    run("wget -qO {} https://linux.dropbox.com/packages/ubuntu/dropbox_2015.10.28_amd64.deb".format(dropbox_deb_file))
     run("sudo dpkg -i {}".format(dropbox_deb_file))
     os.remove(dropbox_deb_file)
 
 
 def _install_network_manager():
-    network_manager_reference = os.path.join(
-        dotfiles_dir, "references", "NetworkManager.conf"
-    )
-    network_manager_config_path = os.sep + os.path.join(
-        "etc", "NetworkManager", "NetworkManager.conf"
-    )
+    network_manager_reference = os.path.join(dotfiles_dir, "references", "NetworkManager.conf")
+    network_manager_config_path = os.sep + os.path.join("etc", "NetworkManager", "NetworkManager.conf")
 
     with open(network_manager_config_path, "r") as fp:
         network_manager_config = fp.read()
     if "dns=none" not in network_manager_config:
-        run(
-            "sudo cp {} {}".format(
-                network_manager_reference, network_manager_config_path
-            )
-        )
+        run("sudo cp {} {}".format(network_manager_reference, network_manager_config_path))
 
         run("sudo systemctl restart NetworkManager")
 
@@ -650,27 +572,22 @@ def install_network_configs():
 
 
 def _get_wireguard_ip_address(private_key):
-    mullvad_register_client_url = 'https://api.mullvad.net/wg/'
-    mullvad_account = config['mullvad']['account']
+    mullvad_register_client_url = "https://api.mullvad.net/wg/"
+    mullvad_account = config["mullvad"]["account"]
 
     request = Request(
         mullvad_register_client_url,
-        data=urlencode({
-            'account': mullvad_account,
-            'pubkey': run_for_output('wg pubkey', input=private_key),
-        }).encode('ascii'),
-        method='POST',
+        data=urlencode({"account": mullvad_account, "pubkey": run_for_output("wg pubkey", input=private_key)}).encode(
+            "ascii"
+        ),
+        method="POST",
     )
-    return urlopen(request).read().decode('ascii')
+    return urlopen(request).read().decode("ascii")
 
 
 def install_mullvad():
     mullvad_dir = os.path.join(dotfiles_dir, "references", "mullvad")
-    mullvad_symlinked_files = [
-        "resolv.conf",
-        "start_firewall.sh",
-        "stop_firewall.sh",
-    ]
+    mullvad_symlinked_files = ["resolv.conf", "start_firewall.sh", "stop_firewall.sh"]
     mullvad_vpn_dir = os.path.join(home_dir, "vpns", "default")
     create_dir(os.path.join(mullvad_vpn_dir))
 
@@ -680,28 +597,28 @@ def install_mullvad():
         if not os.path.exists(vpn_dir_path):
             os.symlink(reference_file_path, vpn_dir_path)
 
-    mullvad_servers_url = 'https://api.mullvad.net/public/relays/wireguard/v1/'
-    wireguard_private_key = os.path.join(os.path.expanduser('~'), '.wg-priv-key')
-    vpn_conf_file = 'default.conf'
+    mullvad_servers_url = "https://api.mullvad.net/public/relays/wireguard/v1/"
+    wireguard_private_key = os.path.join(os.path.expanduser("~"), ".wg-priv-key")
+    vpn_conf_file = "default.conf"
 
     servers_request = Request(mullvad_servers_url)
     with urlopen(servers_request) as request:
         servers_json = json.loads(request.read())
 
     hostname = None
-    for country in servers_json['countries']:
+    for country in servers_json["countries"]:
         if hostname:
             break
 
-        for city in country['cities']:
+        for city in country["cities"]:
             if hostname:
                 break
 
-            for relay in city['relays']:
-                if relay['hostname'].startswith(config['mullvad']['server']):
-                    hostname = relay['hostname']
-                    ip = relay['ipv4_addr_in']
-                    public_key = relay['public_key']
+            for relay in city["relays"]:
+                if relay["hostname"].startswith(config["mullvad"]["server"]):
+                    hostname = relay["hostname"]
+                    ip = relay["ipv4_addr_in"]
+                    public_key = relay["public_key"]
                     break
 
     if not hostname:
@@ -711,17 +628,16 @@ def install_mullvad():
     if os.path.exists(wireguard_private_key):
         wireguard_config.read(wireguard_private_key)
     else:
-        wireguard_config['wireguard'] = {}
-        wireguard_config['wireguard']['private_key'] = \
-            run_for_output('wg genkey')
-        wireguard_config['wireguard']['ip_address'] = \
-            _get_wireguard_ip_address(
-                wireguard_config['wireguard']['private_key'],
-            )
-        with open(wireguard_private_key, 'w') as fp:
+        wireguard_config["wireguard"] = {}
+        wireguard_config["wireguard"]["private_key"] = run_for_output("wg genkey")
+        wireguard_config["wireguard"]["ip_address"] = _get_wireguard_ip_address(
+            wireguard_config["wireguard"]["private_key"]
+        )
+        with open(wireguard_private_key, "w") as fp:
             wireguard_config.write(fp)
 
-    wireguard_config_file = textwrap.dedent('''\
+    wireguard_config_file = textwrap.dedent(
+        """\
         [Interface]
         PrivateKey = {}
         Address = {}
@@ -731,29 +647,22 @@ def install_mullvad():
         PublicKey = {}
         Endpoint = {}:51820
         AllowedIPs = 0.0.0.0/0, ::/0
-    ''').format(
-        wireguard_config['wireguard']['private_key'],
-        wireguard_config['wireguard']['ip_address'],
-        public_key,
-        ip,
-    )
+    """
+    ).format(wireguard_config["wireguard"]["private_key"], wireguard_config["wireguard"]["ip_address"], public_key, ip)
     tmpdir = tempfile.mkdtemp()
     vpn_conf_file_path = os.path.join(tmpdir, vpn_conf_file)
-    vpn_conf_file_path_etc = os.sep + os.path.join('etc', 'wireguard', vpn_conf_file)
-    with open(vpn_conf_file_path, 'w') as fp:
+    vpn_conf_file_path_etc = os.sep + os.path.join("etc", "wireguard", vpn_conf_file)
+    with open(vpn_conf_file_path, "w") as fp:
         fp.write(wireguard_config_file)
-    run('sudo mv {} {}'.format(vpn_conf_file_path, vpn_conf_file_path_etc))
-    run('sudo chown root:root {}'.format(vpn_conf_file_path_etc))
-    run('sudo chmod 600 {}'.format(vpn_conf_file_path_etc))
+    run("sudo mv {} {}".format(vpn_conf_file_path, vpn_conf_file_path_etc))
+    run("sudo chown root:root {}".format(vpn_conf_file_path_etc))
+    run("sudo chmod 600 {}".format(vpn_conf_file_path_etc))
 
 
 def list_additional_steps():
     # TODO: Automate these steps
     print("Additional steps: ")
-    print(
-        '* Silence the terminal bell by adding "set bell-style none" to '
-        "your /etc/inputrc."
-    )
+    print('* Silence the terminal bell by adding "set bell-style none" to your /etc/inputrc.')
     print("Restart your terminal.")
 
 
