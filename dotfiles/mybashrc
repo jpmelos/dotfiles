@@ -181,22 +181,22 @@ time-id() {
 
 # Disables any traffic not using your VPN
 start-stealth() {
-    (cd $HOME/vpns/${@:-default} && bash start_firewall.sh)
+    (cd $HOME/vpns/${@:-mvwg} && bash start_firewall.sh)
 }
 
 # Activates your VPN
 start-client() {
-    wg-quick up ${@:-default}
+    wg-quick up ${@:-mvwg}
 }
 
 # Deactivates your VPN
 stop-client() {
-    wg-quick down ${@:-default}
+    wg-quick down ${@:-mvwg}
 }
 
 # Allows traffic through your ISP again
 stop-stealth() {
-    (cd $HOME/vpns/${@:-default} && bash stop_firewall.sh)
+    (cd $HOME/vpns/${@:-mvwg} && bash stop_firewall.sh)
 }
 
 # Use in case things get screwed up
@@ -220,9 +220,10 @@ reset-network() {
 
 # To use a VPN, do:
 # $ start-stealth <vpn-name>
-# $ vpn-client <vpn-name>
-# $ end-stealth <vpn-name>
-# Leave off <vpn-name> if using the VPN named "default"
+# $ start-client <vpn-name>
+# $ stop-client <vpn-name>
+# $ stop-stealth <vpn-name>
+# Leave off <vpn-name> if using the VPN named "mvwg"
 
 # Show all components of your PATH as a list
 show-path() {

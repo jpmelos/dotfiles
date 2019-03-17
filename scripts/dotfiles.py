@@ -588,7 +588,7 @@ def _get_wireguard_ip_address(private_key):
 def install_mullvad():
     mullvad_dir = os.path.join(dotfiles_dir, "references", "mullvad")
     mullvad_symlinked_files = ["resolv.conf", "start_firewall.sh", "stop_firewall.sh"]
-    mullvad_vpn_dir = os.path.join(home_dir, "vpns", "default")
+    mullvad_vpn_dir = os.path.join(home_dir, "vpns", "mvwg")
     create_dir(os.path.join(mullvad_vpn_dir))
 
     for file in mullvad_symlinked_files:
@@ -599,7 +599,7 @@ def install_mullvad():
 
     mullvad_servers_url = "https://api.mullvad.net/public/relays/wireguard/v1/"
     wireguard_private_key = os.path.join(os.path.expanduser("~"), ".wg-priv-key")
-    vpn_conf_file = "default.conf"
+    vpn_conf_file = "mvwg.conf"
 
     servers_request = Request(mullvad_servers_url)
     with urlopen(servers_request) as request:
