@@ -1,5 +1,6 @@
 from collections import namedtuple
 from configparser import SafeConfigParser
+from urllib.parse import urlencode
 from urllib.request import urlopen, Request
 import base64
 import contextlib
@@ -11,6 +12,8 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
+import textwrap
 
 if sys.version_info[0:2] != (3, 6):
     raise Exception('Must be using Python 3.6')
@@ -49,10 +52,11 @@ def run(command, check_errors=True, *args, **kwargs):
     return completed_process
 
 
-def run_for_output(command):
+def run_for_output(command, *args, **kwargs):
     return run(
-        command, check_errors=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    ).stdout
+        command, check_errors=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        *args, **kwargs,
+    ).stdout.strip()
 
 
 def git_clone(repo, dest=""):
@@ -139,7 +143,6 @@ def install_packages():
         "openresolv",
         "net-tools",
         "openvpn",
-        "network-manager-openvpn-gnome",
         "wireguard",
         "wireguard-dkms",
         "wireguard-tools",
@@ -557,7 +560,7 @@ def install_docker():
     run("sudo apt-key add {}".format(docker_gpg_key_path))
     os.remove(docker_gpg_key_path)
 
-    ubuntu_release = run_for_output("lsb_release -cs").strip()
+    ubuntu_release = run_for_output("lsb_release -cs")
     run(
         "sudo add-apt-repository "
         '"deb [arch=amd64] https://download.docker.com/linux/ubuntu '
@@ -645,13 +648,24 @@ def install_network_configs():
     run("sudo service docker restart")
 
 
+def _get_wireguard_ip_address(private_key):
+    mullvad_register_client_url = 'https://api.mullvad.net/wg/'
+    mullvad_account = config['mullvad']['account']
+
+    request = Request(
+        mullvad_register_client_url,
+        data=urlencode({
+            'account': mullvad_account,
+            'pubkey': run_for_output('wg pubkey', input=private_key),
+        }).encode('ascii'),
+        method='POST',
+    )
+    return urlopen(request).read().decode('ascii')
+
+
 def install_mullvad():
     mullvad_dir = os.path.join(dotfiles_dir, "references", "mullvad")
     mullvad_symlinked_files = [
-        "conf.conf",
-        "mullvad_ca.crt",
-        "mullvad_crl.pem",
-        "mullvad_userpass.txt",
         "resolv.conf",
         "start_firewall.sh",
         "stop_firewall.sh",
@@ -664,13 +678,71 @@ def install_mullvad():
         vpn_dir_path = os.path.join(mullvad_vpn_dir, file)
         os.symlink(reference_file_path, vpn_dir_path)
 
-    userpass_file_reference_path = os.path.join(mullvad_dir, 'mullvad_userpass.txt')
-    userpass_vpn_dir_path = os.path.join(mullvad_vpn_dir, 'mullvad_userpass.txt')
-    run("cp {} {}".format(userpass_file_reference_path, userpass_vpn_dir_path))
-    with open(userpass_vpn_dir_path, "r") as fp:
-        content = fp.read()
-    with open(userpass_vpn_dir_path, "w") as fp:
-        fp.write(content.replace("mullvad_account", config['mullvad']["account"]))
+    mullvad_servers_url = 'https://api.mullvad.net/public/relays/wireguard/v1/'
+    wireguard_private_key = os.path.join(os.path.expanduser('~'), '.wg-priv-key')
+    vpn_conf_file = 'mvwg.conf'
+
+    servers_request = Request(mullvad_servers_url)
+    with urlopen(servers_request) as request:
+        servers_json = json.loads(request.read())
+
+    hostname = None
+    for country in servers_json['countries']:
+        if hostname:
+            break
+
+        for city in country['cities']:
+            if hostname:
+                break
+
+            for relay in city['relays']:
+                if relay['hostname'].startswith(config['mullvad']['server']):
+                    hostname = relay['hostname']
+                    ip = relay['ipv4_addr_in']
+                    public_key = relay['public_key']
+                    break
+
+    if not hostname:
+        raise Exception("Couldn't find server")
+
+    wireguard_config = SafeConfigParser()
+    if os.path.exists(wireguard_private_key):
+        wireguard_config.read(wireguard_private_key)
+    else:
+        wireguard_config['wireguard'] = {}
+        wireguard_config['wireguard']['private_key'] = \
+            run_for_output('wg genkey')
+        wireguard_config['wireguard']['ip_address'] = \
+            _get_wireguard_ip_address(
+                wireguard_config['wireguard']['private_key'],
+            )
+        with open(wireguard_private_key, 'w') as fp:
+            wireguard_config.write(fp)
+
+    wireguard_config_file = textwrap.dedent('''\
+        [Interface]
+        PrivateKey = {}
+        Address = {}
+        DNS = 193.138.218.74
+
+        [Peer]
+        PublicKey = {}
+        Endpoint = {}:51820
+        AllowedIPs = 0.0.0.0/0, ::/0
+    ''').format(
+        wireguard_config['wireguard']['private_key'],
+        wireguard_config['wireguard']['ip_address'],
+        public_key,
+        ip,
+    )
+    tmpdir = tempfile.mkdtemp()
+    vpn_conf_file_path = os.path.join(tmpdir, vpn_conf_file)
+    vpn_conf_file_path_etc = os.sep + os.path.join('etc', 'wireguard', vpn_conf_file)
+    with open(vpn_conf_file_path, 'w') as fp:
+        fp.write(wireguard_config_file)
+    run('sudo mv {} {}'.format(vpn_conf_file_path, vpn_conf_file_path_etc))
+    run('sudo chown root:root {}'.format(vpn_conf_file_path_etc))
+    run('sudo chmod 600 {}'.format(vpn_conf_file_path_etc))
 
 
 def list_additional_steps():

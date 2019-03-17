@@ -185,12 +185,17 @@ start-stealth() {
 }
 
 # Activates your VPN
-vpn-client() {
-    (cd $HOME/vpns/${@:-default} && sudo openvpn --mute-replay-warnings --config conf.conf)
+start-client() {
+    wg-quick up mvwg
+}
+
+# Deactivates your VPN
+stop-client() {
+    wg-quick down mvwg
 }
 
 # Allows traffic through your ISP again
-end-stealth() {
+stop-stealth() {
     (cd $HOME/vpns/${@:-default} && bash stop_firewall.sh)
 }
 
