@@ -1,10 +1,3 @@
-# Select stable versions
-cd ~/.pyenv
-git checkout $1
-shift
-cd plugins/pyenv-virtualenv
-git checkout $1
-shift
 cd
 
 # Let this script use pyenv

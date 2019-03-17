@@ -189,8 +189,8 @@ def _set_terminal_settings():
 
 
 def _disable_ubuntu_automatic_updates():
-    apt_automatic_updates_path = os.path.join(
-        os.sep, "etc", "apt", "apt.conf.d", "10periodic"
+    apt_automatic_updates_path = os.sep + os.path.join(
+        "etc", "apt", "apt.conf.d", "10periodic"
     )
     automatic_update_config = "APT::Periodic::Update-Package-Lists"
     starting_chmod = "644"
@@ -424,7 +424,6 @@ def copy_configuration_files_and_dirs():
 def source_dotfiles():
     source(".myprofile", ".profile")
     source(".mybashrc", ".bashrc")
-    source(".mybash_profile", ".bash_profile")
 
 
 def prepare_vim():
@@ -499,6 +498,7 @@ def install_pyenv():
             latest_pyenv_version.minor,
             latest_pyenv_version.revision,
         )
+        run('git checkout {}'.format(latest_pyenv_version))
 
     with change_dir(pyenv_virtualenv_dir):
         run("git checkout master")
@@ -513,6 +513,7 @@ def install_pyenv():
             latest_pyenv_virtualenv_version.minor,
             latest_pyenv_virtualenv_version.revision,
         )
+        run('git checkout {}'.format(latest_pyenv_virtualenv_version))
 
     python_versions_dir = os.path.join(
         pyenv_dir, "plugins", "python-build", "share", "python-build"
@@ -539,7 +540,7 @@ def install_pyenv():
 
 
 def install_docker():
-    docker_data_dir = os.path.join(os.sep, "var", "lib", "docker")
+    docker_data_dir = os.sep + os.path.join("var", "lib", "docker")
     if os.path.exists(docker_data_dir):
         return
 
@@ -580,7 +581,7 @@ def install_docker():
 
 
 def install_dropbox():
-    if os.path.isdir(os.path.expanduser('~'), 'Dropbox'):
+    if os.path.isdir(os.path.join(os.path.expanduser('~'), 'Dropbox')):
         return
 
     dropbox_deb_file = os.path.join(home_dir, "dropbox.deb")
@@ -605,8 +606,8 @@ def _install_network_manager():
     network_manager_reference = os.path.join(
         dotfiles_dir, "references", "NetworkManager.conf"
     )
-    network_manager_config_path = os.path.join(
-        os.sep, "etc", "NetworkManager", "NetworkManager.conf"
+    network_manager_config_path = os.sep + os.path.join(
+        "etc", "NetworkManager", "NetworkManager.conf"
     )
 
     with open(network_manager_config_path, "r") as fp:
@@ -623,7 +624,7 @@ def _install_network_manager():
 
 def _install_resolvconf():
     resolv_conf_reference = os.path.join(dotfiles_dir, "references", "resolv.conf")
-    resolv_conf_path = os.path.join(os.sep, "etc", "resolv.conf")
+    resolv_conf_path = os.sep + os.path.join("etc", "resolv.conf")
 
     if os.path.islink(resolv_conf_path):
         run("sudo rm {}".format(resolv_conf_path))
@@ -638,11 +639,11 @@ def install_network_configs():
     _install_resolvconf()
 
     iptables_reference = os.path.join(dotfiles_dir, "references", "iptables")
-    iptables_config_path = os.path.join(os.sep, "etc", "iptables", "rules.v4")
+    iptables_config_path = os.sep + os.path.join("etc", "iptables", "rules.v4")
     run("sudo cp {} {}".format(iptables_reference, iptables_config_path))
 
     ip6tables_reference = os.path.join(dotfiles_dir, "references", "ip6tables")
-    ip6tables_config_path = os.path.join(os.sep, "etc", "iptables", "rules.v6")
+    ip6tables_config_path = os.sep + os.path.join("etc", "iptables", "rules.v6")
     run("sudo cp {} {}".format(ip6tables_reference, ip6tables_config_path))
 
     run("sudo service docker restart")
@@ -676,7 +677,8 @@ def install_mullvad():
     for file in mullvad_symlinked_files:
         reference_file_path = os.path.join(mullvad_dir, file)
         vpn_dir_path = os.path.join(mullvad_vpn_dir, file)
-        os.symlink(reference_file_path, vpn_dir_path)
+        if not os.path.exists(vpn_dir_path):
+            os.symlink(reference_file_path, vpn_dir_path)
 
     mullvad_servers_url = 'https://api.mullvad.net/public/relays/wireguard/v1/'
     wireguard_private_key = os.path.join(os.path.expanduser('~'), '.wg-priv-key')
