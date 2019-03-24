@@ -136,6 +136,7 @@ def install_packages():
         "openresolv",
         "net-tools",
         "openvpn",
+        "network-manager-openvpn",
         "wireguard",
         "wireguard-dkms",
         "wireguard-tools",
@@ -195,7 +196,6 @@ def _disable_ubuntu_automatic_updates():
 
 
 def setup_os():
-    # TODO: Make i3 the default window manager option
     _set_default_gdm_style()
     _set_terminal_settings()
     _disable_ubuntu_automatic_updates()
@@ -358,7 +358,6 @@ def copy_configuration_files_and_dirs():
         ("localserver.conf", ".localserver.conf"),
         ("tmux.conf", ".tmux.conf"),
         ("vimrc", ".vimrc"),
-        ("i3_config", ".i3/config"),
         # mybashrc section
         ("mybashrc", ".mybash_profile"),
         ("mybashrc", ".mybashrc"),
@@ -532,34 +531,7 @@ def install_dropbox():
     os.remove(dropbox_deb_file)
 
 
-def _install_network_manager():
-    network_manager_reference = os.path.join(dotfiles_dir, "references", "NetworkManager.conf")
-    network_manager_config_path = os.sep + os.path.join("etc", "NetworkManager", "NetworkManager.conf")
-
-    with open(network_manager_config_path, "r") as fp:
-        network_manager_config = fp.read()
-    if "dns=none" not in network_manager_config:
-        run("sudo cp {} {}".format(network_manager_reference, network_manager_config_path))
-
-        run("sudo systemctl restart NetworkManager")
-
-
-def _install_resolvconf():
-    resolv_conf_reference = os.path.join(dotfiles_dir, "references", "resolv.conf")
-    resolv_conf_path = os.sep + os.path.join("etc", "resolv.conf")
-
-    if os.path.islink(resolv_conf_path):
-        run("sudo rm {}".format(resolv_conf_path))
-    run("sudo cp {} {}".format(resolv_conf_reference, resolv_conf_path))
-
-
 def install_network_configs():
-    run("sudo systemctl disable systemd-resolved.service")
-    run("sudo service systemd-resolved stop")
-
-    _install_network_manager()
-    _install_resolvconf()
-
     iptables_reference = os.path.join(dotfiles_dir, "references", "iptables")
     iptables_config_path = os.sep + os.path.join("etc", "iptables", "rules.v4")
     run("sudo cp {} {}".format(iptables_reference, iptables_config_path))
@@ -567,8 +539,6 @@ def install_network_configs():
     ip6tables_reference = os.path.join(dotfiles_dir, "references", "ip6tables")
     ip6tables_config_path = os.sep + os.path.join("etc", "iptables", "rules.v6")
     run("sudo cp {} {}".format(ip6tables_reference, ip6tables_config_path))
-
-    run("sudo service docker restart")
 
 
 def _get_wireguard_ip_address(private_key):
@@ -585,6 +555,11 @@ def _get_wireguard_ip_address(private_key):
     return urlopen(request).read().decode("ascii")
 
 
+# TODO: Refactor this.
+# Make this create a config file for all Mullvad WireGuard servers.
+# Make it create a start-stealth command that can connect to any WireGuard server
+# automatically creating the killswitch. If a connection already exists, kill the
+# old connection first.
 def install_mullvad():
     mullvad_dir = os.path.join(dotfiles_dir, "references", "mullvad")
     mullvad_symlinked_files = ["resolv.conf", "start_firewall.sh", "stop_firewall.sh"]
@@ -682,7 +657,7 @@ def run_steps():
         install_docker,
         install_dropbox,
         install_network_configs,
-        install_mullvad,
+        # install_mullvad,
         list_additional_steps,
     ]
     for step_function in steps:

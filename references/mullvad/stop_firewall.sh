@@ -1,5 +1,3 @@
-sudo cp ~/devel/dotfiles/references/resolv.conf /etc/resolv.conf
-
 sudo iptables -D INPUT -i mvwg -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 sudo iptables -D INPUT -p udp -m udp -i wlp2s0 -s 185.65.135.223 --sport 51820 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 
