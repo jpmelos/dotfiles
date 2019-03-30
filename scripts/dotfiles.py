@@ -158,6 +158,7 @@ def install_packages():
         "libffi-dev",
     ]
 
+    run('sudo add-apt-repository ppa:wireguard/wireguard')
     run("sudo apt-get update")
     run("sudo apt-get install -y {}".format(" ".join(packages)))
 
