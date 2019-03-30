@@ -133,6 +133,7 @@ def install_packages():
         "tv-fonts",
         "fonts-inconsolata",
         # Networking
+        "iptables-persistent",
         "openresolv",
         "net-tools",
         "openvpn",
