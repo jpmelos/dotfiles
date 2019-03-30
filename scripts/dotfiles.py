@@ -206,6 +206,11 @@ def create_devel_dir():
     os.chdir(devel_dir)
 
 
+def create_bin_dir():
+    bin_dir = os.path.join(os.path.expanduser('~'), 'bin')
+    create_dir(bin_dir)
+
+
 def _generate_ssh_key():
     priv_key_path = os.path.join(ssh_dir, "id_rsa")
     pub_key_path = os.path.join(ssh_dir, "id_rsa.pub")
@@ -555,48 +560,30 @@ def _get_wireguard_ip_address(private_key):
     return urlopen(request).read().decode("ascii")
 
 
-# TODO: Refactor this.
-# Make this create a config file for all Mullvad WireGuard servers.
-# Make it create a start-stealth command that can connect to any WireGuard server
-# automatically creating the killswitch. If a connection already exists, kill the
-# old connection first.
 def install_mullvad():
-    mullvad_dir = os.path.join(dotfiles_dir, "references", "mullvad")
-    mullvad_symlinked_files = ["resolv.conf", "start_firewall.sh", "stop_firewall.sh"]
-    mullvad_vpn_dir = os.path.join(home_dir, "vpns", "mvwg")
-    create_dir(os.path.join(mullvad_vpn_dir))
-
-    for file in mullvad_symlinked_files:
-        reference_file_path = os.path.join(mullvad_dir, file)
-        vpn_dir_path = os.path.join(mullvad_vpn_dir, file)
-        if not os.path.exists(vpn_dir_path):
-            os.symlink(reference_file_path, vpn_dir_path)
-
     mullvad_servers_url = "https://api.mullvad.net/public/relays/wireguard/v1/"
     wireguard_private_key = os.path.join(os.path.expanduser("~"), ".wg-priv-key")
-    vpn_conf_file = "mvwg.conf"
+    wireguard_etc_dir = os.sep + os.path.join("etc", "wireguard")
+    default_vpn_conf_file = "vpn.conf"
 
     servers_request = Request(mullvad_servers_url)
     with urlopen(servers_request) as request:
         servers_json = json.loads(request.read())
 
-    hostname = None
+    servers = {}
+    default_server = None
     for country in servers_json["countries"]:
-        if hostname:
-            break
-
         for city in country["cities"]:
-            if hostname:
-                break
-
             for relay in city["relays"]:
-                if relay["hostname"].startswith(config["mullvad"]["server"]):
-                    hostname = relay["hostname"]
-                    ip = relay["ipv4_addr_in"]
-                    public_key = relay["public_key"]
-                    break
+                hostname = relay['hostname'][:-len('-wireguard')]
+                servers[hostname] = server = {}
 
-    if not hostname:
+                server["ip"] = relay["ipv4_addr_in"]
+                server["public_key"] = relay["public_key"]
+                if hostname == config["mullvad"]["server"]:
+                    default_server = hostname
+
+    if not default_server:
         raise Exception("Couldn't find server")
 
     wireguard_config = SafeConfigParser()
@@ -611,27 +598,33 @@ def install_mullvad():
         with open(wireguard_private_key, "w") as fp:
             wireguard_config.write(fp)
 
-    wireguard_config_file = textwrap.dedent(
-        """\
-        [Interface]
-        PrivateKey = {}
-        Address = {}
-        DNS = 193.138.218.74
+    for hostname, server in servers.items():
+        server_config_file = SafeConfigParser()
+        server_config_file["Interface"] = {}
+        server_config_file["Peer"] = {}
 
-        [Peer]
-        PublicKey = {}
-        Endpoint = {}:51820
-        AllowedIPs = 0.0.0.0/0, ::/0
-    """
-    ).format(wireguard_config["wireguard"]["private_key"], wireguard_config["wireguard"]["ip_address"], public_key, ip)
-    tmpdir = tempfile.mkdtemp()
-    vpn_conf_file_path = os.path.join(tmpdir, vpn_conf_file)
-    vpn_conf_file_path_etc = os.sep + os.path.join("etc", "wireguard", vpn_conf_file)
-    with open(vpn_conf_file_path, "w") as fp:
-        fp.write(wireguard_config_file)
-    run("sudo mv {} {}".format(vpn_conf_file_path, vpn_conf_file_path_etc))
-    run("sudo chown root:root {}".format(vpn_conf_file_path_etc))
-    run("sudo chmod 600 {}".format(vpn_conf_file_path_etc))
+        server_config_file["Interface"]["PrivateKey"] = wireguard_config["wireguard"]["private_key"]
+        server_config_file["Interface"]["Address"] = wireguard_config["wireguard"]["ip_address"]
+        server_config_file["Interface"]["DNS"] = "193.138.218.74"
+
+        server_config_file["Peer"]["PublicKey"] = server["public_key"]
+        server_config_file["Peer"]["Endpoint"] = "{}:51280".format(server["ip"])
+        server_config_file["Peer"]["AllowedIPs"] = "0.0.0.0/0,::/0"
+
+        tmpdir = tempfile.mkdtemp()
+        vpn_conf_file_name = "mv{}wg.conf".format(hostname)
+        vpn_conf_file_path_tmp = os.path.join(tmpdir, vpn_conf_file_name)
+        vpn_conf_file_path_etc = os.path.join(wireguard_etc_dir, vpn_conf_file_name)
+        with open(vpn_conf_file_path_tmp, "w") as fp:
+            server_config_file.write(fp)
+        run("sudo mv {} {}".format(vpn_conf_file_path_tmp, vpn_conf_file_path_etc))
+        run("sudo chown root:root {}".format(vpn_conf_file_path_etc))
+        run("sudo chmod 600 {}".format(vpn_conf_file_path_etc))
+
+    run('sudo ln -s {} {}'.format(
+        os.path.join(wireguard_etc_dir, "mv{}wg.conf".format(default_server)),
+        os.path.join(wireguard_etc_dir, default_vpn_conf_file),
+    ))
 
 
 def list_additional_steps():
@@ -646,6 +639,7 @@ def run_steps():
         install_packages,
         setup_os,
         create_devel_dir,
+        create_bin_dir,
         broadcast_ssh_keys,
         add_known_ssh_hosts,
         clone_dotfiles,
@@ -657,7 +651,7 @@ def run_steps():
         install_docker,
         install_dropbox,
         install_network_configs,
-        # install_mullvad,
+        install_mullvad,
         list_additional_steps,
     ]
     for step_function in steps:

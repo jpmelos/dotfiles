@@ -179,51 +179,17 @@ time-id() {
     date +%Y%m%d%H%M%S
 }
 
-# Disables any traffic not using your VPN
-start-stealth() {
-    (cd $HOME/vpns/${@:-mvwg} && bash start_firewall.sh)
+# Starts VPN and disables any traffic not using it
+start-vpn() {
+    killswitch up ${@:-vpn}
+    wg-quick up ${@:-vpn}
 }
 
-# Activates your VPN
-start-client() {
-    wg-quick up ${@:-mvwg}
+# Stops VPN and enables all traffic
+stop-vpn() {
+    wg-quick down ${@:-vpn}
+    killswitch down ${@:-vpn}
 }
-
-# Deactivates your VPN
-stop-client() {
-    wg-quick down ${@:-mvwg}
-}
-
-# Allows traffic through your ISP again
-stop-stealth() {
-    (cd $HOME/vpns/${@:-mvwg} && bash stop_firewall.sh)
-}
-
-# Use in case things get screwed up
-reset-network() {
-    sudo iptables -X
-
-    sudo iptables -P INPUT DROP
-    sudo iptables -P FORWARD DROP
-    sudo iptables -P OUTPUT DROP
-
-    sudo iptables -A INPUT -m conntrack --ctstate INVALID -j DROP
-    sudo iptables -A INPUT -i lo -j ACCEPT
-    sudo iptables -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-
-    sudo iptables -A OUTPUT -o lo -j ACCEPT
-    sudo iptables -A OUTPUT -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
-
-    # Resets DNS server
-    sudo cp ~/devel/dotfiles/references/resolv.conf /etc/resolv.conf
-}
-
-# To use a VPN, do:
-# $ start-stealth <vpn-name>
-# $ start-client <vpn-name>
-# $ stop-client <vpn-name>
-# $ stop-stealth <vpn-name>
-# Leave off <vpn-name> if using the VPN named "mvwg"
 
 # Show all components of your PATH as a list
 show-path() {
