@@ -537,7 +537,7 @@ def install_dropbox():
 
 
 def install_network_configs():
-    create_dir(os.sep + os.path.join('etc', 'iptables'))
+    run('sudo mkdir -p {}'.format(os.sep + os.path.join('etc', 'iptables'))
 
     iptables_reference = os.path.join(dotfiles_dir, "references", "iptables")
     iptables_config_path = os.sep + os.path.join("etc", "iptables", "rules.v4")
