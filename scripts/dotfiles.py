@@ -546,6 +546,13 @@ def install_network_configs():
     run("sudo cp {} {}".format(ip6tables_reference, ip6tables_config_path))
 
 
+def install_killswitch_for_vpn():
+    killswitch_file = os.path.join(dotfiles_dir, 'scripts', 'killswitch.py')
+    killswitch_etc = os.sep + os.path.join('usr', 'local', 'bin', 'killswitch')
+    run('sudo cp {} {}'.format(killswitch_file, killswitch_etc))
+    run('sudo chmod 755 {}'.format(killswitch_etc))
+
+
 def _get_wireguard_ip_address(private_key):
     mullvad_register_client_url = "https://api.mullvad.net/wg/"
     mullvad_account = config["mullvad"]["account"]
@@ -651,6 +658,7 @@ def run_steps():
         install_docker,
         install_dropbox,
         install_network_configs,
+        install_killswitch_for_vpn,
         install_mullvad,
         list_additional_steps,
     ]

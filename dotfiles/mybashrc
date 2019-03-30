@@ -181,14 +181,14 @@ time-id() {
 
 # Starts VPN and disables any traffic not using it
 start-vpn() {
-    killswitch up ${@:-vpn}
-    wg-quick up ${@:-vpn}
+    sudo killswitch up ${@:-vpn}
+    sudo wg-quick up ${@:-vpn}
 }
 
 # Stops VPN and enables all traffic
 stop-vpn() {
-    wg-quick down ${@:-vpn}
-    killswitch down ${@:-vpn}
+    sudo wg-quick down ${@:-vpn}
+    sudo killswitch down ${@:-vpn}
 }
 
 # Show all components of your PATH as a list
