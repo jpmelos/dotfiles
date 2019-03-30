@@ -167,15 +167,6 @@ def _set_default_gdm_style():
     run("sudo update-alternatives --set gdm3.css /usr/share/gnome-shell/theme/gnome-shell.css")
 
 
-def _set_terminal_settings():
-    terminal_settings_path = os.path.join(dotfiles_dir, "references", "terminal-settings.conf")
-    with open(terminal_settings_path, "r") as fp:
-        run(
-            "dconf load /org/gnome/terminal/legacy/profiles:/:{}/".format("b1dcc9dd-5262-4d8d-a863-c897e6d979b9"),
-            input=fp.read(),
-        )
-
-
 def _disable_ubuntu_automatic_updates():
     apt_automatic_updates_path = os.sep + os.path.join("etc", "apt", "apt.conf.d", "10periodic")
     automatic_update_config = "APT::Periodic::Update-Package-Lists"
@@ -198,7 +189,6 @@ def _disable_ubuntu_automatic_updates():
 
 def setup_os():
     _set_default_gdm_style()
-    _set_terminal_settings()
     _disable_ubuntu_automatic_updates()
 
 
@@ -396,6 +386,15 @@ def copy_configuration_files_and_dirs():
 def source_dotfiles():
     source(".myprofile", ".profile")
     source(".mybashrc", ".bashrc")
+
+
+def set_terminal_settings():
+    terminal_settings_path = os.path.join(dotfiles_dir, "references", "terminal-settings.conf")
+    with open(terminal_settings_path, "r") as fp:
+        run(
+            "dconf load /org/gnome/terminal/legacy/profiles:/:{}/".format("b1dcc9dd-5262-4d8d-a863-c897e6d979b9"),
+            input=fp.read(),
+        )
 
 
 def prepare_vim():
@@ -653,6 +652,7 @@ def run_steps():
         clone_dotfiles,
         copy_configuration_files_and_dirs,
         source_dotfiles,
+        set_terminal_settings,
         prepare_vim,
         get_git_prompt_and_autocompletion,
         install_pyenv,
