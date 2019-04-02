@@ -63,14 +63,14 @@ call vundle#end()            " required
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 " popup menu with clearer colors
-hi Pmenu ctermfg=Black ctermbg=White
-hi PmenuSel ctermfg=Black ctermbg=LightGray
+" hi Pmenu ctermfg=Black ctermbg=White
+" hi PmenuSel ctermfg=Black ctermbg=LightGray
 
 " Write things in more readable colors against dark backgrounds
-hi String ctermfg=Yellow
-hi pythonNumber ctermfg=Green
-hi makeCommands ctermfg=Green
-hi javaBoolean ctermfg=14 cterm=bold
+" hi String ctermfg=Yellow
+" hi pythonNumber ctermfg=Green
+" hi makeCommands ctermfg=Green
+" hi javaBoolean ctermfg=14 cterm=bold
 
 " enable syntax highlighting
 syntax on
@@ -111,9 +111,6 @@ set incsearch  " incremental searching
 set ignorecase " ignore case when searching...
 set smartcase  " unless it contais uppercase
 set hls        " highlight search results
-
-" terminal background dark, adapt colors
-set background=dark
 
 " show line numbers
 set number

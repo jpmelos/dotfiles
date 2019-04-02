@@ -389,11 +389,14 @@ def source_dotfiles():
     source(".mybashrc", ".bashrc")
 
 
+# How to backup and restore your terminal settings:
+# https://askubuntu.com/a/967535
+# To backup, run scripts/backup_terminal.sh from repository root
 def set_terminal_settings():
-    terminal_settings_path = os.path.join(dotfiles_dir, "references", "terminal-settings.conf")
+    terminal_settings_path = os.path.join(dotfiles_dir, "references", "terminal_settings.txt")
     with open(terminal_settings_path, "r") as fp:
         run(
-            "dconf load /org/gnome/terminal/legacy/profiles:/:{}/".format("b1dcc9dd-5262-4d8d-a863-c897e6d979b9"),
+            "dconf load /org/gnome/terminal/",
             input=fp.read(),
         )
 

@@ -11,16 +11,21 @@
     ui = always
     interactive = false
 
-[color "diff"]
-    meta = white bold
-    frag = white
-    new = cyan bold
-    old = red bold
+[color "branch"]
+    current = green dim bold
+    remote = red dim
 
 [color "status"]
-    added = green
-    changed = cyan
-    untracked = red bold
+    added = green dim
+    changed = blue dim
+    untracked = red dim
+
+[color "diff"]
+    meta = black bold
+    frag = black
+    new = green dim bold
+    old = red dim bold
+    whitespace = black red dim bold
 
 [alias]
     bl = blame --show-stats
