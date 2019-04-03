@@ -495,6 +495,17 @@ def install_pyenv():
     )
 
 
+def add_aws_credentials_file():
+    aws_credentials_dir = os.path.join(os.path.expanduser('~'), '.aws')
+    aws_credentials_file_path = os.path.join(aws_credentials_dir, 'credentials')
+
+    create_dir(aws_credentials_dir)
+    aws_credentials = SafeConfigParser()
+    aws_credentials['default'] = config['aws']
+    with open(aws_credentials_file_path, 'w') as fp:
+        aws_credentials.write(fp)
+
+
 def install_docker():
     docker_data_dir = os.sep + os.path.join("var", "lib", "docker")
     if os.path.exists(docker_data_dir):
@@ -644,7 +655,7 @@ def list_additional_steps():
     # TODO: Automate these steps
     print("Additional steps: ")
     print('* Silence the terminal bell by adding "set bell-style none" to your /etc/inputrc.')
-    print("Restart your terminal.")
+    print("Restart your computer.")
 
 
 def run_steps():
@@ -662,6 +673,7 @@ def run_steps():
         prepare_vim,
         get_git_prompt_and_autocompletion,
         install_pyenv,
+        add_aws_credentials_file,
         install_docker,
         install_dropbox,
         install_network_configs,
