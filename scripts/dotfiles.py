@@ -114,6 +114,7 @@ def install_packages():
         "tmux",
         "gnome-session",
         # Utils
+        "htop",
         "vim",
         # Development tools
         "build-essential",
