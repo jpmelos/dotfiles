@@ -12,6 +12,9 @@ export TERM=xterm-256color
 # Changes command prompt
 PS1='\[\033[38;5;19m\]\u\[\033[38;5;88m\]@\[\033[38;5;22m\]\h\[\033[0m\]:\[\033[38;5;100m\]\w\[\033[0m\] @ \[\033[38;5;19m\]\D{%H:%M:%S}\[\033[38;5;88m\]$(__git_ps1) \[\033[38;5;22m\]$\[\033[0m\] '
 
+# Add "pip install --user" bin to PATH
+export PATH=$(python -m site --user-base)/bin:$PATH
+
 # Add ~/bin to PATH
 export PATH=$HOME/bin:$PATH
 
