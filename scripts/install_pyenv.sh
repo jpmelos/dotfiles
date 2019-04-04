@@ -11,12 +11,5 @@ while [[ -n "$1" ]]; do
     if [[ ! -d "$HOME/.pyenv/versions/$1" ]]; then
         pyenv install $1
     fi
-    LATEST_PYTHON_VERSION=$1
     shift
 done
-
-# Update and install default venv packages
-pyenv virtualenv $LATEST_PYTHON_VERSION myvenv
-pyenv shell myvenv
-pip install -U setuptools pip
-pip install -r ~/devel/dotfiles/references/myvenv.txt
