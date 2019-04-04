@@ -17,6 +17,6 @@ done
 
 # Update and install default venv packages
 pyenv virtualenv $LATEST_PYTHON_VERSION myvenv
-pyenv global myvenv
+pyenv shell myvenv
 pip install -U setuptools pip
 pip install -r ~/devel/dotfiles/references/myvenv.txt
