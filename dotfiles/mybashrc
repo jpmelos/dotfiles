@@ -1,22 +1,10 @@
 # vim:ft=sh
 
-# If logged in remotely, start tmux.
-if [ ! -z "$SSH_CLIENT" ] && [ -z "$TMUX" ]; then
-	tmux attach || tmux
-	exit
-fi
-
 # For better colors in Vim.
 export TERM=xterm-256color
 
 # Changes command prompt
 PS1='\[\033[38;5;19m\]\u\[\033[38;5;88m\]@\[\033[38;5;22m\]\h\[\033[0m\]:\[\033[38;5;100m\]\w\[\033[0m\] @ \[\033[38;5;19m\]\D{%H:%M:%S}\[\033[38;5;88m\]$(__git_ps1) \[\033[38;5;22m\]$\[\033[0m\] '
-
-# Add "pip install --user" bin to PATH
-export PATH=$(python -m site --user-base)/bin:$PATH
-
-# Add ~/bin to PATH
-export PATH=$HOME/bin:$PATH
 
 # Sets default editor for various commands
 export EDITOR=$(which vim)
@@ -64,8 +52,8 @@ source ~/.git-prompt.sh
 source ~/.git-completion.bash
 
 # Set up pyenv
-export PYENV_ROOT="$HOME/.pyenv"
-export PATH="$PYENV_ROOT/bin:$PATH"
+export PYENV_ROOT=$HOME/.pyenv
+export PATH=$PYENV_ROOT/bin:$PATH
 eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 

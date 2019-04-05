@@ -379,10 +379,8 @@ def copy_configuration_files_and_dirs():
         ("localserver.conf", ".localserver.conf"),
         ("tmux.conf", ".tmux.conf"),
         ("vimrc", ".vimrc"),
-        # mybashrc section
-        ("mybashrc", ".mybash_profile"),
+        ("myprofile", ".myprofile"),
         ("mybashrc", ".mybashrc"),
-        ("mybashrc", ".myprofile"),
     ]
 
     for item in dotfiles_list:
