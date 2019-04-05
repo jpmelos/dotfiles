@@ -1,3 +1,4 @@
+#!/usr/bin/env python3.6
 import base64
 import contextlib
 import getpass
@@ -184,7 +185,7 @@ def install_packages():
     run("sudo apt-get update")
     run("sudo apt-get install -y {}".format(" ".join(os_packages)))
 
-    run("pip install --user {}".format(" ".join(python_packages)))
+    run("pip3 install --user {}".format(" ".join(python_packages)))
 
 
 def _set_default_gdm_style():
