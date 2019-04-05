@@ -109,7 +109,7 @@ ssh_dir = os.path.join(home_dir, ".ssh")
 
 
 def install_packages():
-    packages = [
+    os_packages = [
         # Desktop
         "tmux",
         "gnome-session",
@@ -148,6 +148,8 @@ def install_packages():
         "python-dev",
         "python3",
         "python3-dev",
+        "python-pip",
+        "python3-pip",
         "libreadline-dev",
         "libncursesw5-dev",
         "libssl-dev",
@@ -160,11 +162,29 @@ def install_packages():
         "zlib1g-dev",
         "libffi-dev",
     ]
+    python_packages = [
+        "awscli",
+        "black",
+        "coverage",
+        "docker-compose",
+        "flake8",
+        "flake8-blind-except",
+        "flake8-builtins",
+        "flake8-docstrings",
+        "flake8-logging-format",
+        "flake8-print",
+        "flake8-rst-docstrings",
+        "ipython",
+        "isort",
+        "pipenv",
+    ]
 
     run('sudo add-apt-repository ppa:certbot/certbot')
     run('sudo add-apt-repository ppa:wireguard/wireguard')
     run("sudo apt-get update")
-    run("sudo apt-get install -y {}".format(" ".join(packages)))
+    run("sudo apt-get install -y {}".format(" ".join(os_packages)))
+
+    run("pip install --user {}".format(" ".join(python_packages)))
 
 
 def _set_default_gdm_style():
