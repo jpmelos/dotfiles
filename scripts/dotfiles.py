@@ -1,7 +1,6 @@
 #!/usr/bin/env python3.6
 import base64
 import contextlib
-import getpass
 import json
 import os
 import re
@@ -557,7 +556,7 @@ def install_docker():
         return
 
     run("sudo groupadd docker")
-    run("sudo usermod -aG docker {}".format(getpass.getuser()))
+    run("sudo usermod -aG docker {}".format(os.getlogin()))
 
 
 def install_dropbox():
