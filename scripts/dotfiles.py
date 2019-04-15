@@ -116,6 +116,8 @@ def install_packages():
         # Utils
         "htop",
         "vim",
+        "rar",
+        "unrar",
         # Development tools
         "build-essential",
         "cmake",
