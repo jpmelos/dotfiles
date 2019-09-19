@@ -342,4 +342,4 @@ nnoremap <F6>8 :set tabstop=8 softtabstop=8 shiftwidth=8<CR>
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 " python with virtualenv support
-silent !bash $VIRTUAL_ENV/bin/activate
+silent !source $VIRTUAL_ENV/bin/activate
