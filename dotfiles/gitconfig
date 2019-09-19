@@ -7,25 +7,14 @@
     pager = less -q
     excludesFile = ~/.gitignore
 
-[color]
-    ui = always
-    interactive = false
+[status]
+    showUntrackedFiles = all
 
-[color "branch"]
-    current = green dim bold
-    remote = red dim
+[merge]
+    conflictStyle = diff3
 
-[color "status"]
-    added = green dim
-    changed = blue dim
-    untracked = red dim
-
-[color "diff"]
-    meta = black bold
-    frag = black
-    new = green dim bold
-    old = red dim bold
-    whitespace = black red dim bold
+[push]
+    default = simple
 
 [alias]
     bl = blame --show-stats
@@ -56,11 +45,22 @@
 
     diff-commits = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr)%Creset' --abbrev-commit --date=relative
 
-[status]
-    showUntrackedFiles = all
+[color]
+    ui = always
+    interactive = false
 
-[merge]
-    conflictStyle = diff3
+[color "branch"]
+    current = green dim bold
+    remote = red dim
 
-[push]
-    default = simple
+[color "status"]
+    added = green dim
+    changed = blue dim
+    untracked = red dim
+
+[color "diff"]
+    meta = black bold
+    frag = black
+    new = green dim bold
+    old = red dim bold
+    whitespace = black red dim bold
