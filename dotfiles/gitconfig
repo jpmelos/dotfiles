@@ -64,3 +64,6 @@
     new = green dim bold
     old = red dim bold
     whitespace = black red dim bold
+
+[includeIf "gitdir:~/devel/close/"]
+	path = ~/devel/dotfiles/dotfiles/gitconfigs/close
