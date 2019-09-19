@@ -47,6 +47,10 @@ alias untar='tar -zxvf'
 # Allows resume if it goes south
 alias wget='wget -c'
 
+# Docker-related aliases
+alias dctail='dc logs -ft'
+alias dctail0='dc logs -ft --tail=0'
+
 # Install the git prompt command (__git_ps1) and autocompletions
 source ~/.git-prompt.sh
 source ~/.git-completion.bash
