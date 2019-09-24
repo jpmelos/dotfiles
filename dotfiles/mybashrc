@@ -42,6 +42,9 @@ alias ls='ls -F --color=never'
 
 alias untar='tar -zxvf'
 
+# Allows alias checking in watch commands
+alias watch='watch '
+
 # Allows resume if it goes south
 alias wget='wget -c'
 
