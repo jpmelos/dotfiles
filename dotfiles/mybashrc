@@ -37,8 +37,13 @@ alias tail='tail -f'
 alias tmux='tmux attach || tmux'
 alias screen='screen -rd || screen'
 
-alias list='ls -FhAls --color=never | less -r'
-alias ls='ls -F --color=never'
+if [[ "$HOME" == /Users/* ]]; then
+    alias list='ls -FhAls | less -r'
+    alias ls='ls -F'
+else
+    alias list='ls -FhAls --color=never | less -r'
+    alias ls='ls -F --color=never'
+fi
 
 alias untar='tar -zxvf'
 
