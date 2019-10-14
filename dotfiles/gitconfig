@@ -41,8 +41,8 @@
     rbs = rebase --skip
     sa = stash save --include-untracked
     sh = show
-    shf = diff-tree --no-commit-id --name-only -r
-    shfh = diff-tree --no-commit-id --name-only -r HEAD
+    shf = diff-tree --no-commit-id --name-only --diff-filter=d -r
+    shfh = diff-tree --no-commit-id --name-only --diff-filter=d -r HEAD
     st = status -u
 
     diff-commits = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr)%Creset' --abbrev-commit --date=relative
