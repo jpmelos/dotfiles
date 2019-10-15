@@ -249,6 +249,10 @@ pyquality() {
     done
 }
 
+pyquality-commit() {
+    pyquality $(git shfh | grep \\.py)
+}
+
 # Re-source this file
 rdot() {
     source ~/.mybashrc
