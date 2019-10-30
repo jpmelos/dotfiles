@@ -5,3 +5,6 @@ foreground-color='rgb(0,0,0)'
 use-system-font=false
 audible-bell=false
 font='Inconsolata Medium 11'
+
+[legacy]
+schema-version=uint32 3
