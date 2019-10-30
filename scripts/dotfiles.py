@@ -569,7 +569,7 @@ def install_dropbox():
 
     run("sudo apt-get install -y libpango1.0-0 libpangox-1.0-0 python-cairo python-gobject-2 python-gtk2")
 
-    run("wget -qO {} https://linux.dropbox.com/packages/ubuntu/dropbox_2015.10.28_amd64.deb".format(dropbox_deb_file))
+    run("wget -qO {} https://linux.dropbox.com/packages/ubuntu/dropbox_2019.02.14_amd64.deb".format(dropbox_deb_file))
     run("sudo dpkg -i {}".format(dropbox_deb_file))
     os.remove(dropbox_deb_file)
 
