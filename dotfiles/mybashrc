@@ -55,6 +55,7 @@ alias wget='wget -c'
 
 # Docker-related aliases
 alias dc='docker-compose'
+alias dce='docker-compose exec'
 alias dctail='dc logs -ft'
 alias dctail0='dc logs -ft --tail=0'
 
