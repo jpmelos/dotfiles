@@ -113,15 +113,18 @@ def install_packages():
         # Desktop
         "tmux",
         "gnome-session",
+        "deluge",
         # Utils
         "gnome-calculator",
         "htop",
         "vim",
         "rar",
         "unrar",
+        "sshfs",
         # Development tools
         "build-essential",
         "cmake",
+        "ack",
         "git",
         "certbot",
         # Entertainment
