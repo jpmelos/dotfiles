@@ -148,9 +148,9 @@ def install_packages():
         # Python dependencies
         "python",
         "python-dev",
+        "python-pip",
         "python3",
         "python3-dev",
-        "python-pip",
         "python3-pip",
         "libreadline-dev",
         "libncursesw5-dev",
