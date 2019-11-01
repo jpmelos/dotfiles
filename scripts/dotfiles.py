@@ -114,6 +114,7 @@ def install_packages():
         "tmux",
         "gnome-session",
         # Utils
+        "gnome-calculator",
         "htop",
         "vim",
         "rar",
