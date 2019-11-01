@@ -679,6 +679,7 @@ def list_additional_steps():
     # TODO: Automate these steps
     print("Additional steps: ")
     print('* Silence the terminal bell by adding "set bell-style none" to your /etc/inputrc.')
+    print('* Comment out "SendEnv LANG LC_*" in /etc/ssh/ssh_config')
     print("Restart your computer.")
 
 
