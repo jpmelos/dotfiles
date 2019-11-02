@@ -114,6 +114,7 @@ def install_packages():
         "tmux",
         "gnome-session",
         "deluge",
+        "pavucontrol",
         # Utils
         "gnome-calculator",
         "htop",
