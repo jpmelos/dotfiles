@@ -115,6 +115,8 @@ def install_packages():
         "gnome-session",
         "deluge",
         "pavucontrol",
+        # Entertainment
+        "vlc",
         # Utils
         "gnome-calculator",
         "htop",
@@ -128,8 +130,6 @@ def install_packages():
         "ack",
         "git",
         "certbot",
-        # Entertainment
-        "vlc",
         # Fonts
         "ttf-mscorefonts-installer",
         "fonts-cantarell",
