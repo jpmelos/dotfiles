@@ -115,6 +115,8 @@ def install_packages():
         "gnome-session",
         "deluge",
         "pavucontrol",
+        "libcanberra-gtk-module",
+        "libcanberra-gtk3-module",
         # Entertainment
         "vlc",
         # Utils
