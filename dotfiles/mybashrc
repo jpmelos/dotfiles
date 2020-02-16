@@ -63,6 +63,9 @@ alias dctail0='dc logs -ft --tail=0'
 source ~/.git-prompt.sh
 source ~/.git-completion.bash
 
+# Make `pip` require a virtualenv
+export PIP_REQUIRE_VIRTUALENV=true
+
 # Set up pyenv
 export PYENV_ROOT=$HOME/.pyenv
 export PATH=$PYENV_ROOT/bin:$PATH
