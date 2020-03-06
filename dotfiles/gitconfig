@@ -32,8 +32,10 @@
     gr = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr)
     ls = ls-files
     mg = merge
+    mga = merge --abort
+    mgc = merge --continue
     pa = add --patch
-    pu = pull --rebase
+    pur = pull --rebase
     puf = push --force-with-lease
     rb = rebase
     rba = rebase --abort
@@ -68,4 +70,4 @@
     whitespace = black red dim bold
 
 [includeIf "gitdir:~/devel/close/"]
-	path = ~/devel/dotfiles/dotfiles/gitconfigs/close
+    path = ~/devel/dotfiles/dotfiles/gitconfigs/close
