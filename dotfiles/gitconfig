@@ -27,6 +27,7 @@
     del = branch -D
     di = diff
     dic = diff --cached
+    diff-commits = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr)%Creset' --abbrev-commit --date=relative
     dst = diff --stat
     fe = fetch --all --prune
     gr = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr)
@@ -35,7 +36,7 @@
     mga = merge --abort
     mgc = merge --continue
     pa = add --patch
-    pur = pull --rebase
+    po = push -u origin HEAD
     puf = push --force-with-lease
     rb = rebase
     rba = rebase --abort
@@ -46,8 +47,6 @@
     shf = diff-tree --no-commit-id --name-only --diff-filter=d -r
     shfh = diff-tree --no-commit-id --name-only --diff-filter=d -r HEAD
     st = status -u
-
-    diff-commits = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr)%Creset' --abbrev-commit --date=relative
 
 [color]
     ui = always
