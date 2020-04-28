@@ -258,8 +258,8 @@ pyquality() {
     done
 }
 
-pyquality-commit() {
-    pyquality $(git shfh | grep \\.py)
+pyquality-git() {
+    pyquality $(git diff --name-only --cached --diff-filter=d -- '*.py*')
 }
 
 # Re-source this file
