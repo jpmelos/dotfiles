@@ -266,3 +266,9 @@ pyquality-git() {
 rdot() {
     source ~/.mybashrc
 }
+
+# Restart a container and follow logs
+dcrtail() {
+    docker-compose restart $1
+    docker-compose logs -ft --tail=1000 $1
+}
