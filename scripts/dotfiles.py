@@ -195,9 +195,14 @@ def _disable_ubuntu_automatic_updates():
     run("sudo chmod {} {}".format(starting_chmod, apt_automatic_updates_path))
 
 
+def _disable_camera_shutter_on_screenshot():
+    run('sudo rm /usr/share/sounds/freedesktop/stereo/camera-shutter.oga')
+
+
 def setup_os():
     _set_default_gdm_style()
     _disable_ubuntu_automatic_updates()
+    _disable_camera_shutter_on_screenshot()
 
 
 def create_devel_dir():
