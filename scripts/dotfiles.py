@@ -686,6 +686,7 @@ def list_additional_steps():
     print("Additional steps: ")
     print('* Silence the terminal bell by adding "set bell-style none" to your /etc/inputrc.')
     print('* Comment out "SendEnv LANG LC_*" in /etc/ssh/ssh_config')
+    print('* Disable screenshot sound by deleting /usr/share/sounds/freedesktop/stereo/camera-shutter.oga')
     print("Restart your computer.")
 
 
