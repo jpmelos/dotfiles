@@ -165,28 +165,10 @@ def install_packages():
         "zlib1g-dev",
         "libffi-dev",
     ]
-    python_packages = [
-        "awscli",
-        "black",
-        "coverage",
-        "docker-compose",
-        "flake8",
-        "flake8-blind-except",
-        "flake8-builtins",
-        "flake8-docstrings",
-        "flake8-logging-format",
-        "flake8-print",
-        "flake8-rst-docstrings",
-        "ipython",
-        "isort",
-        "pipenv",
-    ]
 
     run('sudo add-apt-repository ppa:certbot/certbot')
     run("sudo apt-get update")
     run("sudo apt-get install -y {}".format(" ".join(os_packages)))
-
-    run("pip3 install --user {}".format(" ".join(python_packages)))
 
 
 def _set_default_gdm_style():
@@ -505,7 +487,7 @@ def install_pyenv():
     with change_dir(python_versions_dir):
         output = run_for_output("ls")
         latest_python_versions = get_latest_version(
-            output.split("\n"), python_version_regex, for_minors=((2, 7), (3, 5), (3, 6), (3, 7))
+            output.split("\n"), python_version_regex, for_minors=((2, 7), (3, 5), (3, 6), (3, 7), (3, 8))
         )
         latest_python_versions = [
             "{}.{}.{}".format(version.major, version.minor, version.revision) for version in latest_python_versions
@@ -516,6 +498,15 @@ def install_pyenv():
             latest_pyenv_version, latest_pyenv_virtualenv_version, " ".join(latest_python_versions)
         )
     )
+
+
+def install_poetry():
+    poetry_install_file = os.path.join(os.path.expanduser('~'), 'poetry.py')
+
+    run("wget -qO {} https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py".format(poetry_install_file))
+    run('chmod +x {}'.format(poetry_install_file))
+    run('./{}'.format(poetry_install_file))
+    run('rm {}'.format(poetry_install_file))
 
 
 def add_aws_credentials_file():
@@ -610,6 +601,7 @@ def run_steps():
         prepare_vim,
         get_git_prompt_and_autocompletion,
         install_pyenv,
+        install_poetry,
         add_aws_credentials_file,
         install_docker,
         install_dropbox,
