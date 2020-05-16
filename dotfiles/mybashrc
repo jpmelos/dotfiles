@@ -3,7 +3,6 @@
 # For better colors in Vim.
 export TERM=xterm-256color
 
-# Changes command prompt
 PS1='\[\033[1;38;5;19m\]\u\[\033[0;38;5;196m\]@\[\033[1;38;5;22m\]\h\[\033[0;38;5;0m\]:\[\033[1;38;5;100m\]\w\[\033[0;38;5;0m\] @ \[\033[1;38;5;19m\]\D{%H:%M:%S}\[\033[1;38;5;88m\]$(__git_ps1) \[\033[0;38;5;22m\]$\[\033[0m\] '
 
 # Sets default editor for various commands
@@ -28,15 +27,10 @@ alias cal='cal -3'
 alias cp='cp -i'
 alias mv='mv -i'
 
-alias ngrep='grep --color=always --exclude-dir=.git --binary-files=without-match -InHR'
-alias igrep='grep --color=always --exclude-dir=.git --binary-files=without-match -InHiR'
-
 alias less='less -r'
 alias tail='tail -f'
 
-alias tmux='tmux attach || tmux'
-alias screen='screen -rd || screen'
-
+# Proxy to detect MacOS
 if [[ "$HOME" == /Users/* ]]; then
     alias list='ls -FhAls | less -r'
     alias ls='ls -F'
@@ -57,7 +51,6 @@ alias wget='wget -c'
 alias dc='docker-compose'
 alias dce='docker-compose exec'
 alias dctail='dc logs -ft --tail=1000'
-alias dctail0='dc logs -ft --tail=0'
 
 # Install the git prompt command (__git_ps1) and autocompletions
 source ~/.git-prompt.sh
@@ -71,9 +64,6 @@ export PYENV_ROOT=$HOME/.pyenv
 export PATH=$PYENV_ROOT/bin:$PATH
 eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
-
-# Setup pipx autocompletions
-eval "$(register-python-argcomplete pipx)"
 
 # Mounts an ISO: mount-iso file.iso dir/
 mount-iso() {
@@ -90,24 +80,9 @@ unmount-iso() {
     rm -r "$1"
 }
 
-# Runs a command in all submodules of a repository
-git-submodules() {
-    for repo in $(awk '{print $2}' <(git submodule)); do
-        cd ${repo}
-        echo "** ${repo}"
-        eval $@
-        cd .. > /dev/null
-    done
-}
-
-# Resets the date of the latest commit
-git-reset-date() {
-    GIT_COMMITTER_DATE="$(date)" git commit --amend --no-edit --date "$(date)"
-}
-
 # Serves current working dir to your network
 # This is a DANGEROUS command, anyone who knows your IP (or is scanning for
-# vulnerable IP and ports on the Internet) could download your data, if you
+# vulnerable IPs and ports on the Internet) could download your data, if you
 # provide this with a public interface or 0.0.0.0.
 # Use with care.
 localserver() {
@@ -132,16 +107,6 @@ localserver() {
         nginx:1.15.2 -c "cp /copy_on_start/localserver.conf /etc/nginx/nginx.conf; nginx"
 
     unset ADDR_PORT
-}
-
-# Runs a command and show all files modified by it in the current directory,
-# comparing date of last modification. So, there might be false positives,
-# but still a pretty good idea.
-supervise() {
-    NOW="$(date "+%F %T.%N")"
-    sleep 1
-    $@
-    find . -newermt "$NOW"
 }
 
 # Updates system packages
@@ -185,11 +150,6 @@ list-gnome-settings() {
     done
 }
 
-# Get a time id
-time-id() {
-    date +%Y%m%d%H%M%S
-}
-
 # Starts VPN and disables any traffic not using it
 start-vpn() {
     sudo killswitch up ${@:-vpn}
@@ -210,7 +170,13 @@ show-path() {
     done
 }
 
-# Usage: run-until TIME-ID "command"
+# Get a time id
+time-id() {
+    date +%Y%m%d%H%M%S
+}
+
+# Usage: Run until Dec 25th, 2020 @ 2pm
+# run-until 20201225140000 "command"
 run-until() {
     END=$(expr $1 + 0)
     shift
@@ -226,30 +192,8 @@ run-until() {
     done
 }
 
-# Commands to make debugging against MySQL easier.
-# Assumes user and password are root, which is good enough for
-# local development of most applications
-
-# Common use cases:
-# - mysql_queries | grep -E "(INSERT|DELETE|insert|delete)" > out.sql; mysql_truncate_queries
-
-mysql_set_log() {
-    mysql -h db -u root -proot -e "SET GLOBAL GENERAL_LOG = 1"
-    mysql -h db -u root -proot -e "SET GLOBAL LOG_OUTPUT = 'TABLE'"
-}
-
-mysql_queries() {
-    mysql -h db -u root -proot -e "SELECT * FROM mysql.general_log WHERE command_type = 'Query' AND LOWER(argument) NOT LIKE '%general_log%' AND LOWER(argument) NOT LIKE '%version_comment%' \G"
-}
-
-mysql_truncate_queries() {
-    mysql -h db -u root -proot -e "TRUNCATE TABLE mysql.general_log"
-}
-
 # Quality checks for directories or files
 # Add .isort.cfg and config.cfg to the project
-# Common use case:
-# - find . -name '*.py' -exec pyquality {} \;
 pyquality() {
     for path in "$@"; do
         black "$path"
