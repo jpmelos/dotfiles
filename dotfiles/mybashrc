@@ -150,18 +150,6 @@ list-gnome-settings() {
     done
 }
 
-# Starts VPN and disables any traffic not using it
-start-vpn() {
-    sudo killswitch up ${@:-vpn}
-    sudo wg-quick up ${@:-vpn}
-}
-
-# Stops VPN and enables all traffic
-stop-vpn() {
-    sudo wg-quick down ${@:-vpn}
-    sudo killswitch down ${@:-vpn}
-}
-
 # Show all components of your PATH as a list
 show-path() {
     IFS=':' read -ra PARTS <<< "$PATH"
