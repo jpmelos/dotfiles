@@ -364,6 +364,7 @@ def copy_configuration_files_and_dirs():
     dotfiles_list = [
         ("gitconfig", ".gitconfig"),
         ("gitignore-global", ".gitignore"),
+        ("gpg.conf", ".gnupg/gpg.conf"),
         ("localserver.conf", ".localserver.conf"),
         ("tmux.conf", ".tmux.conf"),
         ("vimrc", ".vimrc"),
