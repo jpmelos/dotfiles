@@ -1,6 +1,7 @@
 [user]
     name = João Sampaio
     email = jpmelos@gmail.com
+    signingkey = 99266092
 
 [core]
     editor = vim
@@ -9,6 +10,12 @@
 
 [status]
     showUntrackedFiles = all
+
+[commit]
+    gpgSign = true
+
+[tag]
+   gpgSign = true
 
 [merge]
     conflictStyle = diff3

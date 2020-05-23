@@ -56,6 +56,10 @@ alias dctail='dc logs -ft --tail=1000'
 source ~/.git-prompt.sh
 source ~/.git-completion.bash
 
+# Start the GPG Agent
+export GPG_TTY=$(tty)
+gpgconf --launch gpg-agent
+
 # Make `pip` require a virtualenv
 export PIP_REQUIRE_VIRTUALENV=true
 
