@@ -51,6 +51,7 @@ alias wget='wget -c'
 alias dc='docker-compose'
 alias dce='docker-compose exec'
 alias dctail='dc logs -ft --tail=1000'
+alias dcstop='docker stop $(docker ps -aq)'
 
 # Install the git prompt command (__git_ps1) and autocompletions
 source ~/.git-prompt.sh
