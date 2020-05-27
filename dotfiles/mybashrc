@@ -209,3 +209,9 @@ dcrtail() {
     docker-compose restart $1
     docker-compose logs -ft --tail=1000 $1
 }
+
+# Remove password from a PDF
+# Usage: pdf-remove-password $PASSWORD $IN $OUT
+pdf-remove-password() {
+    pdftk "$2" input_pw "$1" output "$3"
+}
