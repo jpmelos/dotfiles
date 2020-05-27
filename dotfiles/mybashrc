@@ -141,8 +141,14 @@ size-dirs() {
 
 # Clear Docker environment
 docker-clean() {
+    # Remove containers, images and build cache
     docker rm --force $(docker ps --all --quiet)
-    docker system prune --force --all --volumes
+    docker system prune --force --all
+
+    # Remove anonymous containers
+    docker volume ls --format '{{.Name}}' |
+        grep -E '[0-9a-f]{64}' |
+        xargs docker volume rm
 }
 
 # List all Gnome settings
