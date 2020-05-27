@@ -123,6 +123,7 @@ def install_packages():
         "gnome-calculator",
         "htop",
         "vim",
+        "pdftk",
         "rar",
         "unrar",
         "sshfs",
