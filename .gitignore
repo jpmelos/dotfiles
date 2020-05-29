@@ -1,1 +1,4 @@
 .python-version
+
+# File for local git GPG configuration
+dotfiles/gitconfigs/gpg-keys
