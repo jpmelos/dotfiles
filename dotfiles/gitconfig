@@ -1,7 +1,6 @@
 [user]
     name = João Sampaio
     email = jpmelos@gmail.com
-    signingkey = 99266092
 
 [core]
     editor = vim
@@ -76,6 +75,9 @@
     new = green dim bold
     old = red dim bold
     whitespace = black red dim bold
+
+[include]
+    path = ~/devel/dotfiles/dotfiles/gitconfigs/gpg-keys
 
 [includeIf "gitdir:~/devel/close/"]
     path = ~/devel/dotfiles/dotfiles/gitconfigs/close
