@@ -51,7 +51,8 @@ alias wget='wget -c'
 alias dc='docker-compose'
 alias dce='docker-compose exec'
 alias dctail='dc logs -ft --tail=1000'
-alias dcstop='docker stop $(docker ps -aq)'
+alias dcstop='docker stop $(docker ps --all --quiet)'
+alias dcrm='docker rm --force $(docker ps --all --quiet)'
 
 # Install the git prompt command (__git_ps1) and autocompletions
 source ~/.git-prompt.sh
@@ -139,16 +140,27 @@ size-dirs() {
     done
 }
 
-# Clear Docker environment
-docker-clean() {
-    # Remove containers, images and build cache
-    docker rm --force $(docker ps --all --quiet)
-    docker system prune --force --all
+# Restart a container and follow logs
+dcrtail() {
+    docker-compose restart $1
+    docker-compose logs -ft --tail=1000 $1
+}
 
-    # Remove anonymous containers
+dcic() {
+    # Remove anonymous images
+    docker image rm $(docker image ls -f dangling=true -q)
+
+    # Remove anonymous volumes
     docker volume ls --format '{{.Name}}' |
         grep -E '[0-9a-f]{64}' |
         xargs docker volume rm
+}
+
+# Clear Docker environment
+docker-clean() {
+    dcrm
+    docker system prune --force --all
+    dcic
 }
 
 # List all Gnome settings
@@ -208,16 +220,6 @@ pyquality-git() {
 # Re-source this file
 rdot() {
     source ~/.mybashrc
-}
-
-# Restart a container and follow logs
-dcrtail() {
-    docker-compose restart $1
-    docker-compose logs -ft --tail=1000 $1
-}
-
-dcrm() {
-    docker rm --force $(docker ps --all --quiet)
 }
 
 # Remove password from a PDF
