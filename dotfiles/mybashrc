@@ -227,3 +227,13 @@ rdot() {
 pdf-remove-password() {
     pdftk "$2" input_pw "$1" output "$3"
 }
+
+# Usage: encrypt-file $IN $OUT
+encrypt-file() {
+    openssl enc -aes-256-cbc -md sha512 -pbkdf2 -iter 100000 -salt -in "$1" -out "$2"
+}
+
+# Usage: decrypt-file $IN $OUT
+decrypt-file() {
+    openssl enc -aes-256-cbc -d -md sha512 -pbkdf2 -iter 100000 -salt -in "$1" -out "$2"
+}
