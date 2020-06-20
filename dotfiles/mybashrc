@@ -146,7 +146,7 @@ dcrtail() {
     docker-compose logs -ft --tail=1000 $1
 }
 
-dcic() {
+dcrmaiv() {
     # Remove anonymous images
     docker image rm $(docker image ls -f dangling=true -q)
 
@@ -160,7 +160,7 @@ dcic() {
 docker-clean() {
     dcrm
     docker system prune --force --all
-    dcic
+    dcrmaiv
 }
 
 # List all Gnome settings
