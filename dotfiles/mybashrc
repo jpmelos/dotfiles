@@ -159,7 +159,7 @@ dcrmaiv() {
 # Clear Docker environment
 docker-clean() {
     dcrm
-    docker system prune --force --all
+    docker system prune --force
     dcrmaiv
 }
 
