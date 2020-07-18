@@ -8,11 +8,8 @@ import shlex
 import shutil
 import subprocess
 import sys
-import tempfile
-import textwrap
 from collections import namedtuple
 from configparser import SafeConfigParser
-from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 if sys.version_info[0:2] != (3, 6):
@@ -589,7 +586,6 @@ def list_additional_steps():
     print("Additional steps: ")
     print('* Silence the terminal bell by adding "set bell-style none" to your /etc/inputrc.')
     print('* Comment out "SendEnv LANG LC_*" in /etc/ssh/ssh_config')
-    print('* Disable screenshot sound by deleting /usr/share/sounds/freedesktop/stereo/camera-shutter.oga')
     print("Restart your computer.")
 
 
