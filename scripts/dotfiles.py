@@ -41,7 +41,12 @@ def change_dir(dir_name):
 
 
 def run(command, check_errors=True, universal_newlines=True, *args, **kwargs):
-    completed_process = subprocess.run(shlex.split(command), universal_newlines=universal_newlines, *args, **kwargs)
+    completed_process = subprocess.run(
+        shlex.split(command),
+        universal_newlines=universal_newlines,
+        *args,
+        **kwargs
+    )
     if check_errors:
         completed_process.check_returncode()
     return completed_process
@@ -49,13 +54,24 @@ def run(command, check_errors=True, universal_newlines=True, *args, **kwargs):
 
 def run_for_output(command, *args, **kwargs):
     return run(
-        command, check_errors=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE, *args, **kwargs
+        command,
+        check_errors=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        *args,
+        **kwargs
     ).stdout.strip()
 
 
 def run_for_output_b_stderr(command, *args, **kwargs):
     return run(
-        command, check_errors=False, universal_newlines=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE, *args, **kwargs
+        command,
+        check_errors=False,
+        universal_newlines=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        *args,
+        **kwargs
     ).stderr
 
 
@@ -85,7 +101,11 @@ def get_latest_version(versions, version_regex, for_minors=None):
         match = version_regex.match(version)
         if match:
             valid_versions.append(
-                Version(int(match.group("major")), int(match.group("minor")), int(match.group("revision")))
+                Version(
+                    int(match.group("major")),
+                    int(match.group("minor")),
+                    int(match.group("revision")),
+                )
             )
 
     if not for_minors:
@@ -170,17 +190,22 @@ def install_packages():
         "libffi-dev",
     ]
 
-    run('sudo add-apt-repository ppa:certbot/certbot')
+    run("sudo add-apt-repository ppa:certbot/certbot")
     run("sudo apt-get update")
     run("sudo apt-get install -y {}".format(" ".join(os_packages)))
 
 
 def _set_default_gdm_style():
-    run("sudo update-alternatives --set gdm3.css /usr/share/gnome-shell/theme/gnome-shell.css")
+    run(
+        "sudo update-alternatives"
+        " --set gdm3.css /usr/share/gnome-shell/theme/gnome-shell.css"
+    )
 
 
 def _disable_ubuntu_automatic_updates():
-    apt_automatic_updates_path = os.sep + os.path.join("etc", "apt", "apt.conf.d", "10periodic")
+    apt_automatic_updates_path = os.sep + os.path.join(
+        "etc", "apt", "apt.conf.d", "10periodic"
+    )
     automatic_update_config = "APT::Periodic::Update-Package-Lists"
     starting_chmod = "644"
     needed_chmod = "666"
@@ -200,7 +225,7 @@ def _disable_ubuntu_automatic_updates():
 
 
 def _disable_camera_shutter_on_screenshot():
-    run('sudo rm /usr/share/sounds/freedesktop/stereo/camera-shutter.oga')
+    run("sudo rm /usr/share/sounds/freedesktop/stereo/camera-shutter.oga")
 
 
 def setup_os():
@@ -215,7 +240,7 @@ def create_devel_dir():
 
 
 def create_bin_dir():
-    bin_dir = os.path.join(os.path.expanduser('~'), 'bin')
+    bin_dir = os.path.join(os.path.expanduser("~"), "bin")
     create_dir(bin_dir)
 
 
@@ -232,7 +257,10 @@ def _generate_ssh_key():
 def _send_ssh_key_to_github(ssh_key):
     ssh_key_title = config["github"]["ssh_key_title"]
     authorization = "token {}".format(config["github"]["token"])
-    headers = {"Authorization": authorization, "Content-Type": "application/json; charset=utf-8"}
+    headers = {
+        "Authorization": authorization,
+        "Content-Type": "application/json; charset=utf-8",
+    }
 
     github_base_url = "https://api.github.com"
     keys_resource = "{}/user/keys".format(github_base_url)
@@ -266,8 +294,13 @@ def _send_ssh_key_to_bitbucket(ssh_key):
     ssh_key_title = config["bitbucket"]["ssh_key_title"]
     username = config["bitbucket"]["username"]
     token = "{}:{}".format(username, config["bitbucket"]["token"])
-    authorization = "Basic {}".format(base64.b64encode(token.encode()).decode())
-    headers = {"Authorization": authorization, "Content-Type": "application/json; charset=utf-8"}
+    authorization = "Basic {}".format(
+        base64.b64encode(token.encode()).decode()
+    )
+    headers = {
+        "Authorization": authorization,
+        "Content-Type": "application/json; charset=utf-8",
+    }
 
     base_url = "https://api.bitbucket.org/2.0"
     keys_resource = "{}/users/{}/ssh-keys".format(base_url, username)
@@ -284,7 +317,9 @@ def _send_ssh_key_to_bitbucket(ssh_key):
 
     for key in keys:
         if key["label"] == ssh_key_title:
-            delete_req = Request(key["links"]["self"]["href"], headers=headers, method="DELETE")
+            delete_req = Request(
+                key["links"]["self"]["href"], headers=headers, method="DELETE"
+            )
             urlopen(delete_req)
             break
 
@@ -300,7 +335,10 @@ def _send_ssh_key_to_bitbucket(ssh_key):
 def _send_ssh_key_to_gitlab(ssh_key):
     ssh_key_title = config["gitlab"]["ssh_key_title"]
     authorization = config["gitlab"]["token"]
-    headers = {"Private-Token": authorization, "Content-Type": "application/json; charset=utf-8"}
+    headers = {
+        "Private-Token": authorization,
+        "Content-Type": "application/json; charset=utf-8",
+    }
 
     base_url = "https://gitlab.com/api/v4"
     keys_resource = "{}/user/keys".format(base_url)
@@ -317,7 +355,11 @@ def _send_ssh_key_to_gitlab(ssh_key):
 
     for key in keys:
         if key["title"] == ssh_key_title:
-            delete_req = Request("{}/{}".format(keys_resource, key["id"]), headers=headers, method="DELETE")
+            delete_req = Request(
+                "{}/{}".format(keys_resource, key["id"]),
+                headers=headers,
+                method="DELETE",
+            )
             urlopen(delete_req)
             break
 
@@ -339,7 +381,10 @@ def broadcast_ssh_keys():
 
 def add_known_ssh_hosts():
     known_hosts_path = os.path.join(ssh_dir, "known_hosts")
-    file_urls = "https://raw.githubusercontent.com/jpmelos/dotfiles/master/references/{}"
+    file_urls = (
+        "https://raw.githubusercontent.com/"
+        "jpmelos/dotfiles/master/references/{}"
+    )
     key_filenames = ["github.key", "gitlab.key", "bitbucket.key"]
 
     if not os.path.exists(known_hosts_path):
@@ -365,18 +410,26 @@ def clone_dotfiles():
 
 
 def _resolve_gpg_keys_file_template():
-    gpg_regex = re.compile(r'gpg: key (?P<key_name>[0-9A-Z]{16}):')
-    gpg_keys_template = os.path.join(dotfiles_dir, 'references', 'gpg-keys.template')
-    gpg_keys_file = os.path.join(dotfiles_dir, 'dotfiles', 'gitconfigs', 'gpg-keys')
+    gpg_regex = re.compile(r"gpg: key (?P<key_name>[0-9A-Z]{16}):")
+    gpg_keys_template = os.path.join(
+        dotfiles_dir, "references", "gpg-keys.template"
+    )
+    gpg_keys_file = os.path.join(
+        dotfiles_dir, "dotfiles", "gitconfigs", "gpg-keys"
+    )
 
-    gpg_key = base64.b64decode(config['gpg']['gpg_key'].encode('utf-8'))
-    output = run_for_output_b_stderr('gpg --import', input=gpg_key).decode('utf-8').split('\n')[0]
-    gpg_key_name = gpg_regex.match(output).group('key_name')
+    gpg_key = base64.b64decode(config["gpg"]["gpg_key"].encode("utf-8"))
+    output = (
+        run_for_output_b_stderr("gpg --import", input=gpg_key)
+        .decode("utf-8")
+        .split("\n")[0]
+    )
+    gpg_key_name = gpg_regex.match(output).group("key_name")
 
     with open(gpg_keys_template) as fp:
         content = fp.read()
-    with open(gpg_keys_file, 'w') as fp:
-        fp.write(content.replace('{gpg_key}', gpg_key_name))
+    with open(gpg_keys_file, "w") as fp:
+        fp.write(content.replace("{gpg_key}", gpg_key_name))
 
 
 def resolve_templates():
@@ -427,11 +480,12 @@ def source_dotfiles():
 # https://askubuntu.com/a/967535
 # To backup, run scripts/backup_terminal.sh from repository root
 def set_terminal_settings():
-    terminal_settings_path = os.path.join(dotfiles_dir, "references", "terminal_settings.txt")
+    terminal_settings_path = os.path.join(
+        dotfiles_dir, "references", "terminal_settings.txt"
+    )
     with open(terminal_settings_path, "r") as fp:
         run(
-            "dconf load /org/gnome/terminal/",
-            input=fp.read(),
+            "dconf load /org/gnome/terminal/", input=fp.read(),
         )
 
 
@@ -455,7 +509,9 @@ def prepare_vim():
 
 def get_git_prompt_and_autocompletion():
     git_version_regex = re.compile(r"^git version (?P<version>\d+\.\d+\.\d+)$")
-    git_file_path = "https://raw.githubusercontent.com/git/git/v{}/contrib/completion/{}"
+    git_file_path = (
+        "https://raw.githubusercontent.com/git/git/v{}/contrib/completion/{}"
+    )
     git_files = ["git-completion.bash", "git-prompt.sh"]
 
     output = run_for_output("git --version")
@@ -477,10 +533,16 @@ def install_pyenv():
     pyenv_repo = "https://github.com/pyenv/pyenv"
     pyenv_virtualenv_repo = "https://github.com/pyenv/pyenv-virtualenv"
     pyenv_dir = os.path.join(home_dir, ".pyenv")
-    pyenv_virtualenv_dir = os.path.join(pyenv_dir, "plugins", "pyenv-virtualenv")
+    pyenv_virtualenv_dir = os.path.join(
+        pyenv_dir, "plugins", "pyenv-virtualenv"
+    )
 
-    pyenv_version_regex = re.compile(r"^v(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)$")
-    python_version_regex = re.compile(r"^(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)$")
+    pyenv_version_regex = re.compile(
+        r"^v(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)$"
+    )
+    python_version_regex = re.compile(
+        r"^(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)$"
+    )
 
     if not os.path.exists(pyenv_dir):
         git_clone(pyenv_repo, pyenv_dir)
@@ -493,9 +555,13 @@ def install_pyenv():
         run("git fetch --all")
         run("git pull")
         output = run_for_output("git tag")
-        latest_pyenv_version = get_latest_version(output.split("\n"), pyenv_version_regex)
+        latest_pyenv_version = get_latest_version(
+            output.split("\n"), pyenv_version_regex
+        )
         latest_pyenv_version = "v{}.{}.{}".format(
-            latest_pyenv_version.major, latest_pyenv_version.minor, latest_pyenv_version.revision
+            latest_pyenv_version.major,
+            latest_pyenv_version.minor,
+            latest_pyenv_version.revision,
         )
         run("git checkout {}".format(latest_pyenv_version))
 
@@ -504,7 +570,9 @@ def install_pyenv():
         run("git fetch --all")
         run("git pull")
         output = run_for_output("git tag")
-        latest_pyenv_virtualenv_version = get_latest_version(output.split("\n"), pyenv_version_regex)
+        latest_pyenv_virtualenv_version = get_latest_version(
+            output.split("\n"), pyenv_version_regex
+        )
         latest_pyenv_virtualenv_version = "v{}.{}.{}".format(
             latest_pyenv_virtualenv_version.major,
             latest_pyenv_virtualenv_version.minor,
@@ -512,40 +580,52 @@ def install_pyenv():
         )
         run("git checkout {}".format(latest_pyenv_virtualenv_version))
 
-    python_versions_dir = os.path.join(pyenv_dir, "plugins", "python-build", "share", "python-build")
+    python_versions_dir = os.path.join(
+        pyenv_dir, "plugins", "python-build", "share", "python-build"
+    )
     with change_dir(python_versions_dir):
         output = run_for_output("ls")
         latest_python_versions = get_latest_version(
-            output.split("\n"), python_version_regex, for_minors=((2, 7), (3, 5), (3, 6), (3, 7), (3, 8))
+            output.split("\n"),
+            python_version_regex,
+            for_minors=((2, 7), (3, 5), (3, 6), (3, 7), (3, 8)),
         )
         latest_python_versions = [
-            "{}.{}.{}".format(version.major, version.minor, version.revision) for version in latest_python_versions
+            "{}.{}.{}".format(version.major, version.minor, version.revision)
+            for version in latest_python_versions
         ]
 
     run(
         "bash dotfiles/scripts/install_pyenv.sh {} {} {}".format(
-            latest_pyenv_version, latest_pyenv_virtualenv_version, " ".join(latest_python_versions)
+            latest_pyenv_version,
+            latest_pyenv_virtualenv_version,
+            " ".join(latest_python_versions),
         )
     )
 
 
 def install_poetry():
-    poetry_install_file = os.path.join(os.path.expanduser('~'), 'poetry.py')
+    poetry_install_file = os.path.join(os.path.expanduser("~"), "poetry.py")
 
-    run("wget -qO {} https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py".format(poetry_install_file))
-    run('chmod +x {}'.format(poetry_install_file))
-    run('./{}'.format(poetry_install_file))
-    run('rm {}'.format(poetry_install_file))
+    run(
+        "wget -qO {} https://raw.githubusercontent.com/"
+        "python-poetry/poetry/master/get-poetry.py".format(poetry_install_file)
+    )
+    run("chmod +x {}".format(poetry_install_file))
+    run("./{}".format(poetry_install_file))
+    run("rm {}".format(poetry_install_file))
 
 
 def add_aws_credentials_file():
-    aws_credentials_dir = os.path.join(os.path.expanduser('~'), '.aws')
-    aws_credentials_file_path = os.path.join(aws_credentials_dir, 'credentials')
+    aws_credentials_dir = os.path.join(os.path.expanduser("~"), ".aws")
+    aws_credentials_file_path = os.path.join(
+        aws_credentials_dir, "credentials"
+    )
 
     create_dir(aws_credentials_dir)
     aws_credentials = SafeConfigParser()
-    aws_credentials['default'] = config['aws']
-    with open(aws_credentials_file_path, 'w') as fp:
+    aws_credentials["default"] = config["aws"]
+    with open(aws_credentials_file_path, "w") as fp:
         aws_credentials.write(fp)
 
 
@@ -557,8 +637,15 @@ def install_docker():
     docker_gpg_key_path = os.path.join(home_dir, "docker_repository_gpg_key")
 
     run("sudo apt-get update")
-    run("sudo apt-get -y install apt-transport-https ca-certificates curl software-properties-common")
-    run("curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o {}".format(docker_gpg_key_path))
+    run(
+        "sudo apt-get -y install"
+        " apt-transport-https ca-certificates curl software-properties-common"
+    )
+    run(
+        "curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o {}".format(
+            docker_gpg_key_path
+        )
+    )
     run("sudo apt-key add {}".format(docker_gpg_key_path))
     os.remove(docker_gpg_key_path)
 
@@ -572,7 +659,9 @@ def install_docker():
     run("sudo apt-get -y install docker-ce")
 
     groups_database = run_for_output("getent group").split("\n")
-    groups_components = [components.split(":") for components in groups_database]
+    groups_components = [
+        components.split(":") for components in groups_database
+    ]
     groups = [component[0] for component in groups_components]
     if "docker" in groups:
         return
@@ -587,29 +676,41 @@ def install_dropbox():
 
     dropbox_deb_file = os.path.join(home_dir, "dropbox.deb")
 
-    run("sudo apt-get install -y libpango1.0-0 libpangox-1.0-0 python-cairo python-gobject-2 python-gtk2")
+    run(
+        "sudo apt-get install -y"
+        " libpango1.0-0 libpangox-1.0-0 python-cairo python-gobject-2"
+        " python-gtk2"
+    )
 
-    run("wget -qO {} https://linux.dropbox.com/packages/ubuntu/dropbox_2019.02.14_amd64.deb".format(dropbox_deb_file))
+    run(
+        "wget -qO {} https://linux.dropbox.com/"
+        "packages/ubuntu/dropbox_2019.02.14_amd64.deb".format(dropbox_deb_file)
+    )
     run("sudo dpkg -i {}".format(dropbox_deb_file))
     os.remove(dropbox_deb_file)
 
 
 def install_network_configs():
-    run('sudo mkdir -p {}'.format(os.sep + os.path.join('etc', 'iptables')))
+    run("sudo mkdir -p {}".format(os.sep + os.path.join("etc", "iptables")))
 
     iptables_reference = os.path.join(dotfiles_dir, "references", "iptables")
     iptables_config_path = os.sep + os.path.join("etc", "iptables", "rules.v4")
     run("sudo cp {} {}".format(iptables_reference, iptables_config_path))
 
     ip6tables_reference = os.path.join(dotfiles_dir, "references", "ip6tables")
-    ip6tables_config_path = os.sep + os.path.join("etc", "iptables", "rules.v6")
+    ip6tables_config_path = os.sep + os.path.join(
+        "etc", "iptables", "rules.v6"
+    )
     run("sudo cp {} {}".format(ip6tables_reference, ip6tables_config_path))
 
 
 def list_additional_steps():
     # TODO: Automate these steps
     print("Additional steps: ")
-    print('* Silence the terminal bell by adding "set bell-style none" to your /etc/inputrc.')
+    print(
+        '* Silence the terminal bell by adding "set bell-style none" to your '
+        "/etc/inputrc."
+    )
     print('* Comment out "SendEnv LANG LC_*" in /etc/ssh/ssh_config')
     print("Restart your computer.")
 
