@@ -40,8 +40,8 @@ def change_dir(dir_name):
         os.chdir(old_dir)
 
 
-def run(command, check_errors=True, *args, **kwargs):
-    completed_process = subprocess.run(shlex.split(command), universal_newlines=True, *args, **kwargs)
+def run(command, check_errors=True, universal_newlines=True, *args, **kwargs):
+    completed_process = subprocess.run(shlex.split(command), universal_newlines=universal_newlines, *args, **kwargs)
     if check_errors:
         completed_process.check_returncode()
     return completed_process
@@ -51,6 +51,12 @@ def run_for_output(command, *args, **kwargs):
     return run(
         command, check_errors=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE, *args, **kwargs
     ).stdout.strip()
+
+
+def run_for_output_b_stderr(command, *args, **kwargs):
+    return run(
+        command, check_errors=False, universal_newlines=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE, *args, **kwargs
+    ).stderr
 
 
 def git_clone(repo, dest=""):
@@ -356,6 +362,25 @@ def clone_dotfiles():
         return
 
     git_clone(dotfiles_repo, dotfiles_dir)
+
+
+def _resolve_gpg_keys_file_template():
+    gpg_regex = re.compile(r'gpg: key (?P<key_name>[0-9A-Z]{16}):')
+    gpg_keys_template = os.path.join(dotfiles_dir, 'references', 'gpg-keys.template')
+    gpg_keys_file = os.path.join(dotfiles_dir, 'dotfiles', 'gitconfigs', 'gpg-keys')
+
+    gpg_key = base64.b64decode(config['gpg']['gpg_key'].encode('utf-8'))
+    output = run_for_output_b_stderr('gpg --import', input=gpg_key).decode('utf-8').split('\n')[0]
+    gpg_key_name = gpg_regex.match(output).group('key_name')
+
+    with open(gpg_keys_template) as fp:
+        content = fp.read()
+    with open(gpg_keys_file, 'w') as fp:
+        fp.write(content.replace('{gpg_key}', gpg_key_name))
+
+
+def resolve_templates():
+    _resolve_gpg_keys_file_template()
 
 
 def copy_configuration_files_and_dirs():

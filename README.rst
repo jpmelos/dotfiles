@@ -3,6 +3,9 @@ dotfiles
 
 To install these dotfiles on **Ubuntu 20.04**, add a `~/.dotfiles_config`. The format expected is::
 
+    [gpg]
+    gpg_key = Your GPG key base64-encoded.
+
     [github]
     ssh_key_title = The SSH key you need to add to GitHub for this computer.
     token = Credential we can use to add the SSH key.

@@ -1,0 +1,2 @@
+[user]
+    signingkey = {gpg_key}
