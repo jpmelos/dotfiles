@@ -87,12 +87,6 @@ def append_to_file(dest, line):
             fp.write(line)
 
 
-def source(filename, dest):
-    dest_file = os.path.join(home_dir, dest)
-    source_line = "\nsource ~/{filename}\n".format(filename=filename)
-    append_to_file(dest_file, source_line)
-
-
 def get_latest_version(versions, version_regex, for_minors=None):
     Version = namedtuple("Version", ["major", "minor", "revision"])
 
@@ -444,8 +438,8 @@ def copy_configuration_files_and_dirs():
         ("localserver.conf", ".localserver.conf"),
         ("tmux.conf", ".tmux.conf"),
         ("vimrc", ".vimrc"),
-        ("myprofile", ".myprofile"),
-        ("mybashrc", ".mybashrc"),
+        ("profile", ".profile"),
+        ("bashrc", ".bashrc"),
     ]
 
     for item in dotfiles_list:
@@ -469,11 +463,6 @@ def copy_configuration_files_and_dirs():
 
         create_dir(os.path.dirname(home_path))
         os.symlink(item_path, home_path)
-
-
-def source_dotfiles():
-    source(".myprofile", ".profile")
-    source(".mybashrc", ".bashrc")
 
 
 # How to backup and restore your terminal settings:
