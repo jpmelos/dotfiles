@@ -51,6 +51,7 @@
     rba = rebase --abort
     rbc = rebase --continue
     rbs = rebase --skip
+    reset-date = commit --amend --reset-author --no-edit
     sa = stash save --include-untracked
     sh = show
     shf = diff-tree --no-commit-id --name-only --diff-filter=d -r
