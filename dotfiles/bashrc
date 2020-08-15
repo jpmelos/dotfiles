@@ -255,6 +255,10 @@ pyquality() {
     done
 }
 
+pyquality-all() {
+    find . -name "*.py" -print0 | xargs -0 pyquality
+}
+
 pyquality-git() {
     pyquality $(git diff --name-only --cached --diff-filter=d -- '*.py*')
 }
