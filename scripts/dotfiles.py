@@ -696,7 +696,7 @@ def install_network_configs():
 def list_additional_steps():
     # TODO: Automate these steps
     print(
-"""Additional steps:
+        """Additional steps:
 * Silence the terminal bell by adding "set bell-style none" to your /etc/inputrc
 * Comment out "SendEnv LANG LC_*" in /etc/ssh/ssh_config
 * Install pipx with:
@@ -704,7 +704,7 @@ def list_additional_steps():
   - python3 -m pip install --user pipx
   - pipx completions
 * Restart your computer."""
-)
+    )
 
 
 def run_steps():
