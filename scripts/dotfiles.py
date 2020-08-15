@@ -717,7 +717,6 @@ def run_steps():
         add_known_ssh_hosts,
         clone_dotfiles,
         copy_configuration_files_and_dirs,
-        source_dotfiles,
         set_terminal_settings,
         prepare_vim,
         get_git_prompt_and_autocompletion,
