@@ -1,7 +1,7 @@
 dotfiles
 ========
 
-To install these dotfiles on **Ubuntu 20.04**, add a `~/.dotfiles_config`. The format expected is::
+To install these dotfiles on **Pop!_os 20.04**, add a `~/.dotfiles_config`. The format expected is::
 
     [gpg]
     gpg_key = Your GPG key base64-encoded.

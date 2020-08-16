@@ -43,9 +43,6 @@ Plugin 'tyru/open-browser-github.vim'
 " Git plugins
 Plugin 'tpope/vim-fugitive'
 
-" General programming plugins
-Plugin 'Valloric/YouCompleteMe'
-
 " Python plugins
 Plugin 'tmhedberg/SimpylFold'
 Plugin 'vim-scripts/indentpython.vim'
@@ -160,9 +157,6 @@ set tags=tags;/
 set backupdir=~/.vim/backup//
 set directory=~/.vim/swap//
 set undodir=~/.vim/undo//
-
-" autoclose YouCompleteMe helper window
-let g:ycm_autoclose_preview_window_after_completion=1
 
 " set fold to start open
 set foldlevelstart=20

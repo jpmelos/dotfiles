@@ -9,13 +9,14 @@ import shutil
 import subprocess
 import sys
 from collections import namedtuple
-from configparser import SafeConfigParser
+from configparser import ConfigParser
 from urllib.request import Request, urlopen
 
-if sys.version_info[0:2] != (3, 6):
-    raise Exception("Must be using Python 3.6")
+version = '.'.join(map(str, sys.version_info[0:2]))
+if version != '3.8':
+    raise Exception(f"Must be using Python 3.8: detected {version}")
 
-config = SafeConfigParser()
+config = ConfigParser()
 config_file_path = os.path.expanduser("~/.dotfiles_config")
 if not config.read([config_file_path]):
     raise Exception("Did not find configuration file")
@@ -129,7 +130,6 @@ def install_packages():
     os_packages = [
         # Desktop
         "tmux",
-        "gnome-session",
         "deluge",
         "pavucontrol",
         "libcanberra-gtk-module",
@@ -149,7 +149,6 @@ def install_packages():
         "cmake",
         "ack",
         "git",
-        "certbot",
         # Fonts
         "ttf-mscorefonts-installer",
         "fonts-cantarell",
@@ -165,12 +164,7 @@ def install_packages():
         "iptables-persistent",
         "net-tools",
         # Python dependencies
-        "python",
-        "python-dev",
-        "python-pip",
-        "python3",
         "python3-dev",
-        "python3-pip",
         "libreadline-dev",
         "libncursesw5-dev",
         "libssl-dev",
@@ -184,47 +178,15 @@ def install_packages():
         "libffi-dev",
     ]
 
-    run("sudo add-apt-repository ppa:certbot/certbot")
     run("sudo apt-get update")
     run("sudo apt-get install -y {}".format(" ".join(os_packages)))
 
 
-def _set_default_gdm_style():
-    run(
-        "sudo update-alternatives"
-        " --set gdm3.css /usr/share/gnome-shell/theme/gnome-shell.css"
-    )
-
-
-def _disable_ubuntu_automatic_updates():
-    apt_automatic_updates_path = os.sep + os.path.join(
-        "etc", "apt", "apt.conf.d", "10periodic"
-    )
-    automatic_update_config = "APT::Periodic::Update-Package-Lists"
-    starting_chmod = "644"
-    needed_chmod = "666"
-
-    run("sudo chmod {} {}".format(needed_chmod, apt_automatic_updates_path))
-
-    with open(apt_automatic_updates_path, "r") as fp:
-        content = fp.readlines()
-    with open(apt_automatic_updates_path, "w") as fp:
-        for line in content:
-            if line.startswith(automatic_update_config):
-                fp.write('{} "0";\n'.format(automatic_update_config))
-                continue
-            fp.write(line)
-
-    run("sudo chmod {} {}".format(starting_chmod, apt_automatic_updates_path))
-
-
 def _disable_camera_shutter_on_screenshot():
-    run("sudo rm /usr/share/sounds/freedesktop/stereo/camera-shutter.oga")
+    run("sudo rm /usr/share/sounds/freedesktop/stereo/camera-shutter.oga", check_errors=False)
 
 
 def setup_os():
-    _set_default_gdm_style()
-    _disable_ubuntu_automatic_updates()
     _disable_camera_shutter_on_screenshot()
 
 
@@ -440,6 +402,7 @@ def copy_configuration_files_and_dirs():
         ("vimrc", ".vimrc"),
         ("profile", ".profile"),
         ("bashrc", ".bashrc"),
+        ("bash_logout", ".bash_logout"),
     ]
 
     for item in dotfiles_list:
@@ -492,8 +455,6 @@ def prepare_vim():
 
     git_clone(vundle_repo, vundle_dir)
     run("vim +PluginInstall +qa")
-    with change_dir(os.path.join(vim_dir, "bundle", "YouCompleteMe")):
-        run("python install.py")
 
 
 def get_git_prompt_and_autocompletion():
@@ -577,7 +538,7 @@ def install_pyenv():
         latest_python_versions = get_latest_version(
             output.split("\n"),
             python_version_regex,
-            for_minors=((2, 7), (3, 5), (3, 6), (3, 7), (3, 8)),
+            for_minors=((3, 6), (3, 7), (3, 8)),
         )
         latest_python_versions = [
             "{}.{}.{}".format(version.major, version.minor, version.revision)
@@ -585,24 +546,23 @@ def install_pyenv():
         ]
 
     run(
-        "bash dotfiles/scripts/install_pyenv.sh {} {} {}".format(
-            latest_pyenv_version,
-            latest_pyenv_virtualenv_version,
+        "bash scripts/install_pyenv.sh {}".format(
             " ".join(latest_python_versions),
         )
     )
 
 
 def install_poetry():
-    poetry_install_file = os.path.join(os.path.expanduser("~"), "poetry.py")
+    poetry_install_file = "poetry.py"
 
-    run(
-        "wget -qO {} https://raw.githubusercontent.com/"
-        "python-poetry/poetry/master/get-poetry.py".format(poetry_install_file)
-    )
-    run("chmod +x {}".format(poetry_install_file))
-    run("./{}".format(poetry_install_file))
-    run("rm {}".format(poetry_install_file))
+    with change_dir(os.path.expanduser("~")):
+        run(
+            "wget -qO {} https://raw.githubusercontent.com/"
+            "python-poetry/poetry/master/get-poetry.py".format(poetry_install_file)
+        )
+        run("chmod +x {}".format(poetry_install_file))
+        run("python3 {}".format(poetry_install_file))
+        run("rm {}".format(poetry_install_file))
 
 
 def add_aws_credentials_file():
@@ -612,7 +572,7 @@ def add_aws_credentials_file():
     )
 
     create_dir(aws_credentials_dir)
-    aws_credentials = SafeConfigParser()
+    aws_credentials = ConfigParser()
     aws_credentials["default"] = config["aws"]
     with open(aws_credentials_file_path, "w") as fp:
         aws_credentials.write(fp)
@@ -659,26 +619,6 @@ def install_docker():
     run("sudo usermod -aG docker {}".format(os.getlogin()))
 
 
-def install_dropbox():
-    if os.path.isdir(os.path.join(os.path.expanduser("~"), "Dropbox")):
-        return
-
-    dropbox_deb_file = os.path.join(home_dir, "dropbox.deb")
-
-    run(
-        "sudo apt-get install -y"
-        " libpango1.0-0 libpangox-1.0-0 python-cairo python-gobject-2"
-        " python-gtk2"
-    )
-
-    run(
-        "wget -qO {} https://linux.dropbox.com/"
-        "packages/ubuntu/dropbox_2019.02.14_amd64.deb".format(dropbox_deb_file)
-    )
-    run("sudo dpkg -i {}".format(dropbox_deb_file))
-    os.remove(dropbox_deb_file)
-
-
 def install_network_configs():
     run("sudo mkdir -p {}".format(os.sep + os.path.join("etc", "iptables")))
 
@@ -697,6 +637,7 @@ def list_additional_steps():
     # TODO: Automate these steps
     print(
         """Additional steps:
+* Install Dropbox
 * Silence the terminal bell by adding "set bell-style none" to your /etc/inputrc
 * Comment out "SendEnv LANG LC_*" in /etc/ssh/ssh_config
 * Install pipx with:
@@ -716,6 +657,7 @@ def run_steps():
         broadcast_ssh_keys,
         add_known_ssh_hosts,
         clone_dotfiles,
+        resolve_templates,
         copy_configuration_files_and_dirs,
         set_terminal_settings,
         prepare_vim,
@@ -724,7 +666,6 @@ def run_steps():
         install_poetry,
         add_aws_credentials_file,
         install_docker,
-        install_dropbox,
         install_network_configs,
         list_additional_steps,
     ]
