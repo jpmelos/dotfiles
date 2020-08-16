@@ -12,8 +12,8 @@ from collections import namedtuple
 from configparser import ConfigParser
 from urllib.request import Request, urlopen
 
-version = '.'.join(map(str, sys.version_info[0:2]))
-if version != '3.8':
+version = ".".join(map(str, sys.version_info[0:2]))
+if version != "3.8":
     raise Exception(f"Must be using Python 3.8: detected {version}")
 
 config = ConfigParser()
@@ -46,7 +46,7 @@ def run(command, check_errors=True, universal_newlines=True, *args, **kwargs):
         shlex.split(command),
         universal_newlines=universal_newlines,
         *args,
-        **kwargs
+        **kwargs,
     )
     if check_errors:
         completed_process.check_returncode()
@@ -60,7 +60,7 @@ def run_for_output(command, *args, **kwargs):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         *args,
-        **kwargs
+        **kwargs,
     ).stdout.strip()
 
 
@@ -72,7 +72,7 @@ def run_for_output_b_stderr(command, *args, **kwargs):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         *args,
-        **kwargs
+        **kwargs,
     ).stderr
 
 
@@ -100,7 +100,7 @@ def get_latest_version(versions, version_regex, for_minors=None):
                     int(match.group("major")),
                     int(match.group("minor")),
                     int(match.group("revision")),
-                )
+                ),
             )
 
     if not for_minors:
@@ -183,7 +183,10 @@ def install_packages():
 
 
 def _disable_camera_shutter_on_screenshot():
-    run("sudo rm /usr/share/sounds/freedesktop/stereo/camera-shutter.oga", check_errors=False)
+    run(
+        "sudo rm /usr/share/sounds/freedesktop/stereo/camera-shutter.oga",
+        check_errors=False,
+    )
 
 
 def setup_os():
@@ -251,7 +254,7 @@ def _send_ssh_key_to_bitbucket(ssh_key):
     username = config["bitbucket"]["username"]
     token = "{}:{}".format(username, config["bitbucket"]["token"])
     authorization = "Basic {}".format(
-        base64.b64encode(token.encode()).decode()
+        base64.b64encode(token.encode()).decode(),
     )
     headers = {
         "Authorization": authorization,
@@ -274,7 +277,7 @@ def _send_ssh_key_to_bitbucket(ssh_key):
     for key in keys:
         if key["label"] == ssh_key_title:
             delete_req = Request(
-                key["links"]["self"]["href"], headers=headers, method="DELETE"
+                key["links"]["self"]["href"], headers=headers, method="DELETE",
             )
             urlopen(delete_req)
             break
@@ -368,10 +371,10 @@ def clone_dotfiles():
 def _resolve_gpg_keys_file_template():
     gpg_regex = re.compile(r"gpg: key (?P<key_name>[0-9A-Z]{16}):")
     gpg_keys_template = os.path.join(
-        dotfiles_dir, "references", "gpg-keys.template"
+        dotfiles_dir, "references", "gpg-keys.template",
     )
     gpg_keys_file = os.path.join(
-        dotfiles_dir, "dotfiles", "gitconfigs", "gpg-keys"
+        dotfiles_dir, "dotfiles", "gitconfigs", "gpg-keys",
     )
 
     gpg_key = base64.b64decode(config["gpg"]["gpg_key"].encode("utf-8"))
@@ -433,7 +436,7 @@ def copy_configuration_files_and_dirs():
 # To backup, run scripts/backup_terminal.sh from repository root
 def set_terminal_settings():
     terminal_settings_path = os.path.join(
-        dotfiles_dir, "references", "terminal_settings.txt"
+        dotfiles_dir, "references", "terminal_settings.txt",
     )
     with open(terminal_settings_path, "r") as fp:
         run(
@@ -484,14 +487,14 @@ def install_pyenv():
     pyenv_virtualenv_repo = "https://github.com/pyenv/pyenv-virtualenv"
     pyenv_dir = os.path.join(home_dir, ".pyenv")
     pyenv_virtualenv_dir = os.path.join(
-        pyenv_dir, "plugins", "pyenv-virtualenv"
+        pyenv_dir, "plugins", "pyenv-virtualenv",
     )
 
     pyenv_version_regex = re.compile(
-        r"^v(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)$"
+        r"^v(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)$",
     )
     python_version_regex = re.compile(
-        r"^(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)$"
+        r"^(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)$",
     )
 
     if not os.path.exists(pyenv_dir):
@@ -506,7 +509,7 @@ def install_pyenv():
         run("git pull")
         output = run_for_output("git tag")
         latest_pyenv_version = get_latest_version(
-            output.split("\n"), pyenv_version_regex
+            output.split("\n"), pyenv_version_regex,
         )
         latest_pyenv_version = "v{}.{}.{}".format(
             latest_pyenv_version.major,
@@ -521,7 +524,7 @@ def install_pyenv():
         run("git pull")
         output = run_for_output("git tag")
         latest_pyenv_virtualenv_version = get_latest_version(
-            output.split("\n"), pyenv_version_regex
+            output.split("\n"), pyenv_version_regex,
         )
         latest_pyenv_virtualenv_version = "v{}.{}.{}".format(
             latest_pyenv_virtualenv_version.major,
@@ -531,7 +534,7 @@ def install_pyenv():
         run("git checkout {}".format(latest_pyenv_virtualenv_version))
 
     python_versions_dir = os.path.join(
-        pyenv_dir, "plugins", "python-build", "share", "python-build"
+        pyenv_dir, "plugins", "python-build", "share", "python-build",
     )
     with change_dir(python_versions_dir):
         output = run_for_output("ls")
@@ -548,7 +551,7 @@ def install_pyenv():
     run(
         "bash scripts/install_pyenv.sh {}".format(
             " ".join(latest_python_versions),
-        )
+        ),
     )
 
 
@@ -558,7 +561,9 @@ def install_poetry():
     with change_dir(os.path.expanduser("~")):
         run(
             "wget -qO {} https://raw.githubusercontent.com/"
-            "python-poetry/poetry/master/get-poetry.py".format(poetry_install_file)
+            "python-poetry/poetry/master/get-poetry.py".format(
+                poetry_install_file,
+            ),
         )
         run("chmod +x {}".format(poetry_install_file))
         run("python3 {}".format(poetry_install_file))
@@ -568,7 +573,7 @@ def install_poetry():
 def add_aws_credentials_file():
     aws_credentials_dir = os.path.join(os.path.expanduser("~"), ".aws")
     aws_credentials_file_path = os.path.join(
-        aws_credentials_dir, "credentials"
+        aws_credentials_dir, "credentials",
     )
 
     create_dir(aws_credentials_dir)
@@ -588,12 +593,12 @@ def install_docker():
     run("sudo apt-get update")
     run(
         "sudo apt-get -y install"
-        " apt-transport-https ca-certificates curl software-properties-common"
+        " apt-transport-https ca-certificates curl software-properties-common",
     )
     run(
         "curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o {}".format(
-            docker_gpg_key_path
-        )
+            docker_gpg_key_path,
+        ),
     )
     run("sudo apt-key add {}".format(docker_gpg_key_path))
     os.remove(docker_gpg_key_path)
@@ -602,7 +607,7 @@ def install_docker():
     run(
         "sudo add-apt-repository "
         '"deb [arch=amd64] https://download.docker.com/linux/ubuntu '
-        '{} stable"'.format(ubuntu_release)
+        '{} stable"'.format(ubuntu_release),
     )
     run("sudo apt-get update")
     run("sudo apt-get -y install docker-ce")
@@ -628,7 +633,7 @@ def install_network_configs():
 
     ip6tables_reference = os.path.join(dotfiles_dir, "references", "ip6tables")
     ip6tables_config_path = os.sep + os.path.join(
-        "etc", "iptables", "rules.v6"
+        "etc", "iptables", "rules.v6",
     )
     run("sudo cp {} {}".format(ip6tables_reference, ip6tables_config_path))
 
@@ -638,13 +643,14 @@ def list_additional_steps():
     print(
         """Additional steps:
 * Install Dropbox
-* Silence the terminal bell by adding "set bell-style none" to your /etc/inputrc
+* Silence the terminal bell by adding "set bell-style none" to your
+  /etc/inputrc
 * Comment out "SendEnv LANG LC_*" in /etc/ssh/ssh_config
 * Install pipx with:
   - unset PIP_REQUIRE_VIRTUALENV
   - python3 -m pip install --user pipx
   - pipx completions
-* Restart your computer."""
+* Restart your computer.""",
     )
 
 

@@ -1,0 +1,6 @@
+[flake8]
+# FS003: this is for f-string not prefixed, has a lot of false-positives
+# W503: ignore this to allow line break before operator (goes against Black)
+ignore = FS003,W503
+# flake8-coding
+no-accept-encodings = True
