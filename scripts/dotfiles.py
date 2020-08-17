@@ -170,6 +170,7 @@ def install_packages():
         "libssl-dev",
         "libgdbm-dev",
         "libsqlite3-dev",
+        "libpq-dev",
         "libbz2-dev",
         "liblzma-dev",
         "tk-dev",
