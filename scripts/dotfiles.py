@@ -617,10 +617,8 @@ def install_docker():
         components.split(":") for components in groups_database
     ]
     groups = [component[0] for component in groups_components]
-    if "docker" in groups:
-        return
-
-    run("sudo groupadd docker")
+    if "docker" not in groups:
+        run("sudo groupadd docker")
     run("sudo usermod -aG docker {}".format(os.getlogin()))
 
 
