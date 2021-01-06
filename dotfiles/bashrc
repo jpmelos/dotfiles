@@ -245,7 +245,7 @@ run-until() {
 pyquality() {
     for path in "$@"; do
         black "$path"
-        isort -rc "$path"
+        isort "$path"
         flake8 "$path"
     done
 }
