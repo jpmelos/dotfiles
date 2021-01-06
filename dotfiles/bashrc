@@ -260,7 +260,7 @@ pyquality-git() {
 
 # Re-source this file
 rdot() {
-    source ~/.mybashrc
+    source ~/.bashrc
 }
 
 # Remove password from a PDF
