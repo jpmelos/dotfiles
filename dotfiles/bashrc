@@ -155,7 +155,7 @@ localserver() {
 # Updates system packages
 update() {
     sudo apt-get --allow-releaseinfo-change update
-    sudo apt-get -y dist-upgrade
+    sudo apt-get -y --allow-downgrades dist-upgrade
     sudo apt-get -y autoremove
     sudo apt-get -y clean
 }
