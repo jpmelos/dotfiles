@@ -1,3 +1,5 @@
+/git-ignored
+
 __pycache__
 *.pyc
 
