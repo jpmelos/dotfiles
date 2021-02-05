@@ -3,6 +3,7 @@
 __pycache__
 *.pyc
 
+/.tox
 /.dmypy.json
 /.python-version
 /.idea
