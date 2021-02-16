@@ -162,7 +162,7 @@ update() {
 
 # Prints external IP address
 get-external-ip() {
-    curl ifconfig.co
+    dig +short myip.opendns.com @resolver1.opendns.com
 }
 
 # Fetches a bogus file, printing the current download transfer speed
