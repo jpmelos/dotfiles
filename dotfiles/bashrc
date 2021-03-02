@@ -183,21 +183,18 @@ dcrtail() {
     docker-compose logs -ft --tail=1000 $1
 }
 
-dcrmaiv() {
-    # Remove anonymous images
-    docker image rm $(docker image ls -f dangling=true -q)
-
-    # Remove anonymous volumes
-    docker volume ls --format '{{.Name}}' |
-        grep -E '[0-9a-f]{64}' |
-        xargs docker volume rm
+dcrmiv() {
+    # Remove images
+    docker image rm $(docker image ls -q)
+    # Remove volumes
+    docker volume rm $(docker volume ls -q)
 }
 
 # Clear Docker environment
 docker-clean() {
     dcrm
     docker system prune --force
-    dcrmaiv
+    dcrmiv
 }
 
 # List all Gnome settings
