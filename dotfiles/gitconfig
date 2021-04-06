@@ -7,20 +7,23 @@
     pager = less -q
     excludesFile = ~/.gitignore
 
+[init]
+    defaultBranch = main
+
 [log]
     date = local
 
 [status]
     showUntrackedFiles = all
 
+[merge]
+    conflictStyle = diff3
+
 [commit]
     gpgSign = true
 
 [tag]
    gpgSign = true
-
-[merge]
-    conflictStyle = diff3
 
 [push]
     default = simple
