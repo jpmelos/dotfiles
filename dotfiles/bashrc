@@ -55,14 +55,8 @@ alias mv='mv -i'
 alias less='less -r'
 alias tail='tail -f'
 
-# Proxy to detect MacOS
-if [[ "$HOME" == /Users/* ]]; then
-    alias list='ls -FhAls | less -r'
-    alias ls='ls -F'
-else
-    alias list='ls -FhAls --color=never | less -r'
-    alias ls='ls -F --color=never'
-fi
+alias list='ls -FhAls --color=never | less -r'
+alias ls='ls -F --color=never'
 
 alias untar='tar -zxvf'
 
@@ -162,7 +156,7 @@ update() {
 
 # Prints external IP address
 get-external-ip() {
-    dig +short myip.opendns.com @resolver1.opendns.com
+    curl ifconfig.me
 }
 
 # Fetches a bogus file, printing the current download transfer speed
@@ -260,7 +254,6 @@ rdot() {
     source ~/.bashrc
 }
 
-# Remove password from a PDF
 # Usage: pdf-remove-password $PASSWORD $IN $OUT
 pdf-remove-password() {
     pdftk "$2" input_pw "$1" output "$3"
