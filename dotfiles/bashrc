@@ -1,21 +1,9 @@
 # vim:ft=sh
 
-# If not running interactively, don't do anything
-case $- in
-    *i*) ;;
-      *) return;;
-esac
-
 # For better colors in Vim
 export TERM=xterm-256color
 
 PS1='\[\033[1;38;5;19m\]\u\[\033[0;38;5;196m\]@\[\033[1;38;5;22m\]\h\[\033[0;38;5;0m\]:\[\033[1;38;5;100m\]\w\[\033[0;38;5;0m\] @ \[\033[1;38;5;19m\]\D{%H:%M:%S}\[\033[1;38;5;88m\]$(__git_ps1) \[\033[0;38;5;22m\]$\[\033[0m\] '
-
-# Sets default editor for various commands
-export EDITOR=$(which vim)
-
-# Make grep and other commands show more colors
-export GREP_COLORS="fn=37"
 
 # History length
 HISTSIZE=1000
@@ -23,13 +11,13 @@ HISTFILESIZE=2000
 # Don't put duplicate lines or lines starting with space in the history
 HISTCONTROL=ignoreboth
 # Prepends time to each command in history
-export HISTTIMEFORMAT="%d/%m/%y %T "
+HISTTIMEFORMAT="%d/%m/%y %T "
 # Avoids duplicate commands in history
-export HISTCONTROL=ignoredups:erasedups
+HISTCONTROL=ignoredups:erasedups
 # Append to history file, instead of overwriting it
 shopt -s histappend
 # Updates history after every command
-export PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a; history -c; history -r"
+PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a; history -c; history -r"
 
 # Check the window size after each command and, if necessary,
 # update the values of LINES and COLUMNS
@@ -41,9 +29,6 @@ shopt -s globstar
 
 # Make less more friendly for non-text input files
 [ -x /usr/bin/lesspipe ] && eval "$(SHELL=/bin/sh lesspipe)"
-
-# Colored GCC warnings and errors
-export GCC_COLORS='error=01;31:warning=01;35:note=01;36:caret=01;32:locus=01:quote=01'
 
 alias vim='vim -O'
 
@@ -81,18 +66,7 @@ alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo
 source ~/.git-prompt.sh
 source ~/.git-completion.bash
 
-# Start the GPG Agent
-export GPG_TTY=$(tty)
 gpgconf --launch gpg-agent
-
-# Make `pip` require a virtualenv
-export PIP_REQUIRE_VIRTUALENV=true
-
-# Set up pyenv
-export PYENV_ROOT=$HOME/.pyenv
-export PATH=$PYENV_ROOT/bin:$PATH
-eval "$(pyenv init -)"
-eval "$(pyenv virtualenv-init -)"
 
 if ! shopt -oq posix; then
     if [ -f /usr/share/bash-completion/bash_completion ]; then
