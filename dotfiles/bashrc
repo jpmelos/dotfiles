@@ -76,6 +76,9 @@ if ! shopt -oq posix; then
     fi
 fi
 
+# Setup pyenv for each interactive shell
+eval "$(pyenv init -)"
+
 # Mounts an ISO: mount-iso file.iso dir/
 mount-iso() {
     if [[ ! -d "$2" ]]; then
