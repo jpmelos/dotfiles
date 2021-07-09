@@ -1,0 +1,95 @@
+# vim:ft=zsh
+
+# Path to your oh-my-zsh installation.
+export ZSH="/home/jpmelos/.oh-my-zsh"
+ZSH_THEME="robbyrussell"
+
+CASE_SENSITIVE="true"
+
+DISABLE_AUTO_UPDATE="true"
+DISABLE_UPDATE_PROMPT="true"
+COMPLETION_WAITING_DOTS="true"
+HIST_STAMPS="yyyy-mm-dd"
+
+plugins=(sudo gpg-agent tmux git docker docker-compose pip pyenv redis-cli)
+
+source $ZSH/oh-my-zsh.sh
+
+# For better colors in Vim
+export TERM=xterm-256color
+
+# Start the GPG Agent
+export GPG_TTY=$(tty)
+
+# Allows alias checking in watch commands
+alias watch='watch '
+
+# Allows opening multiple files by default
+alias vim='vim -O'
+
+alias cp='cp -i'
+alias mv='mv -i'
+
+# Setup pyenv for each interactive shell
+eval "$(pyenv init -)"
+
+# Mounts an ISO: mount-iso file.iso dir/
+mount-iso() {
+    if [[ ! -d "$2" ]]; then
+        mkdir "$2"
+    fi
+
+    sudo mount -o loop -t iso9660 "$1" "$2"
+}
+
+# Unmounts an ISO: unmount-iso dir/
+unmount-iso() {
+    sudo umount "$1"
+    rm -r "$1"
+}
+
+# Updates system packages
+update() {
+    sudo apt-get --allow-releaseinfo-change update
+    sudo apt-get -y --allow-downgrades dist-upgrade
+    sudo apt-get -y autoremove
+    sudo apt-get -y clean
+}
+
+# Prints external IP address
+get-external-ip() {
+    curl ifconfig.me
+}
+
+# List all Gnome settings
+list-gnome-settings() {
+    for schema in $(gsettings list-schemas | sort); do
+        for key in $(gsettings list-keys $schema | sort); do
+            value="$(gsettings get $schema $key | tr "\n" " ")"
+            echo "$schema :: $key :: $value"
+        done
+    done
+}
+
+# Show all components of your PATH as a list
+show-path() {
+    IFS=':' read -ra PARTS <<< "$PATH"
+    for part in "${PARTS[@]}"; do
+        echo $part
+    done
+}
+
+# Usage: pdf-remove-password $PASSWORD $IN $OUT
+pdf-remove-password() {
+    pdftk "$2" input_pw "$1" output "$3"
+}
+
+# Usage: encrypt-file $IN $OUT
+encrypt-file() {
+    openssl enc -aes-256-cbc -md sha512 -pbkdf2 -iter 100000 -salt -in "$1" -out "$2"
+}
+
+# Usage: decrypt-file $IN $OUT
+decrypt-file() {
+    openssl enc -aes-256-cbc -d -md sha512 -pbkdf2 -iter 100000 -salt -in "$1" -out "$2"
+}

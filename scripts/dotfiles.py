@@ -13,8 +13,8 @@ from configparser import ConfigParser
 from urllib.request import Request, urlopen
 
 version = ".".join(map(str, sys.version_info[0:2]))
-if version != "3.8":
-    raise Exception(f"Must be using Python 3.8: detected {version}")
+if version != "3.6":
+    raise Exception(f"Must be using Python 3.6: detected {version}")
 
 config = ConfigParser()
 config_file_path = os.path.expanduser("~/.dotfiles_config")
@@ -121,19 +121,17 @@ def get_latest_version(versions, version_regex, for_minors=None):
 home_dir = os.path.expanduser("~")
 
 devel_dir = os.path.join(home_dir, "devel")
-dotfiles_dir = os.path.join(devel_dir, "dotfiles")
-
+bin_dir = os.path.join(home_dir, "bin")
 ssh_dir = os.path.join(home_dir, ".ssh")
+
+dotfiles_dir = os.path.join(devel_dir, "dotfiles")
 
 
 def install_packages():
     os_packages = [
-        # Desktop
+        # Shell
+        "zsh",
         "tmux",
-        "deluge",
-        "pavucontrol",
-        "libcanberra-gtk-module",
-        "libcanberra-gtk3-module",
         # Entertainment
         "vlc",
         # Utils
@@ -144,6 +142,10 @@ def install_packages():
         "rar",
         "unrar",
         "sshfs",
+        "deluge",
+        "pavucontrol",
+        "libcanberra-gtk-module",
+        "libcanberra-gtk3-module",
         # Development tools
         "build-essential",
         "cmake",
@@ -152,6 +154,7 @@ def install_packages():
         # Fonts
         "ttf-mscorefonts-installer",
         "fonts-cantarell",
+        "fonts-powerline",
         "lmodern",
         "ttf-aenigma",
         "ttf-georgewilliams",
@@ -184,10 +187,12 @@ def install_packages():
 
 
 def _disable_camera_shutter_on_screenshot():
-    run(
-        "sudo rm /usr/share/sounds/freedesktop/stereo/camera-shutter.oga",
-        check_errors=False,
-    )
+    shutter_path = "/usr/share/sounds/freedesktop/stereo/camera-shutter.oga"
+    if os.path.exists(shutter_path):
+        print("Shutter file exists.")
+        run(f"sudo rm {shutter_path}")
+    else:
+        print("Shutter file does not exist.")
 
 
 def setup_os():
@@ -196,22 +201,14 @@ def setup_os():
 
 def create_devel_dir():
     create_dir(devel_dir)
-    os.chdir(devel_dir)
 
 
 def create_bin_dir():
-    bin_dir = os.path.join(os.path.expanduser("~"), "bin")
     create_dir(bin_dir)
 
 
-def _generate_ssh_key():
-    priv_key_path = os.path.join(ssh_dir, "id_rsa")
-    pub_key_path = os.path.join(ssh_dir, "id_rsa.pub")
-
-    if not os.path.exists(priv_key_path):
-        run('ssh-keygen -N "" -f {}'.format(priv_key_path))
-    with open(pub_key_path, "r") as key:
-        return key.read().strip()
+def _import_ssh_key():
+    raise Exception
 
 
 def _send_ssh_key_to_github(ssh_key):
@@ -333,7 +330,7 @@ def _send_ssh_key_to_gitlab(ssh_key):
 
 
 def broadcast_ssh_keys():
-    ssh_key = _generate_ssh_key()
+    ssh_key = _import_ssh_key()
     _send_ssh_key_to_github(ssh_key)
     _send_ssh_key_to_bitbucket(ssh_key)
     _send_ssh_key_to_gitlab(ssh_key)
@@ -347,9 +344,9 @@ def add_known_ssh_hosts():
     )
     key_filenames = ["github.key", "gitlab.key", "bitbucket.key"]
 
-    if not os.path.exists(known_hosts_path):
-        create_dir(os.path.dirname(known_hosts_path))
-        os.mknod(known_hosts_path)
+    if os.path.exists(known_hosts_path):
+        with open(known_hosts_path, 'r') as fp:
+            known_hosts = fp.read().split("\n")
 
     for filename in key_filenames:
         url = file_urls.format(filename)
@@ -357,8 +354,11 @@ def add_known_ssh_hosts():
         keys = file_contents.split("\n")
         for key in keys:
             stripped_key = key.strip()
-            if stripped_key:
-                append_to_file(known_hosts_path, "{}\n".format(stripped_key))
+            if stripped_key and stripped_key not in known_hosts:
+                known_hosts.append(stripped_key)
+
+    with open(known_hosts_path, 'w') as fp:
+        fp.write('\n'.join(known_hosts))
 
 
 def clone_dotfiles():
@@ -404,21 +404,11 @@ def copy_configuration_files_and_dirs():
         ("localserver.conf", ".localserver.conf"),
         ("tmux.conf", ".tmux.conf"),
         ("vimrc", ".vimrc"),
-        ("profile", ".profile"),
-        ("bashrc", ".bashrc"),
-        ("bash_logout", ".bash_logout"),
+        ("zprofile", ".zprofile"),
+        ("zshrc", ".zshrc"),
     ]
 
-    for item in dotfiles_list:
-        if isinstance(item, tuple):
-            source = item[0]
-            destination = item[1]
-        elif isinstance(item, str):
-            source = item
-            destination = item
-        else:
-            raise TypeError("Items in 'files' must be strings or tuples")
-
+    for source, destination in dotfiles_list:
         item_path = os.path.join(dotfiles_dir, "dotfiles", source)
         home_path = os.path.join(home_dir, destination)
 
@@ -457,28 +447,6 @@ def prepare_vim():
 
     git_clone(vundle_repo, vundle_dir)
     run("vim +PluginInstall +qa")
-
-
-def get_git_prompt_and_autocompletion():
-    git_version_regex = re.compile(r"^git version (?P<version>\d+\.\d+\.\d+)$")
-    git_file_path = (
-        "https://raw.githubusercontent.com/git/git/v{}/contrib/completion/{}"
-    )
-    git_files = ["git-completion.bash", "git-prompt.sh"]
-
-    output = run_for_output("git --version")
-    match = git_version_regex.match(output)
-    version = match.group("version")
-
-    for file in git_files:
-        file_path = os.path.join(home_dir, ".{}".format(file))
-        if os.path.exists(file_path):
-            continue
-
-        file_path = git_file_path.format(version, file)
-        file_contents = run_for_output("wget -qO - {}".format(file_path))
-        with open(os.path.join(home_dir, ".{}".format(file)), "w") as fp:
-            fp.write(file_contents)
 
 
 def install_pyenv():
@@ -540,7 +508,7 @@ def install_pyenv():
         latest_python_versions = get_latest_version(
             output.split("\n"),
             python_version_regex,
-            for_minors=((3, 6), (3, 7), (3, 8)),
+            for_minors=((3, 6), (3, 7), (3, 8), (3, 9)),
         )
         latest_python_versions = [
             "{}.{}.{}".format(version.major, version.minor, version.revision)
@@ -640,13 +608,7 @@ def list_additional_steps():
     print(  # noqa: T001
         """Additional steps:
 * Install Dropbox
-* Silence the terminal bell by adding "set bell-style none" to your
-  /etc/inputrc
 * Comment out "SendEnv LANG LC_*" in /etc/ssh/ssh_config
-* Install pipx with:
-  - unset PIP_REQUIRE_VIRTUALENV
-  - python3 -m pip install --user pipx
-  - pipx completions
 * Restart your computer."""
     )
 
@@ -664,7 +626,6 @@ def run_steps():
         copy_configuration_files_and_dirs,
         set_terminal_settings,
         prepare_vim,
-        get_git_prompt_and_autocompletion,
         install_pyenv,
         install_poetry,
         add_aws_credentials_file,

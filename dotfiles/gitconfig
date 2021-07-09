@@ -28,41 +28,6 @@
 [push]
     default = simple
 
-[alias]
-    bl = blame --show-stats
-    br = branch
-    ci = commit -v
-    cle = clean -dfx
-    co = checkout
-    cp = cherry-pick
-    dcst = diff --cached --stat
-    del = branch -D
-    di = diff
-    dic = diff --cached
-    diff-commits = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr)%Creset' --abbrev-commit --date=relative
-    dst = diff --stat
-    fe = fetch --all --prune
-    gr = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr)'
-    ls = ls-files
-    mg = merge
-    mga = merge --abort
-    mgc = merge --continue
-    pa = add --patch
-    po = push -u origin HEAD
-    puf = push --force-with-lease
-    rb = rebase
-    rba = rebase --abort
-    rbc = rebase --continue
-    rbs = rebase --skip
-    reset-date = commit --amend --reset-author --no-edit
-    sa = stash save --include-untracked
-    sh = show
-    shf = diff-tree --no-commit-id --name-only --diff-filter=d -r
-    shfh = diff-tree --no-commit-id --name-only --diff-filter=d -r HEAD
-    sl = stash list
-    spop = stash pop
-    st = status -u
-
 [color]
     ui = always
     interactive = false
