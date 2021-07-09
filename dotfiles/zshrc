@@ -1,13 +1,39 @@
 # vim:ft=zsh
 
+if [[ $HOME =~ "/Users/*" ]]; then
+    JPMS_IS_MACOS="true"
+else
+    JPMS_IS_MACOS="false"
+fi
+
 # Path to your oh-my-zsh installation.
-export ZSH="/home/jpmelos/.oh-my-zsh"
+if [[ $JPMS_IS_MACOS == "true" ]]; then
+    export ZSH="/Users/jpmelos/.oh-my-zsh"
+else
+    export ZSH="/home/jpmelos/.oh-my-zsh"
+fi
 
 # Theme configuration
 ZSH_THEME="spaceship"
+SPACESHIP_PROMPT_ORDER=(
+    time          # Time stampts section
+    user          # Username section
+    dir           # Current directory section
+    host          # Hostname section
+    git           # Git section (git_branch + git_status)
+    docker        # Docker section
+    pyenv         # Pyenv section
+    exec_time     # Execution time
+    line_sep      # Line break
+    jobs          # Background jobs indicator
+    exit_code     # Exit code section
+    char          # Prompt character
+)
 SPACESHIP_TIME_SHOW="true"
 SPACESHIP_USER_SHOW="always"
 SPACESHIP_HOST_SHOW="always"
+SPACESHIP_EXIT_CODE_SHOW="true"
+export VIRTUAL_ENV_DISABLE_PROMPT=1
 
 # zsh configuration
 CASE_SENSITIVE="true"
