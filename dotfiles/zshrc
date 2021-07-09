@@ -1,18 +1,5 @@
 # vim:ft=zsh
 
-if [[ $HOME =~ "/Users/*" ]]; then
-    JPMS_IS_MACOS="true"
-else
-    JPMS_IS_MACOS="false"
-fi
-
-# Path to your oh-my-zsh installation.
-if [[ $JPMS_IS_MACOS == "true" ]]; then
-    export ZSH="/Users/jpmelos/.oh-my-zsh"
-else
-    export ZSH="/home/jpmelos/.oh-my-zsh"
-fi
-
 # Theme configuration
 ZSH_THEME="spaceship"
 SPACESHIP_PROMPT_ORDER=(
@@ -33,7 +20,6 @@ SPACESHIP_TIME_SHOW="true"
 SPACESHIP_USER_SHOW="always"
 SPACESHIP_HOST_SHOW="always"
 SPACESHIP_EXIT_CODE_SHOW="true"
-export VIRTUAL_ENV_DISABLE_PROMPT=1
 
 # zsh configuration
 CASE_SENSITIVE="true"
@@ -51,9 +37,6 @@ source $ZSH/oh-my-zsh.sh
 
 # For better colors in Vim
 export TERM=xterm-256color
-
-# Start the GPG Agent
-export GPG_TTY=$(tty)
 
 # Allows alias checking in watch commands
 alias watch='watch '
