@@ -361,6 +361,13 @@ def add_known_ssh_hosts():
         fp.write('\n'.join(known_hosts))
 
 
+def setup_zsh_theme():
+    custom_themes_dir = os.path.join(home_dir, ".oh-my-zsh", "custom", "themes")
+    spaceship_dir = os.path.join(custom_themes_dir, "")
+    run(f"git clone https://github.com/jpmelos/spaceship-prompt.git {custom_themes_dir}/spaceship-prompt")
+    run(f"ln -s {custom_themes_dir}/spaceship-prompt/spaceship.zsh-theme {custom_themes_dir}/themes/spaceship.zsh-theme")
+
+
 def clone_dotfiles():
     dotfiles_repo = "git@github.com:jpmelos/dotfiles"
     if os.path.exists(dotfiles_dir):
@@ -621,6 +628,7 @@ def run_steps():
         create_bin_dir,
         broadcast_ssh_keys,
         add_known_ssh_hosts,
+        setup_zsh_theme,
         clone_dotfiles,
         resolve_templates,
         copy_configuration_files_and_dirs,
