@@ -186,6 +186,10 @@ def install_packages():
     run("sudo apt-get install -y {}".format(" ".join(os_packages)))
 
 
+def _change_default_shell():
+    run("sudo chsh -s /usr/bin/zsh")
+
+
 def _disable_camera_shutter_on_screenshot():
     shutter_path = "/usr/share/sounds/freedesktop/stereo/camera-shutter.oga"
     if os.path.exists(shutter_path):
@@ -196,6 +200,7 @@ def _disable_camera_shutter_on_screenshot():
 
 
 def setup_os():
+    _change_default_shell()
     _disable_camera_shutter_on_screenshot()
 
 
