@@ -2,17 +2,25 @@
 
 # Path to your oh-my-zsh installation.
 export ZSH="/home/jpmelos/.oh-my-zsh"
-ZSH_THEME="robbyrussell"
 
+# Theme configuration
+ZSH_THEME="spaceship"
+SPACESHIP_TIME_SHOW="true"
+SPACESHIP_USER_SHOW="always"
+SPACESHIP_HOST_SHOW="always"
+
+# zsh configuration
 CASE_SENSITIVE="true"
-
 DISABLE_AUTO_UPDATE="true"
 DISABLE_UPDATE_PROMPT="true"
 COMPLETION_WAITING_DOTS="true"
 HIST_STAMPS="yyyy-mm-dd"
-
 plugins=(sudo gpg-agent tmux git docker docker-compose pip pyenv redis-cli)
 
+# Setup pyenv for each interactive shell
+eval "$(pyenv init -)"
+
+# Start framework
 source $ZSH/oh-my-zsh.sh
 
 # For better colors in Vim
@@ -27,11 +35,9 @@ alias watch='watch '
 # Allows opening multiple files by default
 alias vim='vim -O'
 
+# Ask before destructive actions
 alias cp='cp -i'
 alias mv='mv -i'
-
-# Setup pyenv for each interactive shell
-eval "$(pyenv init -)"
 
 # Mounts an ISO: mount-iso file.iso dir/
 mount-iso() {
