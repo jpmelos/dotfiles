@@ -8,7 +8,6 @@ SPACESHIP_PROMPT_ORDER=(
     dir           # Current directory section
     host          # Hostname section
     git           # Git section (git_branch + git_status)
-    docker        # Docker section
     pyenv         # Pyenv section
     exec_time     # Execution time
     line_sep      # Line break
