@@ -416,6 +416,7 @@ def copy_configuration_files_and_dirs():
         ("localserver.conf", ".localserver.conf"),
         ("tmux.conf", ".tmux.conf"),
         ("vimrc", ".vimrc"),
+        ("profile", ".profile"),
         ("zprofile", ".zprofile"),
         ("zshrc", ".zshrc"),
     ]
