@@ -212,8 +212,14 @@ def create_bin_dir():
     create_dir(bin_dir)
 
 
-def _import_ssh_key():
-    raise Exception
+def _generate_ssh_key():
+    priv_key_path = os.path.join(ssh_dir, "id_ed25519")
+    pub_key_path = os.path.join(ssh_dir, "id_ed25519.pub")
+
+    if not os.path.exists(priv_key_path):
+        run('ssh-keygen -t ed25519 -N "" -f {}'.format(priv_key_path))
+    with open(pub_key_path, "r") as key:
+        return key.read().strip()
 
 
 def _send_ssh_key_to_github(ssh_key):
@@ -335,7 +341,7 @@ def _send_ssh_key_to_gitlab(ssh_key):
 
 
 def broadcast_ssh_keys():
-    ssh_key = _import_ssh_key()
+    ssh_key = _generate_ssh_key()
     _send_ssh_key_to_github(ssh_key)
     _send_ssh_key_to_bitbucket(ssh_key)
     _send_ssh_key_to_gitlab(ssh_key)
