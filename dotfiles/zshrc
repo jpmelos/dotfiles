@@ -47,6 +47,10 @@ alias vim='vim -O'
 alias cp='cp -i'
 alias mv='mv -i'
 
+# Docker aliases
+alias d='docker'
+alias dc='docker-compose'
+
 # Mounts an ISO: mount-iso file.iso dir/
 mount-iso() {
     if [[ ! -d "$2" ]]; then
