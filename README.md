@@ -1,6 +1,6 @@
 # dotfiles
 
-To install these dotfiles on **Pop!_os 20.04**, add a `~/.dotfiles_config`. The format expected is:
+To install these dotfiles on **Ubuntu 21.10**, add a `~/.dotfiles_config`. The format expected is:
 
 ```
 [gpg]
