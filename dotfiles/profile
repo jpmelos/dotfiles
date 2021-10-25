@@ -6,12 +6,7 @@ else
     export JPMS_IS_MACOS="false"
 fi
 
-# Path to your oh-my-zsh installation.
-if [[ $JPMS_IS_MACOS == "true" ]]; then
-    export ZSH="/Users/jpmelos/.oh-my-zsh"
-else
-    export ZSH="/home/jpmelos/.oh-my-zsh"
-fi
+export ZSH="$HOME/.oh-my-zsh"
 
 export PIP_REQUIRE_VIRTUALENV=true
 export VIRTUAL_ENV_DISABLE_PROMPT=1
