@@ -21,7 +21,7 @@ token = Credential we can use to add the SSH key.
 
 [aws]
 aws_access_key_id = Your AWS credential.
-aws_secret_access_key =Your AWS credential.
+aws_secret_access_key = Your AWS credential.
 ```
 
 And then run:
