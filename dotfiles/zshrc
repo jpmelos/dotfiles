@@ -91,10 +91,7 @@ list-gnome-settings() {
 
 # Show all components of your PATH as a list
 show-path() {
-    IFS=':' read -ra PARTS <<< "$PATH"
-    for part in "${PARTS[@]}"; do
-        echo $part
-    done
+    python3 -c 'import sys;print(sys.argv[1].replace(":","\n"))' "$PATH"
 }
 
 # Usage: pdf-remove-password $PASSWORD $IN $OUT
