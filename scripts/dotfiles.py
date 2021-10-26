@@ -13,8 +13,8 @@ from configparser import ConfigParser
 from urllib.request import Request, urlopen
 
 version = ".".join(map(str, sys.version_info[0:2]))
-if version != "3.9":
-    raise Exception(f"Must be using Python 3.9: detected {version}")
+if version != "3.8":
+    raise Exception(f"Must be using Python 3.8: detected {version}")
 
 config = ConfigParser()
 config_file_path = os.path.expanduser("~/.dotfiles_config")
@@ -363,16 +363,20 @@ def add_known_ssh_hosts():
         fp.write("\n".join(known_hosts))
 
 
-def setup_zsh_theme():
+def setup_zsh_and_zsh_theme():
     custom_themes_dir = os.path.join(
         home_dir, ".oh-my-zsh", "custom", "themes"
     )
 
     if not os.path.exists(f"{home_dir}/.oh-my-zsh"):
-        run(
-            'sh -c "$(curl -fsSL'
-            ' https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"'
+        zsh_install_script = run_for_output(
+            "curl -fsSL"
+            " https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh"
         )
+        with open("/tmp/zsh-install.sh", "w") as fp:
+            fp.write(zsh_install_script)
+        run("bash /tmp/zsh-install.sh --unattended --keep-zshrc")
+        run("rm /tmp/zsh-install.sh")
     if not os.path.exists(f"{custom_themes_dir}/spaceship-prompt"):
         run(
             "git clone https://github.com/jpmelos/spaceship-prompt.git"
@@ -643,7 +647,7 @@ def run_steps():
         create_bin_dir,
         broadcast_ssh_keys,
         add_known_ssh_hosts,
-        setup_zsh_theme,
+        setup_zsh_and_zsh_theme,
         clone_dotfiles,
         resolve_templates,
         copy_configuration_files_and_dirs,
