@@ -1,5 +1,7 @@
 # vim:ft=zsh
 
+export ZSH_PYENV_VIRTUALENV=false
+
 # Theme configuration
 ZSH_THEME="spaceship"
 SPACESHIP_PROMPT_ORDER=(
