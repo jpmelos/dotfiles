@@ -136,7 +136,7 @@ localserver() {
         -v "/tmp/nginx-logs:/var/log/nginx" \
         -p "$ADDR_PORT:80" \
         --entrypoint bash \
-        nginx:1.15.2 -c "cp /copy_on_start/localserver.conf /etc/nginx/nginx.conf; nginx"
+        nginx:1.21.3 -c "cp /copy_on_start/localserver.conf /etc/nginx/nginx.conf; nginx"
 
     unset RANDOM_PORT
     unset ADDR_PORT
