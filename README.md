@@ -28,6 +28,7 @@ And then run:
 
 ```
 wget -qO - https://raw.githubusercontent.com/jpmelos/dotfiles/master/scripts/dotfiles.py > dotfiles.py
+wget -qO - https://raw.githubusercontent.com/jpmelos/dotfiles/master/scripts/install_pyenv.sh > install_pyenv.sh
 python3 dotfiles.py
-rm dotfiles.py .dotfiles_config  # Delete config file as it contains secret information.
+rm dotfiles.py install_pyenv.sh .dotfiles_config  # Clean up and delete config file as it contains secret information.
 ```
