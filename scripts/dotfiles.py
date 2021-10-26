@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.6
+#!/usr/bin/env python3
 import base64
 import contextlib
 import json
@@ -13,8 +13,8 @@ from configparser import ConfigParser
 from urllib.request import Request, urlopen
 
 version = ".".join(map(str, sys.version_info[0:2]))
-if version != "3.6":
-    raise Exception(f"Must be using Python 3.6: detected {version}")
+if version != "3.9":
+    raise Exception(f"Must be using Python 3.9: detected {version}")
 
 config = ConfigParser()
 config_file_path = os.path.expanduser("~/.dotfiles_config")
@@ -157,7 +157,6 @@ def install_packages():
         "fonts-powerline",
         "lmodern",
         "ttf-aenigma",
-        "ttf-georgewilliams",
         "ttf-bitstream-vera",
         "ttf-sjfonts",
         "fonts-tuffy",
@@ -187,21 +186,11 @@ def install_packages():
 
 
 def _change_default_shell():
-    run("sudo chsh -s /usr/bin/zsh")
-
-
-def _disable_camera_shutter_on_screenshot():
-    shutter_path = "/usr/share/sounds/freedesktop/stereo/camera-shutter.oga"
-    if os.path.exists(shutter_path):
-        print("Shutter file exists.")
-        run(f"sudo rm {shutter_path}")
-    else:
-        print("Shutter file does not exist.")
+    run("chsh -s /usr/bin/zsh")
 
 
 def setup_os():
     _change_default_shell()
-    _disable_camera_shutter_on_screenshot()
 
 
 def create_devel_dir():
@@ -356,8 +345,10 @@ def add_known_ssh_hosts():
     key_filenames = ["github.key", "gitlab.key", "bitbucket.key"]
 
     if os.path.exists(known_hosts_path):
-        with open(known_hosts_path, 'r') as fp:
+        with open(known_hosts_path, "r") as fp:
             known_hosts = fp.read().split("\n")
+    else:
+        known_hosts = []
 
     for filename in key_filenames:
         url = file_urls.format(filename)
@@ -368,15 +359,31 @@ def add_known_ssh_hosts():
             if stripped_key and stripped_key not in known_hosts:
                 known_hosts.append(stripped_key)
 
-    with open(known_hosts_path, 'w') as fp:
-        fp.write('\n'.join(known_hosts))
+    with open(known_hosts_path, "w") as fp:
+        fp.write("\n".join(known_hosts))
 
 
 def setup_zsh_theme():
-    custom_themes_dir = os.path.join(home_dir, ".oh-my-zsh", "custom", "themes")
-    spaceship_dir = os.path.join(custom_themes_dir, "")
-    run(f"git clone https://github.com/jpmelos/spaceship-prompt.git {custom_themes_dir}/spaceship-prompt")
-    run(f"ln -s {custom_themes_dir}/spaceship-prompt/spaceship.zsh-theme {custom_themes_dir}/themes/spaceship.zsh-theme")
+    custom_themes_dir = os.path.join(
+        home_dir, ".oh-my-zsh", "custom", "themes"
+    )
+
+    if not os.path.exists(f"{home_dir}/.oh-my-zsh"):
+        run(
+            'sh -c "$(curl -fsSL'
+            ' https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"'
+        )
+    if not os.path.exists(f"{custom_themes_dir}/spaceship-prompt"):
+        run(
+            "git clone https://github.com/jpmelos/spaceship-prompt.git"
+            f" {custom_themes_dir}/spaceship-prompt"
+        )
+    if not os.path.exists(f"{custom_themes_dir}/spaceship.zsh-theme"):
+        run(f"mkdir -p {custom_themes_dir}")
+        run(
+            f"ln -s {custom_themes_dir}/spaceship-prompt/spaceship.zsh-theme"
+            f" {custom_themes_dir}/spaceship.zsh-theme"
+        )
 
 
 def clone_dotfiles():
@@ -534,11 +541,7 @@ def install_pyenv():
             for version in latest_python_versions
         ]
 
-    run(
-        "bash scripts/install_pyenv.sh {}".format(
-            " ".join(latest_python_versions)
-        )
-    )
+    run("bash install_pyenv.sh {}".format(" ".join(latest_python_versions)))
 
 
 def install_poetry():
