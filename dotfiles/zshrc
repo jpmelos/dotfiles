@@ -111,3 +111,33 @@ encrypt-file() {
 decrypt-file() {
     openssl enc -aes-256-cbc -d -md sha512 -pbkdf2 -iter 100000 -salt -in "$1" -out "$2"
 }
+
+# Serves current working dir to your network
+# This is a DANGEROUS command, anyone who knows your IP (or is scanning for
+# vulnerable IPs and ports on the Internet) could download your data, if you
+# expose this to the wrong network. Use with care.
+# Usage: localserver $IP $PORT
+localserver() {
+    RANDOM_PORT=$(( $RANDOM % 16385 + 49152 ))
+    ADDR_PORT="${1:-127.0.0.1}:${2:-$RANDOM_PORT}"
+
+    if [[ ! -d /tmp/nginx ]]; then
+        mkdir /tmp/nginx
+    fi
+    \cp ~/.localserver.conf /tmp/nginx/localserver.conf
+
+    echo "Connect to $ADDR_PORT"
+    docker run \
+        --rm \
+        -ti \
+        --name localserver \
+        -v "$PWD:/usr/share/nginx/html:ro" \
+        -v "/tmp/nginx:/copy_on_start:ro" \
+        -v "/tmp/nginx-logs:/var/log/nginx" \
+        -p "$ADDR_PORT:80" \
+        --entrypoint bash \
+        nginx:1.15.2 -c "cp /copy_on_start/localserver.conf /etc/nginx/nginx.conf; nginx"
+
+    unset RANDOM_PORT
+    unset ADDR_PORT
+}
