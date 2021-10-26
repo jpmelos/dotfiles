@@ -181,8 +181,11 @@ def install_packages():
         "libffi-dev",
     ]
 
-    run("sudo apt-get update")
-    run("sudo apt-get install -y {}".format(" ".join(os_packages)))
+    run("sudo apt-get --allow-releaseinfo-change update")
+    run("sudo apt-get -y --allow-downgrades dist-upgrade")
+    run("sudo apt-get -y install {}".format(" ".join(os_packages)))
+    run("sudo apt-get -y autoremove")
+    run("sudo apt-get -y clean")
 
 
 def _change_default_shell():
@@ -364,7 +367,7 @@ def add_known_ssh_hosts():
 
 
 def setup_zsh_and_zsh_theme():
-    install_script_path = '/tmp/zsh-install.sh'
+    install_script_path = "/tmp/zsh-install.sh"
     custom_themes_dir = os.path.join(
         home_dir, ".oh-my-zsh", "custom", "themes"
     )
