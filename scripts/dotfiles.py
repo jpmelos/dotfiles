@@ -165,7 +165,10 @@ def install_packages():
         # Networking
         "iptables-persistent",
         "net-tools",
-        # Python dependencies
+        # Python 3 tools
+        "python3-venv",
+        "python3-pip",
+        # Python 3 dependencies
         "python3-dev",
         "libreadline-dev",
         "libncursesw5-dev",
@@ -563,6 +566,10 @@ def install_poetry():
         run("chmod +x {}".format(poetry_install_file))
         run("python3 {}".format(poetry_install_file))
         run("rm {}".format(poetry_install_file))
+
+
+def install_pipx():
+    run("python3 -m pip install --user pipx")
 
 
 def add_aws_credentials_file():
