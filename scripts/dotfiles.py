@@ -364,19 +364,18 @@ def add_known_ssh_hosts():
 
 
 def setup_zsh_and_zsh_theme():
+    install_script_path = '/tmp/zsh-install.sh'
     custom_themes_dir = os.path.join(
         home_dir, ".oh-my-zsh", "custom", "themes"
     )
 
     if not os.path.exists(f"{home_dir}/.oh-my-zsh"):
-        zsh_install_script = run_for_output(
-            "curl -fsSL"
+        run_for_output(
+            f"wget -qO {install_script_path}"
             " https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh"
         )
-        with open("/tmp/zsh-install.sh", "w") as fp:
-            fp.write(zsh_install_script)
-        run("bash /tmp/zsh-install.sh --unattended --keep-zshrc")
-        run("rm /tmp/zsh-install.sh")
+        run(f"bash {install_script_path} --unattended --keep-zshrc")
+        run(f"rm {install_script_path}")
     if not os.path.exists(f"{custom_themes_dir}/spaceship-prompt"):
         run(
             "git clone https://github.com/jpmelos/spaceship-prompt.git"
