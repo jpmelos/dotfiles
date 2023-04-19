@@ -10,7 +10,7 @@ SPACESHIP_PROMPT_ORDER=(
     dir           # Current directory section
     host          # Hostname section
     git           # Git section (git_branch + git_status)
-    pyenv         # Pyenv section
+    python        # Python section
     exec_time     # Execution time
     line_sep      # Line break
     jobs          # Background jobs indicator
@@ -28,7 +28,7 @@ DISABLE_AUTO_UPDATE="true"
 DISABLE_UPDATE_PROMPT="true"
 COMPLETION_WAITING_DOTS="true"
 HIST_STAMPS="yyyy-mm-dd"
-plugins=(sudo gpg-agent tmux git docker docker-compose pip pyenv redis-cli)
+plugins=(sudo gpg-agent tmux git docker docker-compose pip python redis-cli)
 
 # Setup pyenv for each interactive shell
 eval "$(pyenv init -)"
