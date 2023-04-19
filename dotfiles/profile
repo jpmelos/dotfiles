@@ -13,6 +13,9 @@ export VIRTUAL_ENV_DISABLE_PROMPT=1
 
 export PYENV_ROOT=$HOME/.pyenv
 
+if [[ $JPMS_IS_MACOS == "true" ]]; then
+    export PATH="/opt/homebrew/bin:$PATH"
+fi
 export PATH="$HOME/.local/bin:$PATH"
 export PATH="$HOME/.cargo/bin:$PATH"
 export PATH="$HOME/.poetry/bin:$PATH"
