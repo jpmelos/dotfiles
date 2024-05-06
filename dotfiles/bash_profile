@@ -1,0 +1,48 @@
+# Are we on a Mac?
+if [[ "$HOME" =~ /Users/* ]]; then
+    JPMELOS_IS_MACOS="true"
+else
+    JPMELOS_IS_MACOS="false"
+fi
+
+# Set the PATH.
+export PATH="$HOME/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.pyenv/bin:$PATH"
+export PATH="$HOME/.cargo/bin:$PATH"
+if [[ $JPMELOS_IS_MACOS == "true" ]]; then
+    export PATH="/opt/homebrew/bin:$PATH"
+fi
+
+# Sets the default editor for various commands.
+export EDITOR=$(which nvim)
+
+# Set up the GPG Agent.
+export GPG_TTY=$(tty)
+
+# For better colors in Neovim.
+export TERM=xterm-256color
+
+# Set default shell.
+export SHELL=$HOME/bin/jpsh
+
+###############################
+#                             #
+#    Python-specific stuff    #
+#                             #
+###############################
+
+# Make Pip require a virtual environment to install stuff. Do not pollute
+# the system.
+export PIP_REQUIRE_VIRTUALENV=true
+
+# No need to show the current virtual environment in the prompt, since we'll
+# use Starship for that.
+export VIRTUAL_ENV_DISABLE_PROMPT=1
+
+# Indicate where the pyenv root is.
+export PYENV_ROOT=$HOME/.pyenv
+# Setup pyenv for each interactive shell.
+eval "$(pyenv init -)"
+
+source ~/.bashrc

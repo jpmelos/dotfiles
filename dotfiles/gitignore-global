@@ -1,10 +1,16 @@
-/git-ignored
-
+# Compiled Python files
 __pycache__
 *.pyc
 
+# Python distribution
 /dist
 
+# Python's tox test running framework
 /.tox
+
+# Python's virtualenv management tools
 /.python-version
+/.pyenv-version
+
+# JetBrain's IDE configuration files per project
 /.idea

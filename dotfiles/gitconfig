@@ -3,8 +3,7 @@
     email = jpmelos@gmail.com
 
 [core]
-    editor = vim
-    pager = less -q
+    pager = less -Q
     excludesFile = ~/.gitignore
 
 [init]
@@ -23,14 +22,10 @@
     gpgSign = true
 
 [tag]
-   gpgSign = true
+    gpgSign = true
 
 [push]
     default = simple
-
-[color]
-    ui = always
-    interactive = false
 
 [color "branch"]
     current = green dim bold

@@ -1,0 +1,63 @@
+# Set up the GPG Agent.
+export GPG_TTY=$(tty)
+
+###############################
+#                             #
+#    Python-specific stuff    #
+#                             #
+###############################
+
+# Set up pyenv for each interactive shell.
+eval "$(pyenv init -)"
+
+#################
+#               #
+#    Aliases    #
+#               #
+#################
+
+# Allows alias checking in watch commands.
+alias watch='watch '
+
+# Makes Neovim open multiple files in different buffers, all immediately
+# visible, in the same tab.
+alias v='nvim -O'
+alias vi='nvim -O'
+alias vim='nvim -O'
+alias nvim='nvim -O'
+
+# Ask before destructive actions.
+alias cp='cp -i'
+alias mv='mv -i'
+
+# Docker aliases.
+alias d='docker'
+alias dc='docker-compose'
+
+###################
+#                 #
+#    Functions    #
+#                 #
+###################
+
+# Updates the system.
+update() {
+    sudo apt-get --allow-releaseinfo-change update
+    sudo apt-get -y --allow-downgrades dist-upgrade
+    sudo apt-get -y autoremove
+    sudo apt-get -y clean
+}
+
+######################
+#                    #
+#    Go into tmux    #
+#                    #
+######################
+
+if [[ "$TERM_PROGRAM" != "tmux" ]]; then
+    if [[ $(tmux ls 2>&1) =~ "no server"* ]]; then
+        exec tmux
+    else
+        exec tmux attach
+    fi
+fi
