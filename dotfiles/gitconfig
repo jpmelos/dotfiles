@@ -27,6 +27,7 @@
 
 [push]
     default = simple
+    autoSetupRemote = true
 
 [color "branch"]
     current = green dim bold
@@ -62,6 +63,7 @@
     p = push
     psup = push --set-upstream
     pf = push --force-with-lease
+    l = log --oneline --graph
 
 [include]
     path = ~/devel/dotfiles/dotfiles/gitconfigs/gpg-keys
