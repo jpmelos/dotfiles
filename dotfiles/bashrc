@@ -3,6 +3,14 @@ echo "Sourcing ~/.bashrc"
 # Set up the GPG Agent.
 export GPG_TTY=$(tty)
 
+################
+#              #
+#    Prompt    #
+#              #
+################
+
+eval "$(starship init bash)"
+
 ###############################
 #                             #
 #    Python-specific stuff    #
