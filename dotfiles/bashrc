@@ -47,11 +47,13 @@ alias dc='docker-compose'
 
 # Git aliases.
 alias g='git'
+alias gcm='git checkout $(git main-branch)'
 alias gst='git status'
 alias gd='git diff'
 alias gdca='git diff --cached'
 alias ga='git add'
 alias gaa='git add -A :/'
+alias gapa='git add --patch'
 alias gc='git commit'
 alias gca='git commit -a'
 alias gp='git push'

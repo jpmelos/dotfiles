@@ -19,6 +19,7 @@
     conflictStyle = diff3
 
 [commit]
+    verbose = true
     gpgSign = true
 
 [tag]
@@ -44,16 +45,19 @@
     whitespace = black red dim bold
 
 [alias]
+    main-branch = !git symbolic-ref refs/remotes/origin/HEAD | cut -d'/' -f4
+    cm = "!f(){ git checkout $(git main-branch) $@;}; f"
     st = status
     d = diff
     dca = diff --cached
+    a = add
+    aa = add -A :/
+    apa = add --patch
     c = commit
     ca = commit -a
     p = push
     psup = push --set-upstream
     pf = push --force-with-lease
-    a = add
-    aa = add -A :/
 
 [include]
     path = ~/devel/dotfiles/dotfiles/gitconfigs/gpg-keys
