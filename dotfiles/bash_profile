@@ -1,3 +1,5 @@
+echo "Sourcing ~/.bash_profile"
+
 # Are we on a Mac?
 if [[ "$HOME" =~ /Users/* ]]; then
     JPMELOS_IS_MACOS="true"
@@ -6,10 +8,15 @@ else
 fi
 
 # Set the PATH.
+# My own executables.
 export PATH="$HOME/bin:$PATH"
+# Binaries not managed via a package manager.
 export PATH="$HOME/.local/bin:$PATH"
+# pyenv's own binaries.
 export PATH="$HOME/.pyenv/bin:$PATH"
+# Rust tooling's own binaries.
 export PATH="$HOME/.cargo/bin:$PATH"
+# Binaries installed by Homebrew.
 if [[ $JPMELOS_IS_MACOS == "true" ]]; then
     export PATH="/opt/homebrew/bin:$PATH"
 fi
@@ -17,14 +24,23 @@ fi
 # Sets the default editor for various commands.
 export EDITOR=$(which nvim)
 
-# Set up the GPG Agent.
-export GPG_TTY=$(tty)
-
 # For better colors in Neovim.
 export TERM=xterm-256color
 
-# Set default shell.
-export SHELL=$HOME/bin/jpsh
+#############################
+#                           #
+#    Bash-specific stuff    #
+#                           #
+#############################
+
+# Keep infinite command history in memory.
+export HISTSIZE=-1
+
+# For duplicate consecutive commands, store only once in history.
+export HISTCONTROL=ignoredups
+
+# Keep infinite command history in file.
+export HISTFILESIZE=-1
 
 ###############################
 #                             #
@@ -42,7 +58,11 @@ export VIRTUAL_ENV_DISABLE_PROMPT=1
 
 # Indicate where the pyenv root is.
 export PYENV_ROOT=$HOME/.pyenv
-# Setup pyenv for each interactive shell.
-eval "$(pyenv init -)"
+
+##########################
+#                        #
+#    Source ~/.bashrc    #
+#                        #
+##########################
 
 source ~/.bashrc

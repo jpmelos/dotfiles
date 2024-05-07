@@ -1,3 +1,5 @@
+echo "Sourcing ~/.bashrc"
+
 # Set up the GPG Agent.
 export GPG_TTY=$(tty)
 
@@ -16,6 +18,15 @@ eval "$(pyenv init -)"
 #               #
 #################
 
+# Edit Bash configuration files.
+alias erc='nvim -O ~/.bash_profile ~/.bashrc'
+
+# Source Bash configuration files.
+alias src='source ~/.bash_profile'
+
+# Show path in readable format.
+alias spth='echo $PATH | tr : "\n"'
+
 # Allows alias checking in watch commands.
 alias watch='watch '
 
@@ -33,6 +44,19 @@ alias mv='mv -i'
 # Docker aliases.
 alias d='docker'
 alias dc='docker-compose'
+
+# Git aliases.
+alias g='git'
+alias gst='git status'
+alias gd='git diff'
+alias gdca='git diff --cached'
+alias ga='git add'
+alias gaa='git add -A :/'
+alias gc='git commit'
+alias gca='git commit -a'
+alias gp='git push'
+alias gpsup='git push --set-upstream'
+alias gpf='git push --force-with-lease'
 
 ###################
 #                 #

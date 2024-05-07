@@ -43,6 +43,18 @@
     old = red dim bold
     whitespace = black red dim bold
 
+[alias]
+    st = status
+    d = diff
+    dca = diff --cached
+    c = commit
+    ca = commit -a
+    p = push
+    psup = push --set-upstream
+    pf = push --force-with-lease
+    a = add
+    aa = add -A :/
+
 [include]
     path = ~/devel/dotfiles/dotfiles/gitconfigs/gpg-keys
 
