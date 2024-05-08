@@ -60,6 +60,7 @@
     apa = add --patch
     c = commit
     ca = commit -a
+    sh = show
     p = push
     psup = push --set-upstream
     pf = push --force-with-lease
