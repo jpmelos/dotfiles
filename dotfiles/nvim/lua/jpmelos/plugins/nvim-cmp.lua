@@ -27,6 +27,7 @@ return {
             mapping = cmp.mapping.preset.insert({
                 -- Previous suggestion.
                 ["<C-k>"] = cmp.mapping.select_prev_item(),
+                ["<S-Tab>"] = cmp.mapping.select_prev_item(),
                 -- Next suggestion.
                 ["<C-j>"] = cmp.mapping.select_next_item(),
                 ["<Tab>"] = cmp.mapping.select_next_item(),
