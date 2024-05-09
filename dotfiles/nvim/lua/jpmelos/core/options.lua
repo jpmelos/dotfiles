@@ -64,3 +64,6 @@ opt.statusline = "%f %y %m %r%=%c,%l/%L"
 -- What to save in sessions.
 opt.sessionoptions = "blank,buffers,curdir,folds,help,tabpages,winsize"
     .. ",winpos,terminal,localoptions"
+
+-- Make jumps behave like browser navigation.
+opt.jumpoptions = "stack"
