@@ -117,19 +117,6 @@ update() {
     sudo apt-get -y clean
 }
 
-#
-# Usage:
-#
-#     run_on_save "$FSWATCH_FLAGS" "$COMMAND"
-#
-# Example:
-#
-#     run_on_save '--exclude <regex_for_file> .' '<some_command>'
-#
-run_on_save () {
-    fswatch -0 -r -o -l 1 $1 |  xargs -0 -n1 -I{} $2
-}
-
 ######################
 #                    #
 #    Go into tmux    #
