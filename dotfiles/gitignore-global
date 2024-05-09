@@ -13,7 +13,6 @@ __pycache__
 
 # Python's virtualenv management tools
 /.python-version
-/.pyenv-version
 
 # JetBrain's IDE configuration files per project
 /.idea
