@@ -26,6 +26,10 @@ return {
             },
         })
 
+        -- We don't want to run these tools from the Vim's PATH, instead we
+        -- want to use whatever the current project has in its path. But leave
+        -- it here in case we want to install something using Mason in the
+        -- future...
         -- mason_tool_installer.setup({
         --     ensure_installed = {
         --         "stylua",
