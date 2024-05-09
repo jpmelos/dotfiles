@@ -106,6 +106,20 @@ return {
                     capabilities = capabilities,
                 })
             end,
+            ["pyright"] = function()
+                lspconfig["pyright"].setup({
+                    capabilities = capabilities,
+                    settings = {
+                        python = {
+                            -- Only syntax and semantic errors. No type
+                            -- checking in the IDE.
+                            analysis = {
+                                typeCheckingMode = "off",
+                            },
+                        },
+                    },
+                })
+            end,
             ["lua_ls"] = function()
                 lspconfig["lua_ls"].setup({
                     capabilities = capabilities,
