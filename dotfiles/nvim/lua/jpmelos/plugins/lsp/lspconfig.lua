@@ -114,6 +114,7 @@ return {
                             -- Only syntax and semantic errors. No type
                             -- checking in the IDE.
                             analysis = {
+                                diagnosticMode = "workspace",
                                 typeCheckingMode = "off",
                             },
                         },
