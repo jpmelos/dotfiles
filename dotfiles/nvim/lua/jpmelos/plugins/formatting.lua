@@ -57,7 +57,7 @@ return {
                 vim.g.disable_autoformat = false
             end
         end, {
-            desc = "Re-enable autoformat-on-save",
+            desc = "Enable autoformat-on-save",
             bang = true,
         })
 
