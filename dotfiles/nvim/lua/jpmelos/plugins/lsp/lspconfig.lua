@@ -129,6 +129,7 @@ return {
                             -- global. Useful when working with Neovim
                             -- configuration.
                             diagnostics = {
+                                disable = { "type-check" },
                                 globals = { "vim" },
                             },
                         },
