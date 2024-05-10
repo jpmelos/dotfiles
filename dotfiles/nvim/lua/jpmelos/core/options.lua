@@ -24,8 +24,39 @@ opt.autoindent = true
 -- 4 spaces for indent width.
 opt.shiftwidth = 4
 
--- Do not wrap lines.
-opt.wrap = false
+-- Soft-wrap lines.
+opt.wrap = true
+-- But break it at word boundaries (boundaries defined by `breakat`).
+opt.linebreak = false
+-- Only soft-wrap at spaces.
+opt.breakat = " "
+-- Indent the same way as the parent line, to keep blocks intact.
+opt.breakindent = true
+-- Shift broken lines by two columns, to make it move obvious it'a broken.
+opt.breakindentopt = "shift:3,sbr"
+-- Show ↪ in front of broken lines, needs `breakopt` to contain `sbr`.
+opt.showbreak = "↪"
+
+-- Set text width for automatic formatting.
+opt.textwidth = 79
+-- Fine-tune formatting.
+-- c: Automatically format comments.
+-- r: Automatically add comment leader upon <Enter> in insert mode.
+-- o: Automatically insert comment leader if using "o" or "O" for new line in a
+--    comment in normal mode.
+-- /: Only insert comment leader in next line if comment is the entire line. Do
+--    not continue a comment that started after a statement in the preceding
+--    line.
+-- q: Allow formatting with `gq`.
+-- n: Consider lists, as they are defined in `formatlistpat`.
+-- ]: Respect `textwidth` strictly.
+-- j: Remove comment leader when joining lines.
+opt.formatoptions = "cro/qn]j"
+-- Use Vim's default formatter.
+opt.formatexpr = ""
+-- Use Vim's default formatter.
+opt.formatprg = ""
+
 -- Highlight column for text wrapping.
 opt.colorcolumn = "80"
 

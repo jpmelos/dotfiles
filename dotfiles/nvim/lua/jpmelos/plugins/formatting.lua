@@ -16,6 +16,13 @@ return {
             end,
         })
 
+        -- Use Vim's internal formatter, instead of `conform.nvim`, for `gq`.
+        vim.api.nvim_create_autocmd('LspAttach', {
+            callback = function(args)
+                vim.bo[args.buf].formatexpr = nil
+            end,
+        })
+
         vim.api.nvim_create_user_command("Format", function(args)
             local range = nil
             if args.count ~= -1 then
@@ -79,8 +86,5 @@ return {
             "<cmd>FormatEnable<CR>",
             { desc = "Enable auto-format on save" }
         )
-
-        -- Use `conform.nvim` when using `gq`.
-        vim.opt.formatexpr = "v:lua.require'conform'.formatexpr()"
     end,
 }
