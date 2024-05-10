@@ -17,7 +17,7 @@ return {
         })
 
         -- Use Vim's internal formatter, instead of `conform.nvim`, for `gq`.
-        vim.api.nvim_create_autocmd('LspAttach', {
+        vim.api.nvim_create_autocmd("LspAttach", {
             callback = function(args)
                 vim.bo[args.buf].formatexpr = nil
             end,
