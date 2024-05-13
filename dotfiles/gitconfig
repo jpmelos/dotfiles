@@ -46,12 +46,12 @@
     whitespace = black red dim bold
 
 [alias]
-    main-branch = !git symbolic-ref refs/remotes/origin/HEAD | cut -d'/' -f4
-    cm = "!f(){ git checkout $(git main-branch) $@;}; f"
     b = branch
     bn = checkout -b
     bd = branch -D
     co = checkout
+    main-branch = !git symbolic-ref refs/remotes/origin/HEAD | cut -d'/' -f4
+    cm = "!f(){ git checkout $(git main-branch) $@;}; f"
     st = status
     d = diff
     dca = diff --cached

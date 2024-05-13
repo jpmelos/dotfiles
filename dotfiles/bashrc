@@ -56,11 +56,11 @@ alias dc='docker-compose'
 # Git aliases.
 # When adding an alias, also configure completions below.
 alias g='git'
-alias gcm='g cm'
 alias gb='g b'
 alias gbn='g bn'
 alias gbd='g bd'
 alias gco='g co'
+alias gcm='g cm'
 alias gst='g st'
 alias gd='g d'
 alias gdca='g dca'
@@ -84,11 +84,11 @@ alias gl='g l'
 source ~/devel/dotfiles/dotfiles/git-completion.bash
 
 __git_complete g git
-__git_complete gcm git_checkout
 __git_complete gb git_branch
 __git_complete gbn git_checkout
 __git_complete gbd git_branch
 __git_complete gco git_checkout
+__git_complete gcm git_checkout
 __git_complete gst git_status
 __git_complete gd git_diff
 __git_complete gdca git_diff
