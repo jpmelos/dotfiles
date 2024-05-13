@@ -52,6 +52,7 @@
     co = checkout
     main-branch = !git symbolic-ref refs/remotes/origin/HEAD | cut -d'/' -f4
     cm = "!f(){ git checkout $(git main-branch) $@;}; f"
+    cp = cherry-pick
     st = status
     d = diff
     dca = diff --cached
