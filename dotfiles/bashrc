@@ -3,6 +3,23 @@ echo "Sourcing ~/.bashrc"
 # Set up the GPG Agent.
 export GPG_TTY=$(tty)
 
+#################
+#               #
+#    autoenv    #
+#               #
+#################
+
+# Find authorized and unauthorized autoenvs in these files.
+[ -f ~/.autoenv_authorized ] || touch ~/.autoenv_authorized
+[ -f ~/.autoenv_not_authorized ] || touch ~/.autoenv_not_authorized
+# Rename autoenv files to less generic names.
+AUTOENV_ENV_FILENAME=.autoenv.enter
+AUTOENV_ENV_LEAVE_FILENAME=.autoenv.leave
+# Enable autoenv leave too.
+AUTOENV_ENABLE_LEAVE=1
+
+source ~/.autoenv/activate.sh
+
 ################
 #              #
 #    Prompt    #
