@@ -11,8 +11,5 @@ __pycache__
 # Python's tox test running framework
 /.tox
 
-# Python's virtualenv management tools
-/.python-version
-
 # JetBrain's IDE configuration files per project
 /.idea
