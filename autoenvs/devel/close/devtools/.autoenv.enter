@@ -15,3 +15,21 @@ fpull() {
     dc up -d core closeio_shell
     dc logs -f --tail 1000 closeio_api
 }
+
+fquality() {
+    dc exec closeio_shell black . \
+        && dc exec closeio_shell ruff check --fix . \
+        && dc exec closeio_shell black --check . \
+        && dc exec closeio_shell ruff check . \
+        && dc exec closeio_shell dmypy run
+}
+
+ftest() {
+    dc exec closeio_shell pytest -vv $@
+}
+
+fgql() {
+    dc exec closeio_shell pytest --overwrite-snapshots \
+        tests/common/graphql/test_schema.py \
+        tests/admin/graphql/test_schema.py
+}
