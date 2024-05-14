@@ -1,1 +1,1 @@
-return { "stevearc/dressing.nvim", lazy = false }
+return { "stevearc/dressing.nvim", lazy = false, opts = {} }

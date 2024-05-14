@@ -7,4 +7,5 @@ return {
             desc = "Maximize/minimize a split",
         },
     },
+    opts = {},
 }

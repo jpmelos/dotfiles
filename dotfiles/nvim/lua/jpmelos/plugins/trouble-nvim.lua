@@ -16,4 +16,5 @@ return {
             desc = "Open todos in quickfix list",
         },
     },
+    opts = {},
 }

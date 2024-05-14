@@ -13,4 +13,5 @@ return {
             desc = "Swap windows",
         },
     },
+    opts = {},
 }
