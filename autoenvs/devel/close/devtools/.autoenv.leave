@@ -1,0 +1,9 @@
+# vim: set ft=bash :
+
+if [ -z "$AUTOENV_CLOSE_DEVTOOLS" ]; then
+    return
+fi
+
+unset AUTOENV_CLOSE_DEVTOOLS
+
+unset -f fpull

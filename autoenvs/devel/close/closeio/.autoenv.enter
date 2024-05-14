@@ -1,0 +1,19 @@
+# vim: set ft=bash :
+
+if [ -n "$AUTOENV_CLOSE_CLOSEIO" ]; then
+    return
+fi
+
+AUTOENV_CLOSE_CLOSEIO=1
+
+source .venv/bin/activate
+
+finstall() {
+    pip install -r requirements/requirements-pip.txt \
+        && pip install -r requirements/requirements.txt \
+        && pip install -r requirements/requirements.private \
+        && pip install -r requirements/requirements-dev.txt \
+        && pip install -r requirements/requirements-lint.txt \
+        && pip install -r requirements/requirements-test.txt \
+        && pip install -r requirements/requirements-deploy-notifications.txt
+}

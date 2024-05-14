@@ -1,0 +1,11 @@
+# vim: set ft=bash :
+
+if [ -z "$AUTOENV_CLOSE_CLOSEIO" ]; then
+    return
+fi
+
+unset AUTOENV_CLOSE_CLOSEIO
+
+deactivate
+
+unset -f finstall

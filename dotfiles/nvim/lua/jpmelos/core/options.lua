@@ -26,15 +26,13 @@ opt.shiftwidth = 4
 
 -- Soft-wrap lines.
 opt.wrap = true
--- But break it at word boundaries (boundaries defined by `breakat`).
+-- No need to worry about where you break the line.
 opt.linebreak = false
--- Only soft-wrap at spaces.
-opt.breakat = " "
 -- Indent the same way as the parent line, to keep blocks intact.
 opt.breakindent = true
 -- Shift broken lines by two columns, to make it move obvious it'a broken.
-opt.breakindentopt = "shift:3,sbr"
--- Show ↪ in front of broken lines, needs `breakopt` to contain `sbr`.
+opt.breakindentopt = "shift:4"
+-- Show ↪ in front of broken lines.
 opt.showbreak = "↪"
 
 -- Set text width for automatic formatting.

@@ -1,0 +1,17 @@
+# vim: set ft=bash :
+
+if [ -n "$AUTOENV_CLOSE_DEVTOOLS" ]; then
+    return
+fi
+
+AUTOENV_CLOSE_DEVTOOLS=1
+
+fpull() {
+    docker rm -f $(docker ps -aq)
+    docker volume rm devtools_redis6_data
+    docker volume rm devtools_redis7_data
+    bin/login
+    dc pull --include-deps core closeio_shell
+    dc up -d core closeio_shell
+    dc logs -f --tail 1000 closeio_api
+}
