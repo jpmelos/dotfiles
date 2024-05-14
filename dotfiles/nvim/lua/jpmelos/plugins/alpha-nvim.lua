@@ -1,8 +1,7 @@
 return {
     "goolord/alpha-nvim",
-    event = "VimEnter",
+    lazy = false,
     config = function()
-        local alpha = require("alpha")
         local dashboard = require("alpha.themes.dashboard")
 
         dashboard.section.header.val = {
@@ -17,32 +16,38 @@ return {
         }
 
         dashboard.section.buttons.val = {
-            dashboard.button("e", "  > New File", "<cmd>ene<CR>"),
+            dashboard.button(":e", "  > New File", "<cmd>ene<CR>"),
             dashboard.button(
-                "SPC ee",
+                "<Space>ee",
                 "  > Toggle file explorer",
                 "<cmd>NvimTreeToggle<CR>"
             ),
             dashboard.button(
-                "SPC ff",
-                "󰱼  > Find File",
+                "<Space>ff",
+                "󰱼  > Find file",
                 "<cmd>Telescope find_files<CR>"
             ),
             dashboard.button(
-                "SPC fs",
-                "  > Find Word",
+                "<Space>fs",
+                "  > Find word",
                 "<cmd>Telescope live_grep<CR>"
             ),
             dashboard.button(
-                "SPC wr",
-                "󰁯  > Restore Session For Current Directory",
+                "<Space>wr",
+                "󰁯  > Restore session for directory",
                 "<cmd>SessionRestore<CR>"
             ),
-            dashboard.button("q", "  > Quit NVIM", "<cmd>qa<CR>"),
+            dashboard.button(":q", "  > Quit", "<cmd>qa<CR>"),
         }
 
-        alpha.setup(dashboard.opts)
-        -- Disable folding in the alpha buffer.
-        vim.cmd("autocmd FileType alpha setlocal nofoldenable")
+        require("alpha").setup(dashboard.opts)
+
+        -- Disable folding in the Alpha buffer.
+        vim.api.nvim_create_autocmd("FileType", {
+            pattern = "alpha",
+            callback = function()
+                vim.opt_local.foldenable = false
+            end,
+        })
     end,
 }

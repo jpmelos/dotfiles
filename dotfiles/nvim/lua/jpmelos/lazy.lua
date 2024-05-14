@@ -15,16 +15,12 @@ end
 vim.opt.rtp:prepend(lazypath)
 
 -- Configure lazy.
-require("lazy").setup(
-    -- TODO: Can I flatten `plugins.lsp` into just `plugins`?
-    { { import = "jpmelos.plugins" }, { import = "jpmelos.plugins.lsp" } },
-    {
-        checker = {
-            enabled = true, -- Check for updates automatically.
-            notify = false, -- But no need to notify.
-        },
-        change_detection = {
-            notify = false, -- Do not notify about changed lazy files.
-        },
-    }
-)
+require("lazy").setup("jpmelos.plugins", {
+    checker = {
+        enabled = true, -- Check for updates automatically.
+        notify = false, -- But no need to notify.
+    },
+    change_detection = {
+        notify = false, -- Do not notify about changed lazy files.
+    },
+})

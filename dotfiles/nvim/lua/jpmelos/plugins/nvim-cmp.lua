@@ -1,18 +1,16 @@
 return {
     "hrsh7th/nvim-cmp",
-    event = "InsertEnter",
+    lazy = false,
     dependencies = {
         "hrsh7th/cmp-buffer", -- Source for text in buffer.
         "hrsh7th/cmp-path", -- Source for file system paths.
-        { "L3MON4D3/LuaSnip", version = "v2.*" },
+        "L3MON4D3/LuaSnip", -- A snippers engine.
         "saadparwaiz1/cmp_luasnip", -- For integration with `L3MON4D3/LuaSnip`.
         "onsails/lspkind.nvim", -- Pictograms inside suggestions modal.
         "hrsh7th/cmp-nvim-lsp-signature-help", -- Signature help.
     },
     config = function()
         local cmp = require("cmp")
-        local luasnip = require("luasnip")
-        local lspkind = require("lspkind")
 
         cmp.setup({
             completion = {
@@ -22,7 +20,7 @@ return {
             -- `nvim-cmp` may show weird behavior.
             snippet = {
                 expand = function(args)
-                    luasnip.lsp_expand(args.body)
+                    require("luasnip").lsp_expand(args.body)
                 end,
             },
             mapping = cmp.mapping.preset.insert({
@@ -52,12 +50,7 @@ return {
                 { name = "path" }, -- Paths from the file system.
             }),
             -- Configure pictograms from `onsails/lspkind.nvim`.
-            formatting = {
-                format = lspkind.cmp_format({
-                    maxwidth = 50,
-                    ellipsis_char = "...",
-                }),
-            },
+            formatting = { format = require("lspkind").cmp_format({}) },
         })
     end,
 }

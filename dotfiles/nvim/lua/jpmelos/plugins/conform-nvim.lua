@@ -1,8 +1,10 @@
 return {
     "stevearc/conform.nvim",
-    event = { "BufReadPre", "BufNewFile" },
+    lazy = false,
     config = function()
+        local K = vim.keymap.set
         local conform = require("conform")
+
         conform.setup({
             formatters_by_ft = {},
             format_on_save = function(bufnr)
@@ -37,7 +39,7 @@ return {
                     ["end"] = { args.line2, end_line:len() },
                 }
             end
-            require("conform").format({
+            conform.format({
                 async = true,
                 lsp_fallback = false,
                 range = range,
@@ -52,7 +54,7 @@ return {
                 vim.g.disable_autoformat = true
             end
         end, {
-            desc = "Disable autoformat-on-save",
+            desc = "Disable autoformat on save",
             bang = true,
         })
         vim.api.nvim_create_user_command("FormatEnable", function(args)
@@ -60,27 +62,52 @@ return {
                 -- FormatEnable! will enable formatting just for this buffer.
                 vim.b.disable_autoformat = false
             else
-                vim.b.disable_autoformat = false
                 vim.g.disable_autoformat = false
             end
         end, {
-            desc = "Enable autoformat-on-save",
+            desc = "Enable autoformat on save",
+            bang = true,
+        })
+        vim.api.nvim_create_user_command("FormatToggle", function(args)
+            if args.bang then
+                if vim.b.disable_autoformat then
+                    -- FormatEnable! will enable formatting just for this buffer.
+                    vim.b.disable_autoformat = false
+                else
+                    vim.b.disable_autoformat = true
+                end
+            else
+                if vim.g.disable_autoformat then
+                    -- FormatEnable! will enable formatting just for this buffer.
+                    vim.g.disable_autoformat = false
+                else
+                    vim.g.disable_autoformat = true
+                end
+            end
+        end, {
+            desc = "Toggle autoformat on save",
             bang = true,
         })
 
-        vim.keymap.set(
+        K(
             { "n", "v" },
             "<leader>mp",
             "<cmd>Format<CR>",
             { desc = "Format file (or range in visual mode)" }
         )
-        vim.keymap.set(
+        K(
+            { "n" },
+            "<leader>mt",
+            "<cmd>FormatToggle<CR>",
+            { desc = "Toggle auto-format on save" }
+        )
+        K(
             { "n" },
             "<leader>md",
             "<cmd>FormatDisable<CR>",
             { desc = "Disable auto-format on save" }
         )
-        vim.keymap.set(
+        K(
             { "n" },
             "<leader>me",
             "<cmd>FormatEnable<CR>",

@@ -1,13 +1,14 @@
 return {
     "rmagatti/auto-session",
+    lazy = false,
     config = function()
-        local auto_session = require("auto-session")
+        local K = vim.keymap.set
 
-        auto_session.setup({
+        require("auto-session").setup({
             auto_session_enable_last_session = false,
-            auto_session_enabled = true,
-            auto_session_create_enabled = true,
-            auto_save_enabled = true,
+            auto_session_enabled = false,
+            auto_session_create_enabled = false,
+            auto_save_enabled = false,
             auto_restore_enabled = false,
             auto_session_use_git_branch = false,
             auto_session_allowed_dirs = { "~/devel/*" },
@@ -18,15 +19,13 @@ return {
             },
         })
 
-        local keymap = vim.keymap
-
-        keymap.set(
+        K(
             "n",
             "<leader>wr",
             "<cmd>SessionRestore<CR>",
             { desc = "Restore session for current directory" }
         )
-        keymap.set(
+        K(
             "n",
             "<leader>ws",
             "<cmd>SessionSave<CR>",

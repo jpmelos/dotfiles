@@ -1,8 +1,9 @@
 return {
     "iamcco/markdown-preview.nvim",
-    cmd = { "MarkdownPreviewToggle", "MarkdownPreview", "MarkdownPreviewStop" },
-    ft = { "markdown" },
+    lazy = false,
     init = function()
+        local K = vim.keymap.set
+
         -- Do not auto-close the preview window when closing Markdown buffer.
         vim.g.mkdp_auto_close = false
         -- Use the same window for all previews.
@@ -10,9 +11,7 @@ return {
         -- When changing the buffer, also update the preview.
         vim.g.mkdp_combine_preview_auto_refresh = true
 
-        local k = vim.keymap.set
-
-        k(
+        K(
             "n",
             "<leader>pm",
             "<cmd>MarkdownPreviewToggle<cr>",

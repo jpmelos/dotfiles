@@ -1,6 +1,6 @@
 return {
     "nvim-treesitter/nvim-treesitter",
-    event = { "BufReadPre", "BufNewFile" },
+    lazy = false,
     -- Make sure we always update all parsers when we update tree-sitter.
     build = ":TSUpdate",
     dependencies = {
@@ -8,8 +8,7 @@ return {
         "windwp/nvim-ts-autotag",
     },
     config = function()
-        local treesitter = require("nvim-treesitter.configs")
-        treesitter.setup({
+        require("nvim-treesitter.configs").setup({
             -- Better syntax highlighting.
             highlight = { enable = true },
             -- Better indentation.
@@ -19,7 +18,7 @@ return {
             -- Ensure these language parsers are installed.
             ensure_installed = {
                 -- These five parsers should always be installed according to
-                -- the documentation.
+                -- the documentation. :shrug:
                 "c",
                 "lua",
                 "query",
@@ -76,7 +75,7 @@ return {
             },
             -- Disable tree-sitter syntax highlighting for large files.
             disable = function(lang, buf)
-                local max_filesize = 100 * 1024 -- 100 KB
+                local max_filesize = 1024 * 1024 -- 1MB
                 local ok, stats =
                     pcall(vim.loop.fs_stat, vim.api.nvim_buf_get_name(buf))
                 if ok and stats and stats.size > max_filesize then
