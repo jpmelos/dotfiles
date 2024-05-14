@@ -1,7 +1,8 @@
 -- Set default Neovim's explorer to tree mode.
 vim.cmd("let g:netrw_liststyle = 3")
 
-local opt = vim.opt -- For conciseness.
+local opt = vim.opt
+local api = vim.api
 
 -- Disable mouse entirely.
 opt.mouse = ""
@@ -60,8 +61,7 @@ opt.colorcolumn = "80"
 
 -- Ignore case when searching...
 opt.ignorecase = true
--- ... unless you have mixed case in your search,
--- then assume case-sensitive.
+-- ... unless you have mixed case in your search, then assume case-sensitive.
 opt.smartcase = true
 
 -- Highlight current line.
@@ -96,3 +96,14 @@ opt.sessionoptions = "blank,buffers,curdir,folds,help,tabpages,winsize"
 
 -- Make jumps behave like browser navigation.
 opt.jumpoptions = "stack"
+
+-- Reload files on focus.
+api.nvim_create_autocmd(
+    { "FocusGained", "BufEnter", "BufWinEnter" },
+    { command = "checktime" }
+)
+-- Save files automatically when leaving buffer.
+api.nvim_create_autocmd(
+    { "FocusLost", "BufLeave", "BufWinLeave" },
+    { command = "silent! wa" }
+)
