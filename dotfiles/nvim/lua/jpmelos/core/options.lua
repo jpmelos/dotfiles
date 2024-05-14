@@ -58,6 +58,13 @@ opt.formatprg = ""
 
 -- Highlight column for text wrapping.
 opt.colorcolumn = "80"
+-- Specific colorcolumn setting for git commit files.
+api.nvim_create_autocmd("FileType", {
+    pattern = "gitcommit",
+    callback = function()
+        opt.colorcolumn = "50,72"
+    end,
+})
 
 -- Ignore case when searching...
 opt.ignorecase = true
