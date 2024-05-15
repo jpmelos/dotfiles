@@ -26,8 +26,10 @@ fi
 # Sets the default editor for various commands.
 export EDITOR=$(which nvim)
 
+# Find any custom terminfos that we install.
+export TERMINFO_DIRS=$HOME/.local/share/terminfo:$TERMINFO_DIRS
 # For better colors in Neovim.
-export TERM=xterm-256color
+export TERM=tmux-256color
 
 #############################
 #                           #
