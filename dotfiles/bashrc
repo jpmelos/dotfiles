@@ -1,3 +1,5 @@
+# vim: set ft=bash :
+
 echo "Sourcing ~/.bashrc"
 
 # Set up the GPG Agent.

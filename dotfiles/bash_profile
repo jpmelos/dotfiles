@@ -1,3 +1,5 @@
+# vim: set ft=bash :
+
 echo "Sourcing ~/.bash_profile"
 
 # Are we on a Mac?
