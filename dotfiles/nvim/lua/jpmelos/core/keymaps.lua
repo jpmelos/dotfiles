@@ -22,5 +22,18 @@ K(
 )
 
 -- Navigate line by line in soft-wrapped lines.
-K({"n", "v"}, "k", "gk")
-K({"n", "v"}, "j", "gj")
+K({ "n", "v" }, "k", "gk")
+K({ "n", "v" }, "j", "gj")
+
+K({ "n", "v" }, "<C-u>", function()
+    local half_window = math.ceil(
+        vim.api.nvim_win_get_height(vim.api.nvim_get_current_win()) / 2
+    ) - 1
+    return half_window .. "k"
+end, { expr = true })
+K({ "n", "v" }, "<C-d>", function()
+    local half_window = math.ceil(
+        vim.api.nvim_win_get_height(vim.api.nvim_get_current_win()) / 2
+    ) - 1
+    return half_window .. "j"
+end, { expr = true })
