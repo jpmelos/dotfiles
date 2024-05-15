@@ -9,7 +9,7 @@ bold.style = "Medium"
 italic.style = "Thin Italic"
 bold_italic.style = "Medium Italic"
 size = 12
-builtin_box_drawing = false
+builtin_box_drawing = true
 
 [colors.primary]
 background = '#ffffff'
