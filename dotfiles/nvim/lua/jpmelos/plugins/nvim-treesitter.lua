@@ -12,7 +12,13 @@ return {
             -- Better syntax highlighting.
             highlight = { enable = true },
             -- Better indentation.
-            indent = { enable = true },
+            indent = {
+                enable = true,
+                disable = {
+                    -- Indentation for bullet points is worse.
+                    "markdown",
+                }
+            },
             -- Enable autotagging with the `nvim-ts-autotag` plugin.
             autotag = { enable = true },
             -- Ensure these language parsers are installed.
