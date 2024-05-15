@@ -22,5 +22,5 @@ K(
 )
 
 -- Navigate line by line in soft-wrapped lines.
-K("n", "k", "gk")
-K("n", "j", "gj")
+K({"n", "v"}, "k", "gk")
+K({"n", "v"}, "j", "gj")
