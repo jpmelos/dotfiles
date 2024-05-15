@@ -1,5 +1,6 @@
 return {
     "szw/vim-maximizer",
+    lazy = false,
     keys = {
         {
             "<leader>sm",
@@ -7,5 +8,4 @@ return {
             desc = "Maximize/minimize a split",
         },
     },
-    opts = {},
 }
