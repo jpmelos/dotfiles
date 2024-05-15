@@ -2,6 +2,8 @@ return {
     "ruifm/gitlinker.nvim",
     lazy = false,
     config = function()
+        local K = vim.keymap.set
+
         require("gitlinker").setup({ mappgins = nil })
 
         vim.api.nvim_create_user_command("GetGitLink", function()
@@ -15,13 +17,13 @@ return {
             })
         end, {})
 
-        vim.api.nvim_set_keymap(
+        K(
             "n",
             "<leader>gy",
             "<cmd>GetGitLink<CR>",
             { desc = "Copy git permalink" }
         )
-        vim.api.nvim_set_keymap(
+        K(
             "v",
             "<leader>gy",
             "<cmd>GetGitLinkV<CR>",
