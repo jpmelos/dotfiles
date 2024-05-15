@@ -47,7 +47,8 @@ return {
                 { name = "nvim_lsp_signature_help" }, -- Signature help.
                 { name = "luasnip" }, -- Snippets.
                 { name = "buffer" }, -- Text from the current buffer.
-                { name = "path" }, -- Paths from the file system.
+                -- Paths from the file system.
+                { name = "path", option = { trailing_slash = true } },
             }),
             -- Configure pictograms from `onsails/lspkind.nvim`.
             formatting = { format = require("lspkind").cmp_format({}) },
