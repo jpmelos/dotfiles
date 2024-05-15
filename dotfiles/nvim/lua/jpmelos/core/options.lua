@@ -62,7 +62,7 @@ opt.colorcolumn = "80"
 api.nvim_create_autocmd("FileType", {
     pattern = "gitcommit",
     callback = function()
-        opt.colorcolumn = "50,72"
+        opt.colorcolumn = "51,73"
     end,
 })
 
