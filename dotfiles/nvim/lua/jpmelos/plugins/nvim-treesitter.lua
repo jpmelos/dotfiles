@@ -17,7 +17,7 @@ return {
                 disable = {
                     -- Indentation for bullet points is worse.
                     "markdown",
-                }
+                },
             },
             -- Enable autotagging with the `nvim-ts-autotag` plugin.
             autotag = { enable = true },
