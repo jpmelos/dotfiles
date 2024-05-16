@@ -22,5 +22,7 @@ return {
             s = "+ Splits",
             t = "+ Tabs",
         }, { prefix = "<leader>" })
+
+        vim.cmd("hi WhichKeyFloat guibg=#eeeeee")
     end,
 }
