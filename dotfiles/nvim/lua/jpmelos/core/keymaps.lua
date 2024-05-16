@@ -39,3 +39,17 @@ K({ "n", "v" }, "<C-d>", function()
     ) - 1
     return half_window .. "j"
 end, { expr = true })
+
+-- Terminal management.
+-- <Esc> leaves the terminal insert mode.
+K("t", "<Esc>", "<C-\\><C-n>")
+-- Open a terminal split at the bottom of the screen in the current directory.
+K("n", "t", function()
+    local term_height = math.max(
+        math.ceil(
+            vim.api.nvim_win_get_height(vim.api.nvim_get_current_win()) / 4
+        ) - 1,
+        15
+    )
+    return "<cmd>bo sp term://bash<cr><cmd>resize " .. term_height .. "<cr>i"
+end, { expr = true })
