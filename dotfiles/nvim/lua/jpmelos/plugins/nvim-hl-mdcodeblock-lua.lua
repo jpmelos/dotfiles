@@ -3,7 +3,7 @@ return {
     lazy = false,
     dependencies = { "nvim-treesitter" },
     init = function()
-        vim.cmd("hi MDCodeBlock guibg=#eaeaea")
+        vim.cmd("hi MDCodeBlock gui=none guifg=none guibg=#eeeeee")
     end,
     opts = {
         padding_right = 0,
