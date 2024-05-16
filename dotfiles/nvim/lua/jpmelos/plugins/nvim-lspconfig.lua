@@ -52,12 +52,7 @@ return {
             vim.diagnostic.goto_prev,
             { desc = "Previous diagnostic" }
         )
-        K(
-            "n",
-            "]d",
-            vim.diagnostic.goto_next,
-            { desc = "Next diagnostic" }
-        )
+        K("n", "]d", vim.diagnostic.goto_next, { desc = "Next diagnostic" })
 
         -- Capabilities, with the ones added by `nvim-cmp`.
         local capabilities = cmp_nvim_lsp.default_capabilities()

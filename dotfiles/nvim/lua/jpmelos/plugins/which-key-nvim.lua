@@ -9,21 +9,18 @@ return {
         local wk = require("which-key")
         wk.setup()
 
-        wk.register(
-            {
-                w = "+ Sessions",
-                p = "+ Format",
-                l = "+ Lint",
-                c = "+ Code actions",
-                g = "+ Git",
-                m = "+ Markdown",
-                f = "+ Finder",
-                e = "+ Explorer",
-                x = "+ Quickfix",
-                s = "+ Splits",
-                t = "+ Tabs",
-            },
-            {prefix = "<leader>"}
-        )
+        wk.register({
+            w = "+ Sessions",
+            p = "+ Format",
+            l = "+ Lint",
+            c = "+ Code actions",
+            g = "+ Git",
+            m = "+ Markdown",
+            f = "+ Finder",
+            e = "+ Explorer",
+            x = "+ Quickfix",
+            s = "+ Splits",
+            t = "+ Tabs",
+        }, { prefix = "<leader>" })
     end,
 }
