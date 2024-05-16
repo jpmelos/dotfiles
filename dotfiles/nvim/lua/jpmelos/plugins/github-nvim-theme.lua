@@ -14,6 +14,7 @@ return {
             },
         })
 
+        vim.cmd("hi StatusLineNC gui=none guifg=#ffffff guibg=#5fafd7")
         vim.cmd("colorscheme github_light")
     end,
 }
