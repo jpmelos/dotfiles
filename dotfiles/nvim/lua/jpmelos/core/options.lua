@@ -1,4 +1,5 @@
 local opt = vim.opt
+local opt_local = vim.opt_local
 local api = vim.api
 
 -- Disable mouse entirely.
@@ -59,7 +60,7 @@ opt.colorcolumn = "80"
 api.nvim_create_autocmd("FileType", {
     pattern = "gitcommit",
     callback = function()
-        opt.colorcolumn = "51,73"
+        opt_local.colorcolumn = "51,73"
     end,
 })
 
