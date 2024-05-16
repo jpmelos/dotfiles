@@ -9,10 +9,18 @@ return {
     config = function()
         require("github-theme").setup()
 
+        -- Use the `github_light` theme from this colorscheme.
         vim.cmd("colorscheme github_light")
-        vim.cmd("hi Comment gui=italic guifg=#57606a guibg=none")
+        -- Customize inactive status line, to make it appear. By default, it is
+        -- invisible in this theme.
         vim.cmd("hi StatusLineNC gui=none guifg=#ffffff guibg=#5fafd7")
+        -- Make the cursor line be underlined and have no background color.
         vim.cmd("hi CursorLine gui=underline guifg=none guibg=none")
+        -- Make constructors show as regular function calls.
         vim.cmd("hi! link @constructor Function")
+        -- Make comments and string documentation (like docstrings in Python)
+        -- show in italic.
+        vim.cmd("hi Comment gui=italic")
+        vim.cmd("hi @string.documentation gui=italic")
     end,
 }
