@@ -93,7 +93,7 @@ opt.splitbelow = true -- Split horizontal window to the bottom.
 opt.swapfile = false
 
 -- Simple status line.
-opt.statusline = "%f %y %m %r%=%c,%l/%L"
+opt.statusline = " %f %y %m %r%=%c,%l/%L "
 
 -- What to save in sessions.
 opt.sessionoptions = "blank,buffers,curdir,folds,help,tabpages,winsize"
