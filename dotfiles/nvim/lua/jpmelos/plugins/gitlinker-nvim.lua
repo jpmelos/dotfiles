@@ -21,13 +21,13 @@ return {
             "n",
             "<leader>gy",
             "<cmd>GetGitLink<CR>",
-            { desc = "Copy git permalink" }
+            { desc = "Copy permalink" }
         )
         K(
             "v",
             "<leader>gy",
             "<cmd>GetGitLinkV<CR>",
-            { desc = "Copy git permalink" }
+            { desc = "Copy permalink" }
         )
     end,
 }

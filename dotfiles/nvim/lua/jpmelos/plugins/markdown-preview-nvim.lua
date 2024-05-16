@@ -13,7 +13,7 @@ return {
 
         K(
             "n",
-            "<leader>pm",
+            "<leader>mp",
             "<cmd>MarkdownPreviewToggle<cr>",
             { desc = "Toggle Markdown preview" }
         )

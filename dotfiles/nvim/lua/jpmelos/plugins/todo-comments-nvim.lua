@@ -7,10 +7,10 @@ return {
 
         local todo_comments = require("todo-comments")
 
-        K("n", "]t", function()
+        K("n", "]c", function()
             todo_comments.jump_next()
         end, { desc = "Next todo comment" })
-        K("n", "[t", function()
+        K("n", "[c", function()
             todo_comments.jump_prev()
         end, { desc = "Previous todo comment" })
 

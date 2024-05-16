@@ -12,14 +12,16 @@ K("n", "<leader>sx", "<cmd>close<CR>", { desc = "Close current split" })
 -- Tab management.
 K("n", "<leader>to", "<cmd>tabnew<CR>", { desc = "Open new tab" })
 K("n", "<leader>tx", "<cmd>tabclose<CR>", { desc = "Close current tab" })
-K("n", "<leader>tn", "<cmd>tabn<CR>", { desc = "Go to next tab" })
-K("n", "<leader>tp", "<cmd>tabp<CR>", { desc = "Go to previous tab" })
 K(
     "n",
     "<leader>tf",
     "<cmd>tabnew %<CR>",
     { desc = "Open current buffer in new tab" }
 )
+
+-- Tab navigation.
+K("n", "<leader>]t", "<cmd>tabn<CR>", { desc = "Next tab" })
+K("n", "<leader>[t", "<cmd>tabp<CR>", { desc = "Previous tab" })
 
 -- Navigate line by line in soft-wrapped lines.
 K({ "n", "v" }, "k", "gk")

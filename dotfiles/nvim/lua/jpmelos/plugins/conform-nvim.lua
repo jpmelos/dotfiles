@@ -3,6 +3,7 @@ return {
     lazy = false,
     config = function()
         local K = vim.keymap.set
+
         local conform = require("conform")
 
         conform.setup({
@@ -91,25 +92,25 @@ return {
 
         K(
             { "n", "v" },
-            "<leader>mp",
+            "<leader>pf",
             "<cmd>Format<CR>",
             { desc = "Format file (or range in visual mode)" }
         )
         K(
             { "n" },
-            "<leader>mt",
+            "<leader>pt",
             "<cmd>FormatToggle<CR>",
             { desc = "Toggle auto-format on save" }
         )
         K(
             { "n" },
-            "<leader>md",
+            "<leader>pd",
             "<cmd>FormatDisable<CR>",
             { desc = "Disable auto-format on save" }
         )
         K(
             { "n" },
-            "<leader>me",
+            "<leader>pe",
             "<cmd>FormatEnable<CR>",
             { desc = "Enable auto-format on save" }
         )

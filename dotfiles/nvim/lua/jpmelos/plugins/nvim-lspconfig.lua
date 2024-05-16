@@ -38,11 +38,11 @@ return {
             vim.lsp.buf.code_action,
             { desc = "Show LSP code actions" }
         )
-        K("n", "<leader>rn", vim.lsp.buf.rename, { desc = "Smart rename" })
+        K("n", "<leader>cr", vim.lsp.buf.rename, { desc = "Smart rename" })
 
         K(
             "n",
-            "<leader>d",
+            "<leader>ld",
             vim.diagnostic.open_float,
             { desc = "Show line diagnostic" }
         )
@@ -50,13 +50,13 @@ return {
             "n",
             "[d",
             vim.diagnostic.goto_prev,
-            { desc = "Go to previous diagnostic" }
+            { desc = "Previous diagnostic" }
         )
         K(
             "n",
             "]d",
             vim.diagnostic.goto_next,
-            { desc = "Go to next diagnostic" }
+            { desc = "Next diagnostic" }
         )
 
         -- Capabilities, with the ones added by `nvim-cmp`.

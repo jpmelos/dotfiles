@@ -18,7 +18,7 @@ return {
             }
         )
 
-        K("n", "<leader>lt", function()
+        K("n", "<leader>ll", function()
             lint.try_lint()
         end, { desc = "Lint current file" })
     end,
