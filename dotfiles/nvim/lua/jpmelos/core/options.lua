@@ -83,7 +83,7 @@ opt.backspace = "indent,eol,nostop"
 -- Integrate with the system's clipboard.
 -- Relies on having an external tool installed for integration.
 -- See `:h clipboard-tool` for more.
-opt.clipboard:append("unnamedplus")
+opt.clipboard = { "unnamedplus"}
 
 -- Splitting windows.
 opt.splitright = true -- Split vertical windows to the right.
