@@ -15,7 +15,8 @@ return {
         -- invisible in this theme.
         vim.cmd("hi StatusLineNC gui=none guifg=#ffffff guibg=#5fafd7")
         -- Make the cursor line be underlined and have no background color.
-        vim.cmd("hi CursorLine gui=underline guifg=none guibg=none")
+        vim.cmd("hi CursorLine guibg=#eeeeee")
+        vim.cmd("hi ColorColumn guibg=#dadada")
         -- Make constructors show as regular function calls.
         vim.cmd("hi! link @constructor Function")
         -- Make comments and string documentation (like docstrings in Python)
