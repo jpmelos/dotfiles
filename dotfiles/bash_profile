@@ -1,7 +1,5 @@
 # vim: set ft=bash :
 
-echo "Sourcing ~/.bash_profile"
-
 # Are we on a Mac?
 if [[ "$HOME" =~ /Users/* ]]; then
     JPMELOS_IS_MACOS="true"
@@ -30,6 +28,9 @@ export EDITOR=$(which nvim)
 export TERMINFO_DIRS=$HOME/.local/share/terminfo:$TERMINFO_DIRS
 # For better colors in Neovim.
 export TERM=tmux-256color
+
+# Set up the GPG Agent.
+GPG_TTY=$(tty)
 
 #############################
 #                           #

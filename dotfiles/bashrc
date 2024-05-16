@@ -1,9 +1,7 @@
 # vim: set ft=bash :
 
-echo "Sourcing ~/.bashrc"
-
 # Set up the GPG Agent.
-export GPG_TTY=$(tty)
+GPG_TTY=$(tty)
 
 #################
 #               #
@@ -14,11 +12,11 @@ export GPG_TTY=$(tty)
 # Find authorized and unauthorized autoenvs in these files.
 [ -f ~/.autoenv_authorized ] || touch ~/.autoenv_authorized
 [ -f ~/.autoenv_not_authorized ] || touch ~/.autoenv_not_authorized
+# Enable autoenv leave too.
+AUTOENV_ENABLE_LEAVE=1
 # Rename autoenv files to less generic names.
 AUTOENV_ENV_FILENAME=.autoenv.enter
 AUTOENV_ENV_LEAVE_FILENAME=.autoenv.leave
-# Enable autoenv leave too.
-AUTOENV_ENABLE_LEAVE=1
 
 source ~/.autoenv/activate.sh
 
@@ -52,7 +50,7 @@ alias erc='nvim -O ~/.bash_profile ~/.bashrc'
 alias src='source ~/.bash_profile'
 
 # Show path in readable format.
-alias spth='echo $PATH | tr : "\n"'
+alias path='echo $PATH | tr : "\n"'
 
 # Allows alias checking in watch commands.
 alias watch='watch '
