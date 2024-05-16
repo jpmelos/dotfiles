@@ -30,9 +30,6 @@ export TERMINFO_DIRS=$HOME/.local/share/terminfo:$TERMINFO_DIRS
 # For better colors in Neovim.
 export TERM=tmux-256color
 
-# Set up the GPG Agent.
-GPG_TTY=$(tty)
-
 #############################
 #                           #
 #    Bash-specific stuff    #
