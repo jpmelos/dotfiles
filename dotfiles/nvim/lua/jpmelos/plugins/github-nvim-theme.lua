@@ -22,5 +22,9 @@ return {
         -- show in italic.
         vim.cmd("hi Comment gui=italic")
         vim.cmd("hi @string.documentation gui=italic")
+        -- Git commit temporary file.
+        vim.cmd("hi diffAdded guibg=none")
+        vim.cmd("hi diffremoved guibg=none")
+        vim.cmd("hi Special guifg=none")
     end,
 }
