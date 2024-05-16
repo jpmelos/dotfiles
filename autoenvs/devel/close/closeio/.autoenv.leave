@@ -8,4 +8,5 @@ unset AUTOENV_CLOSE_CLOSEIO
 
 deactivate
 
-unset -f finstall
+unset -f fr
+unset -f fp

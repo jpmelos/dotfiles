@@ -6,7 +6,9 @@ fi
 
 unset AUTOENV_CLOSE_DEVTOOLS
 
-unset -f fpull
-unset -f fquality
-unset -f ftest
-unset -f fgql
+unset -f fd
+unset -f fq
+unset -f ft
+unset -f fg
+unset -f fs
+unset -f fp

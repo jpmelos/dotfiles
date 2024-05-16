@@ -6,7 +6,8 @@ fi
 
 AUTOENV_CLOSE_DEVTOOLS=1
 
-fpull() {
+[ $(type fd > /dev/null 2>&1) ] && echo "Overwriting fd"
+fd() {  # docker
     docker rm -f $(docker ps -aq)
     docker volume rm devtools_redis6_data
     docker volume rm devtools_redis7_data
@@ -16,7 +17,8 @@ fpull() {
     dc logs -f --tail 1000 closeio_api
 }
 
-fquality() {
+[ $(type fq > /dev/null 2>&1) ] && echo "Overwriting fq"
+fq() {  # quality
     dc exec closeio_shell black . \
         && dc exec closeio_shell ruff check --fix . \
         && dc exec closeio_shell black --check . \
@@ -24,12 +26,24 @@ fquality() {
         && dc exec closeio_shell dmypy run
 }
 
-ftest() {
+[ $(type ft > /dev/null 2>&1) ] && echo "Overwriting ft"
+ft() {  # test
     dc exec closeio_shell pytest -vv $@
 }
 
-fgql() {
+[ $(type fg > /dev/null 2>&1) ] && echo "Overwriting fg"
+fg() {  # graphql
     dc exec closeio_shell pytest --overwrite-snapshots \
         tests/common/graphql/test_schema.py \
         tests/admin/graphql/test_schema.py
+}
+
+[ $(type fs > /dev/null 2>&1) ] && echo "Overwriting fs"
+fs() {  # shell
+    dc exec closeio_shell bash
+}
+
+[ $(type fp > /dev/null 2>&1) ] && echo "Overwriting fp"
+fp() {  # python
+    dc exec closeio_shell python manage.py shell
 }

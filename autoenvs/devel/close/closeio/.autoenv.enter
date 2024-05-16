@@ -8,7 +8,8 @@ AUTOENV_CLOSE_CLOSEIO=1
 
 source .venv/bin/activate
 
-finstall() {
+[ $(type fr > /dev/null 2>&1) ] && echo "Overwriting fr"
+fr() {  # requirements
     pip install -r requirements/requirements-pip.txt \
         && pip install -r requirements/requirements.txt \
         && pip install -r requirements/requirements.private \
@@ -16,4 +17,9 @@ finstall() {
         && pip install -r requirements/requirements-lint.txt \
         && pip install -r requirements/requirements-test.txt \
         && pip install -r requirements/requirements-deploy-notifications.txt
+}
+
+[ $(type fp > /dev/null 2>&1) ] && echo "Overwriting fp"
+fp() {  # production
+    python scripts/remote-shell --keep-alive bash
 }
