@@ -13,6 +13,7 @@ return {
 
         require("noice").setup({
             lsp = {
+                progress = { enabled = false },
                 -- Override Markdown rendering so that `nvim-cmp` and other
                 -- plugins use `nvim-treesitter`.
                 override = {
