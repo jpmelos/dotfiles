@@ -55,6 +55,7 @@ return {
                 "passwd",
                 -- TODO: "pip_requirements",
                 "python",
+                "regex",
                 "rust",
                 "scss",
                 "sql",
