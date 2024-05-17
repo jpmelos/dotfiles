@@ -92,6 +92,10 @@ opt.splitbelow = true -- Split horizontal window to the bottom.
 -- Turn off swapfiles.
 opt.swapfile = false
 
+-- Make the `CursorHold` event trigger quickly so we can get variable
+-- highlights quickly.
+opt.updatetime = 200
+
 -- Simple status line.
 opt.statusline = " %f %y %m %r%=%c,%l/%L "
 
