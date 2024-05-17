@@ -1,5 +1,21 @@
 # README
 
+## Installing tmux
+
+1. Install the plugin manager.
+
+   ```bash
+   git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+   ```
+
+1. Link `dotfiles/tmux.conf` to `~/.tmux.conf`.
+
+1. Run `<C-a> I`.
+
+## Installing nvim
+
+1. Link `dotfiles/nvim` to `~/.config/nvim`.
+
 ## tmux-256color in MacOS (not needed in latest versions)
 
 1. Install a newer version of `ncurses` with Homebrew:
