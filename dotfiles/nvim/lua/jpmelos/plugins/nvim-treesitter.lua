@@ -13,6 +13,17 @@ return {
         require("nvim-treesitter.configs").setup({
             -- Better syntax highlighting.
             highlight = { enable = true },
+            -- Incremental selection via tree-sitter with C-Space and
+            -- backspace.
+            incremental_selection = {
+                enable = true,
+                keymaps = {
+                    init_selection = "<C-space>",
+                    node_incremental = "<C-space>",
+                    scope_incremental = false,
+                    node_decremental = "<bs>",
+                },
+            },
             -- Better indentation.
             indent = {
                 enable = true,
@@ -71,18 +82,6 @@ return {
                 "vue",
                 "yaml",
             },
-            ignore_install = {},
-            -- Incremental selection via tree-sitter with C-Space and
-            -- backspace.
-            incremental_selection = {
-                enable = true,
-                keymaps = {
-                    init_selection = "<C-space>",
-                    node_incremental = "<C-space>",
-                    scope_incremental = false,
-                    node_decremental = "<bs>",
-                },
-            },
             -- Disable tree-sitter syntax highlighting for large files.
             disable = function(lang, buf)
                 local max_filesize = 1024 * 1024 -- 1MB
@@ -94,5 +93,11 @@ return {
                 return false
             end,
         })
+
+        local opt = vim.opt
+
+        opt.foldmethod = "expr"
+        opt.foldexpr = "nvim_treesitter#foldexpr()"
+        opt.foldenable = false
     end,
 }
