@@ -3,6 +3,20 @@
 # Set up the GPG Agent.
 export GPG_TTY=$(tty)
 
+#############################
+#                           #
+#    Bash-specific stuff    #
+#                           #
+#############################
+
+run_autoenv_on_init() {
+    if [ -z $AUTOENV_RAN_ON_INIT ]; then
+        cd /
+        cd - > /dev/null
+        AUTOENV_RAN_ON_INIT=1
+    fi
+}
+
 #################
 #               #
 #    autoenv    #

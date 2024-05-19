@@ -43,7 +43,7 @@ export HISTCONTROL=erasedups:ignoreboth
 # Keep infinite command history in file.
 export HISTFILESIZE=-1
 # Persist every command immediately, load new commands.
-export PROMPT_COMMAND="history -a; history -n; ${PROMPT_COMMAND}"
+export PROMPT_COMMAND="history -a; history -n; run_autoenv_on_init; ${PROMPT_COMMAND}"
 
 ###############################
 #                             #
