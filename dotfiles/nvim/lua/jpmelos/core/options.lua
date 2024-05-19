@@ -63,6 +63,12 @@ api.nvim_create_autocmd("FileType", {
         opt_local.colorcolumn = "51,73"
     end,
 })
+api.nvim_create_autocmd("FileType", {
+    pattern = "dap-repl",
+    callback = function()
+        opt_local.colorcolumn = ""
+    end,
+})
 
 -- Ignore case when searching...
 opt.ignorecase = true
