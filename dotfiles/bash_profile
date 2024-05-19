@@ -38,12 +38,12 @@ export TERM=tmux-256color
 
 # Keep infinite command history in memory.
 export HISTSIZE=-1
-
-# For duplicate consecutive commands, store only once in history.
-export HISTCONTROL=ignoredups
-
+# Erase all duplicate lines, don't store lines starting with space.
+export HISTCONTROL=erasedups:ignoreboth
 # Keep infinite command history in file.
 export HISTFILESIZE=-1
+# Persist every command immediately, load new commands.
+export PROMPT_COMMAND="history -a; history -n; ${PROMPT_COMMAND}"
 
 ###############################
 #                             #
