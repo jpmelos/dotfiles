@@ -6,6 +6,8 @@ return {
     dependencies = {
         -- Automatically open and close HTML tags.
         "windwp/nvim-ts-autotag",
+        -- Enable highlighting in the DAP REPL.
+        "LiadOz/nvim-dap-repl-highlights",
     },
     config = function()
         require("nvim-treesitter.configs").setup({
@@ -34,6 +36,7 @@ return {
                 "bash",
                 "css",
                 "csv",
+                "dap_repl",
                 "diff",
                 "git_config",
                 "git_rebase",

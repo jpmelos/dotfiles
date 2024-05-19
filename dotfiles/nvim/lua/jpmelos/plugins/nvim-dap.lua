@@ -4,7 +4,7 @@ local function getHostPortAndDebug(callback)
 
     local input = Input({
         position = "50%",
-        size = { width = 40},
+        size = { width = 40 },
         border = {
             style = "rounded",
             text = {
@@ -26,7 +26,7 @@ local function getHostPortAndDebug(callback)
                 return
             end
 
-            callback({type = "server", host=host, port=port})
+            callback({ type = "server", host = host, port = port })
         end,
     })
 
