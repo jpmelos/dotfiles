@@ -3,6 +3,7 @@ return {
     lazy = false,
     config = function()
         local K = vim.keymap.set
+        local api = vim.api
 
         local gs = require("gitsigns")
 
@@ -33,5 +34,11 @@ return {
         K("n", "<leader>gD", function()
             gs.diffthis("~")
         end, { desc = "Diff this buffer" })
+
+        -- Reload files on focus.
+        api.nvim_create_autocmd(
+            { "FocusGained", "BufEnter", "BufWinEnter" },
+            { callback = gs.refresh }
+        )
     end,
 }
