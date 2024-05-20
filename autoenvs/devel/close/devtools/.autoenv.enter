@@ -6,44 +6,90 @@ fi
 
 AUTOENV_CLOSE_DEVTOOLS=1
 
-[ $(type fd > /dev/null 2>&1) ] && echo "Overwriting fd"
-fd() {  # docker
-    docker rm -f $(docker ps -aq)
-    docker volume rm devtools_redis6_data
-    docker volume rm devtools_redis7_data
-    bin/login
-    dc pull --include-deps core closeio_shell
-    dc up -d core closeio_shell
-    dc logs -f --tail 1000 closeio_api
-}
+if type fh > /dev/null 2>&1; then
+    echo ".autoenv.enter: Would overwrite fh, did not"
+else
+    AUTOENV_CLOSE_DEVTOOLS_FH=1
 
-[ $(type fq > /dev/null 2>&1) ] && echo "Overwriting fq"
-fq() {  # quality
-    dc exec closeio_shell black . \
-        && dc exec closeio_shell ruff check --fix . \
-        && dc exec closeio_shell black --check . \
-        && dc exec closeio_shell ruff check . \
-        && dc exec closeio_shell dmypy run
-}
+    fh() {  # help
+        echo "fh -> This help."
+        echo "fl -> Start docker-compose containers."
+        echo "fq -> Run quality checks."
+        echo "ft -> Run tests."
+        echo "fgr -> Update GraphQL snapshots."
+        echo "fs -> Start local shell."
+        echo "fp -> Start local Python shell."
+    }
+fi
 
-[ $(type ft > /dev/null 2>&1) ] && echo "Overwriting ft"
-ft() {  # test
-    dc exec closeio_shell pytest -vv $@
-}
+if type fl > /dev/null 2>&1; then
+    echo ".autoenv.enter: Would overwrite fl, did not"
+else
+    AUTOENV_CLOSE_DEVTOOLS_FL=1
 
-[ $(type fg > /dev/null 2>&1) ] && echo "Overwriting fg"
-fg() {  # graphql
-    dc exec closeio_shell pytest --overwrite-snapshots \
-        tests/common/graphql/test_schema.py \
-        tests/admin/graphql/test_schema.py
-}
+    fl() {  # local
+        docker rm -f $(docker ps -aq)
+        docker volume rm devtools_redis6_data
+        docker volume rm devtools_redis7_data
+        bin/login
+        dc pull --include-deps core closeio_shell
+        dc up -d core closeio_shell
+        dc logs -f --tail 1000 closeio_api
+    }
+fi
 
-[ $(type fs > /dev/null 2>&1) ] && echo "Overwriting fs"
-fs() {  # shell
-    dc exec closeio_shell bash
-}
+if type fq > /dev/null 2>&1; then
+    echo ".autoenv.enter: Would overwrite fq, did not"
+else
+    AUTOENV_CLOSE_DEVTOOLS_FQ=1
 
-[ $(type fp > /dev/null 2>&1) ] && echo "Overwriting fp"
-fp() {  # python
-    dc exec closeio_shell python manage.py shell
-}
+    fq() {  # quality
+        dc exec closeio_shell black . \
+            && dc exec closeio_shell ruff check --fix . \
+            && dc exec closeio_shell black --check . \
+            && dc exec closeio_shell ruff check . \
+            && dc exec closeio_shell dmypy run
+    }
+fi
+
+if type ft > /dev/null 2>&1; then
+    echo ".autoenv.enter: Would overwrite ft, did not"
+else
+    AUTOENV_CLOSE_DEVTOOLS_FT=1
+
+    ft() {  # test
+        dc exec closeio_shell pytest -vv $@
+    }
+fi
+
+if type fgr > /dev/null 2>&1; then
+    echo ".autoenv.enter: Would overwrite fgr, did not"
+else
+    AUTOENV_CLOSE_DEVTOOLS_FGR=1
+
+    fgr() {  # graphql
+        dc exec closeio_shell pytest --overwrite-snapshots \
+            tests/common/graphql/test_schema.py \
+            tests/admin/graphql/test_schema.py
+    }
+fi
+
+if type fs > /dev/null 2>&1; then
+    echo ".autoenv.enter: Would overwrite fs, did not"
+else
+    AUTOENV_CLOSE_DEVTOOLS_FS=1
+
+    fs() {  # shell
+        dc exec closeio_shell bash
+    }
+fi
+
+if type fp > /dev/null 2>&1; then
+    echo ".autoenv.enter: Would overwrite fp, did not"
+else
+    AUTOENV_CLOSE_DEVTOOLS_FP=1
+
+    fp() {  # python
+        dc exec closeio_shell python manage.py shell
+    }
+fi

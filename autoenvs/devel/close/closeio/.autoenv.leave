@@ -8,5 +8,22 @@ unset AUTOENV_CLOSE_CLOSEIO
 
 deactivate
 
-unset -f fr
-unset -f fp
+if [ -n "$AUTOENV_CLOSE_CLOSEIO_FH" ]; then
+    unset AUTOENV_CLOSE_CLOSEIO_FH
+    unset -f fh
+fi
+
+if [ -n "$AUTOENV_CLOSE_CLOSEIO_FR" ]; then
+    unset AUTOENV_CLOSE_CLOSEIO_FR
+    unset -f fr
+fi
+
+if [ -n "$AUTOENV_CLOSE_CLOSEIO_FP" ]; then
+    unset AUTOENV_CLOSE_CLOSEIO_FP
+    unset -f fp
+fi
+
+if [ -n "$AUTOENV_CLOSE_CLOSEIO_FPP" ]; then
+    unset AUTOENV_CLOSE_CLOSEIO_FPP
+    unset -f fpp
+fi

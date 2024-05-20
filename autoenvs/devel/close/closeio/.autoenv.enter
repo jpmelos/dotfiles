@@ -8,18 +8,51 @@ AUTOENV_CLOSE_CLOSEIO=1
 
 source .venv/bin/activate
 
-[ $(type fr > /dev/null 2>&1) ] && echo "Overwriting fr"
-fr() {  # requirements
-    pip install -r requirements/requirements-pip.txt \
-        && pip install -r requirements/requirements.txt \
-        && pip install -r requirements/requirements.private \
-        && pip install -r requirements/requirements-dev.txt \
-        && pip install -r requirements/requirements-lint.txt \
-        && pip install -r requirements/requirements-test.txt \
-        && pip install -r requirements/requirements-deploy-notifications.txt
-}
+if type fh > /dev/null 2>&1; then
+    echo ".autoenv.enter: Would overwrite fh, did not"
+else
+    AUTOENV_CLOSE_CLOSEIO_FH=1
 
-[ $(type fp > /dev/null 2>&1) ] && echo "Overwriting fp"
-fp() {  # production
-    python scripts/remote-shell --keep-alive bash
-}
+    fh() {  # requirements
+        echo "fh -> This help."
+        echo "fr -> Install all requirements."
+        echo "fp -> Start production shell."
+    }
+fi
+
+if type fr > /dev/null 2>&1; then
+    echo ".autoenv.enter: Would overwrite fr, did not"
+else
+    AUTOENV_CLOSE_CLOSEIO_FR=1
+
+    fr() {  # requirements
+        pip install -r requirements/requirements-pip.txt \
+            && pip install -r requirements/requirements.txt \
+            && pip install -r requirements/requirements.private \
+            && pip install -r requirements/requirements-dev.txt \
+            && pip install -r requirements/requirements-lint.txt \
+            && pip install -r requirements/requirements-test.txt \
+            && pip install -r \
+                requirements/requirements-deploy-notifications.txt
+    }
+fi
+
+if type fp > /dev/null 2>&1; then
+    echo ".autoenv.enter: Would overwrite fp, did not"
+else
+    AUTOENV_CLOSE_CLOSEIO_FP=1
+
+    fp() {  # production
+        python scripts/remote-shell --keep-alive bash $@
+    }
+fi
+
+if type fpp > /dev/null 2>&1; then
+    echo ".autoenv.enter: Would overwrite fpp, did not"
+else
+    AUTOENV_CLOSE_CLOSEIO_FPP=1
+
+    fp() {  # production
+        python scripts/remote-shell --keep-alive python manage.py shell $@
+    }
+fi

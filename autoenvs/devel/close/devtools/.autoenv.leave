@@ -6,9 +6,37 @@ fi
 
 unset AUTOENV_CLOSE_DEVTOOLS
 
-unset -f fd
-unset -f fq
-unset -f ft
-unset -f fg
-unset -f fs
-unset -f fp
+if [ -n "$AUTOENV_CLOSE_DEVTOOLS_FH" ]; then
+    unset AUTOENV_CLOSE_DEVTOOLS_FH
+    unset -f fh
+fi
+
+if [ -n "$AUTOENV_CLOSE_DEVTOOLS_FL" ]; then
+    unset AUTOENV_CLOSE_DEVTOOLS_FL
+    unset -f fl
+fi
+
+if [ -n "$AUTOENV_CLOSE_DEVTOOLS_FQ" ]; then
+    unset AUTOENV_CLOSE_DEVTOOLS_FQ
+    unset -f fq
+fi
+
+if [ -n "$AUTOENV_CLOSE_DEVTOOLS_FT" ]; then
+    unset AUTOENV_CLOSE_DEVTOOLS_FT
+    unset -f ft
+fi
+
+if [ -n "$AUTOENV_CLOSE_DEVTOOLS_FGR" ]; then
+    unset AUTOENV_CLOSE_DEVTOOLS_FGR
+    unset -f fgr
+fi
+
+if [ -n "$AUTOENV_CLOSE_DEVTOOLS_FS" ]; then
+    unset AUTOENV_CLOSE_DEVTOOLS_FS
+    unset -f fs
+fi
+
+if [ -n "$AUTOENV_CLOSE_DEVTOOLS_FP" ]; then
+    unset AUTOENV_CLOSE_DEVTOOLS_FP
+    unset -f fp
+fi
