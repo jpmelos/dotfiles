@@ -8,6 +8,10 @@ unset AUTOENV_CLOSE_CLOSEIO
 
 deactivate
 
+if [ -n "$REMOTE_DEBUG_ROOT" ]; then
+    unset REMOTE_DEBUG_ROOT
+fi
+
 if [ -n "$AUTOENV_CLOSE_CLOSEIO_FH" ]; then
     unset AUTOENV_CLOSE_CLOSEIO_FH
     unset -f fh

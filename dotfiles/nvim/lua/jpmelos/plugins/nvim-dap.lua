@@ -52,6 +52,16 @@ return {
                 type = "python",
                 request = "attach",
                 name = "Debug Python attaching to a DAP server",
+                -- Things below are passed as arguments to debugpy.
+                pathMappings = function()
+                    if os.getenv("REMOTE_DEBUG_ROOT") then
+                        return {
+                            localRoot = "${workspaceFolder}",
+                            remoteRoot = "${env:REMOTE_DEBUG_ROOT}",
+                        }
+                    end
+                    return ""
+                end,
             },
         }
         dap.adapters.python = getHostPortAndDebug

@@ -8,6 +8,10 @@ AUTOENV_CLOSE_CLOSEIO=1
 
 source .venv/bin/activate
 
+if [ -z "$REMOTE_DEBUG_ROOT" ]; then
+    export REMOTE_DEBUG_ROOT="/home/closeio/closeio"
+fi
+
 if type fh > /dev/null 2>&1; then
     echo ".autoenv.enter: Would overwrite fh, did not"
 else
