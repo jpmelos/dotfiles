@@ -5,6 +5,8 @@ return {
     opts = {},
     config = function()
         local K = vim.keymap.set
+        local api = vim.api
+        local opt_local = vim.opt_local
 
         local dap = require("dap")
         local dapui = require("dapui")
@@ -62,5 +64,12 @@ return {
 
         K("n", "<leader>do", dapui.open, { desc = "Open DAP UI" })
         K("n", "<leader>dc", dapui.close, { desc = "Close DAP UI" })
+
+        api.nvim_create_autocmd("FileType", {
+            pattern = "dap-repl",
+            callback = function()
+                opt_local.colorcolumn = ""
+            end,
+        })
     end,
 }
