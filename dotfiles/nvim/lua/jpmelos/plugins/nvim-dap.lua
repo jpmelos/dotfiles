@@ -56,11 +56,13 @@ return {
                 pathMappings = function()
                     if os.getenv("REMOTE_DEBUG_ROOT") then
                         return {
-                            localRoot = "${workspaceFolder}",
-                            remoteRoot = "${env:REMOTE_DEBUG_ROOT}",
+                            {
+                                localRoot = "${workspaceFolder}",
+                                remoteRoot = "${env:REMOTE_DEBUG_ROOT}",
+                            },
                         }
                     end
-                    return ""
+                    return {}
                 end,
             },
         }
