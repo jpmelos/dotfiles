@@ -20,8 +20,8 @@ K(
 )
 
 -- Tab navigation.
-K("n", "<leader>]t", "<cmd>tabn<CR>", { desc = "Next tab" })
-K("n", "<leader>[t", "<cmd>tabp<CR>", { desc = "Previous tab" })
+K("n", "]t", "<cmd>tabn<CR>", { desc = "Next tab" })
+K("n", "[t", "<cmd>tabp<CR>", { desc = "Previous tab" })
 
 -- Navigate line by line in soft-wrapped lines.
 K({ "n", "v" }, "k", "gk")
