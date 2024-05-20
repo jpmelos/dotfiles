@@ -43,8 +43,8 @@ return {
                             size = 1,
                         },
                     },
-                    position = "bottom",
-                    size = 10,
+                    position = "right",
+                    size = 80,
                 },
             },
         })

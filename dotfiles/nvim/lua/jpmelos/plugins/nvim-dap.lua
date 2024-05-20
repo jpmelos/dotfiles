@@ -98,6 +98,7 @@ return {
             { desc = "Toggle breakpoint" }
         )
         K("n", "<leader>dh", dap.continue, { desc = "Continue" })
+        K("n", "<leader>dx", dap.disconnect, { desc = "End current session" })
         K("n", "<leader>dl", dap.step_over, { desc = "Step over" })
         K("n", "<leader>dj", dap.step_into, { desc = "Step into" })
         K("n", "<leader>dk", dap.step_out, { desc = "Step out" })
