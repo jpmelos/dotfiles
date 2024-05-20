@@ -56,14 +56,37 @@ return {
         }
         dap.adapters.python = getHostPortAndDebug
 
+        vim.cmd("hi DapBreakpoint guifg=#ff0000")
+
+        vim.fn.sign_define(
+            "DapStopped",
+            { text = "→", texthl = "DapBreakpoint" }
+        )
+        vim.fn.sign_define(
+            "DapLogPoint",
+            { text = "", texthl = "DapBreakpoint" }
+        )
+        vim.fn.sign_define(
+            "DapBreakpoint",
+            { text = "", texthl = "DapBreakpoint" }
+        )
+        vim.fn.sign_define(
+            "DapBreakpointCondition",
+            { text = "", texthl = "DapBreakpoint" }
+        )
+        vim.fn.sign_define(
+            "DapBreakpointRejected",
+            { text = "", texthl = "DapBreakpoint" }
+        )
+
         K(
             "n",
             "<leader>db",
             dap.toggle_breakpoint,
             { desc = "Toggle breakpoint" }
         )
-        K("n", "<leader>dl", dap.continue, { desc = "Continue" })
-        K("n", "<leader>dh", dap.step_over, { desc = "Step over" })
+        K("n", "<leader>dh", dap.continue, { desc = "Continue" })
+        K("n", "<leader>dl", dap.step_over, { desc = "Step over" })
         K("n", "<leader>dj", dap.step_into, { desc = "Step into" })
         K("n", "<leader>dk", dap.step_out, { desc = "Step out" })
         K("n", "<leader>dK", dap.up, { desc = "Go up in the stacktrace" })
