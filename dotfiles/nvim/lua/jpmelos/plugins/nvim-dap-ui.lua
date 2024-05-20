@@ -62,7 +62,9 @@ return {
             dapui.close()
         end
 
-        K("n", "<leader>do", dapui.open, { desc = "Open DAP UI" })
+        K("n", "<leader>do", function()
+            dapui.open({ reset = true })
+        end, { desc = "Open DAP UI" })
         K("n", "<leader>dc", dapui.close, { desc = "Close DAP UI" })
 
         api.nvim_create_autocmd("FileType", {
