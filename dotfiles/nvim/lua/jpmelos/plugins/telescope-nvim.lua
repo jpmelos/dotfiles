@@ -1,3 +1,7 @@
+local get_parent = function(path)
+    return path:match("(.*" .. "/" .. ")")
+end
+
 return {
     "nvim-telescope/telescope.nvim",
     branch = "0.1.x",
@@ -7,8 +11,10 @@ return {
         "nvim-telescope/telescope-fzf-native.nvim",
         "nvim-tree/nvim-web-devicons",
         "folke/todo-comments.nvim",
+        "nvim-tree/nvim-tree.lua",
     },
     config = function()
+        local api = vim.api
         local K = vim.keymap.set
 
         local telescope = require("telescope")
@@ -17,6 +23,8 @@ return {
 
         local trouble = require("trouble")
         local trouble_telescope = require("trouble.providers.telescope")
+
+        local tree_api = require("nvim-tree.api")
 
         local custom_actions = transform_mod({
             open_trouble_qflist = function()
@@ -71,5 +79,19 @@ return {
             "<cmd>TodoTelescope<cr>",
             { desc = "Find todos in current directory" }
         )
+        K("n", "<leader>fp", function()
+            local ft = api.nvim_get_option_value("filetype", {})
+            local path
+
+            if ft == "NvimTree" then
+                local node = tree_api.tree.get_node_under_cursor()
+                path = node.absolute_path
+            else
+                path = api.nvim_buf_get_name(0)
+            end
+            path = get_parent(path)
+
+            return "<cmd>Telescope live_grep search_dirs=" .. path .. "<cr>"
+        end, { expr = true, desc = "Search in path under cursor" })
     end,
 }
