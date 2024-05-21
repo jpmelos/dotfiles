@@ -1,3 +1,14 @@
+-- Things used in the `run_to_cursor` keymap binding.
+local waiting_for_breakpoint = false
+local register_waiting_for_breakpoint_handler = function(dap)
+    dap.listeners.before["event_stopped"]["jpmelos"] = function()
+        if waiting_for_breakpoint then
+            dap.toggle_breakpoint()
+        end
+        waiting_for_breakpoint = false
+    end
+end
+
 local function getHostPortAndDebug(callback)
     local Input = require("nui.input")
     local event = require("nui.utils.autocmd").event
@@ -91,14 +102,22 @@ return {
             { text = "", texthl = "DapBreakpoint" }
         )
 
+        -- Register handler to handle our run_to_cursor.
+        register_waiting_for_breakpoint_handler(dap)
+
+        K("n", "<leader>dh", dap.continue, { desc = "Continue" })
+        K("n", "<leader>dr", function()
+            dap.set_breakpoint()
+            waiting_for_breakpoint = true
+            dap.continue()
+        end, { desc = "Run to cursor" })
+        K("n", "<leader>dx", dap.disconnect, { desc = "End current session" })
         K(
             "n",
             "<leader>db",
             dap.toggle_breakpoint,
             { desc = "Toggle breakpoint" }
         )
-        K("n", "<leader>dh", dap.continue, { desc = "Continue" })
-        K("n", "<leader>dx", dap.disconnect, { desc = "End current session" })
         K("n", "<leader>dl", dap.step_over, { desc = "Step over" })
         K("n", "<leader>dj", dap.step_into, { desc = "Step into" })
         K("n", "<leader>dk", dap.step_out, { desc = "Step out" })
