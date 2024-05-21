@@ -58,7 +58,7 @@ else
     AUTOENV_CLOSE_DEVTOOLS_FT=1
 
     ft() {  # test
-        dc exec closeio_shell pytest -vv $@
+        dc run --rm --name testing closeio_shell pytest -vv $@
     }
 fi
 
