@@ -86,10 +86,13 @@ return {
             if ft == "NvimTree" then
                 local node = tree_api.tree.get_node_under_cursor()
                 path = node.absolute_path
+                if node.type ~= "directory" then
+                    path = get_parent(path)
+                end
             else
                 path = api.nvim_buf_get_name(0)
+                path = get_parent(path)
             end
-            path = get_parent(path)
 
             return "<cmd>Telescope live_grep search_dirs=" .. path .. "<cr>"
         end, { expr = true, desc = "Search in path under cursor" })
