@@ -1,11 +1,37 @@
+local function broadcast(sessions, fn)
+    for _, session in pairs(sessions) do
+        fn(session)
+        broadcast(session.children, fn)
+    end
+end
+
+local function toggle_bp_current_line(api, dap)
+    local bufnr = api.nvim_get_current_buf()
+    local lnum = api.nvim_win_get_cursor(0)[1]
+    dap.set_breakpoint()
+    return { bufnr = bufnr, lnum = lnum }
+end
+
+local function unset_bp_current_line(dap, dap_breakpoints, bufnr, lnum)
+    dap_breakpoints.toggle({ replace = true }, bufnr, lnum)
+    dap_breakpoints.toggle({}, bufnr, lnum)
+    local bps = dap_breakpoints.get(bufnr)
+    broadcast(dap.sessions(), function(s)
+        s:set_breakpoints(bps)
+    end)
+end
+
 -- Things used in the `run_to_cursor` keymap binding.
-local waiting_for_breakpoint = false
-local register_waiting_for_breakpoint_handler = function(dap)
+local waiting_for_breakpoint = nil
+local register_waiting_for_breakpoint_handler = function(dap, dap_breakpoints)
     dap.listeners.before["event_stopped"]["jpmelos"] = function()
-        if waiting_for_breakpoint then
-            dap.toggle_breakpoint()
+        if waiting_for_breakpoint ~= nil then
+            -- Make sure it's set so toggle removes it.
+            local bufnr = waiting_for_breakpoint.bufnr
+            local lnum = waiting_for_breakpoint.lnum
+            unset_bp_current_line(dap, dap_breakpoints, bufnr, lnum)
         end
-        waiting_for_breakpoint = false
+        waiting_for_breakpoint = nil
     end
 end
 
@@ -54,9 +80,11 @@ return {
     "mfussenegger/nvim-dap",
     lazy = false,
     config = function()
+        local api = vim.api
         local K = vim.keymap.set
 
         local dap = require("dap")
+        local dap_breakpoints = require("dap.breakpoints")
 
         dap.configurations.python = {
             {
@@ -102,13 +130,14 @@ return {
             { text = "", texthl = "DapBreakpoint" }
         )
 
-        -- Register handler to handle our run_to_cursor.
-        register_waiting_for_breakpoint_handler(dap)
+        -- Register handler to handle our `run_to_cursor`.
+        register_waiting_for_breakpoint_handler(dap, dap_breakpoints)
 
         K("n", "<leader>dh", dap.continue, { desc = "Continue" })
+        -- This is our custom `run_to_cursor` mapping. It works even when there
+        -- isn't a session running. It starts a session.
         K("n", "<leader>dr", function()
-            dap.set_breakpoint()
-            waiting_for_breakpoint = true
+            waiting_for_breakpoint = toggle_bp_current_line(api, dap)
             dap.continue()
         end, { desc = "Run to cursor" })
         K("n", "<leader>dx", dap.disconnect, { desc = "End current session" })
