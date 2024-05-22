@@ -6,6 +6,12 @@ fi
 
 AUTOENV_CLOSE_DEVTOOLS=1
 
+############
+#          #
+#    fh    #
+#          #
+############
+
 if type fh > /dev/null 2>&1; then
     echo ".autoenv.enter: Would overwrite fh, did not"
 else
@@ -21,6 +27,12 @@ else
         echo "fp -> Start local Python shell."
     }
 fi
+
+############
+#          #
+#    fl    #
+#          #
+############
 
 if type fl > /dev/null 2>&1; then
     echo ".autoenv.enter: Would overwrite fl, did not"
@@ -38,6 +50,12 @@ else
     }
 fi
 
+############
+#          #
+#    fq    #
+#          #
+############
+
 if type fq > /dev/null 2>&1; then
     echo ".autoenv.enter: Would overwrite fq, did not"
 else
@@ -52,6 +70,12 @@ else
     }
 fi
 
+############
+#          #
+#    ft    #
+#          #
+############
+
 if type ft > /dev/null 2>&1; then
     echo ".autoenv.enter: Would overwrite ft, did not"
 else
@@ -61,6 +85,12 @@ else
         dc run --rm --name testing closeio_shell pytest -vv $@
     }
 fi
+
+#############
+#           #
+#    fgr    #
+#           #
+#############
 
 if type fgr > /dev/null 2>&1; then
     echo ".autoenv.enter: Would overwrite fgr, did not"
@@ -75,6 +105,12 @@ else
     }
 fi
 
+############
+#          #
+#    fs    #
+#          #
+############
+
 if type fs > /dev/null 2>&1; then
     echo ".autoenv.enter: Would overwrite fs, did not"
 else
@@ -84,6 +120,12 @@ else
         dc exec closeio_shell bash
     }
 fi
+
+############
+#          #
+#    fp    #
+#          #
+############
 
 if type fp > /dev/null 2>&1; then
     echo ".autoenv.enter: Would overwrite fp, did not"
