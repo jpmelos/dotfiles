@@ -22,6 +22,7 @@ else
         echo "fl -> Start docker-compose containers."
         echo "fq -> Run quality checks."
         echo "ft -> Run tests."
+        echo "ftd -> Run tests with debugger."
         echo "fgr -> Update GraphQL snapshots."
         echo "fs -> Start local shell."
         echo "fp -> Start local Python shell."
@@ -83,6 +84,25 @@ else
 
     ft() {  # test
         dc run --rm --name testing closeio_shell pytest -vv $@
+    }
+fi
+
+#############
+#           #
+#    ftd    #
+#           #
+#############
+
+if type ftd > /dev/null 2>&1; then
+    echo ".autoenv.enter: Would overwrite ftd, did not"
+else
+    AUTOENV_CLOSE_DEVTOOLS_FTD=1
+
+    ftd() {  # test
+        dc run --rm --name testing -p 27027:27027 closeio_shell \
+            python -m \
+                debugpy --listen 0.0.0.0:27027 --wait-for-client -m \
+                    pytest -vv $@
     }
 fi
 

@@ -52,6 +52,17 @@ fi
 
 #############
 #           #
+#    ftd    #
+#           #
+#############
+
+if [ -n "$AUTOENV_CLOSE_DEVTOOLS_FTD" ]; then
+    unset AUTOENV_CLOSE_DEVTOOLS_FTD
+    unset -f ftd
+fi
+
+#############
+#           #
 #    fgr    #
 #           #
 #############
