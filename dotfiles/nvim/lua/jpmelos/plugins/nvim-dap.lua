@@ -24,7 +24,7 @@ end
 -- Things used in the `run_to_cursor` keymap binding.
 local waiting_for_breakpoint = nil
 local register_waiting_for_breakpoint_handler = function(dap, dap_breakpoints)
-    dap.listeners.before["event_stopped"]["jpmelos"] = function()
+    local handle_stopped_or_terminated_event = function()
         if waiting_for_breakpoint ~= nil then
             -- Make sure it's set so toggle removes it.
             local bufnr = waiting_for_breakpoint.bufnr
@@ -33,6 +33,11 @@ local register_waiting_for_breakpoint_handler = function(dap, dap_breakpoints)
         end
         waiting_for_breakpoint = nil
     end
+
+    dap.listeners.before["event_stopped"]["jpmelos"] =
+        handle_stopped_or_terminated_event
+    dap.listeners.before["event_terminated"]["jpmelos"] =
+        handle_stopped_or_terminated_event
 end
 
 local function getHostPortAndDebug(callback)
