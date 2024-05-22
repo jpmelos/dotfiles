@@ -68,9 +68,10 @@ else
     AUTOENV_CLOSE_DEVTOOLS_FGR=1
 
     fgr() {  # graphql
-        dc exec closeio_shell pytest --overwrite-snapshots \
-            tests/common/graphql/test_schema.py \
-            tests/admin/graphql/test_schema.py
+        dc run --rm --name testing closeio_shell \
+            pytest -vv --overwrite-snapshots \
+                tests/common/graphql/test_schema.py \
+                tests/admin/graphql/test_schema.py
     }
 fi
 
