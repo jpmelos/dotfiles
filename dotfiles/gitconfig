@@ -62,6 +62,7 @@
     c = commit
     ca = commit -a
     sh = show
+    shf = show --name-status
     p = push
     psup = push --set-upstream
     pf = push --force-with-lease
