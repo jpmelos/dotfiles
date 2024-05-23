@@ -3,6 +3,9 @@ vim.g.mapleader = " "
 
 local K = vim.keymap.set
 
+-- C-c clear the screen of searches.
+K({"n", "i"}, "<C-c>", "<cmd>nohl<cr>", { desc = "Clear search highlight" })
+
 -- Tab management.
 K("n", "<leader>to", "<cmd>tabnew<CR>", { desc = "Open new tab" })
 K("n", "<leader>tx", "<cmd>tabclose<CR>", { desc = "Close current tab" })
@@ -21,6 +24,7 @@ K("n", "[t", "<cmd>tabp<CR>", { desc = "Previous tab" })
 K({ "n", "v" }, "k", "gk")
 K({ "n", "v" }, "j", "gj")
 
+-- C-u and C-d only jump half screen.
 K({ "n", "v" }, "<C-u>", function()
     local half_window = math.ceil(
         vim.api.nvim_win_get_height(vim.api.nvim_get_current_win()) / 2
