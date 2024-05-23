@@ -3,12 +3,6 @@ vim.g.mapleader = " "
 
 local K = vim.keymap.set
 
--- Window management.
-K("n", "<leader>sv", "<C-w>v", { desc = "Split window vertically" })
-K("n", "<leader>sh", "<C-w>s", { desc = "Split window horizontally" })
-K("n", "<leader>se", "<C-w>=", { desc = "Make splits equal size" })
-K("n", "<leader>sx", "<cmd>close<CR>", { desc = "Close current split" })
-
 -- Tab management.
 K("n", "<leader>to", "<cmd>tabnew<CR>", { desc = "Open new tab" })
 K("n", "<leader>tx", "<cmd>tabclose<CR>", { desc = "Close current tab" })
