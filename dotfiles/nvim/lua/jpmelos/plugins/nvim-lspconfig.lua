@@ -43,15 +43,14 @@ return {
             settings = {
                 pylsp = {
                     plugins = {
-                        autopep8 = { enabled = false },
-                        pycodestyle = { enabled = false },
-                        pyflakes = { enabled = false },
+                        jedi_completion = { fuzzy = true, eager = true },
                         rope_autoimport = { enabled = true },
-                        rope_completion = { enabled = true },
-                        yapf = { enabled = false },
-                        ruff = { formatEnabled = false, extendIgnore = { "I" } },
                         pylsp_mypy = { live_mode = false, dmypy = true },
                         pylsp_rope = { enabled = true, rename = true },
+                        ruff = {
+                            formatEnabled = false,
+                            extendIgnore = { "I" },
+                        },
                     },
                 },
             },
