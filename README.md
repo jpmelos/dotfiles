@@ -58,22 +58,3 @@
 
    Be sure to use `/usr/bin/tic` instead of just `tic` to use the system-wide
    one.
-
-## Lua Utilities
-
-### Print a table
-
-```lua
-function dump(o)
-    if type(o) == 'table' then
-        local s = '{ '
-        for k,v in pairs(o) do
-            if type(k) ~= 'number' then k = '"'..k..'"' end
-            s = s .. '['..k..'] = ' .. dump(v) .. ','
-        end
-        return s .. '} '
-    else
-        return tostring(o)
-    end
-end
-```
