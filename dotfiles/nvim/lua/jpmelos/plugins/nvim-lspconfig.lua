@@ -24,7 +24,7 @@ return {
         mason_lspconfig.setup({
             -- These are `nvim-lspconfig` names, which will be translated to
             -- Mason package names by `mason-lspconfig.nvim`.
-            ensure_installed = { "lua_ls", "basedpyright" },
+            ensure_installed = { "lua_ls", "pyright" },
         })
 
         -- Capabilities, with the ones added by `nvim-cmp`.
@@ -43,16 +43,19 @@ return {
                     capabilities = capabilities,
                 })
             end,
-            ["basedpyright"] = function()
-                lspconfig["basedpyright"].setup({
+            ["pyright"] = function()
+                lspconfig["pyright"].setup({
+                    cmd = { "pyright-langserver", "--watch", "--stdio" },
                     capabilities = capabilities,
                     settings = {
+                        pyright = { disableOrganizeImports = true },
                         python = {
                             -- Only syntax and semantic errors. No type
                             -- checking in the IDE.
                             analysis = {
                                 diagnosticMode = "workspace",
                                 typeCheckingMode = "off",
+                                autoSearchPaths = false,
                             },
                         },
                     },
