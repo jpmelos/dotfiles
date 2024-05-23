@@ -24,9 +24,7 @@ return {
         mason_lspconfig.setup({
             -- These are `nvim-lspconfig` names, which will be translated to
             -- Mason package names by `mason-lspconfig.nvim`.
-            ensure_installed = {
-                "lua_ls",
-            },
+            ensure_installed = { "lua_ls", "basedpyright" },
         })
 
         -- Capabilities, with the ones added by `nvim-cmp`.
@@ -38,29 +36,26 @@ return {
             cmp_nvim_lsp.default_capabilities()
         )
 
-        lspconfig["pylsp"].setup({
-            capabilities = capabilities,
-            settings = {
-                pylsp = {
-                    plugins = {
-                        jedi_completion = { fuzzy = true, eager = true },
-                        rope_autoimport = { enabled = true },
-                        pylsp_mypy = { live_mode = false, dmypy = true },
-                        pylsp_rope = { enabled = true, rename = true },
-                        ruff = {
-                            formatEnabled = false,
-                            extendIgnore = { "I" },
-                        },
-                    },
-                },
-            },
-        })
-
         mason_lspconfig.setup_handlers({
             -- Default handler for all servers not explicitly defined here.
             function(server_name)
                 lspconfig[server_name].setup({
                     capabilities = capabilities,
+                })
+            end,
+            ["basedpyright"] = function()
+                lspconfig["basedpyright"].setup({
+                    capabilities = capabilities,
+                    settings = {
+                        python = {
+                            -- Only syntax and semantic errors. No type
+                            -- checking in the IDE.
+                            analysis = {
+                                diagnosticMode = "workspace",
+                                typeCheckingMode = "off",
+                            },
+                        },
+                    },
                 })
             end,
             ["lua_ls"] = function()
