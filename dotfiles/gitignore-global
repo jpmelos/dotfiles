@@ -7,7 +7,7 @@
 
 # Compiled Python files
 __pycache__
-*.pyc
+*.py[co]
 
 # Python distribution
 /dist
