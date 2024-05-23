@@ -7,7 +7,6 @@ return {
         "L3MON4D3/LuaSnip", -- A snippers engine.
         "saadparwaiz1/cmp_luasnip", -- For integration with `L3MON4D3/LuaSnip`.
         "onsails/lspkind.nvim", -- Pictograms inside suggestions modal.
-        "hrsh7th/cmp-nvim-lsp-signature-help", -- Signature help.
     },
     config = function()
         local cmp = require("cmp")
@@ -48,7 +47,6 @@ return {
             -- Sources for autocompletion.
             sources = cmp.config.sources({
                 { name = "nvim_lsp" }, -- LSP.
-                { name = "nvim_lsp_signature_help" }, -- Signature help.
                 { name = "luasnip" }, -- Snippets.
                 { name = "buffer" }, -- Text from the current buffer.
                 -- Paths from the file system.

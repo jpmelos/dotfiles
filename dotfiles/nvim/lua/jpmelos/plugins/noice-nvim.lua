@@ -30,7 +30,7 @@ return {
                 command_palette = true,
                 -- Send long messages to a split.
                 long_message_to_split = true,
-                -- Add a border to hover docs and signature help.
+                -- Add a border to hover docs.
                 lsp_doc_border = true,
             },
         })
