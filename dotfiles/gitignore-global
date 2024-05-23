@@ -4,6 +4,7 @@
 
 # Python virtual environments
 /.venv
+/jpmelos-requirements.txt
 
 # Compiled Python files
 __pycache__
