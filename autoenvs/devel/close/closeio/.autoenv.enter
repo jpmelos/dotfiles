@@ -45,13 +45,12 @@ else
 
     fr() {  # requirements
         pip install -r requirements/requirements-pip.txt \
-            && pip install -r requirements/requirements.txt \
-            && pip install -r requirements/requirements.private \
-            && pip install -r requirements/requirements-dev.txt \
-            && pip install -r requirements/requirements-lint.txt \
-            && pip install -r requirements/requirements-test.txt \
-            && pip install -r \
-                requirements/requirements-deploy-notifications.txt
+        && pip install -r requirements/requirements.txt \
+        && pip install -r requirements/requirements.private \
+        && pip install -r requirements/requirements-dev.txt \
+        && pip install -r requirements/requirements-lint.txt \
+        && pip install -r requirements/requirements-test.txt \
+        && pip install -r requirements/requirements-deploy-notifications.txt
     }
 fi
 
@@ -75,9 +74,9 @@ else
             && docker volume rm devtools_redis6_data \
             && docker volume rm devtools_redis7_data \
             && bin/login \
-            && dc pull --include-deps core closeio_shell \
-            && dc up -d core closeio_shell \
-            && dc logs -f --tail 1000 closeio_api
+            && docker-compose pull --include-deps core closeio_shell \
+            && docker-compose up -d core closeio_shell \
+            && docker-compose logs -f --tail 1000 closeio_api
         )
     }
 fi
@@ -98,11 +97,11 @@ else
     fq() {  # quality
         (
             cd ../devtools \
-            && dc exec closeio_shell black . \
-            && dc exec closeio_shell ruff check --fix . \
-            && dc exec closeio_shell black --check . \
-            && dc exec closeio_shell ruff check . \
-            && dc exec closeio_shell dmypy run
+            && docker-compose exec closeio_shell black . \
+            && docker-compose exec closeio_shell ruff check --fix . \
+            && docker-compose exec closeio_shell black --check . \
+            && docker-compose exec closeio_shell ruff check . \
+            && docker-compose exec closeio_shell dmypy run
         )
     }
 fi
@@ -123,7 +122,7 @@ else
     ft() {  # test
         (
             cd ../devtools \
-            && dc run --rm --name testing closeio_shell \
+            && docker-compose run --rm --name testing closeio_shell \
                 pytest -vv $@
         )
     }
@@ -145,17 +144,10 @@ else
     ftd() {  # test
         (
             cd ../devtools \
-            && dc run \
-                --rm \
-                --name testing \
-                -p 27027:27027 \
-                closeio_shell \
-                    python -m \
-                        debugpy \
-                            --listen 0.0.0.0:27027 \
-                            --wait-for-client \
-                            -m \
-                                pytest -vv $@
+            && docker-compose run --rm --name testing -p 27027:27027 \
+                closeio_shell python -m \
+                    debugpy --listen 0.0.0.0:27027 --wait-for-client -m \
+                        pytest -vv $@
         )
     }
 fi
@@ -176,10 +168,10 @@ else
     fgr() {  # graphql
         (
             cd ../devtools \
-            && dc run --rm --name testing closeio_shell \
-                pytest -vv --overwrite-snapshots \
-                    tests/common/graphql/test_schema.py \
-                    tests/admin/graphql/test_schema.py
+            && docker-compose run --rm --name testing closeio_shell pytest
+                -vv --overwrite-snapshots \
+                tests/common/graphql/test_schema.py \
+                tests/admin/graphql/test_schema.py
         )
     }
 fi
@@ -200,7 +192,7 @@ else
     fls() {  # shell
         (
             cd ../devtools \
-            && dc exec closeio_shell bash
+            && docker-compose exec closeio_shell bash
         )
     }
 fi
@@ -221,7 +213,7 @@ else
     flp() {  # python
         (
             cd ../devtools \
-            && dc exec closeio_shell python manage.py shell
+            && docker-compose exec closeio_shell python manage.py shell
         )
     }
 fi
