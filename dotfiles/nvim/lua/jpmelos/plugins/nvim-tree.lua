@@ -47,26 +47,32 @@ return {
         K(
             "n",
             "<leader>ee",
-            "<cmd>NvimTreeToggle<CR>",
-            { desc = "Toggle file explorer" }
+            "<cmd>NvimTreeOpen<CR>",
+            { desc = "Open/focus file explorer" }
         )
         K(
             "n",
             "<leader>ef",
-            "<cmd>NvimTreeFindFileToggle<CR>",
-            { desc = "Toggle file explorer on current file" }
+            "<cmd>NvimTreeFindFile<CR>",
+            { desc = "Open/focus file explorer on current file" }
         )
         K(
             "n",
             "<leader>ec",
             "<cmd>NvimTreeCollapse<CR>",
-            { desc = "Collapse file explorer" }
+            { desc = "Collapse entries in file explorer" }
         )
         K(
             "n",
             "<leader>er",
             "<cmd>NvimTreeRefresh<CR>",
             { desc = "Refresh file explorer" }
+        )
+        K(
+            "n",
+            "<leader>ex",
+            "<cmd>NvimTreeClose<CR>",
+            { desc = "Close file explorer" }
         )
     end,
 }
