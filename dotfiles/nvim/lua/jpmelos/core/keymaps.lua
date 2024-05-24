@@ -3,9 +3,6 @@ vim.g.mapleader = " "
 
 local K = vim.keymap.set
 
--- C-c clear the screen of searches.
-K({ "n", "i" }, "<C-c>", "<cmd>nohl<cr>", { desc = "Clear search highlight" })
-
 -- Tab management.
 K("n", "<leader>to", "<cmd>tabnew<CR>", { desc = "Open new tab" })
 K("n", "<leader>tx", "<cmd>tabclose<CR>", { desc = "Close current tab" })
