@@ -21,6 +21,7 @@ else
         echo "fh -> This help."
         echo "fr -> Install all requirements."
         echo "fp -> Start production shell."
+        echo "fpp -> Start production Python REPL."
     }
 fi
 
@@ -56,7 +57,7 @@ if type fpp > /dev/null 2>&1; then
 else
     AUTOENV_CLOSE_CLOSEIO_FPP=1
 
-    fp() {  # production
+    fpp() {  # production Python
         python scripts/remote-shell --keep-alive python manage.py shell $@
     }
 fi
