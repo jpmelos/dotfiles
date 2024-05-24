@@ -40,45 +40,54 @@ local register_waiting_for_breakpoint_handler = function(dap, dap_breakpoints)
         handle_stopped_or_terminated_event
 end
 
+local debug_with_host_port = function(callback, host_port)
+    local host, port = host_port:match("(.-):(.*)")
+    port = tonumber(port)
+    if host == nil or port == nil or host == "" or port == "" then
+        vim.notify("Invalid host:port configuration!", "error")
+        return
+    end
+
+    callback({ type = "server", host = host, port = port })
+end
+
 local function getHostPortAndDebug(callback)
     local Input = require("nui.input")
     local event = require("nui.utils.autocmd").event
 
-    local input = Input({
-        position = "50%",
-        size = { width = 40 },
-        border = {
-            style = "rounded",
-            text = {
-                top = " host:port ",
-                top_align = "center",
+    local host_port_env = os.getenv("REMOTE_DEBUG_HOST_PORT")
+    if host_port_env == nil then
+        local input = Input({
+            position = "50%",
+            size = { width = 40 },
+            border = {
+                style = "rounded",
+                text = {
+                    top = " host:port ",
+                    top_align = "center",
+                },
             },
-        },
-        win_options = {
-            winhighlight = "Normal:Normal,FloatBorder:Normal",
-        },
-    }, {
-        prompt = "> ",
-        default_value = "localhost:27027",
-        on_submit = function(value)
-            local host, port = value:match("(.-):(.*)")
-            port = tonumber(port)
-            if host == nil or port == nil or host == "" or port == "" then
-                vim.notify("Invalid host:port configuration!", "error")
-                return
-            end
+            win_options = {
+                winhighlight = "Normal:Normal,FloatBorder:Normal",
+            },
+        }, {
+            prompt = "> ",
+            default_value = "localhost:27027",
+            on_submit = function(host_port)
+                debug_with_host_port(callback, host_port)
+            end,
+        })
 
-            callback({ type = "server", host = host, port = port })
-        end,
-    })
-
-    input:on(event.BufLeave, function()
-        input:unmount()
-    end)
-    input:map("n", "<Esc>", function()
-        input:unmount()
-    end, { noremap = true })
-    input:mount()
+        input:on(event.BufLeave, function()
+            input:unmount()
+        end)
+        input:map("n", "<Esc>", function()
+            input:unmount()
+        end, { noremap = true })
+        input:mount()
+    else
+        debug_with_host_port(callback, host_port_env)
+    end
 end
 
 return {

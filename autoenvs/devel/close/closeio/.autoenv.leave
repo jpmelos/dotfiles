@@ -12,6 +12,10 @@ if [ -n "$REMOTE_DEBUG_ROOT" ]; then
     unset REMOTE_DEBUG_ROOT
 fi
 
+if [ -n "$REMOTE_DEBUG_HOST_PORT" ]; then
+    unset REMOTE_DEBUG_HOST_PORT
+fi
+
 ############
 #          #
 #    fh    #
