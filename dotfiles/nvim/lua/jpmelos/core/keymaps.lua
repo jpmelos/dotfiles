@@ -38,6 +38,10 @@ K({ "n", "v" }, "<C-d>", function()
     return half_window .. "j"
 end, { expr = true })
 
+-- Enter expands folds, backspace collapses folds.
+K("n", "<enter>", "zo")
+K("n", "<backspace>", "zc")
+
 -- Terminal management.
 -- <Esc> leaves the terminal insert mode.
 K("t", "<Esc>", "<C-\\><C-n>")
