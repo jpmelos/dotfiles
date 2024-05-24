@@ -1,10 +1,12 @@
+# Ignore all personal environment files.
+jpenv*
+
 # autoenv files
 .autoenv.enter
 .autoenv.leave
 
 # Python virtual environments
 /.venv
-/jpmelos-requirements.txt
 
 # Compiled Python files
 __pycache__
