@@ -13,6 +13,7 @@ return {
             w = "+ Sessions",
             p = "+ Format",
             l = "+ Lint",
+            d = "+ Debug",
             c = "+ Code actions",
             g = "+ Git",
             m = "+ Markdown",
