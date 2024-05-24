@@ -1,5 +1,0 @@
-python-lsp-server
-pylsp-rope
-pylsp-mypy
-pyls-memestra
-python-lsp-ruff
