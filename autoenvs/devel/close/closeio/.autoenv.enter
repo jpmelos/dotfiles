@@ -74,6 +74,7 @@ else
     fl() {  # local
         (
             cd ../devtools \
+            && git pull \
             && docker rm -f $(docker ps -aq) \
             && docker volume rm devtools_redis6_data \
             && docker volume rm devtools_redis7_data \
