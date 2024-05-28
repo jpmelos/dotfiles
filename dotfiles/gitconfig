@@ -18,6 +18,9 @@
 [merge]
     conflictStyle = diff3
 
+[rebase]
+    updateRefs = true
+
 [commit]
     verbose = true
     gpgSign = true
