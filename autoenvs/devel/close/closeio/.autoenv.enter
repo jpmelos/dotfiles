@@ -102,10 +102,10 @@ else
     fq() {  # quality
         (
             cd ../devtools \
-            && docker-compose exec closeio_shell black . \
             && docker-compose exec closeio_shell ruff check --fix . \
-            && docker-compose exec closeio_shell black --check . \
+            && docker-compose exec closeio_shell black . \
             && docker-compose exec closeio_shell ruff check . \
+            && docker-compose exec closeio_shell black --check . \
             && docker-compose exec closeio_shell dmypy run
         )
     }
