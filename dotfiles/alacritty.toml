@@ -3,6 +3,9 @@ decorations = "None"
 padding.x = 5
 padding.y = 5
 
+[mouse]
+hide_when_typing = true
+
 [font]
 normal.family = "JetBrainsMono Nerd Font Mono"
 normal.style = "Thin"
