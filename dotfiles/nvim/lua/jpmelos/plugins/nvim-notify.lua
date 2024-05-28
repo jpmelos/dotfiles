@@ -6,6 +6,7 @@ return {
         local K = vim.keymap.set
 
         vim.notify = require("notify")
+        vim.notify.setup({ max_width = 100 })
 
         K(
             "n",
