@@ -82,6 +82,17 @@ if [ -n "$AUTOENV_CLOSE_CLOSEIO_FTD" ]; then
     unset -f ftd
 fi
 
+##############
+#            #
+#    ftdl    #
+#            #
+##############
+
+if [ -n "$AUTOENV_CLOSE_CLOSEIO_FTDL" ]; then
+    unset AUTOENV_CLOSE_CLOSEIO_FTDL
+    unset -f ftdl
+fi
+
 #############
 #           #
 #    fgr    #

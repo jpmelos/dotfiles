@@ -149,6 +149,30 @@ else
     ftd() {  # test debug
         (
             cd ../devtools \
+            && docker-compose run --rm --name testing -p 27027:27027 \
+                closeio_shell python -m \
+                    debugpy --listen 0.0.0.0:27027 --wait-for-client -m \
+                        pytest -vv $@
+        )
+    }
+fi
+
+##############
+#            #
+#    ftdl    #
+#            #
+##############
+
+FH_HELP="$FH_HELP\nftdl -> Run tests in debug mode, loop."
+
+if type ftdl > /dev/null 2>&1; then
+    echo ".autoenv.enter: Would overwrite ftdl, did not"
+else
+    AUTOENV_CLOSE_CLOSEIO_FTDL=1
+
+    ftdl() {  # test debug loop
+        (
+            cd ../devtools \
             && while true; do \
                 docker-compose run --rm --name testing -p 27027:27027 \
                     closeio_shell python -m \
