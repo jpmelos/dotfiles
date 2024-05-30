@@ -2,6 +2,9 @@ local opt = vim.opt
 local opt_local = vim.opt_local
 local api = vim.api
 
+-- Disable swapfiles.
+opt.swapfile = false
+
 -- Disable mouse entirely.
 opt.mouse = ""
 -- Keep cursor at the middle of the screen.
