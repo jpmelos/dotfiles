@@ -150,7 +150,7 @@ else
         (
             cd ../devtools \
             && docker-compose run --rm --name testing -p 27027:27027 \
-                closeio_shell python -m \
+                closeio_shell python -Xfrozen_modules=off -m \
                     debugpy --listen 0.0.0.0:27027 --wait-for-client -m \
                         pytest -vv $@
         )
@@ -171,16 +171,10 @@ else
     AUTOENV_CLOSE_CLOSEIO_FTDL=1
 
     ftdl() {  # test debug loop
-        (
-            cd ../devtools \
-            && while true; do \
-                docker-compose run --rm --name testing -p 27027:27027 \
-                    closeio_shell python -m \
-                        debugpy --listen 0.0.0.0:27027 --wait-for-client -m \
-                            pytest -vv $@ \
-                && sleep 1; \
-            done
-        )
+        while true; do \
+            ftd $@; \
+            sleep 1; \
+        done
     }
 fi
 
