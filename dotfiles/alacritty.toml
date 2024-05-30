@@ -2,6 +2,7 @@
 decorations = "None"
 padding.x = 5
 padding.y = 5
+option_as_alt = "Both"
 
 [mouse]
 hide_when_typing = true
