@@ -38,3 +38,5 @@ end, { expr = true, desc = "Jump half screen down" })
 -- Enter expands folds, backspace collapses folds.
 K("n", "<enter>", "zo", { desc = "Open fold under cursor" })
 K("n", "<backspace>", "zc", { desc = "Close fold under cursor" })
+
+K({ "i", "n" }, "<C-n>", "<cmd>nohls<cr>", { desc = "Clear search highlights" })
