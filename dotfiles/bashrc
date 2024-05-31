@@ -9,7 +9,12 @@ export GPG_TTY=$(tty)
 #                           #
 #############################
 
-shopt -s  histverify no_empty_cmd_completion
+# - histverify: Command history substitutions are put in the input line for
+#   verification, instead of being immediately run.
+# - no_empty_cmd_completion: When completion is attempted on an empty line
+#   (press <Tab> on an empty line), bash won't look in $PATH for completing
+#   possible commands.
+shopt -s histverify no_empty_cmd_completion
 
 run_autoenv_on_init() {
     if [ -z $AUTOENV_RAN_ON_INIT ]; then
