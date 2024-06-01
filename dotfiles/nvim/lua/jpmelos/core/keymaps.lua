@@ -52,6 +52,8 @@ end, { expr = true, desc = "Jump half screen down" })
 K("n", "<enter>", "zo", { desc = "Open fold under cursor" })
 K("n", "<backspace>", "zc", { desc = "Close fold under cursor" })
 
+-- Clear search highlights like this, since we use C-l to navigate through
+-- splits. See plugin Navigator.nvim.
 K(
     { "i", "n" },
     "<C-n>",
