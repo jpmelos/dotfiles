@@ -78,9 +78,6 @@ return {
                             -- configuration.
                             diagnostics = {
                                 disable = { "type-check" },
-                                -- TODO: Do we still need globals vim even with
-                                -- neodev.nvim?
-                                globals = { "vim" },
                             },
                         },
                     },
