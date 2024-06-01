@@ -32,8 +32,6 @@ return {
                     "markdown",
                 },
             },
-            -- Enable autotagging with the `nvim-ts-autotag` plugin.
-            autotag = { enable = true },
             -- Ensure these language parsers are installed.
             ensure_installed = {
                 -- These five parsers should always be installed according to
