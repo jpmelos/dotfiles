@@ -24,7 +24,7 @@ return {
         mason_lspconfig.setup({
             -- These are `nvim-lspconfig` names, which will be translated to
             -- Mason package names by `mason-lspconfig.nvim`.
-            ensure_installed = { "lua_ls", "pyright" },
+            ensure_installed = { "bashls", "lua_ls", "pyright" },
         })
 
         -- Capabilities, with the ones added by `nvim-cmp`.

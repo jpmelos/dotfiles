@@ -8,7 +8,7 @@ return {
         require("mason-tool-installer").setup({
             -- Install language servers with `mason-lspconfig.nvim` to
             -- ensure automatic configuration.
-            ensure_installed = {},
+            ensure_installed = { "shellcheck" },
         })
     end,
 }
