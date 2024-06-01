@@ -50,16 +50,18 @@ return {
             end,
             ["pyright"] = function()
                 lspconfig["pyright"].setup({
-                    cmd = { "pyright-langserver", "--watch", "--stdio" },
                     capabilities = capabilities,
                     settings = {
                         pyright = { disableOrganizeImports = true },
                         python = {
-                            -- Only syntax and semantic errors. No type
-                            -- checking in the IDE.
                             analysis = {
+                                -- Inspect the entire workspace: all importable
+                                -- code.
                                 diagnosticMode = "workspace",
+                                -- Only syntax and semantic errors. No type
+                                -- checking in the IDE.
                                 typeCheckingMode = "off",
+                                -- Do not mess with my path.
                                 autoSearchPaths = false,
                             },
                         },
