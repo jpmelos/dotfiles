@@ -21,6 +21,9 @@
 [rebase]
     updateRefs = true
 
+[rerere]
+	enabled = true
+
 [commit]
     verbose = true
     gpgSign = true
