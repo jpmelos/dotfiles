@@ -5,6 +5,9 @@ local api = vim.api
 -- Disable swapfiles.
 opt.swapfile = false
 
+-- Save undo history.
+opt.undofile = true
+
 -- Disable mouse entirely.
 opt.mouse = ""
 -- Keep cursor at the middle of the screen.
