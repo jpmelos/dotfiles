@@ -18,6 +18,7 @@ return {
         local K = vim.keymap.set
 
         local telescope = require("telescope")
+        local builtins = require("telescope.builtin")
         local actions = require("telescope.actions")
         local transform_mod = require("telescope.actions.mt").transform_mod
 
@@ -58,25 +59,25 @@ return {
         K(
             "n",
             "<leader>ff",
-            "<cmd>Telescope find_files<cr>",
+            builtins.find_files,
             { desc = "Find files in current directory" }
         )
         K(
             "n",
             "<leader>fs",
-            "<cmd>Telescope live_grep<cr>",
+            builtins.live_grep,
             { desc = "Find string in current directory" }
         )
         K(
             "n",
             "<leader>fc",
-            "<cmd>Telescope grep_string<cr>",
+            builtins.grep_string,
             { desc = "Find string under cursor in current directory" }
         )
         K(
             "n",
             "<leader>ft",
-            "<cmd>TodoTelescope<cr>",
+            telescope.extensions["todo-comments"].todo,
             { desc = "Find todos in current directory" }
         )
         K("n", "<leader>fp", function()
@@ -94,7 +95,21 @@ return {
                 path = get_parent(path)
             end
 
-            return "<cmd>Telescope live_grep search_dirs=" .. path .. "<cr>"
-        end, { expr = true, desc = "Search in path under cursor" })
+            builtins.live_grep({ search_dirs = { path } })
+        end, { desc = "Find in current path" })
+        K(
+            "n",
+            "<leader>fh",
+            builtins.help_tags,
+            { desc = "Find Neovim help tags" }
+        )
+        K("n", "<leader>fb", builtins.buffers, { desc = "Find buffers" })
+        K(
+            "n",
+            "<leader>fg",
+            builtins.git_status,
+            { desc = "Find git modified files" }
+        )
+        K("n", "<leader>fm", builtins.commands, { desc = "Find commands" })
     end,
 }
