@@ -21,8 +21,18 @@ K("n", "[t", "<cmd>tabp<CR>", { desc = "Previous tab" })
 K("n", "]t", "<cmd>tabn<CR>", { desc = "Next tab" })
 
 -- Navigate line by line in soft-wrapped lines.
-K({ "n", "v" }, "k", "gk", { desc = "Navigate one screen line up" })
-K({ "n", "v" }, "j", "gj", { desc = "Navigate one screen line down" })
+K(
+    { "n", "v" },
+    "k",
+    "v:count == 0 ? 'gk' : 'k'",
+    { expr = true, silent = true, desc = "Navigate one screen line up" }
+)
+K(
+    { "n", "v" },
+    "j",
+    "v:count == 0 ? 'gj' : 'j'",
+    { expr = true, silent = true, desc = "Navigate one screen line down" }
+)
 
 -- C-u and C-d only jump half screen.
 K({ "n", "v" }, "<C-u>", function()
