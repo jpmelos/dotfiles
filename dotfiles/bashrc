@@ -164,10 +164,4 @@ update() {
 #                    #
 ######################
 
-if [ -z "$TMUX" ]; then
-    if [[ $(tmux ls 2>&1) =~ "no server"* ]]; then
-        exec tmux
-    else
-        exec tmux attach
-    fi
-fi
+tmux has-session && exec tmux attach || exec tmux
