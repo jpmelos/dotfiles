@@ -1,0 +1,7 @@
+{
+  "bash-language-server": "5.3.3",
+  "lua-language-server": "3.9.1",
+  "pyright": "1.1.364",
+  "rust-analyzer": "2024-05-27",
+  "shellcheck": "v0.10.0"
+}
