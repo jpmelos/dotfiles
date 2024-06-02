@@ -164,4 +164,10 @@ update() {
 #                    #
 ######################
 
-tmux has-session && exec tmux attach || exec tmux
+if [ -z "$TMUX" ]; then
+    if tmux has-session; then
+        exec tmux attach
+    else
+        exec tmux
+    fi
+fi
