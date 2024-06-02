@@ -110,6 +110,12 @@ return {
             builtins.git_status,
             { desc = "Find git modified files" }
         )
+        K(
+            "n",
+            "<leader>fr",
+            builtins.git_bcommits,
+            { desc = "Find changes on this file" }
+        )
         K("n", "<leader>fm", builtins.commands, { desc = "Find commands" })
     end,
 }
