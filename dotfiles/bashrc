@@ -17,7 +17,7 @@ export GPG_TTY=$(tty)
 shopt -s histverify no_empty_cmd_completion
 
 run_autoenv_on_init() {
-    if [ -z $AUTOENV_RAN_ON_INIT ]; then
+    if [ -z "$AUTOENV_RAN_ON_INIT" ]; then
         cd /
         cd - > /dev/null
         AUTOENV_RAN_ON_INIT=1
