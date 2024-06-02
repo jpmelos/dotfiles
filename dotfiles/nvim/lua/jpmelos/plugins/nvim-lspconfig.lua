@@ -48,6 +48,21 @@ return {
                     capabilities = capabilities,
                 })
             end,
+            ["lua_ls"] = function()
+                lspconfig["lua_ls"].setup({
+                    capabilities = capabilities,
+                    settings = {
+                        Lua = {
+                            -- Make the language server recognize the "vim"
+                            -- global. Useful when working with Neovim
+                            -- configuration.
+                            diagnostics = {
+                                disable = { "type-check" },
+                            },
+                        },
+                    },
+                })
+            end,
             ["pyright"] = function()
                 lspconfig["pyright"].setup({
                     capabilities = capabilities,
@@ -63,21 +78,6 @@ return {
                                 typeCheckingMode = "off",
                                 -- Do not mess with my path.
                                 autoSearchPaths = false,
-                            },
-                        },
-                    },
-                })
-            end,
-            ["lua_ls"] = function()
-                lspconfig["lua_ls"].setup({
-                    capabilities = capabilities,
-                    settings = {
-                        Lua = {
-                            -- Make the language server recognize the "vim"
-                            -- global. Useful when working with Neovim
-                            -- configuration.
-                            diagnostics = {
-                                disable = { "type-check" },
                             },
                         },
                     },
