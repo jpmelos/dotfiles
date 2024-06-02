@@ -48,8 +48,14 @@ return {
                     capabilities = capabilities,
                 })
             end,
-            ["lua_ls"] = function()
-                lspconfig["lua_ls"].setup({
+            bashls = function()
+                lspconfig.bashls.setup({
+                    capabilities = capabilities,
+                    settings = { filetypes = { "sh", "bash" } },
+                })
+            end,
+            lua_ls = function()
+                lspconfig.lua_ls.setup({
                     capabilities = capabilities,
                     settings = {
                         Lua = {
@@ -63,8 +69,8 @@ return {
                     },
                 })
             end,
-            ["pyright"] = function()
-                lspconfig["pyright"].setup({
+            pyright = function()
+                lspconfig.pyright.setup({
                     capabilities = capabilities,
                     settings = {
                         pyright = { disableOrganizeImports = true },

@@ -1,4 +1,4 @@
-# vim: set ft=sh :
+# vim: set ft=bash :
 
 # Are we on a Mac?
 if [[ "$HOME" =~ /Users/* ]]; then

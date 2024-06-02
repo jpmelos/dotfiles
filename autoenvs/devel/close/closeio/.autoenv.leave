@@ -1,4 +1,4 @@
-# vim: set ft=sh :
+# vim: set ft=bash :
 
 if [ -z "$AUTOENV_CLOSE_CLOSEIO" ]; then
     return

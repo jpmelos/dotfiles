@@ -1,4 +1,4 @@
-# vim: set ft=sh :
+# vim: set ft=bash :
 
 # Set up the GPG Agent.
 export GPG_TTY=$(tty)
