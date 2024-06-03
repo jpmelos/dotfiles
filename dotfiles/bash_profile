@@ -13,12 +13,14 @@ fi
 if [[ $JPMELOS_IS_MACOS == "true" ]]; then
     export PATH="/opt/homebrew/bin:$PATH"
 fi
+# Binaries not managed via a package manager.
+export PATH="$HOME/.local/bin:$PATH"
+# Neovim's Mason installations.
+export PATH="$HOME/.local/share/nvim/mason/bin:$PATH"
 # Rust tooling's own binaries.
 export PATH="$HOME/.cargo/bin:$PATH"
 # pyenv's own binaries.
 export PATH="$HOME/.pyenv/bin:$PATH"
-# Binaries not managed via a package manager.
-export PATH="$HOME/.local/bin:$PATH"
 # My own executables.
 export PATH="$HOME/bin:$PATH"
 
