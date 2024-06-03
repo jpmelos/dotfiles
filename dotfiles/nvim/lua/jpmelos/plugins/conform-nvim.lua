@@ -6,23 +6,39 @@ return {
 
         local conform = require("conform")
 
+        -- Disable autoformat by default. Use workspaces to enable it for
+        -- specific projects.
+        vim.g.disable_autoformat = true
+
         conform.setup({
-            formatters_by_ft = {},
-            format_on_save = function(bufnr)
+            -- Use workspaces to change this for specific projects.
+            formatters_by_ft = {
+                sh = { "shfmt" },
+                lua = { "stylua" },
+                python = {
+                    "ruff_fix",
+                    "ruff_format",
+                    "ruff_organize_imports",
+                },
+            },
+        })
+
+        vim.api.nvim_create_autocmd({ "BufWritePost", "InsertLeave" }, {
+            pattern = "*",
+            callback = function()
                 -- Disable with a global or buffer-local variable.
-                if
-                    vim.g.disable_autoformat or vim.b[bufnr].disable_autoformat
-                then
-                    return false
+                if vim.g.disable_autoformat or vim.b.disable_autoformat then
+                    return
                 end
-                return { lsp_fallback = false }
+
+                require("conform").format({ async = true })
             end,
         })
 
         -- Use Vim's internal formatter, instead of `conform.nvim`, for `gq`.
         vim.api.nvim_create_autocmd("LspAttach", {
             callback = function(args)
-                vim.bo[args.buf].formatexpr = nil
+                vim.bo[args.buf].formatexpr = ""
             end,
         })
 
