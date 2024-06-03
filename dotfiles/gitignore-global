@@ -1,22 +1,23 @@
 # Ignore all personal environment files.
 jpenv*
 
-# autoenv files
+# autoenv files.
 .autoenv.enter
 .autoenv.leave
 
-# Python virtual environments
+# Python virtual environments.
 /.venv
 
-# Compiled Python files
+# Compiled Python files.
 __pycache__
 *.py[co]
 
-# Python distribution
+# Python distributions.
 /dist
 
-# Python's tox test running framework
+# Python's test running frameworks.
 /.tox
 
-# JetBrain's IDE configuration files per project
+# Project-specific IDE configuration files.
+/.nvim.lua
 /.idea
