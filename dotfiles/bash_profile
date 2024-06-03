@@ -37,6 +37,7 @@ field_prepend PATH "$HOME/.cargo/bin"
 field_prepend PATH "$HOME/.pyenv/bin"
 # My own executables.
 field_prepend PATH "$HOME/bin"
+export PATH
 
 # Sets the default editor for various commands.
 export EDITOR=$(which nvim)
