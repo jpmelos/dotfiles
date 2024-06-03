@@ -59,11 +59,12 @@ return {
                     capabilities = capabilities,
                     settings = {
                         Lua = {
-                            -- Make the language server recognize the "vim"
-                            -- global. Useful when working with Neovim
-                            -- configuration.
                             diagnostics = {
                                 disable = { "type-check" },
+                                -- Make the language server recognize the "vim"
+                                -- global. Useful when working with Neovim
+                                -- configuration.
+                                globals = { "vim" },
                             },
                         },
                     },
