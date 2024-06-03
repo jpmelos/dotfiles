@@ -2,6 +2,9 @@
   "bash-language-server": "5.3.3",
   "lua-language-server": "3.9.1",
   "pyright": "1.1.364",
+  "ruff": "0.4.7",
   "rust-analyzer": "2024-05-27",
-  "shellcheck": "v0.10.0"
+  "shellcheck": "v0.10.0",
+  "shfmt": "v3.8.0",
+  "stylua": "v0.20.0"
 }
