@@ -10,18 +10,19 @@ return {
         wk.setup()
 
         wk.register({
-            w = "+ Sessions",
-            p = "+ Format",
-            l = "+ LSP/Lint",
-            d = "+ Debug",
             c = "+ Code actions",
-            g = "+ Git",
-            m = "+ Markdown",
-            f = "+ Finder",
+            d = "+ Debug",
             e = "+ Explorer",
-            x = "+ Quickfix",
+            f = "+ Finder",
+            g = "+ Git",
+            l = "+ LSP/Lint",
+            m = "+ Markdown",
+            o = "+ Obsidian",
+            p = "+ Format",
             s = "+ Splits",
             t = "+ Tabs",
+            w = "+ Sessions",
+            x = "+ Quickfix",
         }, { prefix = "<leader>" })
 
         vim.cmd("hi WhichKeyFloat guibg=#eeeeee")
