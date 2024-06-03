@@ -115,13 +115,25 @@ alias gpsup='g psup'
 alias gpf='g pf'
 alias gl='g l'
 
+################################
+#                              #
+#    Homebrew's completions    #
+#                              #
+################################
+
+if type brew &>/dev/null; then
+    HOMEBREW_PREFIX="$(brew --prefix)"
+
+    for COMPLETION in "${HOMEBREW_PREFIX}/etc/bash_completion.d/"*; do
+        [[ -r "${COMPLETION}" ]] && source "${COMPLETION}"
+    done
+fi
+
 #########################
 #                       #
 #    git completions    #
 #                       #
 #########################
-
-source ~/devel/dotfiles/dotfiles/git-completion.bash
 
 __git_complete g git
 __git_complete gb git_branch
