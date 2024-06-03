@@ -12,7 +12,7 @@ return {
         wk.register({
             w = "+ Sessions",
             p = "+ Format",
-            l = "+ Lint",
+            l = "+ LSP/Lint",
             d = "+ Debug",
             c = "+ Code actions",
             g = "+ Git",
