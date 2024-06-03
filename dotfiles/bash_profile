@@ -42,9 +42,6 @@ export PATH
 # Sets the default editor for various commands.
 export EDITOR=$(which nvim)
 
-# Find any custom terminfos that we install.
-export TERMINFO_DIRS=$HOME/.local/share/terminfo:$TERMINFO_DIRS
-
 #############################
 #                           #
 #    Bash-specific stuff    #
