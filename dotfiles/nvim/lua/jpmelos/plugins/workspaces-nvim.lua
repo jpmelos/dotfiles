@@ -26,9 +26,9 @@ end
 
 -- Function that changes workspace to the one of the active buffer.
 local change_workspace_on_buf_change = function()
-    -- Do nothing if no file type.
+    -- Do nothing if not a regular buffer.
     local buf_type = vim.api.nvim_get_option_value("buftype", { buf = 0 })
-    if buf_type == "" then
+    if buf_type ~= "" and buf_type ~= "acwrite" then
         return
     end
 
