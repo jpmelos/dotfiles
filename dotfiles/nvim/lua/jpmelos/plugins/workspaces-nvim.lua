@@ -62,7 +62,16 @@ local change_workspace_on_buf_change = function()
     end
 end
 
-local on_workspace_open = function(name)
+local on_workspace_open = function(name, path)
+    local exrc_path = path .. ".nvim.lua"
+
+    local secure_state = vim.secure.read(exrc_path)
+    if secure_state then
+        vim.cmd.source(path .. ".nvim.lua")
+    else
+        vim.notify("Could not load file " .. exrc_path, "error")
+    end
+
     vim.notify("Workspace activated: " .. name .. ".")
 end
 
