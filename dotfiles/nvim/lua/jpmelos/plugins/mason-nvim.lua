@@ -3,6 +3,7 @@ return {
     lazy = false,
     config = function()
         require("mason").setup({
+            PATH = "skip",
             ui = {
                 icons = {
                     package_installed = "✓",
