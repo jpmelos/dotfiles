@@ -7,22 +7,36 @@ else
     JPMELOS_IS_MACOS="false"
 fi
 
+#################
+#               #
+#    Imports    #
+#               #
+#################
+
+[[ -f ~/.bash_fields.sh ]] && source ~/.bash_fields.sh
+
+##############################
+#                            #
+#    Environment-specific    #
+#                            #
+##############################
+
 # Set the PATH. Things are always prepended, so the last entry to be entered
 # here is the one with the highest priority.
 # Binaries installed by Homebrew.
 if [[ $JPMELOS_IS_MACOS == "true" ]]; then
-    export PATH="/opt/homebrew/bin:$PATH"
+    field_prepend PATH /opt/homebrew/bin
 fi
 # Binaries not managed via a package manager.
-export PATH="$HOME/.local/bin:$PATH"
+field_prepend PATH "$HOME/.local/bin"
 # Neovim's Mason installations.
-export PATH="$HOME/.local/share/nvim/mason/bin:$PATH"
+field_prepend PATH "$HOME/.local/share/nvim/mason/bin"
 # Rust tooling's own binaries.
-export PATH="$HOME/.cargo/bin:$PATH"
+field_prepend PATH "$HOME/.cargo/bin"
 # pyenv's own binaries.
-export PATH="$HOME/.pyenv/bin:$PATH"
+field_prepend PATH "$HOME/.pyenv/bin"
 # My own executables.
-export PATH="$HOME/bin:$PATH"
+field_prepend PATH "$HOME/bin"
 
 # Sets the default editor for various commands.
 export EDITOR=$(which nvim)
