@@ -39,9 +39,6 @@ field_prepend PATH "$HOME/.pyenv/bin"
 field_prepend PATH "$HOME/bin"
 export PATH
 
-# Sets the default editor for various commands.
-export EDITOR=$(which nvim)
-
 #############################
 #                           #
 #    Bash-specific stuff    #
@@ -55,6 +52,18 @@ export HISTFILESIZE=$HISTSIZE
 export HISTCONTROL=erasedups:ignoreboth
 # Persist every command immediately, load new commands.
 export PROMPT_COMMAND="history -a; history -n; run_autoenv_on_init; ${PROMPT_COMMAND}"
+
+########################
+#                      #
+#    Work utilities    #
+#                      #
+########################
+
+# Sets the default editor for various commands.
+export EDITOR=nvim
+
+# Configure ripgrep to use a configuration file.
+export RIPGREP_CONFIG_PATH="$HOME/.ripgreprc"
 
 ###############################
 #                             #

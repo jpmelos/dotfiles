@@ -1,0 +1,12 @@
+#
+# ATTENTION: This will affect nvim's telescope too!
+#
+--no-heading
+--with-filename
+--line-number
+--column
+--smart-case
+--no-ignore
+--hidden
+--glob
+    !/.git
