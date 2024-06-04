@@ -16,7 +16,6 @@ return {
         }
 
         dashboard.section.buttons.val = {
-            dashboard.button(":e", "  > New File", "<cmd>ene<CR>"),
             dashboard.button(
                 "<Space>ee",
                 "  > Toggle file explorer",
