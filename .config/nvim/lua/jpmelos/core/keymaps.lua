@@ -34,6 +34,11 @@ K(
     { expr = true, silent = true, desc = "Navigate one screen line down" }
 )
 
+-- Lots of tools, like telescope and others, rely on V to make a vertical
+-- split, and X to make a horizontal split. Let's follow that lead here.
+K("n", "<C-w>x", "<cmd>split<cr>")
+K("n", "<C-w>v", "<cmd>vsplit<cr>")
+
 -- C-u and C-d only jump half screen.
 K({ "n", "v" }, "<C-u>", function()
     local half_window = math.ceil(
