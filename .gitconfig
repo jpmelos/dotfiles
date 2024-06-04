@@ -4,7 +4,7 @@
 
 [core]
     pager = less -Q
-    excludesFile = ~/.gitignore
+    excludesFile = ~/.gitignore-global
 
 [init]
     defaultBranch = main
@@ -75,7 +75,7 @@
     l = log --oneline --graph
 
 [include]
-    path = ~/devel/dotfiles/dotfiles/gitconfigs/gpg-keys
+    path = ~/devel/dotfiles/references/gitconfigs/gpg-keys
 
 [includeIf "gitdir:~/devel/close/"]
-    path = ~/devel/dotfiles/dotfiles/gitconfigs/close
+    path = ~/devel/dotfiles/references/gitconfigs/close

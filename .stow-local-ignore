@@ -1,0 +1,8 @@
+^/.git
+^/.gitignore
+^/.nvim.lua
+^/.stow-local-ignore
+^/README.md
+^/references
+^/stylua.toml
+^/.stowrc
