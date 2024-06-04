@@ -2,9 +2,9 @@
 
 # Are we on a Mac?
 if [[ "$HOME" =~ /Users/* ]]; then
-    JPMELOS_IS_MACOS="true"
+	JPMELOS_IS_MACOS="true"
 else
-    JPMELOS_IS_MACOS="false"
+	JPMELOS_IS_MACOS="false"
 fi
 
 #################
@@ -25,7 +25,7 @@ fi
 # here is the one with the highest priority.
 # Binaries installed by Homebrew.
 if [[ $JPMELOS_IS_MACOS == "true" ]]; then
-    field_prepend PATH /opt/homebrew/bin
+	field_prepend PATH /opt/homebrew/bin
 fi
 # Binaries not managed via a package manager.
 field_prepend PATH "$HOME/.local/bin"
