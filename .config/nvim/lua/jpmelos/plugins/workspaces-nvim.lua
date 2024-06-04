@@ -65,8 +65,8 @@ end
 local on_workspace_open = function(name, path)
     local exrc_path = path .. ".nvim.lua"
 
-    local secure_state = vim.secure.read(exrc_path)
-    if secure_state then
+    local secure_exrc = vim.secure.read(exrc_path)
+    if secure_exrc then
         vim.cmd.source(path .. ".nvim.lua")
     else
         vim.notify("Could not load file " .. exrc_path, "error")
