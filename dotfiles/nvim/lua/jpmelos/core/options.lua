@@ -60,6 +60,24 @@ opt.formatexpr = ""
 -- Use Vim's default formatter.
 opt.formatprg = ""
 
+opt.listchars = {
+    eol = "$",
+    tab = ">-",
+    space = "•",
+    lead = "•",
+    trail = "•",
+    extends = "→",
+    precedes = "←",
+    conceal = " ",
+    nbsp = "⇔",
+}
+
+-- Don't conceal anything. Projects that want to customize this should use a
+-- workspace and a `.nvim.lua` file in their root directory.
+opt.conceallevel = 0
+-- Don't conceal in the cursor line when in normal mode or search mode.
+opt.concealcursor = "nc"
+
 -- Highlight column for text wrapping.
 opt.colorcolumn = "80"
 -- Specific colorcolumn setting for git commit files.
