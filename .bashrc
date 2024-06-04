@@ -17,11 +17,11 @@ export GPG_TTY=$(tty)
 shopt -s histverify no_empty_cmd_completion
 
 run_autoenv_on_init() {
-    if [ -z "$AUTOENV_RAN_ON_INIT" ]; then
-        cd /
-        cd - > /dev/null
-        AUTOENV_RAN_ON_INIT=1
-    fi
+	if [ -z "$AUTOENV_RAN_ON_INIT" ]; then
+		cd /
+		cd - >/dev/null
+		AUTOENV_RAN_ON_INIT=1
+	fi
 }
 
 #################
@@ -122,11 +122,11 @@ alias gl='g l'
 ################################
 
 if type brew &>/dev/null; then
-    HOMEBREW_PREFIX="$(brew --prefix)"
+	HOMEBREW_PREFIX="$(brew --prefix)"
 
-    for COMPLETION in "${HOMEBREW_PREFIX}/etc/bash_completion.d/"*; do
-        [[ -r "${COMPLETION}" ]] && source "${COMPLETION}"
-    done
+	for COMPLETION in "${HOMEBREW_PREFIX}/etc/bash_completion.d/"*; do
+		[[ -r "${COMPLETION}" ]] && source "${COMPLETION}"
+	done
 fi
 
 #########################
@@ -164,10 +164,10 @@ __git_complete gl git_log
 
 # Updates the system.
 update() {
-    sudo apt-get --allow-releaseinfo-change update
-    sudo apt-get -y --allow-downgrades dist-upgrade
-    sudo apt-get -y autoremove
-    sudo apt-get -y clean
+	sudo apt-get --allow-releaseinfo-change update
+	sudo apt-get -y --allow-downgrades dist-upgrade
+	sudo apt-get -y autoremove
+	sudo apt-get -y clean
 }
 
 ######################
@@ -177,9 +177,9 @@ update() {
 ######################
 
 if [ -z "$TMUX" ]; then
-    if tmux has-session; then
-        exec tmux attach
-    else
-        exec tmux
-    fi
+	if tmux has-session; then
+		exec tmux attach
+	else
+		exec tmux
+	fi
 fi
