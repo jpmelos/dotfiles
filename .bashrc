@@ -58,6 +58,20 @@ eval "$(starship init bash)"
 # Set up pyenv for each interactive shell.
 eval "$(pyenv init -)"
 
+################################
+#                              #
+#    Homebrew's completions    #
+#                              #
+################################
+
+if type brew &>/dev/null; then
+	HOMEBREW_PREFIX="$(brew --prefix)"
+
+	for COMPLETION in "${HOMEBREW_PREFIX}/etc/bash_completion.d/"*; do
+		[[ -r "${COMPLETION}" ]] && source "${COMPLETION}"
+	done
+fi
+
 #################
 #               #
 #    Aliases    #
@@ -114,20 +128,6 @@ alias gp='g p'
 alias gpsup='g psup'
 alias gpf='g pf'
 alias gl='g l'
-
-################################
-#                              #
-#    Homebrew's completions    #
-#                              #
-################################
-
-if type brew &>/dev/null; then
-	HOMEBREW_PREFIX="$(brew --prefix)"
-
-	for COMPLETION in "${HOMEBREW_PREFIX}/etc/bash_completion.d/"*; do
-		[[ -r "${COMPLETION}" ]] && source "${COMPLETION}"
-	done
-fi
 
 #########################
 #                       #
