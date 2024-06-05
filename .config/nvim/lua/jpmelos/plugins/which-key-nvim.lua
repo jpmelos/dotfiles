@@ -9,6 +9,7 @@ return {
         local wk = require("which-key")
         wk.setup()
 
+        wk.register({ gp = "LSP previews" })
         wk.register({
             c = "+ Code actions",
             d = "+ Debug",
