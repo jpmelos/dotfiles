@@ -42,17 +42,10 @@ return {
         )
 
         mason_lspconfig.setup_handlers({
-            -- Default handler for all servers not explicitly defined here.
-            function(server_name)
-                lspconfig[server_name].setup({
-                    capabilities = capabilities,
-                })
-            end,
+            -- When adding a server here, at a minimum you need to send it
+            -- the capabilities table. See below for examples.
             bashls = function()
-                lspconfig.bashls.setup({
-                    capabilities = capabilities,
-                    settings = { filetypes = { "sh", "bash" } },
-                })
+                lspconfig.bashls.setup({ capabilities = capabilities })
             end,
             lua_ls = function()
                 lspconfig.lua_ls.setup({
