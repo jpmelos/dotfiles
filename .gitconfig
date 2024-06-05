@@ -56,8 +56,8 @@
     bn = checkout -b
     bd = branch -D
     co = checkout
-    main-branch = !git symbolic-ref refs/remotes/origin/HEAD | cut -d'/' -f4
-    cm = "!f(){ git checkout $(git main-branch) $@;}; f"
+    main-branch = ! git symbolic-ref refs/remotes/origin/HEAD | cut -d'/' -f4
+    cm = ! git checkout $(git main-branch)
     cp = cherry-pick
     st = status
     d = diff
@@ -72,7 +72,7 @@
     p = push
     psup = push --set-upstream
     pf = push --force-with-lease
-    l = log --oneline --graph
+    l = "! f() { git log --color=always --oneline --graph --decorate $@ | awk -f ~/.git-log-prepend-number-awk | less -R; }; f"
 
 [include]
     path = ~/devel/dotfiles/references/gitconfigs/gpg-keys
