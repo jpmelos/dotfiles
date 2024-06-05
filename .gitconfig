@@ -61,6 +61,7 @@
     cp = cherry-pick
     st = status
     d = diff
+    dst = diff --name-status
     dca = diff --cached
     a = add
     aa = add -A :/
