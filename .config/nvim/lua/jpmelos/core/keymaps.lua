@@ -57,6 +57,11 @@ end, { expr = true, desc = "Jump half screen down" })
 K("n", "<enter>", "zo", { desc = "Open fold under cursor" })
 K("n", "<backspace>", "zc", { desc = "Close fold under cursor" })
 
+-- Always search with "very magic" (the \v thing).
+K("n", "/", "/\\v", { noremap = true })
+K("n", "?", "?\\v", { noremap = true })
+K("n", "\\", ":%s/\\v", { noremap = true })
+
 -- Clear search highlights like this, since we use C-l to navigate through
 -- splits. See plugin Navigator.nvim.
 K(
