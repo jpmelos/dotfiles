@@ -33,9 +33,18 @@ return {
             end,
         })
 
+        -- ripgrep arguments come from ~/.ripgreprc.
         telescope.setup({
             defaults = {
-                -- ripgrep arguments come from ~/.ripgreprc.
+                pickers = {
+                    -- The command for live_grep and grep_string is specified
+                    -- just below.
+                    find_files = {
+                        find_command = { "rg", "--files", "--color=never" },
+                    },
+                },
+                -- Used for live_grep and grep_string. The command for
+                -- find_files is specified just above.
                 vimgrep_arguments = { "rg", "--color=never" },
                 path_display = { "smart" },
                 mappings = {
