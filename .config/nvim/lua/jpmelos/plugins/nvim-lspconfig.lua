@@ -99,6 +99,18 @@ return {
         )
         K(
             "n",
+            "gs",
+            "<cmd>Telescope lsp_document_symbols<CR>",
+            { desc = "Show LSP symbols in buffer" }
+        )
+        K(
+            "n",
+            "gS",
+            "<cmd>Telescope lsp_workspace_symbols<CR>",
+            { desc = "Show LSP symbols in workspace" }
+        )
+        K(
+            "n",
             "K",
             vim.lsp.buf.hover,
             { desc = "Show documentation for what is under cursor" }
