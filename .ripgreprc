@@ -6,7 +6,7 @@
 --line-number
 --column
 --smart-case
---no-ignore
+# Search hidden files, except .git directories.
 --hidden
 --glob
     !/.git
