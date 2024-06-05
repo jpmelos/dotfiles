@@ -30,11 +30,6 @@ return {
 
         K("n", "<leader>gp", gs.preview_hunk, { desc = "Preview hunk" })
 
-        K("n", "<leader>gd", gs.diffthis, { desc = "Diff this hunk" })
-        K("n", "<leader>gD", function()
-            gs.diffthis("~")
-        end, { desc = "Diff this buffer" })
-
         -- Reload files on focus.
         api.nvim_create_autocmd(
             { "FocusGained", "BufEnter", "BufWinEnter" },
