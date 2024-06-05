@@ -124,6 +124,7 @@ alias gc='g c'
 alias gca='g ca'
 alias gsh='g sh'
 alias gshf='g shf'
+alias gshh='g shh'
 alias gp='g p'
 alias gpsup='g psup'
 alias gpf='g pf'
@@ -151,6 +152,7 @@ __git_complete gc git_commit
 __git_complete gca git_commit
 __git_complete gsh git_show
 __git_complete gshf git_show
+__git_complete gshh git_show
 __git_complete gp git_push
 __git_complete gpsup git_push
 __git_complete gpf git_push

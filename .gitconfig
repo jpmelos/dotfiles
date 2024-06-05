@@ -69,6 +69,7 @@
     ca = commit -a
     sh = show
     shf = show --name-status
+    shh = "! f() { HEADN=$1; shift; git show "HEAD~$HEADN" $@; }; f"
     p = push
     psup = push --set-upstream
     pf = push --force-with-lease
