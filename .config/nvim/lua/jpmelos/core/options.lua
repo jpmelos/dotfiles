@@ -114,7 +114,8 @@ opt.splitright = true -- Split vertical windows to the right.
 opt.splitbelow = true -- Split horizontal window to the bottom.
 
 -- Simple status line.
-opt.statusline = " %f %y %m %r %= %{LspStatus()} %v,%l/%L %02p%% "
+opt.statusline =
+    " %f %y %m %r %= %{LspStatus()} %{IsRecording()} %v,%l/%L %02p%% "
 
 -- What to save in sessions.
 opt.sessionoptions = "blank,buffers,curdir,folds,help,tabpages,winsize"

@@ -24,4 +24,17 @@ vim.api.nvim_create_user_command("Redir", function(ctx)
     vim.opt_local.modified = false
 end, { nargs = "+", complete = "command" })
 
+vim.api.nvim_exec2(
+    [[
+        function! IsRecording() abort
+            let reg = reg_recording()
+            if reg == ""
+                return ""
+            endif
+            return "@" .. reg
+        endfunction
+    ]],
+    {}
+)
+
 return { PrintTable = PrintTable }
