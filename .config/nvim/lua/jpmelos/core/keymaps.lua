@@ -70,3 +70,17 @@ K(
     "<cmd>nohls<cr>",
     { desc = "Clear search highlights" }
 )
+
+-- Copy path of current buffer to clipboard.
+K(
+    "n",
+    "<leader>by",
+    '<cmd>let @+ = expand("%:.")<cr>',
+    { desc = "Copy relative path to clipboard" }
+)
+K(
+    "n",
+    "<leader>bY",
+    '<cmd>let @+ = expand("%:p")<cr>',
+    { desc = "Copy absolute path to clipboard" }
+)

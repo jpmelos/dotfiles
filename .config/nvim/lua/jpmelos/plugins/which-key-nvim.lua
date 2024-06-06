@@ -11,6 +11,7 @@ return {
 
         wk.register({ gp = "LSP previews" })
         wk.register({
+            b = "+ Current buffer",
             c = "+ Code actions",
             d = "+ Debug",
             e = "+ Explorer",
