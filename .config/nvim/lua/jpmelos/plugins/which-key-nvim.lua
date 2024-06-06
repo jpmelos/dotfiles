@@ -23,6 +23,7 @@ return {
             p = "+ Format",
             s = "+ Splits",
             t = "+ Tabs",
+            v = "+ Database",
             w = "+ Sessions",
             x = "+ Quickfix",
         }, { prefix = "<leader>" })

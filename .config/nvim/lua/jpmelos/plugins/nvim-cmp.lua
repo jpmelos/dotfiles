@@ -7,6 +7,7 @@ return {
         "L3MON4D3/LuaSnip", -- A snippers engine.
         "saadparwaiz1/cmp_luasnip", -- For integration with `L3MON4D3/LuaSnip`.
         "onsails/lspkind.nvim", -- Pictograms inside suggestions modal.
+        "kristijanhusak/vim-dadbod-completion", -- SQL completions.
     },
     config = function()
         local cmp = require("cmp")
@@ -51,6 +52,7 @@ return {
                 { name = "buffer" }, -- Text from the current buffer.
                 -- Paths from the file system.
                 { name = "path", option = { trailing_slash = true } },
+                { name = "vim-dadbod-completion" },
             }),
             -- Configure pictograms from `onsails/lspkind.nvim`.
             formatting = { format = require("lspkind").cmp_format({}) },
