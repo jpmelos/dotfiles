@@ -28,7 +28,7 @@ return {
 
         K("n", "<leader>gu", gs.undo_stage_hunk, { desc = "Undo stage hunk" })
 
-        K("n", "<leader>gp", gs.preview_hunk, { desc = "Preview hunk" })
+        K("n", "<leader>gd", gs.preview_hunk, { desc = "Preview hunk" })
 
         -- Reload files on focus.
         api.nvim_create_autocmd(
