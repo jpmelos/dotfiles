@@ -34,7 +34,12 @@ return {
 
         -- Reload files on focus.
         api.nvim_create_autocmd(
-            { "FocusGained", "BufEnter", "BufWinEnter" },
+            {
+                "FocusGained",
+                "BufEnter",
+                "BufWinEnter",
+                "FileChangedShellPost",
+            },
             { callback = gs.refresh }
         )
     end,
