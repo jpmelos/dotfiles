@@ -67,7 +67,7 @@ local function getHostPortAndDebug(callback)
     local Input = require("nui.input")
     local event = require("nui.utils.autocmd").event
 
-    local host_port_env = os.getenv("REMOTE_DEBUG_HOST_PORT")
+    local host_port_env = vim.g.remote_debug_debugpy_host_port
     if host_port_env == nil then
         local input = Input({
             position = "50%",
@@ -111,26 +111,42 @@ return {
 
         local dap = require("dap")
 
+        vim.g.remote_debug_debugpy_just_my_code = "true"
+        vim.g.remote_debug_debugpy_path_mappings = ""
+        vim.g.remote_debug_debugpy_host_port = ""
+
         dap.configurations.python = {
             {
-                type = "python",
+                type = "debugpy",
                 request = "attach",
-                name = "Debug Python attaching to a DAP server",
+                name = "Debug Python by attaching to debugpy",
                 -- Things below are passed as arguments to debugpy.
+                justMyCode = function()
+                    return vim.g.remote_debug_debugpy_just_my_code
+                end,
                 pathMappings = function()
-                    if os.getenv("REMOTE_DEBUG_ROOT") then
-                        return {
-                            {
-                                localRoot = "${workspaceFolder}",
-                                remoteRoot = "${env:REMOTE_DEBUG_ROOT}",
-                            },
-                        }
+                    local path_mappings =
+                        vim.g.remote_debug_debugpy_path_mappings
+                    local dap_mappings = {}
+
+                    if path_mappings then
+                        for mapping in path_mappings:gmatch("([^;]+)") do
+                            local localRoot, remoteRoot =
+                                mapping:match("(.+)=(.+)")
+                            table.insert(dap_mappings, {
+                                localRoot = localRoot,
+                                remoteRoot = remoteRoot,
+                            })
+                        end
+
+                        return dap_mappings
                     end
+
                     return {}
                 end,
             },
         }
-        dap.adapters.python = getHostPortAndDebug
+        dap.adapters.debugpy = getHostPortAndDebug
 
         vim.cmd("hi DapBreakpoint guifg=#ff0000")
 
@@ -166,16 +182,27 @@ return {
             dap.continue()
         end, { desc = "Run to cursor" })
         K("n", "<leader>dx", dap.disconnect, { desc = "End current session" })
+
         K(
             "n",
             "<leader>db",
             dap.toggle_breakpoint,
             { desc = "Toggle breakpoint" }
         )
-        K("n", "<leader>dl", dap.step_over, { desc = "Step over" })
+
         K("n", "<leader>dj", dap.step_into, { desc = "Step into" })
         K("n", "<leader>dk", dap.step_out, { desc = "Step out" })
+        K("n", "<leader>dl", dap.step_over, { desc = "Step over" })
+
         K("n", "<leader>dK", dap.up, { desc = "Go up in the stacktrace" })
         K("n", "<leader>dJ", dap.down, { desc = "Go down in the stacktrace" })
+
+        K("n", "<leader>dc", function()
+            if vim.g.remote_debug_debugpy_just_my_code == "true" then
+                vim.g.remote_debug_debugpy_just_my_code = "false"
+            else
+                vim.g.remote_debug_debugpy_just_my_code = "true"
+            end
+        end, { desc = "debugpy: Toggle justMyCode" })
     end,
 }
