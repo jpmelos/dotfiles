@@ -41,14 +41,22 @@ return {
             cmp_nvim_lsp.default_capabilities()
         )
 
+        local lsp_on_attach = function()
+            vim.cmd("redrawstatus")
+        end
+
         mason_lspconfig.setup_handlers({
             -- When adding a server here, at a minimum you need to send it
             -- the capabilities table. See below for examples.
             bashls = function()
-                lspconfig.bashls.setup({ capabilities = capabilities })
+                lspconfig.bashls.setup({
+                    on_attach = lsp_on_attach,
+                    capabilities = capabilities,
+                })
             end,
             lua_ls = function()
                 lspconfig.lua_ls.setup({
+                    on_attach = lsp_on_attach,
                     capabilities = capabilities,
                     settings = {
                         Lua = {
@@ -65,6 +73,7 @@ return {
             end,
             pyright = function()
                 lspconfig.pyright.setup({
+                    on_attach = lsp_on_attach,
                     capabilities = capabilities,
                     settings = {
                         pyright = { disableOrganizeImports = true },

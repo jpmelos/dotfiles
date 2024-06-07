@@ -35,11 +35,14 @@ end
 
 function UpdateGitBranch()
     local git_branch = os.capture("git branch | awk '/^* /{print $2}'")
+
     if string.startswith(git_branch, "fatal") then
         vim.g.git_branch = nil
-        return
+    else
+        vim.g.git_branch = git_branch
     end
-    vim.g.git_branch = git_branch
+
+    vim.cmd("redrawstatus")
 end
 
 function GetGitBranchForStatusLine()
