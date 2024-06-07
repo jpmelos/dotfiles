@@ -39,6 +39,14 @@ field_prepend PATH "$HOME/.pyenv/bin"
 field_prepend PATH "$HOME/bin"
 export PATH
 
+################################
+#                              #
+#    Terminal configuration    #
+#                              #
+################################
+
+export TERMINFO_DIRS=$HOME/.local/share/terminfo:$TERMINFO_DIRS
+
 #############################
 #                           #
 #    Bash-specific stuff    #

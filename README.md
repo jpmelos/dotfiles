@@ -1,6 +1,16 @@
 # README
 
-## Installing tmux
+## Installing these dotfiles
+
+1. Make sure `stow` is installed.
+
+1. Run:
+
+   ```bash
+   stow .
+   ```
+
+## Installing tmux plugins
 
 1. Install the plugin manager.
 
@@ -8,23 +18,13 @@
    git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
    ```
 
-1. Link `dotfiles/tmux.conf` to `~/.tmux.conf`.
+1. Type `<prefix>I`.
 
-1. Run `<C-a> I`.
+## Configuring terminal for font effects and more
 
-## Installing nvim
+1. Install the latest version of `ncurses`.
 
-1. Link `dotfiles/nvim` to `~/.config/nvim`.
-
-## tmux-256color in MacOS (not needed in latest versions)
-
-1. Install a newer version of `ncurses` with Homebrew:
-
-   ```bash
-   brew install ncurses
-   ```
-
-1. Set the correct terminfo in your bash files:
+1. Set the correct terminfo in your `.bash_profile` file:
 
    ```bash
    # Find any custom terminfos that we install.
@@ -35,7 +35,7 @@
 
 1. Set the correct terminfo in your `tmux.conf` file as well:
 
-   ```bash
+   ```
    set -s default-terminal tmux-256color
    ```
 
