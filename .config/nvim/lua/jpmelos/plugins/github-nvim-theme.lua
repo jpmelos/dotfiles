@@ -25,6 +25,11 @@ return {
         -- Make constructors show as regular function calls.
         vim.cmd("hi! link @constructor Function")
 
+        -- Code syntax improvements.
+        vim.cmd("hi @variable.member gui=none guifg=none guibg=none")
+        vim.cmd("hi Function gui=none guifg=none guibg=none")
+        vim.cmd("hi @type gui=none guifg=none guibg=none")
+
         -- Make comments and string documentation (like docstrings in Python)
         -- show in italic.
         vim.cmd("hi Comment gui=italic")
