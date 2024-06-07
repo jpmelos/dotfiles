@@ -67,12 +67,21 @@ return {
         })
         telescope.load_extension("fzf")
 
+        --
+        -- Files.
+        --
         K(
             "n",
             "<leader>ff",
             builtins.find_files,
             { desc = "Find files in current directory" }
         )
+        K("n", "<leader>fb", builtins.buffers, { desc = "Find buffers" })
+        K("n", "<leader>fo", builtins.oldfiles, { desc = "Find old files" })
+
+        --
+        -- Strings.
+        --
         K(
             "n",
             "<leader>fs",
@@ -84,12 +93,6 @@ return {
             "<leader>fc",
             builtins.grep_string,
             { desc = "Find string under cursor in current directory" }
-        )
-        K(
-            "n",
-            "<leader>ft",
-            telescope.extensions["todo-comments"].todo,
-            { desc = "Find todos in current directory" }
         )
         K("n", "<leader>fp", function()
             local ft = api.nvim_get_option_value("filetype", {})
@@ -107,14 +110,50 @@ return {
             end
 
             builtins.live_grep({ search_dirs = { path } })
-        end, { desc = "Find in current path" })
+        end, { desc = "Find string in current path" })
+
+        --
+        -- Todos.
+        --
+        K(
+            "n",
+            "<leader>ft",
+            telescope.extensions["todo-comments"].todo,
+            { desc = "Find todos in current directory" }
+        )
+
+        --
+        -- Vim.
+        --
         K(
             "n",
             "<leader>fh",
             builtins.help_tags,
             { desc = "Find Neovim help tags" }
         )
-        K("n", "<leader>fb", builtins.buffers, { desc = "Find buffers" })
+        K("n", "<leader>fm", builtins.commands, { desc = "Find commands" })
+        K(
+            "n",
+            "<leader>fu",
+            builtins.command_history,
+            { desc = "Find old commands" }
+        )
+        K(
+            "n",
+            "<leader>fi",
+            builtins.search_history,
+            { desc = "Find old searches" }
+        )
+        K(
+            "n",
+            "<leader>fe",
+            builtins.highlights,
+            { desc = "Find old searches" }
+        )
+
+        --
+        -- Git.
+        --
         K(
             "n",
             "<leader>fg",
@@ -127,6 +166,5 @@ return {
             builtins.git_bcommits,
             { desc = "Find changes on this file" }
         )
-        K("n", "<leader>fm", builtins.commands, { desc = "Find commands" })
     end,
 }
