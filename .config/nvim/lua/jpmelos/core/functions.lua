@@ -49,6 +49,19 @@ function GetGitBranchForStatusLine()
     return " " .. vim.g.git_branch
 end
 
+function GetLspServers()
+    local clients = ""
+    for _, client in pairs(vim.lsp.get_clients()) do
+        clients = clients .. client.config.name .. ","
+    end
+
+    if clients == "" then
+        return clients
+    end
+
+    return "[" .. clients:sub(1, -2) .. "]"
+end
+
 vim.api.nvim_create_user_command("Redir", function(ctx)
     local lines = vim.split(
         vim.api.nvim_exec2(ctx.args, { output = true }).output,
@@ -84,6 +97,10 @@ vim.api.nvim_exec2(
 
         function! GitBranch() abort
             return luaeval("GetGitBranchForStatusLine()")
+        endfunction
+
+        function! LspServers() abort
+            return luaeval("GetLspServers()")
         endfunction
     ]],
     {}
