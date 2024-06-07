@@ -1,3 +1,5 @@
+vim.g.git_branch = nil
+
 function PrintTable(o)
     if type(o) == "table" then
         local s = "{ "
@@ -11,6 +13,40 @@ function PrintTable(o)
     else
         return tostring(o)
     end
+end
+
+function string.startswith(str, start)
+    return str.sub(str, 1, str.len(start)) == start
+end
+
+function os.capture(cmd, raw)
+    local f = assert(io.popen(cmd, "r"))
+    local s = assert(f:read("*a"))
+    f:close()
+
+    if raw then
+        return s
+    end
+
+    s = string.gsub(s, "^%s+", "")
+    s = string.gsub(s, "%s+$", "")
+    return s
+end
+
+function UpdateGitBranch()
+    local git_branch = os.capture("git branch | awk '/^* /{print $2}'")
+    if string.startswith(git_branch, "fatal") then
+        vim.g.git_branch = nil
+        return
+    end
+    vim.g.git_branch = git_branch
+end
+
+function GetGitBranchForStatusLine()
+    if vim.g.git_branch == nil then
+        return ""
+    end
+    return " " .. vim.g.git_branch
 end
 
 vim.api.nvim_create_user_command("Redir", function(ctx)
@@ -34,7 +70,6 @@ vim.api.nvim_exec2(
             return a:longer[len(a:longer)-len(a:shorter):] ==# a:shorter
         endfunction
 
-
         function! Contains(longer, shorter) abort
             return stridx(a:longer, a:short) >= 0
         endfunction
@@ -48,11 +83,7 @@ vim.api.nvim_exec2(
         endfunction
 
         function! GitBranch() abort
-            let gbr = trim(system("git branch | awk '/^* /{print $2}'"))
-            if StartsWith(gbr, "fatal")
-                return ""
-            endif
-            return " " .. gbr
+            return luaeval("GetGitBranchForStatusLine()")
         endfunction
     ]],
     {}

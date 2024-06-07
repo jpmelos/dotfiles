@@ -21,3 +21,11 @@ vim.api.nvim_create_autocmd("TextYankPost", {
     end,
     group = yank_highlight_augroup,
 })
+
+local git_branch_augroup =
+    vim.api.nvim_create_augroup("git_branch_augroup", { clear = true })
+-- See `:help vim.highlight.on_yank()`.
+vim.api.nvim_create_autocmd({ "VimEnter", "FocusGained" }, {
+    callback = UpdateGitBranch,
+    group = git_branch_augroup,
+})
