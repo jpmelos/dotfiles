@@ -26,12 +26,33 @@ end, { nargs = "+", complete = "command" })
 
 vim.api.nvim_exec2(
     [[
+        function! StartsWith(longer, shorter) abort
+            return a:longer[0:len(a:shorter)-1] ==# a:shorter
+        endfunction
+
+        function! EndsWith(longer, shorter) abort
+            return a:longer[len(a:longer)-len(a:shorter):] ==# a:shorter
+        endfunction
+
+
+        function! Contains(longer, shorter) abort
+            return stridx(a:longer, a:short) >= 0
+        endfunction
+
         function! IsRecording() abort
             let reg = reg_recording()
             if reg == ""
                 return ""
             endif
             return "@" .. reg
+        endfunction
+
+        function! GitBranch() abort
+            let gbr = trim(system("git branch | awk '/^* /{print $2}'"))
+            if StartsWith(gbr, "fatal")
+                return ""
+            endif
+            return " " .. gbr
         endfunction
     ]],
     {}
