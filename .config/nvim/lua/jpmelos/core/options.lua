@@ -115,7 +115,7 @@ opt.splitbelow = true -- Split horizontal window to the bottom.
 
 -- Simple status line.
 opt.statusline =
-    " %f %y %m %r %= %{IsRecording()} %{LspServers()} %{GitBranch()} %v,%l/%L %02p%% "
+    " %f %y %m %r %= %{LspServers()} %{GitBranch()} %v,%l/%L %02p%% "
 
 -- What to save in sessions.
 opt.sessionoptions = "blank,buffers,curdir,folds,help,tabpages,winsize"

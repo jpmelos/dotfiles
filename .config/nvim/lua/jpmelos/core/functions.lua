@@ -87,13 +87,13 @@ vim.api.nvim_exec2(
             return stridx(a:longer, a:short) >= 0
         endfunction
 
-        function! IsRecording() abort
-            let reg = reg_recording()
-            if reg == ""
-                return ""
-            endif
-            return "@" .. reg
-        endfunction
+        " function! IsRecording() abort
+        "     let reg = reg_recording()
+        "     if reg == ""
+        "         return ""
+        "     endif
+        "     return "@" .. reg
+        " endfunction
 
         function! GitBranch() abort
             return luaeval("GetGitBranchForStatusLine()")
