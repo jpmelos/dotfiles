@@ -1,5 +1,6 @@
+local workspace_augroup =
+    vim.api.nvim_create_augroup("workspace_augroup", { clear = true })
 -- Load local ./.nvim.lua file, if one exists.
-local my_ws_grp = vim.api.nvim_create_augroup("my_ws_grp", { clear = true })
 vim.api.nvim_create_autocmd({ "VimEnter" }, {
     callback = function()
         local exrc_path = vim.fn.getcwd() .. "/.nvim.lua"
@@ -8,16 +9,15 @@ vim.api.nvim_create_autocmd({ "VimEnter" }, {
             vim.notify("Sourced ./.nvim.lua.")
         end
     end,
-    group = my_ws_grp,
+    group = workspace_augroup,
 })
 
+local yank_highlight_augroup =
+    vim.api.nvim_create_augroup("yank_highlight_augroup", { clear = true })
 -- See `:help vim.highlight.on_yank()`.
-local highlight_group =
-    vim.api.nvim_create_augroup("YankHighlight", { clear = true })
 vim.api.nvim_create_autocmd("TextYankPost", {
     callback = function()
         vim.highlight.on_yank({ timeout = 1000 })
     end,
-    group = highlight_group,
-    pattern = "*",
+    group = yank_highlight_augroup,
 })
