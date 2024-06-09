@@ -16,8 +16,8 @@ K("n", "<leader>tf", function()
 end, { desc = "Open current buffer in new tab" })
 
 -- Tab navigation.
-K("n", "[t", "<cmd>tabp<CR>", { desc = "Previous tab" })
-K("n", "]t", "<cmd>tabn<CR>", { desc = "Next tab" })
+K("n", "<C-M-h>", "<cmd>tabp<CR>", { desc = "Previous tab" })
+K("n", "<C-M-l>", "<cmd>tabn<CR>", { desc = "Next tab" })
 
 -- Navigate line by line in soft-wrapped lines.
 K(
