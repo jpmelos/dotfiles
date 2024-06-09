@@ -1,3 +1,9 @@
+local fix_pyright_hover_doc = function(value)
+    value = string.gsub(value, "&nbsp;", " ")
+    value = string.gsub(value, "\\_", "_")
+    return value
+end
+
 return {
     "neovim/nvim-lspconfig",
     lazy = false,
@@ -94,10 +100,31 @@ return {
             end,
         })
 
-        vim.lsp.handlers["textDocument/hover"] =
-            vim.lsp.with(vim.lsp.handlers.hover, {
-                border = "rounded",
-            })
+        vim.lsp.handlers["textDocument/hover"] = function(
+            _,
+            result,
+            ctx,
+            config
+        )
+            -- pyright returns a bunch of Markdown crap in its documentation
+            -- responses. Let's fix it a bit.
+            if vim.bo.filetype == "python" then
+                result.contents.value =
+                    fix_pyright_hover_doc(result.contents.value)
+            end
+
+            if config == nil then
+                config = { border = "rounded" }
+            else
+                config = vim.tbl_deep_extend(
+                    "force",
+                    config,
+                    { border = "rounded" }
+                )
+            end
+
+            return vim.lsp.handlers.hover(_, result, ctx, config)
+        end
 
         K(
             "n",
