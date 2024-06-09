@@ -8,8 +8,10 @@ return {
     config = function()
         require("nvim-dap-virtual-text").setup({
             only_first_definition = false,
-            all_references = true,
-            virt_text_pos = "eol",
+            virt_text_pos = "inline",
+            display_callback = function(variable)
+                return " = " .. variable.value
+            end,
         })
     end,
 }
