@@ -67,6 +67,10 @@ return {
         end, { desc = "Open DAP UI" })
         K("n", "<leader>dc", dapui.close, { desc = "Close DAP UI" })
 
+        K("n", "<leader>de", function()
+            dapui.eval(nil, { enter = true })
+        end, { desc = "Evaluate under cursor" })
+
         api.nvim_create_autocmd("FileType", {
             pattern = "dap-repl",
             callback = function()
