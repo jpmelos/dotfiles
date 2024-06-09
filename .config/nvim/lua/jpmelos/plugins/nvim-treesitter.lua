@@ -25,13 +25,7 @@ return {
                 },
             },
             -- Better indentation.
-            indent = {
-                enable = true,
-                disable = {
-                    -- Indentation for bullet points is worse.
-                    "markdown",
-                },
-            },
+            indent = { enable = true },
             -- Ensure these language parsers are installed.
             ensure_installed = {
                 -- These five parsers should always be installed according to
