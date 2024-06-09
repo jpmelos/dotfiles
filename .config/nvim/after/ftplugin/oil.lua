@@ -4,5 +4,5 @@ local actions = require("oil.actions")
 
 o.colorcolumn = ""
 
-K("n", "<CR>", actions.select.callback)
-K("n", "<ESC>", "<cmd>q<cr>")
+K("n", "<CR>", actions.select.callback, { buffer = true })
+K("n", "<ESC>", "<cmd>q<cr>", { buffer = true })
