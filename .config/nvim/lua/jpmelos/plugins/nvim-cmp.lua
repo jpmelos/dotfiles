@@ -10,6 +10,7 @@ return {
         "onsails/lspkind.nvim",
         "kristijanhusak/vim-dadbod-completion",
         "hrsh7th/cmp-nvim-lsp-signature-help",
+        "folke/lazydev.nvim",
     },
     config = function()
         local cmp = require("cmp")
@@ -53,6 +54,7 @@ return {
                 { name = "luasnip" },
                 { name = "vim-dadbod-completion" },
                 { name = "nvim_lsp_signature_help" },
+                { name = "lazydev" },
             }),
             -- Configure pictograms from `onsails/lspkind.nvim`.
             formatting = { format = require("lspkind").cmp_format({}) },

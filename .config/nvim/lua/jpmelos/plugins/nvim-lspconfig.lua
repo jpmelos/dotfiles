@@ -10,7 +10,6 @@ return {
     dependencies = {
         "williamboman/mason-lspconfig.nvim",
         "hrsh7th/cmp-nvim-lsp",
-        "folke/neodev.nvim",
     },
     config = function()
         local K = vim.keymap.set
