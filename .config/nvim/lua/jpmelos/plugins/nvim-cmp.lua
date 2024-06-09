@@ -2,12 +2,13 @@ return {
     "hrsh7th/nvim-cmp",
     lazy = false,
     dependencies = {
-        "hrsh7th/cmp-buffer", -- Source for text in buffer.
-        "hrsh7th/cmp-path", -- Source for file system paths.
-        "L3MON4D3/LuaSnip", -- A snippers engine.
-        "saadparwaiz1/cmp_luasnip", -- For integration with `L3MON4D3/LuaSnip`.
-        "onsails/lspkind.nvim", -- Pictograms inside suggestions modal.
-        "kristijanhusak/vim-dadbod-completion", -- SQL completions.
+        "hrsh7th/cmp-buffer",
+        "hrsh7th/cmp-path",
+        "hrsh7th/cmp-nvim-lsp",
+        "L3MON4D3/LuaSnip",
+        "saadparwaiz1/cmp_luasnip",
+        "onsails/lspkind.nvim",
+        "kristijanhusak/vim-dadbod-completion",
         "hrsh7th/cmp-nvim-lsp-signature-help",
     },
     config = function()
@@ -30,10 +31,8 @@ return {
             },
             mapping = cmp.mapping.preset.insert({
                 -- Previous suggestion.
-                ["<C-k>"] = cmp.mapping.select_prev_item(),
                 ["<S-Tab>"] = cmp.mapping.select_prev_item(),
                 -- Next suggestion.
-                ["<C-j>"] = cmp.mapping.select_next_item(),
                 ["<Tab>"] = cmp.mapping.select_next_item(),
                 -- Scroll documentation pane.
                 ["<C-b>"] = cmp.mapping.scroll_docs(-4),
@@ -48,16 +47,23 @@ return {
             }),
             -- Sources for autocompletion.
             sources = cmp.config.sources({
-                { name = "nvim_lsp" }, -- LSP.
-                { name = "luasnip" }, -- Snippets.
-                { name = "buffer" }, -- Text from the current buffer.
-                -- Paths from the file system.
+                { name = "nvim_lsp" },
+                { name = "buffer" },
                 { name = "path", option = { trailing_slash = true } },
+                { name = "luasnip" },
                 { name = "vim-dadbod-completion" },
                 { name = "nvim_lsp_signature_help" },
             }),
             -- Configure pictograms from `onsails/lspkind.nvim`.
             formatting = { format = require("lspkind").cmp_format({}) },
+        })
+
+        -- SQL specific completion.
+        cmp.setup.filetype({ "sql" }, {
+            sources = {
+                { name = "vim-dadbod-completion" },
+                { name = "buffer" },
+            },
         })
     end,
 }
