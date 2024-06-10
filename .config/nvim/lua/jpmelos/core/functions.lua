@@ -42,7 +42,7 @@ function UpdateGitBranch()
         vim.g.git_branch = git_branch
     end
 
-    vim.cmd("redrawstatus")
+    vim.cmd("redrawtabline")
 end
 
 function GetGitBranchForStatusLine()
