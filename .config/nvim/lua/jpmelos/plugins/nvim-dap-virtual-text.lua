@@ -11,8 +11,14 @@ return {
             -- it for every reference. There's another setting for that.
             only_first_definition = false,
             virt_text_pos = "eol",
+            virt_lines = true,
             display_callback = function(variable)
-                return " = " .. variable.value
+                local text = variable.name .. " = " .. variable.value
+
+                if #text > 79 then
+                    return string.sub(text, 1, 76) .. "..."
+                end
+                return text
             end,
         })
     end,
