@@ -11,7 +11,9 @@ return {
         local dap = require("dap")
         local dapui = require("dapui")
 
+        ---@diagnostic disable-next-line: missing-fields
         dapui.setup({
+            ---@diagnostic disable-next-line: missing-fields
             controls = { enabled = false },
             layouts = {
                 {
@@ -68,6 +70,7 @@ return {
         K("n", "<leader>dc", dapui.close, { desc = "Close DAP UI" })
 
         K("n", "<leader>de", function()
+            ---@diagnostic disable-next-line: missing-fields
             dapui.eval(nil, { enter = true })
         end, { desc = "Evaluate under cursor" })
 
