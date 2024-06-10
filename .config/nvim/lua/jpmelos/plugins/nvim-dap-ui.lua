@@ -69,7 +69,7 @@ return {
         end, { desc = "Open DAP UI" })
         K("n", "<leader>dc", dapui.close, { desc = "Close DAP UI" })
 
-        K("n", "<leader>de", function()
+        K({ "n", "v" }, "<leader>de", function()
             ---@diagnostic disable-next-line: missing-fields
             dapui.eval(nil, { enter = true })
         end, { desc = "Evaluate under cursor" })
