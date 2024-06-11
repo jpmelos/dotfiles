@@ -29,6 +29,7 @@ return {
         vim.cmd("hi @variable.member gui=none guifg=none guibg=none")
         vim.cmd("hi Function gui=none guifg=none guibg=none")
         vim.cmd("hi @type gui=none guifg=none guibg=none")
+        vim.cmd("hi Operator gui=none guifg=none guibg=none")
 
         -- Make comments and string documentation (like docstrings in Python)
         -- show in italic.
