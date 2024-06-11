@@ -72,7 +72,6 @@
     shf = show --name-status
     shh = "! f() { HEADN=$1; shift; git show "HEAD~$HEADN" $@; }; f"
     p = push
-    psup = push --set-upstream
     pf = push --force-with-lease
     l = "! f() { git log --color=always --oneline --graph --decorate $@ | awk -f ~/.git-log-prepend-number-awk | less -R; }; f"
 

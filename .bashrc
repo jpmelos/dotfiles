@@ -139,7 +139,6 @@ alias gsh='g sh'
 alias gshf='g shf'
 alias gshh='g shh'
 alias gp='g p'
-alias gpsup='g psup'
 alias gpf='g pf'
 alias gl='g l'
 
