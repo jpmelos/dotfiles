@@ -10,6 +10,7 @@ return {
         "nvim-lua/plenary.nvim",
         "nvim-telescope/telescope-fzf-native.nvim",
         "nvim-tree/nvim-web-devicons",
+        "folke/trouble.nvim",
         "folke/todo-comments.nvim",
         "nvim-tree/nvim-tree.lua",
     },
@@ -20,18 +21,14 @@ return {
         local telescope = require("telescope")
         local builtins = require("telescope.builtin")
         local actions = require("telescope.actions")
-        local transform_mod = require("telescope.actions.mt").transform_mod
 
-        local trouble = require("trouble")
         local trouble_telescope = require("trouble.sources.telescope")
 
         local tree_api = require("nvim-tree.api")
 
-        local custom_actions = transform_mod({
-            open_trouble_qflist = function()
-                trouble.toggle("quickfix")
-            end,
-        })
+        local open_in_trouble_focus = function(telescope_bufnr)
+            trouble_telescope.open(telescope_bufnr, { focus = true })
+        end
 
         -- ripgrep arguments come from ~/.ripgreprc.
         telescope.setup({
@@ -51,16 +48,12 @@ return {
                     n = {
                         ["<C-k>"] = actions.move_selection_previous,
                         ["<C-j>"] = actions.move_selection_next,
-                        ["<C-q>"] = actions.send_selected_to_qflist
-                            + custom_actions.open_trouble_qflist,
-                        ["<C-t>"] = trouble_telescope.open,
+                        ["<C-q>"] = open_in_trouble_focus,
                     },
                     i = {
                         ["<C-k>"] = actions.move_selection_previous,
                         ["<C-j>"] = actions.move_selection_next,
-                        ["<C-q>"] = actions.send_selected_to_qflist
-                            + custom_actions.open_trouble_qflist,
-                        ["<C-t>"] = trouble_telescope.open,
+                        ["<C-q>"] = open_in_trouble_focus,
                     },
                 },
             },

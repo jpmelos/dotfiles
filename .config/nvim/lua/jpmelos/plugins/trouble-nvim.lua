@@ -7,14 +7,19 @@ return {
     },
     keys = {
         {
+            "<leader>xs",
+            "<cmd>Trouble symbols toggle focus=false<cr>",
+            desc = "Toggle symbols table",
+        },
+        {
             "<leader>xx",
-            "<cmd>TroubleToggle quickfix<CR>",
-            desc = "Open/close quickfix list",
+            "<cmd>Trouble telescope toggle focus=true<cr>",
+            desc = "Toggle telescope selected results",
         },
         {
             "<leader>xt",
-            "<cmd>TodoTrouble<CR>",
-            desc = "Open todos in quickfix list",
+            "<cmd>Trouble todo toggle focus=true<cr>",
+            desc = "Toggle todos in trouble list",
         },
     },
     opts = {},
