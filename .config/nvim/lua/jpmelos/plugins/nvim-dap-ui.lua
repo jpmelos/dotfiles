@@ -38,16 +38,6 @@ return {
                     position = "left",
                     size = 40,
                 },
-                {
-                    elements = {
-                        {
-                            id = "repl",
-                            size = 1,
-                        },
-                    },
-                    position = "right",
-                    size = 80,
-                },
             },
         })
 

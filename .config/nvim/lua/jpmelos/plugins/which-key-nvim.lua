@@ -14,6 +14,7 @@ return {
             b = "+ Current buffer",
             c = "+ Code actions",
             d = "+ Debug",
+            dp = "+ Python",
             e = "+ Explorer",
             f = "+ Finder",
             g = "+ Git",

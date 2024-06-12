@@ -197,7 +197,7 @@ return {
         K("n", "<leader>dK", dap.up, { desc = "Go up in the stacktrace" })
         K("n", "<leader>dJ", dap.down, { desc = "Go down in the stacktrace" })
 
-        K("n", "<leader>dc", function()
+        K("n", "<leader>dpc", function()
             if vim.g.remote_debug_debugpy_just_my_code == "true" then
                 vim.g.remote_debug_debugpy_just_my_code = "false"
             else
