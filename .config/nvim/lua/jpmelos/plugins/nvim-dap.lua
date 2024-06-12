@@ -190,6 +190,10 @@ return {
             { desc = "Toggle breakpoint" }
         )
 
+        K({ "n", "v" }, "<leader>dv", function()
+            vim.cmd("vertical DapEval")
+        end, { desc = "Open REPL" })
+
         K("n", "<leader>dj", dap.step_into, { desc = "Step into" })
         K("n", "<leader>dk", dap.step_out, { desc = "Step out" })
         K("n", "<leader>dl", dap.step_over, { desc = "Step over" })
