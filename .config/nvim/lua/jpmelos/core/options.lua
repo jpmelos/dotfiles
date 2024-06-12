@@ -114,7 +114,7 @@ opt.splitright = true -- Split vertical windows to the right.
 opt.splitbelow = true -- Split horizontal window to the bottom.
 
 -- Simple statusline and tabline.
-opt.statusline = " %f %y %m %r %= %{LspServers()} %v,%l/%L %02p%% "
+opt.statusline = " %f %y %m %r %= %{LspServers()} %l/%L-%v %02p%% "
 opt.showtabline = 2
 opt.tabline = " [%{tabpagenr()}/%{tabpagenr('$')}] %= %{GitBranch()} "
 
