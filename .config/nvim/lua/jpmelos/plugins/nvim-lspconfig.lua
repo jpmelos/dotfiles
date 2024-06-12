@@ -34,6 +34,7 @@ return {
                 "lua_ls",
                 "pyright",
                 "rust_analyzer",
+                "sqlls",
             },
         })
 
@@ -95,6 +96,18 @@ return {
                             },
                         },
                     },
+                })
+            end,
+            rust_analyzer = function()
+                lspconfig.rust_analyzer.setup({
+                    on_attach = lsp_on_attach,
+                    capabilities = capabilities,
+                })
+            end,
+            sqlls = function()
+                lspconfig.sqlls.setup({
+                    on_attach = lsp_on_attach,
+                    capabilities = capabilities,
                 })
             end,
         })
