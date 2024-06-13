@@ -89,3 +89,6 @@ K(
     '<cmd>let @+ = expand("%:p")<cr>',
     { desc = "Copy absolute path to clipboard" }
 )
+
+-- Python specific: split a string on the current char
+K("n", "<leader>cs", 'a"<cr>"<esc>', { desc = "Python: Split string" })
