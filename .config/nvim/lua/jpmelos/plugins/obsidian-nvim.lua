@@ -2,17 +2,12 @@ return {
     "epwalsh/obsidian.nvim",
     -- Use latest release instead of latest commit.
     version = "*",
-    lazy = true,
+    lazy = false,
     dependencies = {
         "nvim-lua/plenary.nvim",
         "hrsh7th/nvim-cmp",
         "nvim-telescope/telescope.nvim",
         "nvim-treesitter/nvim-treesitter",
-    },
-    -- Only load `obsidian.nvim` for markdown files in my vault:
-    event = {
-        "BufReadPre " .. vim.fn.expand("~") .. "/second-brain/**.md",
-        "BufNewFile " .. vim.fn.expand("~") .. "/second-brain/**.md",
     },
     opts = {
         workspaces = {
@@ -26,8 +21,8 @@ return {
                         alias_format = "%Y-%m-%d",
                         template = "daily.md",
                     },
-                    wiki_link_func = "use_path_only",
-                    preferred_link_style = "wiki",
+                    -- wiki_link_func = "use_path_only",
+                    preferred_link_style = "markdown",
                     templates = {
                         folder = "templates",
                         date_format = "%Y-%m-%d",
@@ -39,9 +34,11 @@ return {
                 },
             },
         },
+        -- When using ':ObsidianOpen'.
+        open_app_foreground = false,
         completion = {
             nvim_cmp = true,
-            min_chars = 2,
+            min_chars = 1,
         },
         mappings = {
             ["gf"] = {
@@ -55,6 +52,10 @@ return {
                     return require("obsidian").util.toggle_checkbox()
                 end,
                 opts = { buffer = true, desc = "Toggle checkbox" },
+            },
+            ["<leader>ot"] = {
+                action = "<cmd>ObsidianToday<cr>",
+                opts = { buffer = true, desc = "Open today's daily" },
             },
         },
         follow_url_func = function(url)
@@ -89,7 +90,7 @@ return {
             hl_groups = {
                 ObsidianTodo = { bold = true, fg = "#f78c6c" },
                 ObsidianDone = { bold = true, fg = "#89ddff" },
-                ObsidianBullet = { bold = true, fg = "#89ddff" },
+                ObsidianBullet = { bold = true },
                 ObsidianExtLinkIcon = { fg = "#c792ea" },
                 ObsidianRefText = { underline = true, fg = "#c792ea" },
                 ObsidianHighlightText = { bg = "#75662e" },
