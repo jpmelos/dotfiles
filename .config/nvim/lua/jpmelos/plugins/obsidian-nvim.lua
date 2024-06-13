@@ -16,7 +16,7 @@ return {
                 path = "~/second-brain",
                 overrides = {
                     daily_notes = {
-                        folder = "dailies",
+                        folder = "00-dailies",
                         date_format = "%Y-%m-%d",
                         alias_format = "%Y-%m-%d",
                         template = nil,
