@@ -19,7 +19,7 @@ return {
                         folder = "dailies",
                         date_format = "%Y-%m-%d",
                         alias_format = "%Y-%m-%d",
-                        template = "daily.md",
+                        template = nil,
                     },
                     -- wiki_link_func = "use_path_only",
                     preferred_link_style = "markdown",
