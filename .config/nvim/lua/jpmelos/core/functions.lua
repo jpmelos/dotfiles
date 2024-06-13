@@ -34,14 +34,14 @@ function os.capture(cmd, raw)
 end
 
 function UpdateGitBranch()
-    local git_branch = os.capture("git branch | awk '/^* /{print $2}'")
-
-    if string.startswith(git_branch, "fatal") then
+    local dot_git_path = vim.loop.cwd() .. "/.git"
+    local ok, _ = vim.loop.fs_stat(dot_git_path)
+    if not ok then
         vim.g.git_branch = nil
-    else
-        vim.g.git_branch = git_branch
+        return
     end
 
+    vim.g.git_branch = os.capture("git branch | awk '/^* /{print $2}'")
     vim.cmd("redrawtabline")
 end
 
