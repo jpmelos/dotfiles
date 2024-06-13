@@ -31,6 +31,21 @@ return {
                         -- variable and the value a function
                         substitutions = {},
                     },
+                    note_id_func = function(title)
+                        if title ~= nil then
+                            return title
+                                :gsub(" ", "-")
+                                :gsub("[^A-Za-z0-9-_]", "_")
+                                :lower()
+                        end
+
+                        local note_id = ""
+                        for _ = 1, 16 do
+                            note_id = note_id
+                                .. string.char(math.random(97, 122))
+                        end
+                        return note_id
+                    end,
                 },
             },
         },
