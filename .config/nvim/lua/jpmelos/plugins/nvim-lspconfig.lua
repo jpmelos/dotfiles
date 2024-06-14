@@ -85,12 +85,8 @@ return {
                         pyright = { disableOrganizeImports = true },
                         python = {
                             analysis = {
-                                -- Inspect the entire workspace: all importable
-                                -- code.
                                 diagnosticMode = "workspace",
-                                -- Only syntax and semantic errors. No type
-                                -- checking in the IDE.
-                                typeCheckingMode = "off",
+                                typeCheckingMode = "strict",
                                 -- Do not mess with my path.
                                 autoSearchPaths = false,
                             },
