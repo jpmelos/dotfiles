@@ -104,10 +104,10 @@ alias watch='watch '
 
 # Makes Neovim open multiple files in different buffers, all immediately
 # visible, in the same tab.
-alias v='nvim -O'
-alias vi='nvim -O'
-alias vim='nvim -O'
-alias nvim='nvim -O'
+alias v='\nvim -O'
+alias vi='\nvim -O'
+alias vim='\nvim -O'
+alias nvim='\nvim -O'
 
 # Ask before destructive actions.
 alias cp='cp -i'
