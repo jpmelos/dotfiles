@@ -1,5 +1,4 @@
 local fix_pyright_hover_doc = function(value)
-    value = string.gsub(value, "&nbsp;", " ")
     value = string.gsub(value, "\\_", "_")
     return value
 end
