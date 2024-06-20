@@ -58,7 +58,7 @@ return {
             end
             conform.format({
                 async = true,
-                lsp_fallback = false,
+                lsp_format = "never",
                 range = range,
             })
         end, { range = true })
