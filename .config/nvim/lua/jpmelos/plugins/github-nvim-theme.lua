@@ -18,7 +18,7 @@ return {
         vim.cmd("hi StatusLineNC gui=none guifg=#ffffff guibg=#5fafd7")
         vim.cmd("hi TabLineFill gui=none guifg=#f6f8fa guibg=#5094e4")
 
-        -- Make the cursor line be underlined and have no background color.
+        -- Make the cursor line have a gray background.
         vim.cmd("hi CursorLine gui=none guifg=none guibg=#eeeeee")
         vim.cmd("hi ColorColumn gui=none guifg=none guibg=#dadada")
 
