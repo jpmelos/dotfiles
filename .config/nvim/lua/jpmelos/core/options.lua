@@ -76,7 +76,7 @@ opt.listchars = {
 -- workspace and a `.nvim.lua` file in their root directory.
 opt.conceallevel = 0
 -- Don't conceal in the cursor line when in normal mode or search mode.
-opt.concealcursor = "nc"
+opt.concealcursor = "c"
 
 -- Highlight column for text wrapping.
 opt.colorcolumn = "80"
