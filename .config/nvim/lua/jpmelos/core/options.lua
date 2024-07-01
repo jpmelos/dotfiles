@@ -22,12 +22,12 @@ opt.signcolumn = "yes"
 
 -- 4 spaces for tabs.
 opt.tabstop = 4
+-- 4 spaces for indent width.
+opt.shiftwidth = 4
 -- Expand tab to spaces.
 opt.expandtab = true
 -- Copy indent from current line when starting new one.
 opt.autoindent = true
--- 4 spaces for indent width.
-opt.shiftwidth = 4
 
 -- Soft-wrap lines.
 opt.wrap = true
@@ -35,7 +35,8 @@ opt.wrap = true
 opt.linebreak = false
 -- Indent the same way as the parent line, to keep blocks intact.
 opt.breakindent = true
--- Shift broken lines by two columns, to make it move obvious it'a broken.
+-- Shift broken lines by the same number of columns as the tab stop, to make it
+-- move obvious it'a broken.
 opt.breakindentopt = "shift:4"
 -- Show ↪ in front of broken lines.
 opt.showbreak = "↪"
