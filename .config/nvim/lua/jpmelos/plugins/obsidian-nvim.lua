@@ -48,6 +48,43 @@ return {
                     end,
                 },
             },
+            {
+                name = "second-brain-close",
+                path = "~/second-brain-close",
+                overrides = {
+                    daily_notes = {
+                        folder = "00-dailies",
+                        date_format = "%Y-%m-%d",
+                        alias_format = "%Y-%m-%d",
+                        template = nil,
+                    },
+                    -- wiki_link_func = "use_path_only",
+                    preferred_link_style = "markdown",
+                    templates = {
+                        folder = "templates",
+                        date_format = "%Y-%m-%d",
+                        time_format = "%H:%M",
+                        -- A map for custom variables, the key should be the
+                        -- variable and the value a function
+                        substitutions = {},
+                    },
+                    note_id_func = function(title)
+                        if title ~= nil then
+                            return title
+                                :gsub(" ", "-")
+                                :gsub("[^A-Za-z0-9-_]", "_")
+                                :lower()
+                        end
+
+                        local note_id = ""
+                        for _ = 1, 16 do
+                            note_id = note_id
+                                .. string.char(math.random(97, 122))
+                        end
+                        return note_id
+                    end,
+                },
+            },
         },
         -- When using ':ObsidianOpen'.
         open_app_foreground = false,
