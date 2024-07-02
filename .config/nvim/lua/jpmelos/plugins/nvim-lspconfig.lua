@@ -85,7 +85,7 @@ return {
                         python = {
                             analysis = {
                                 diagnosticMode = "workspace",
-                                typeCheckingMode = "strict",
+                                typeCheckingMode = "off",
                                 -- Do not mess with my path.
                                 autoSearchPaths = false,
                             },
