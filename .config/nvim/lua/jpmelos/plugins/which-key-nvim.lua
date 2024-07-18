@@ -7,7 +7,7 @@ return {
     end,
     config = function()
         local wk = require("which-key")
-        wk.setup()
+        wk.setup({ win = { border = "rounded" } })
 
         wk.add({ { "gp", desc = "LSP previews" } })
         wk.add({
@@ -30,7 +30,5 @@ return {
                 { "x", desc = "+ Quickfix" },
             },
         })
-
-        vim.cmd("hi WhichKeyFloat guibg=#eeeeee")
     end,
 }
