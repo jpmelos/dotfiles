@@ -115,7 +115,7 @@ alias mv='mv -i'
 
 # Docker aliases.
 alias d='docker'
-alias dc='docker-compose'
+alias dc='docker compose'
 alias docker-nuke-all-the-things='yes | docker system prune --volumes --all'
 
 # Git aliases.
