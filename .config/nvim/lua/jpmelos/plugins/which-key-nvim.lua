@@ -9,25 +9,27 @@ return {
         local wk = require("which-key")
         wk.setup()
 
-        wk.register({ gp = "LSP previews" })
-        wk.register({
-            b = "+ Current buffer",
-            c = "+ Code actions",
-            d = "+ Debug",
-            dp = "+ Python",
-            e = "+ Explorer",
-            f = "+ Finder",
-            g = "+ Git",
-            l = "+ LSP/Lint",
-            m = "+ Markdown",
-            o = "+ Obsidian",
-            p = "+ Format",
-            s = "+ Splits",
-            t = "+ Tabs",
-            v = "+ Database",
-            w = "+ Sessions",
-            x = "+ Quickfix",
-        }, { prefix = "<leader>" })
+        wk.add({ { "gp", desc = "LSP previews" } })
+        wk.add({
+            {
+                { "b", desc = "+ Current buffer" },
+                { "c", desc = "+ Code actions" },
+                { "d", desc = "+ Debug" },
+                { "dp", desc = "+ Python" },
+                { "e", desc = "+ Explorer" },
+                { "f", desc = "+ Finder" },
+                { "g", desc = "+ Git" },
+                { "l", desc = "+ LSP/Lint" },
+                { "m", desc = "+ Markdown" },
+                { "o", desc = "+ Obsidian" },
+                { "p", desc = "+ Format" },
+                { "s", desc = "+ Splits" },
+                { "t", desc = "+ Tabs" },
+                { "v", desc = "+ Database" },
+                { "w", desc = "+ Sessions" },
+                { "x", desc = "+ Quickfix" },
+            },
+        })
 
         vim.cmd("hi WhichKeyFloat guibg=#eeeeee")
     end,
