@@ -17,11 +17,11 @@ export GPG_TTY=$(tty)
 shopt -s histverify no_empty_cmd_completion
 
 run_autoenv_on_init() {
-	if [ -z "$AUTOENV_RAN_ON_INIT" ]; then
-		cd /
-		cd - >/dev/null
-		AUTOENV_RAN_ON_INIT=1
-	fi
+    if [ -z "$AUTOENV_RAN_ON_INIT" ]; then
+        cd /
+        cd - >/dev/null
+        AUTOENV_RAN_ON_INIT=1
+    fi
 }
 
 #################
@@ -65,11 +65,11 @@ eval "$(pyenv init -)"
 ################################
 
 if type brew &>/dev/null; then
-	HOMEBREW_PREFIX="$(brew --prefix)"
+    HOMEBREW_PREFIX="$(brew --prefix)"
 
-	for COMPLETION in "${HOMEBREW_PREFIX}/etc/bash_completion.d/"*; do
-		[[ -r "${COMPLETION}" ]] && source "${COMPLETION}"
-	done
+    for COMPLETION in "${HOMEBREW_PREFIX}/etc/bash_completion.d/"*; do
+        [[ -r "${COMPLETION}" ]] && source "${COMPLETION}"
+    done
 fi
 
 #################
@@ -179,32 +179,32 @@ __git_complete gl git_log
 
 # Updates the system.
 update() {
-	sudo apt-get --allow-releaseinfo-change update
-	sudo apt-get -y --allow-downgrades dist-upgrade
-	sudo apt-get -y autoremove
-	sudo apt-get -y clean
+    sudo apt-get --allow-releaseinfo-change update
+    sudo apt-get -y --allow-downgrades dist-upgrade
+    sudo apt-get -y autoremove
+    sudo apt-get -y clean
 }
 
 # Extract stuff.
 extract() {
-	if [ -f "$1" ]; then
-		case "$1" in
-		*.tar.bz2) tar xjf "$1" ;;
-		*.tar.gz) tar xzf "$1" ;;
-		*.bz2) bunzip2 "$1" ;;
-		*.rar) rar x "$1" ;;
-		*.gz) gunzip "$1" ;;
-		*.tar) tar xf "$1" ;;
-		*.tbz2) tar xjf "$1" ;;
-		*.tgz) tar xzf "$1" ;;
-		*.zip) unzip "$1" ;;
-		*.Z) uncompress "$1" ;;
-		*.7z) 7z x "$1" ;;
-		*) echo "'$1' cannot be extracted via extract()" ;;
-		esac
-	else
-		echo "'$1' is not a valid file"
-	fi
+    if [ -f "$1" ]; then
+        case "$1" in
+        *.tar.bz2) tar xjf "$1" ;;
+        *.tar.gz) tar xzf "$1" ;;
+        *.bz2) bunzip2 "$1" ;;
+        *.rar) rar x "$1" ;;
+        *.gz) gunzip "$1" ;;
+        *.tar) tar xf "$1" ;;
+        *.tbz2) tar xjf "$1" ;;
+        *.tgz) tar xzf "$1" ;;
+        *.zip) unzip "$1" ;;
+        *.Z) uncompress "$1" ;;
+        *.7z) 7z x "$1" ;;
+        *) echo "'$1' cannot be extracted via extract()" ;;
+        esac
+    else
+        echo "'$1' is not a valid file"
+    fi
 }
 
 ######################
@@ -214,9 +214,9 @@ extract() {
 ######################
 
 if [ -z "$TMUX" ]; then
-	if tmux has-session; then
-		exec tmux attach
-	else
-		exec tmux
-	fi
+    if tmux has-session; then
+        exec tmux attach
+    else
+        exec tmux
+    fi
 fi
