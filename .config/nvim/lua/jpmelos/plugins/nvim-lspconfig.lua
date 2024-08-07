@@ -147,6 +147,18 @@ return {
         )
         K(
             "n",
+            "gt",
+            "<cmd>Telescope lsp_type_definitions<CR>",
+            { desc = "Show LSP type definitions" }
+        )
+        K(
+            "n",
+            "gi",
+            "<cmd>Telescope lsp_implementations<CR>",
+            { desc = "Show LSP implementations" }
+        )
+        K(
+            "n",
             "gs",
             "<cmd>Telescope lsp_document_symbols<CR>",
             { desc = "Show LSP symbols in buffer" }
