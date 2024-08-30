@@ -142,6 +142,7 @@ alias gshh='g shh'
 alias gp='g p'
 alias gpf='g pf'
 alias gl='g l'
+alias gnuke='g nuke'
 
 #########################
 #                       #

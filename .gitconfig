@@ -74,6 +74,7 @@
     p = push
     pf = push --force-with-lease
     l = "! f() { git log --color=always --oneline --graph --decorate $@ | awk -f ~/.git-log-prepend-number-awk | less -R; }; f"
+    nuke = "! f() { source "$HOME/.gitfunctions"; __git_nuke; }; f"
 
 [include]
     path = ~/devel/dotfiles/references/gitconfigs/gpg-keys

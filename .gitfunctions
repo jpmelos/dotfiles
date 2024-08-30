@@ -1,0 +1,13 @@
+# vim: set ft=sh :
+
+__git_nuke() {
+    git checkout "$(git main-branch)"
+    git reset --hard "origin/$(git main-branch)"
+    git fetch --prune
+    for branch in $(git branch -vv | grep ': gone]' | awk '{print $1}'); do
+        git branch -D "$branch"
+    done
+    git gc --prune=now --aggressive
+    git prune
+}
+
