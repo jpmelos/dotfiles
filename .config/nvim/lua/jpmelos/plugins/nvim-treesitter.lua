@@ -24,8 +24,8 @@ return {
                     node_decremental = "<bs>",
                 },
             },
-            -- Better indentation.
-            indent = { enable = true },
+            -- Better indentation. But for markdown, it's worse...
+            indent = { enable = true, disable = { "markdown" } },
             -- Ensure these language parsers are installed.
             ensure_installed = {
                 -- These five parsers should always be installed according to
