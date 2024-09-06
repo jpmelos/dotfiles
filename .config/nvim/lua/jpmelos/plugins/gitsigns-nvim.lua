@@ -33,11 +33,8 @@ return {
         K("n", "<leader>gf", gs.refresh, { desc = "Force-refresh git signs" })
 
         -- Reload files on focus.
-        api.nvim_create_autocmd({
-            "FocusGained",
-            "BufEnter",
-            "BufWinEnter",
-            "FileChangedShellPost",
-        }, { callback = gs.refresh })
+        api.nvim_create_autocmd({ "FileChangedShellPost" }, {
+            callback = gs.refresh,
+        })
     end,
 }
