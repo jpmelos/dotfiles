@@ -35,13 +35,15 @@ end
 
 function UpdateGitBranch()
     local dot_git_path = vim.loop.cwd() .. "/.git"
-    local ok, _ = vim.loop.fs_stat(dot_git_path)
-    if not ok then
-        vim.g.git_branch = nil
-        return
+    local in_git_root, _ = vim.loop.fs_stat(dot_git_path)
+
+    if not in_git_root then
+        vim.g.git_branch = "not in git root"
+    else
+        vim.g.git_branch =
+            os.capture("git branch | grep '^* ' | awk '{print $2}'")
     end
 
-    vim.g.git_branch = os.capture("git branch | awk '/^* /{print $2}'")
     vim.cmd("redrawtabline")
 end
 
