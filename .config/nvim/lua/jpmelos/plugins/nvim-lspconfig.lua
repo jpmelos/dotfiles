@@ -184,12 +184,9 @@ return {
         )
         K("n", "<leader>cr", vim.lsp.buf.rename, { desc = "Smart rename" })
 
-        K(
-            "n",
-            "<leader>ld",
-            vim.diagnostic.open_float,
-            { desc = "Show line diagnostic" }
-        )
+        K("n", "<leader>ld", function()
+            vim.diagnostic.open_float({ border = "rounded" })
+        end, { desc = "Show line diagnostic" })
         K(
             "n",
             "[d",
