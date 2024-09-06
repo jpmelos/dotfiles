@@ -40,8 +40,12 @@ function UpdateGitBranch()
     if not in_git_root then
         vim.g.git_branch = "not in git root"
     else
-        vim.g.git_branch =
-            os.capture("git branch | grep '^* ' | awk '{print $2}'")
+        local git_branch = os.capture("git branch | grep '^* '")
+        if git_branch:find("no branch, rebasing") then
+            vim.g.git_branch = "(rebasing)"
+        else
+            vim.g.git_branch = git_branch:sub(3)
+        end
     end
 
     vim.cmd("redrawtabline")
