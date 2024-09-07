@@ -8,15 +8,11 @@ return {
 
         lint.linters_by_ft = {}
 
-        vim.api.nvim_create_autocmd(
-            { "FocusGained", "BufEnter", "BufWritePost", "InsertLeave" },
-            {
-                group = vim.api.nvim_create_augroup("lint", { clear = true }),
-                callback = function()
-                    lint.try_lint()
-                end,
-            }
-        )
+        vim.api.nvim_create_autocmd({ "BufWritePost", "InsertLeave" }, {
+            callback = function()
+                lint.try_lint()
+            end,
+        })
 
         K("n", "<leader>ll", function()
             lint.try_lint()

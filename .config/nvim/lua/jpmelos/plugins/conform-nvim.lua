@@ -35,7 +35,6 @@ return {
         })
 
         vim.api.nvim_create_autocmd({ "BufWritePost", "InsertLeave" }, {
-            pattern = "*",
             callback = function()
                 -- Disable with a global or buffer-local variable.
                 if vim.g.disable_autoformat or vim.b.disable_autoformat then
