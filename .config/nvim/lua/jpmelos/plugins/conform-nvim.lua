@@ -6,12 +6,23 @@ return {
 
         local conform = require("conform")
 
-        -- Disable autoformat by default. Use workspaces to enable it for
-        -- specific projects.
+        -- Disable autoformat by default. Use repository-local .nvim.lua to
+        -- enable it for specific projects.
         vim.g.disable_autoformat = true
 
         conform.setup({
-            -- Use workspaces to change this for specific projects.
+            -- Use repository-local .nvim.lua to overwrite this for specific
+            -- projects. Something like:
+            -- ```
+            --     local conform = require("conform")
+            --     conform.formatters_by_ft = {
+            --         python = {
+            --             "ruff_fix",
+            --             "ruff_organize_imports",
+            --             "black",
+            --         },
+            --     }
+            -- ```
             formatters_by_ft = {
                 sh = { "shfmt" },
                 lua = { "stylua" },
