@@ -208,6 +208,61 @@ extract() {
     fi
 }
 
+# Determine actual size of a file in disk (considers entire blocks) or total
+# size of a directory.
+function fs() {
+    if du -b /dev/null >/dev/null 2>&1; then
+        local arg=-sbh
+    else
+        local arg=-sh
+    fi
+    if [[ -n "$@" ]]; then
+        du $arg -- "$@"
+    else
+        du $arg .[^.]* ./*
+    fi
+}
+
+# Start an HTTP server from a directory, optionally specifying the port
+function server() {
+    local port="${1:-8000}"
+    sleep 1 && open "http://localhost:${port}/" &
+    # Set the default Content-Type to `text/plain` instead of
+    # `application/octet-stream` snd serve everything as UTF-8 (although not
+    # technically correct, this doesn’t break anything for binary files).
+    python -c $'import SimpleHTTPServer;\nmap = SimpleHTTPServer.SimpleHTTPRequestHandler.extensions_map;\nmap[""] = "text/plain";\nfor key, value in map.items():\n\tmap[key] = value + ";charset=UTF-8";\nSimpleHTTPServer.test();' "$port"
+}
+
+# Compare original and gzipped file size.
+function gz() {
+    local origsize=$(wc -c <"$1")
+    local gzipsize=$(gzip -c "$1" | wc -c)
+    local ratio=$(echo "$gzipsize * 100 / $origsize" | bc -l)
+    printf "orig: %d bytes\n" "$origsize"
+    printf "gzip: %d bytes (%2.2f%%)\n" "$gzipsize" "$ratio"
+}
+
+# Normalize `open` across Linux, macOS, and Windows.
+# This is needed to make the `o` function (see below) cross-platform.
+if [ ! $(uname -s) = 'Darwin' ]; then
+    if grep -q Microsoft /proc/version; then
+        # Ubuntu on Windows using the Linux subsystem
+        alias open='explorer.exe'
+    else
+        alias open='xdg-open'
+    fi
+fi
+
+# `o` with no arguments opens the current directory, otherwise opens the given
+# location.
+function o() {
+    if [ $# -eq 0 ]; then
+        open .
+    else
+        open "$@"
+    fi
+}
+
 ######################
 #                    #
 #    Go into tmux    #
