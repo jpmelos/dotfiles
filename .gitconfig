@@ -3,8 +3,16 @@
     email = jpmelos@gmail.com
 
 [core]
-    pager = less -Q
+    pager = delta
     excludesFile = ~/.gitignore-global
+
+[interactive]
+    diffFilter = delta --color-only
+
+[delta]
+    navigate = true
+    side-by-side = true
+    line-numbers = true
 
 [init]
     defaultBranch = main
@@ -14,6 +22,9 @@
 
 [status]
     showUntrackedFiles = all
+
+[diff]
+    colorMoved = default
 
 [merge]
     conflictStyle = diff3
