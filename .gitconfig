@@ -63,7 +63,7 @@
     whitespace = black red dim bold
 
 [alias]
-    b = branch
+    b = branch -vv
     bn = checkout -b
     bd = branch -D
     co = checkout
