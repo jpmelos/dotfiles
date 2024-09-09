@@ -1,7 +1,7 @@
 # vim: set ft=sh :
 
 __git_nuke() {
-    git checkout "$(git main-branch)"
+    git checkout -f "$(git main-branch)"
     git reset --hard "origin/$(git main-branch)"
     git fetch --prune
     for branch in $(git branch -vv | grep ': gone]' | awk '{print $1}'); do
@@ -10,4 +10,3 @@ __git_nuke() {
     git gc --prune=now --aggressive
     git prune
 }
-
