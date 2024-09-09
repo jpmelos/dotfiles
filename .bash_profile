@@ -29,8 +29,6 @@ if [[ $JPMELOS_IS_MACOS == "true" ]]; then
 fi
 # Binaries not managed via a package manager.
 field_prepend PATH "$HOME/.local/bin"
-# Neovim's Mason installations.
-field_prepend PATH "$HOME/.local/share/nvim/mason/bin"
 # Rust tooling's own binaries.
 field_prepend PATH "$HOME/.cargo/bin"
 # pyenv's own binaries.
