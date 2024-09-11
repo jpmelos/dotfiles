@@ -63,28 +63,45 @@
     whitespace = black red dim bold
 
 [alias]
-    b = branch -vv
-    bn = checkout -b
-    bd = branch -D
-    co = checkout
+    # Utilities.
     main-branch = ! git symbolic-ref refs/remotes/origin/HEAD | cut -d'/' -f4
-    cm = ! git checkout $(git main-branch)
+
+    b = branch -vv
+    bn = checkout -b  # n = new
+    bd = branch -D  # d = delete
+
+    # o = checkout
+    o = checkout
+    om = ! git checkout $(git main-branch)  # m = master or main
+
+    # cp = cherry-pick, intruding into c (commit) namespace
     cp = cherry-pick
+
     st = status
+
     d = diff
     dst = diff --name-status
     dca = diff --cached
+
     a = add
     aa = add -A :/
     apa = add --patch
+
     c = commit
     ca = commit -a
+    cma = commit -a --amend
+    can = commit -a -n
+    cman = commit -a --amend -n
+
     sh = show
     shf = show --name-status
     shh = "! f() { HEADN=$1; shift; git show "HEAD~$HEADN" $@; }; f"
+
     p = push
     pf = push --force-with-lease
+
     l = "! f() { git log --color=always --oneline --graph --decorate $@ | awk -f ~/.git-log-prepend-number-awk | less -R; }; f"
+
     nuke = "! f() { source "$HOME/.gitfunctions"; __git_nuke; }; f"
 
 [include]

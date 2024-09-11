@@ -118,30 +118,49 @@ alias d='docker'
 alias dc='docker compose'
 alias docker-nuke-all-the-things='yes | docker system prune --volumes --all'
 
-# Git aliases.
+#####################
+#                   #
+#    git aliases    #
+#                   #
+#####################
 # When adding an alias, also configure completions below.
+
 alias g='git'
+
 alias gb='g b'
 alias gbn='g bn'
 alias gbd='g bd'
-alias gco='g co'
-alias gcm='g cm'
+
+alias go='g o'
+alias gom='g om'
+
 alias gcp='g cp'
+
 alias gst='g st'
+
 alias gd='g d'
 alias gdst='g dst'
 alias gdca='g dca'
+
 alias ga='g a'
 alias gaa='g aa'
 alias gapa='g apa'
+
 alias gc='g c'
 alias gca='g ca'
+alias gcma='g cma'
+alias gcan='g can'
+alias gcman='g cman'
+
 alias gsh='g sh'
 alias gshf='g shf'
 alias gshh='g shh'
+
 alias gp='g p'
 alias gpf='g pf'
+
 alias gl='g l'
+
 alias gnuke='g nuke'
 
 #########################
@@ -151,25 +170,39 @@ alias gnuke='g nuke'
 #########################
 
 __git_complete g git
+
 __git_complete gb git_branch
 __git_complete gbn git_checkout
 __git_complete gbd git_branch
-__git_complete gco git_checkout
-__git_complete gcm git_checkout
+
+__git_complete go git_checkout
+__git_complete gom git_checkout
+
+__git_complete gcp git_cherry_pick
+
 __git_complete gst git_status
+
 __git_complete gd git_diff
+__git_complete gdst git_diff
 __git_complete gdca git_diff
+
 __git_complete ga git_add
 __git_complete gaa git_add
 __git_complete gapa git_add
+
 __git_complete gc git_commit
 __git_complete gca git_commit
+__git_complete gcma git_commit
+__git_complete gcan git_commit
+__git_complete gcman git_commit
+
 __git_complete gsh git_show
 __git_complete gshf git_show
 __git_complete gshh git_show
+
 __git_complete gp git_push
-__git_complete gpsup git_push
 __git_complete gpf git_push
+
 __git_complete gl git_log
 
 ###################
