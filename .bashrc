@@ -148,8 +148,11 @@ alias gapa='g apa'
 
 alias gc='g c'
 alias gca='g ca'
+alias gcm='g cm'
+alias gcn='g cn'
 alias gcma='g cma'
 alias gcan='g can'
+alias gcmn='g cmn'
 alias gcman='g cman'
 
 alias gsh='g sh'
@@ -192,8 +195,11 @@ __git_complete gapa git_add
 
 __git_complete gc git_commit
 __git_complete gca git_commit
+__git_complete gcm git_commit
+__git_complete gcn git_commit
 __git_complete gcma git_commit
 __git_complete gcan git_commit
+__git_complete gcmn git_commit
 __git_complete gcman git_commit
 
 __git_complete gsh git_show
