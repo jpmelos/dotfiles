@@ -217,6 +217,14 @@ __git_complete gl git_log
 #                 #
 ###################
 
+gnh() { # git no hooks
+    echo "Disabling git hooks..."
+    mv "$(git root)/.git/hooks" "$(git root)/.git/hooks_dead"
+    eval $*
+    mv "$(git root)/.git/hooks_dead" "$(git root)/.git/hooks"
+    echo "Re-enabled git hooks."
+}
+
 # Updates the system.
 update() {
     sudo apt-get --allow-releaseinfo-change update
