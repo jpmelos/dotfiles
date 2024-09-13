@@ -93,10 +93,10 @@
     ca = commit -a
     cm = commit --amend
     cn = commit -n
-    cma = commit -a --amend
+    cam = commit -a --amend
     can = commit -a -n
     cmn = commit --amend -n
-    cman = commit -a --amend -n
+    camn = commit -a --amend -n
 
     sh = show
     shf = show --name-status

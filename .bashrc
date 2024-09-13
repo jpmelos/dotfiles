@@ -150,10 +150,10 @@ alias gc='g c'
 alias gca='g ca'
 alias gcm='g cm'
 alias gcn='g cn'
-alias gcma='g cma'
+alias gcam='g cam'
 alias gcan='g can'
 alias gcmn='g cmn'
-alias gcman='g cman'
+alias gcamn='g camn'
 
 alias gsh='g sh'
 alias gshf='g shf'
@@ -197,10 +197,10 @@ __git_complete gc git_commit
 __git_complete gca git_commit
 __git_complete gcm git_commit
 __git_complete gcn git_commit
-__git_complete gcma git_commit
+__git_complete gcam git_commit
 __git_complete gcan git_commit
 __git_complete gcmn git_commit
-__git_complete gcman git_commit
+__git_complete gcamn git_commit
 
 __git_complete gsh git_show
 __git_complete gshf git_show
