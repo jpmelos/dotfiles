@@ -65,6 +65,8 @@
 [alias]
     # Utilities.
     main-branch = ! git symbolic-ref refs/remotes/origin/HEAD | cut -d'/' -f4
+    root = rev-parse --show-toplevel
+    nuke = "! f() { source "$HOME/.gitfunctions"; __git_nuke; }; f"
 
     b = branch -vv
     bn = checkout -b  # n = new
@@ -104,8 +106,6 @@
     pf = push --force-with-lease
 
     l = "! f() { git log --color=always --oneline --graph --decorate $@ | awk -f ~/.git-log-prepend-number-awk | less -R; }; f"
-
-    nuke = "! f() { source "$HOME/.gitfunctions"; __git_nuke; }; f"
 
 [include]
     path = ~/devel/dotfiles/references/gitconfigs/gpg-keys
