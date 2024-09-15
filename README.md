@@ -2,7 +2,7 @@
 
 ## Installing these dotfiles
 
-1. Make sure `stow` is installed.
+1. Install `stow`.
 
 1. Run:
 
@@ -12,7 +12,7 @@
 
 ## Installing tmux plugins
 
-1. Install the plugin manager.
+1. Install `tpm`, the tmux plugin manager.
 
    ```bash
    git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
@@ -20,7 +20,7 @@
 
 1. Type `<prefix>I`.
 
-## Configuring terminal for font effects and more
+## [MacOS only] Configuring terminal for font effects and more
 
 1. Install the latest version of `ncurses`.
 
