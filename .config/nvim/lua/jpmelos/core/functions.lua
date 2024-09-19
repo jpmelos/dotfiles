@@ -60,7 +60,7 @@ end
 
 function GetLspServers()
     local clients = ""
-    for _, client in pairs(vim.lsp.get_clients()) do
+    for _, client in pairs(vim.lsp.get_clients({ bufnr = 0 })) do
         clients = clients .. client.config.name .. ","
     end
 
