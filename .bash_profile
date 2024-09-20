@@ -88,6 +88,14 @@ export VIRTUAL_ENV_DISABLE_PROMPT=1
 # Indicate where the pyenv root is.
 export PYENV_ROOT=$HOME/.pyenv
 
+#########################
+#                       #
+#    Other utilities    #
+#                       #
+#########################
+
+export OP_ACCOUNT=my.1password.com
+
 ##########################
 #                        #
 #    Source ~/.bashrc    #
