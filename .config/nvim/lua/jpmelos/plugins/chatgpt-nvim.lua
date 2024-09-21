@@ -2,6 +2,7 @@ local openai_params = {
     model = "gpt-4o",
     frequency_penalty = 0,
     presence_penalty = 0,
+    max_tokens = 3000, -- Default is 300, 3,000 seems like safe still.
     temperature = 0,
     top_p = 1,
     n = 1,
@@ -12,13 +13,13 @@ return {
     cmd = { "ChatGPT", "ChatGPTEditWithInstructions" },
     keys = {
         {
-            "<leader>ao",
+            "<leader>a",
             "<cmd>ChatGPT<CR>",
             mode = { "n" },
             desc = "Open chat",
         },
         {
-            "<leader>ae",
+            "<leader>a",
             "<cmd>ChatGPTEditWithInstructions<CR>",
             mode = { "v" },
             desc = "Edit code",
