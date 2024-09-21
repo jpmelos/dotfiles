@@ -9,7 +9,21 @@ local openai_params = {
 
 return {
     "jackMort/ChatGPT.nvim",
-    lazy = false,
+    cmd = { "ChatGPT", "ChatGPTEditWithInstructions" },
+    keys = {
+        {
+            "<leader>ao",
+            "<cmd>ChatGPT<CR>",
+            mode = { "n" },
+            desc = "Open chat",
+        },
+        {
+            "<leader>ae",
+            "<cmd>ChatGPTEditWithInstructions<CR>",
+            mode = { "v" },
+            desc = "Edit code",
+        },
+    },
     dependencies = {
         "MunifTanjim/nui.nvim",
         "nvim-lua/plenary.nvim",
@@ -17,21 +31,11 @@ return {
         "nvim-telescope/telescope.nvim",
     },
     config = function()
-        local K = vim.keymap.set
-
         require("chatgpt").setup({
             api_key_cmd = "op item get vtzbgc3ybgalzoamj7hietafpe --vault afpmshswzblkzmziqhtqfu2sji --fields notesPlain",
             show_line_numbers = true,
             openai_params = openai_params,
             openai_edit_params = openai_params,
         })
-
-        K({ "n" }, "<leader>ao", "<cmd>ChatGPT<CR>", { desc = "Open chat" })
-        K(
-            { "v" },
-            "<leader>ae",
-            "<cmd>ChatGPTEditWithInstructions<CR>",
-            { desc = "Edit code" }
-        )
     end,
 }
