@@ -29,10 +29,15 @@ return {
             -- These are `nvim-lspconfig` names, which will be translated to
             -- Mason package names by `mason-lspconfig.nvim`.
             ensure_installed = {
+                -- bash
                 "bashls",
-                "lua_ls",
+                -- Python
                 "pyright",
+                -- Lua
+                "lua_ls",
+                -- Rust
                 "rust_analyzer",
+                -- SQL
                 "sqlls",
             },
         })
@@ -59,23 +64,6 @@ return {
                     capabilities = capabilities,
                 })
             end,
-            lua_ls = function()
-                lspconfig.lua_ls.setup({
-                    on_attach = lsp_on_attach,
-                    capabilities = capabilities,
-                    settings = {
-                        Lua = {
-                            diagnostics = {
-                                disable = { "type-check" },
-                                -- Make the language server recognize the "vim"
-                                -- global. Useful when working with Neovim
-                                -- configuration.
-                                globals = { "vim" },
-                            },
-                        },
-                    },
-                })
-            end,
             pyright = function()
                 lspconfig.pyright.setup({
                     on_attach = lsp_on_attach,
@@ -88,6 +76,23 @@ return {
                                 typeCheckingMode = "off",
                                 -- Do not mess with my path.
                                 autoSearchPaths = false,
+                            },
+                        },
+                    },
+                })
+            end,
+            lua_ls = function()
+                lspconfig.lua_ls.setup({
+                    on_attach = lsp_on_attach,
+                    capabilities = capabilities,
+                    settings = {
+                        Lua = {
+                            diagnostics = {
+                                disable = { "type-check" },
+                                -- Make the language server recognize the "vim"
+                                -- global. Useful when working with Neovim
+                                -- configuration.
+                                globals = { "vim" },
                             },
                         },
                     },

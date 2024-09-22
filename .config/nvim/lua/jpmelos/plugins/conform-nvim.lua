@@ -25,12 +25,14 @@ return {
             -- ```
             formatters_by_ft = {
                 sh = { "shfmt" },
-                lua = { "stylua" },
                 python = {
                     "ruff_fix",
                     "ruff_organize_imports",
                     "ruff_format",
                 },
+                lua = { "stylua" },
+                rust = { "rustfmt" },
+                sql = { "sqlfluff" },
             },
         })
 
