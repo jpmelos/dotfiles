@@ -17,10 +17,6 @@ return {
                     name = "second-brain",
                     path = "~/second-brain",
                 },
-                {
-                    name = "second-brain-close",
-                    path = "~/second-brain-close",
-                },
             },
             -- When using ':ObsidianOpen'.
             open_app_foreground = false,
