@@ -16,6 +16,7 @@ return {
     config = function()
         local api = vim.api
         local K = vim.keymap.set
+        local os_sep = require("plenary.path").path.sep
 
         local telescope = require("telescope")
         local builtins = require("telescope.builtin")
@@ -42,17 +43,35 @@ return {
                 -- Used for live_grep and grep_string. The command for
                 -- find_files is specified just above.
                 vimgrep_arguments = { "rg", "--color=never" },
+
                 path_display = { "smart" },
+
+                history = {
+                    path = vim.fn.stdpath("data")
+                        .. os_sep
+                        .. "telescope_history.sqlite3",
+                    limit = 10000,
+                },
+                cache_picker = {
+                    num_pickers = -1,
+                    limit_entries = 10000,
+                    ignore_empty_prompt = true,
+                },
+
                 mappings = {
                     n = {
                         ["<C-k>"] = actions.move_selection_previous,
                         ["<C-j>"] = actions.move_selection_next,
                         ["<C-q>"] = open_in_trouble_focus,
+                        ["<C-Down>"] = actions.cycle_history_next,
+                        ["<C-Up>"] = actions.cycle_history_prev,
                     },
                     i = {
                         ["<C-k>"] = actions.move_selection_previous,
                         ["<C-j>"] = actions.move_selection_next,
                         ["<C-q>"] = open_in_trouble_focus,
+                        ["<C-Down>"] = actions.cycle_history_next,
+                        ["<C-Up>"] = actions.cycle_history_prev,
                     },
                 },
             },

@@ -1,7 +1,7 @@
 {
-  "bash-language-server": "5.4.0",
+  "bash-language-server": "5.4.2",
   "lua-language-server": "3.10.6",
-  "pyright": "1.1.381",
+  "pyright": "1.1.382",
   "ruff": "0.6.7",
   "rust-analyzer": "2024-09-16",
   "shellcheck": "v0.10.0",
