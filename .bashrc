@@ -133,6 +133,7 @@ alias gbd='g bd'
 
 alias go='g o'
 alias gom='g om'
+alias gof='g of'
 
 alias gcp='g cp'
 
@@ -180,6 +181,7 @@ __git_complete gbd git_branch
 
 __git_complete go git_checkout
 __git_complete gom git_checkout
+__git_complete gof git_checkout
 
 __git_complete gcp git_cherry_pick
 

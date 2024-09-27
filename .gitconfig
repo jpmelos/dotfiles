@@ -75,6 +75,7 @@
     # o = checkout
     o = checkout
     om = ! git checkout $(git main-branch)  # m = master or main
+    of = checkout -f
 
     # cp = cherry-pick, intruding into c (commit) namespace
     cp = cherry-pick
