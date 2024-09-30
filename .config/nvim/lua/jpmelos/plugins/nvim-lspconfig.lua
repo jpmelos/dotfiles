@@ -102,6 +102,21 @@ return {
                 lspconfig.rust_analyzer.setup({
                     on_attach = lsp_on_attach,
                     capabilities = capabilities,
+                    settings = {
+                        ["rust-analyzer"] = {
+                            completion = {
+                                fullFunctionSignatures = {
+                                    enable = true,
+                                },
+                                hideDeprecated = true,
+                            },
+                            diagnostics = {
+                                styleLints = {
+                                    enable = true,
+                                },
+                            },
+                        },
+                    },
                 })
             end,
             sqlls = function()
