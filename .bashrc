@@ -123,10 +123,24 @@ alias docker-nuke-all-the-things='yes | docker system prune --volumes --all'
 #    git aliases and completions    #
 #                                   #
 #####################################
-# When adding an alias, also configure completions below.
 
 alias g='git'
 __git_complete g git
+
+alias gnuke='g nuke'
+
+alias gst='g st'
+__git_complete gst git_status
+
+alias gsh='g sh'
+alias gshf='g shf'
+alias gshh='g shh'
+__git_complete gsh git_show
+__git_complete gshf git_show
+__git_complete gshh git_show
+
+alias gl='g l'
+__git_complete gl git_log
 
 alias gb='g b'
 alias gbn='g bn'
@@ -135,25 +149,19 @@ __git_complete gb git_branch
 __git_complete gbn git_checkout
 __git_complete gbd git_branch
 
-alias go='g o'
-alias gom='g om'
-alias gof='g of'
-__git_complete go git_checkout
-__git_complete gom git_checkout
-__git_complete gof git_checkout
-
-alias gcp='g cp'
-__git_complete gcp git_cherry_pick
-
-alias gst='g st'
-__git_complete gst git_status
-
 alias gd='g d'
 alias gdst='g dst'
 alias gdca='g dca'
 __git_complete gd git_diff
 __git_complete gdst git_diff
 __git_complete gdca git_diff
+
+alias go='g o'
+alias gom='g om'
+alias gof='g of'
+__git_complete go git_checkout
+__git_complete gom git_checkout
+__git_complete gof git_checkout
 
 alias ga='g a'
 alias gaa='g aa'
@@ -179,12 +187,8 @@ __git_complete gcan git_commit
 __git_complete gcmn git_commit
 __git_complete gcamn git_commit
 
-alias gsh='g sh'
-alias gshf='g shf'
-alias gshh='g shh'
-__git_complete gsh git_show
-__git_complete gshf git_show
-__git_complete gshh git_show
+alias gcp='g cp'
+__git_complete gcp git_cherry_pick
 
 alias gp='g p'
 alias gpf='g pf'
@@ -193,11 +197,6 @@ __git_complete gpf git_push
 
 alias gpu='g pu'
 __git_complete gpu git_pull
-
-alias gl='g l'
-__git_complete gl git_log
-
-alias gnuke='g nuke'
 
 ###################
 #                 #

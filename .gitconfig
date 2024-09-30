@@ -68,26 +68,31 @@
     nuke = "! f() { source "$HOME/.gitfunctions"; __git_nuke; }; f"
     big-revert = "! f() { source "$HOME/.gitfunctions"; __git_big_revert; }; f"
 
+    # st = status
+    st = status
+
+    # sh = show
+    sh = show
+    shf = show --name-status
+    shh = "! f() { HEADN=$1; shift; git show "HEAD~$HEADN" $@; }; f"
+
+    # l = log
+    l = "! f() { git log --color=always --oneline --graph --decorate $@ | awk -f ~/.git-log-prepend-number-awk | less -R; }; f"
+
     # b = branch
     b = branch -vv --sort=-committerdate
     bn = checkout -b  # n = new
     bd = branch -D  # d = delete
 
-    # o = checkout
-    o = checkout
-    om = ! git checkout $(git main-branch)  # m = master or main
-    of = checkout -f
-
-    # cp = cherry-pick, intruding into c (commit) namespace
-    cp = cherry-pick
-
-    # st = status
-    st = status
-
     # d = diff
     d = diff
     dst = diff --name-status
     dca = diff --cached
+
+    # o = checkout
+    o = checkout
+    om = ! git checkout $(git main-branch)  # m = master or main
+    of = checkout -f
 
     # a = add
     a = add
@@ -104,10 +109,8 @@
     cmn = commit --amend -n
     camn = commit -a --amend -n
 
-    # sh = show
-    sh = show
-    shf = show --name-status
-    shh = "! f() { HEADN=$1; shift; git show "HEAD~$HEADN" $@; }; f"
+    # cp = cherry-pick, intruding into c (commit) namespace
+    cp = cherry-pick
 
     # p = push (except pu for pull)
     p = push
@@ -115,9 +118,6 @@
 
     # pu = pull
     pu = pull
-
-    # l = log
-    l = "! f() { git log --color=always --oneline --graph --decorate $@ | awk -f ~/.git-log-prepend-number-awk | less -R; }; f"
 
 [include]
     path = ~/devel/dotfiles/references/gitconfigs/gpg-keys
