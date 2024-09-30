@@ -68,7 +68,7 @@
     nuke = "! f() { source "$HOME/.gitfunctions"; __git_nuke; }; f"
     big-revert = "! f() { source "$HOME/.gitfunctions"; __git_big_revert; }; f"
 
-    b = branch -vv
+    b = branch -vv --sort=-committerdate
     bn = checkout -b  # n = new
     bd = branch -D  # d = delete
 
