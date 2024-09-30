@@ -36,7 +36,8 @@
 1. Set the correct terminfo in your `tmux.conf` file as well:
 
    ```
-   set -s default-terminal tmux-256color
+   set -g default-terminal 'tmux-256color'
+   set -as terminal-overrides ',xterm*:Tc:sitm=\E[3m'
    ```
 
 1. Copy the `tmux-256color` terminfo from the newer Homebrew to a file:
