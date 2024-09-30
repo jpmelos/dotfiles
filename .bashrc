@@ -312,7 +312,7 @@ function o() {
 }
 
 function is_in_path() {
-  builtin type -P "$1" &> /dev/null
+    builtin type -P "$1" &>/dev/null
 }
 
 ######################
