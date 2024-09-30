@@ -58,10 +58,6 @@ K({ "n", "v" }, "<C-d>", function()
     return half_window .. "j"
 end, { expr = true, desc = "Jump half screen down" })
 
--- Enter expands folds, backspace collapses folds.
-K("n", "<enter>", "zo", { desc = "Open fold under cursor" })
-K("n", "<backspace>", "zc", { desc = "Close fold under cursor" })
-
 -- Always search with "very magic" (the \v thing).
 K("n", "/", "/\\v", { noremap = true })
 K("n", "?", "?\\v", { noremap = true })
