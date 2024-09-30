@@ -190,6 +190,13 @@ __git_complete gcamn git_commit
 alias gcp='g cp'
 __git_complete gcp git_cherry_pick
 
+alias gr='g r'
+alias gri='g ri'
+alias grim='g rim'
+__git_complete gr git_rebase
+__git_complete gri git_rebase
+__git_complete grim git_rebase
+
 alias gp='g p'
 alias gpf='g pf'
 __git_complete gp git_push

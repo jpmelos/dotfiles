@@ -112,6 +112,11 @@
     # cp = cherry-pick, intruding into c (commit) namespace
     cp = cherry-pick
 
+    # r = rebase
+    r = rebase
+    ri = rebase -i
+    rim = "! f() { git rebase -i $(git main-branch); }; f"
+
     # p = push (except pu for pull)
     p = push
     pf = push --force-with-lease
