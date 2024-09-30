@@ -163,6 +163,8 @@ alias gshh='g shh'
 alias gp='g p'
 alias gpf='g pf'
 
+alias gpu='g pu'
+
 alias gl='g l'
 
 alias gnuke='g nuke'
@@ -210,6 +212,8 @@ __git_complete gshh git_show
 
 __git_complete gp git_push
 __git_complete gpf git_push
+
+__git_complete gpu git_pull
 
 __git_complete gl git_log
 

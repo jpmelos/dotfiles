@@ -109,9 +109,12 @@
     shf = show --name-status
     shh = "! f() { HEADN=$1; shift; git show "HEAD~$HEADN" $@; }; f"
 
-    # p = push
+    # p = push (except pu for pull)
     p = push
     pf = push --force-with-lease
+
+    # pu = pull
+    pu = pull
 
     # l = log
     l = "! f() { git log --color=always --oneline --graph --decorate $@ | awk -f ~/.git-log-prepend-number-awk | less -R; }; f"
