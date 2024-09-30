@@ -15,12 +15,15 @@ return {
         -- Customize inactive status line, to make it appear. By default, it is
         -- invisible in this theme.
         vim.cmd("hi StatusLine gui=none guifg=#f6f8fa guibg=#5094e4")
-        vim.cmd("hi StatusLineNC gui=none guifg=#ffffff guibg=#5fafd7")
+        vim.cmd("hi StatusLineNC gui=none guifg=#f6f8fa guibg=#5fafd7")
         vim.cmd("hi TabLineFill gui=none guifg=#f6f8fa guibg=#5094e4")
 
         -- Make the cursor line have a gray background.
         vim.cmd("hi CursorLine gui=none guifg=none guibg=#eeeeee")
         vim.cmd("hi ColorColumn gui=none guifg=none guibg=#dadada")
+
+        -- Make strings show in green.
+        vim.cmd("hi String gui=none guifg=#006900")
 
         -- Make constructors show as regular function calls.
         vim.cmd("hi! link @constructor Function")
