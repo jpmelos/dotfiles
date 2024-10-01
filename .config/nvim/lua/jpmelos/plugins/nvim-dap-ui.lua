@@ -63,12 +63,5 @@ return {
             ---@diagnostic disable-next-line: missing-fields
             dapui.eval(nil, { enter = true })
         end, { desc = "Evaluate under cursor" })
-
-        api.nvim_create_autocmd("FileType", {
-            pattern = "dap-repl",
-            callback = function()
-                opt_local.colorcolumn = ""
-            end,
-        })
     end,
 }

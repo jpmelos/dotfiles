@@ -79,10 +79,9 @@ opt.conceallevel = 0
 -- Conceal in all modes.
 opt.concealcursor = ""
 
+-- Disable folding everywhere.
 opt.foldenable = false
 
--- Highlight column for text wrapping.
-opt.colorcolumn = "80"
 -- Specific colorcolumn setting for git commit files.
 api.nvim_create_autocmd("FileType", {
     pattern = "gitcommit",
