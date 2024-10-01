@@ -36,7 +36,9 @@ return {
             },
         })
 
-        vim.api.nvim_create_autocmd({ "BufWritePost", "InsertLeave" }, {
+        -- ButWritePost: After saving a buffer.
+        -- InsertLeave: Every time we leave insert mode.
+        vim.api.nvim_create_autocmd({ "BufWritePost" }, {
             callback = function()
                 -- Disable with a global or buffer-local variable.
                 if vim.g.disable_autoformat or vim.b.disable_autoformat then
