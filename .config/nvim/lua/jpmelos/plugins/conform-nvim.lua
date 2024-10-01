@@ -49,6 +49,10 @@ return {
             end,
         })
 
+        -- TODO: Figure this one out: how is this related to `conform.nvim` if
+        -- it acts upon `LspAttach`? Should this be in another file, like the
+        -- `lspconfig.nvim` file? Or do we even need this at all?
+        --
         -- Use Vim's internal formatter, instead of `conform.nvim`, for `gq`.
         vim.api.nvim_create_autocmd("LspAttach", {
             callback = function(args)
