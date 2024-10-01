@@ -127,13 +127,7 @@ opt.sessionoptions = "blank,buffers,curdir,help,tabpages,winsize,winpos"
 -- Make jumps behave like browser navigation.
 opt.jumpoptions = "stack"
 
--- Reload files on focus.
-api.nvim_create_autocmd(
-    { "FocusGained", "BufEnter", "BufWinEnter" },
-    { command = "checktime" }
-)
--- Save files automatically when leaving buffer.
-api.nvim_create_autocmd(
-    { "FocusLost", "BufLeave", "BufWinLeave" },
-    { command = "silent! wa" }
-)
+-- Reload files when coming back to Neovim.
+api.nvim_create_autocmd({ "FocusGained" }, { command = "checktime" })
+-- Save files automatically when leaving Neovim.
+api.nvim_create_autocmd({ "FocusLost" }, { command = "wa", nested = true })
