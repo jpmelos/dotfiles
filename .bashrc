@@ -220,12 +220,18 @@ gnh() { # git no hooks
 }
 
 # Updates the system.
-update() {
-    sudo apt-get --allow-releaseinfo-change update
-    sudo apt-get -y --allow-downgrades dist-upgrade
-    sudo apt-get -y autoremove
-    sudo apt-get -y clean
-}
+if [ "$JPMELOS_IS_MACOS" = "true" ]; then
+    update() {
+        brew update && brew upgrade
+    }
+else
+    update() {
+        sudo apt-get --allow-releaseinfo-change update
+        sudo apt-get -y --allow-downgrades dist-upgrade
+        sudo apt-get -y autoremove
+        sudo apt-get -y clean
+    }
+fi
 
 # Extract stuff.
 extract() {
