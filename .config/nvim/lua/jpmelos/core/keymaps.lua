@@ -4,7 +4,13 @@ vim.g.mapleader = " "
 local K = vim.keymap.set
 
 -- Leave insert mode with jj.
-vim.api.nvim_set_keymap("i", "jj", "<Esc>", { noremap = false })
+vim.api.nvim_set_keymap("i", "jj", "<ESC>", { noremap = true, silent = true })
+vim.api.nvim_set_keymap(
+    "i",
+    "<ESC>",
+    "<NOP>",
+    { noremap = true, silent = true }
+)
 
 -- Tab management.
 K("n", "<leader>to", "<cmd>tabnew<CR>", { desc = "Open new tab" })
