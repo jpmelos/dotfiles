@@ -1,6 +1,8 @@
 local opt = vim.opt
 local opt_local = vim.opt_local
 local api = vim.api
+local cmd = vim.cmd
+local fn = vim.fn
 
 -- Disable swapfiles.
 opt.swapfile = false
@@ -130,4 +132,12 @@ opt.jumpoptions = "stack"
 -- Reload files when coming back to Neovim.
 api.nvim_create_autocmd({ "FocusGained" }, { command = "checktime" })
 -- Save files automatically when leaving Neovim.
-api.nvim_create_autocmd({ "FocusLost" }, { command = "wa", nested = true })
+api.nvim_create_autocmd({ "FocusLost" }, {
+    callback = function()
+        cmd("wa")
+        if fn.mode() == "i" then
+            cmd("stopinsert")
+        end
+    end,
+    nested = true,
+})
