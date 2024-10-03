@@ -312,17 +312,3 @@ function o() {
 function is_in_path() {
     builtin type -P "$1" &>/dev/null
 }
-
-######################
-#                    #
-#    Go into tmux    #
-#                    #
-######################
-
-if is_in_path tmux && [ -z "$TMUX" ]; then
-    if tmux has-session; then
-        exec tmux attach
-    else
-        exec tmux
-    fi
-fi
