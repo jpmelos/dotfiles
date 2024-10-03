@@ -121,8 +121,8 @@ opt.showtabline = 2
 opt.tabline = " [%{tabpagenr()}/%{tabpagenr('$')}] %= %{GitBranch()} "
 
 -- What to save in sessions.
-opt.sessionoptions = "blank,buffers,curdir,help,tabpages,winsize,winpos"
-    .. ",terminal,localoptions"
+opt.sessionoptions = "blank,buffers,curdir,folds,help,tabpages,winsize"
+    .. ",winpos,terminal,localoptions"
 
 -- Make jumps behave like browser navigation.
 opt.jumpoptions = "stack"
