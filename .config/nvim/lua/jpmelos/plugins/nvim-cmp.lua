@@ -9,7 +9,6 @@ return {
         "saadparwaiz1/cmp_luasnip",
         "onsails/lspkind.nvim",
         "kristijanhusak/vim-dadbod-completion",
-        "hrsh7th/cmp-nvim-lsp-signature-help",
         "folke/lazydev.nvim",
     },
     config = function()
@@ -53,7 +52,6 @@ return {
                 { name = "path", option = { trailing_slash = true } },
                 { name = "luasnip" },
                 { name = "vim-dadbod-completion" },
-                { name = "nvim_lsp_signature_help" },
                 { name = "lazydev" },
             }),
             -- Configure pictograms from `onsails/lspkind.nvim`.
