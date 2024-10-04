@@ -4,13 +4,8 @@ vim.g.mapleader = " "
 local K = vim.keymap.set
 
 -- Disable using <ESC> to leave insert mode.
-vim.api.nvim_set_keymap("i", "jj", "<ESC>", { noremap = true, silent = true })
-vim.api.nvim_set_keymap(
-    "i",
-    "<ESC>",
-    "<NOP>",
-    { noremap = true, silent = true }
-)
+K("i", "jj", "<ESC>", { noremap = true, silent = true })
+K({ "i", "v" }, "<ESC>", "<NOP>", { noremap = true, silent = true })
 
 -- Tab management.
 K("n", "<leader>to", "<cmd>tabnew<CR>", { desc = "Open new tab" })
