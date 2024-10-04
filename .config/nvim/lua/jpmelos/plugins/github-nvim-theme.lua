@@ -12,6 +12,9 @@ return {
         -- Use the `github_light` theme from this colorscheme.
         vim.cmd("colorscheme github_light")
 
+        vim.cmd("hi Normal guibg=#fafafa")
+        vim.cmd("hi NormalNC guibg=#fafafa")
+
         -- Customize inactive status line, to make it appear. By default, it is
         -- invisible in this theme.
         vim.cmd("hi StatusLine gui=none guifg=#f6f8fa guibg=#5094e4")

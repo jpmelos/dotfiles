@@ -2,7 +2,7 @@ local module = {}
 
 function module.apply_to_config(config)
     local foreground_color = "#474747"
-    local background_color = "#ffffff"
+    local background_color = "#fafafa"
 
     local padding_px = 5
 
