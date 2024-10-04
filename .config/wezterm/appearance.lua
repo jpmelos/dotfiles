@@ -56,6 +56,8 @@ function module.apply_to_config(config)
         saturation = 0.95,
         brightness = 0.95,
     }
+
+    config.harfbuzz_features = { "calt=0", "clig=0", "liga=0" }
 end
 
 return module
