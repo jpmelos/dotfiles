@@ -6,28 +6,31 @@ return {
         vim.o.timeoutlen = 500
     end,
     config = function()
-        local wk = require("which-key")
-        wk.setup({ win = { border = "rounded" } })
-
-        wk.add({ { "gp", desc = "LSP previews" } })
-        wk.add({
-            {
-                { "b", desc = "+ Current buffer" },
-                { "c", desc = "+ Code actions" },
-                { "d", desc = "+ Debug" },
-                { "dp", desc = "+ Python" },
-                { "e", desc = "+ Explorer" },
-                { "f", desc = "+ Finder" },
-                { "g", desc = "+ Git" },
-                { "l", desc = "+ LSP/Lint" },
-                { "m", desc = "+ Markdown" },
-                { "o", desc = "+ Obsidian" },
-                { "p", desc = "+ Format" },
-                { "s", desc = "+ Splits" },
-                { "t", desc = "+ Tabs" },
-                { "v", desc = "+ Database" },
-                { "w", desc = "+ Sessions" },
-                { "x", desc = "+ Quickfix" },
+        require("which-key").setup({
+            win = { border = "rounded" },
+            keys = {
+                scroll_down = "<C-d>",
+                scroll_up = "<C-f>",
+            },
+            spec = {
+                { "gp", group = "LSP previews" },
+                { "<leader>b", group = "+ Current buffer" },
+                { "<leader>c", group = "+ Code actions" },
+                { "<leader>d", group = "+ Debug" },
+                { "<leader>dp", group = "+ Python" },
+                { "<leader>e", group = "+ Explorer" },
+                { "<leader>f", group = "+ Finder" },
+                { "<leader>g", group = "+ Git" },
+                { "<leader>l", group = "+ LSP/Lint" },
+                { "<leader>m", group = "+ Markdown" },
+                { "<leader>o", group = "+ Obsidian" },
+                { "<leader>p", group = "+ Format" },
+                { "<leader>r", group = "+ Requests" },
+                { "<leader>s", group = "+ Splits" },
+                { "<leader>t", group = "+ Tabs" },
+                { "<leader>v", group = "+ Database" },
+                { "<leader>w", group = "+ Sessions" },
+                { "<leader>x", group = "+ Quickfix" },
             },
         })
     end,
