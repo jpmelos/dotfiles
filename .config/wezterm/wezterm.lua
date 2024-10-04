@@ -7,7 +7,6 @@ local mouse = require("mouse")
 
 appearance.apply_to_config(config)
 keys.apply_to_config(config)
-mouse.apply_to_config(config)
 
 config.automatically_reload_config = false
 
