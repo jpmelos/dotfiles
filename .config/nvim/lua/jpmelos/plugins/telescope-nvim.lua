@@ -69,6 +69,7 @@ return {
                         ["<C-f>"] = actions.preview_scrolling_down,
                         ["<C-x>"] = actions.file_split,
                         ["<C-v>"] = actions.file_vsplit,
+                        ["<C-c>"] = actions.close,
                     },
                     i = {
                         ["<C-k>"] = actions.move_selection_previous,
@@ -80,6 +81,7 @@ return {
                         ["<C-f>"] = actions.preview_scrolling_down,
                         ["<C-x>"] = actions.file_split,
                         ["<C-v>"] = actions.file_vsplit,
+                        ["<C-c>"] = actions.close,
                     },
                 },
             },
