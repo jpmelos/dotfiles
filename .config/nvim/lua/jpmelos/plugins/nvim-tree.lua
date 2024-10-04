@@ -73,9 +73,7 @@ return {
             },
         })
 
-        vim.api.nvim_create_augroup("NvimTreeResize", { clear = true })
         vim.api.nvim_create_autocmd({ "VimResized" }, {
-            group = "NvimTreeResize",
             callback = function()
                 if tree_view.is_visible() then
                     tree_view.close()
