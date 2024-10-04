@@ -3,6 +3,15 @@ vim.g.mapleader = " "
 
 local K = vim.keymap.set
 
+-- Disable using <ESC> to leave insert mode.
+vim.api.nvim_set_keymap("i", "jj", "<ESC>", { noremap = true, silent = true })
+vim.api.nvim_set_keymap(
+    "i",
+    "<ESC>",
+    "<NOP>",
+    { noremap = true, silent = true }
+)
+
 -- Tab management.
 K("n", "<leader>to", "<cmd>tabnew<CR>", { desc = "Open new tab" })
 K("n", "<leader>tx", "<cmd>tabclose<CR>", { desc = "Close current tab" })
@@ -82,6 +91,3 @@ K(
     '<cmd>let @+ = expand("%:p")<cr>',
     { desc = "Copy absolute path to clipboard" }
 )
-
--- Python specific: split a string on the current char
-K("n", "<leader>cs", 'a"<cr>"<esc>', { desc = "Python: Split string" })
