@@ -8,7 +8,7 @@ function module.apply_to_config(config)
     config.mouse_bindings = {
         {
             event = { Up = { streak = 1, button = "Left" } },
-            mods = "CTRL",
+            mods = "SUPER",
             action = wezterm.action.OpenLinkAtMouseCursor,
         },
     }
