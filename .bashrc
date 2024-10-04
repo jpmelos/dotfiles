@@ -143,9 +143,11 @@ alias gl='g l'
 __git_complete gl git_log
 
 alias gb='g b'
+alias gbr='g br'
 alias gbn='g bn'
 alias gbd='g bd'
 __git_complete gb git_branch
+__git_complete gbr git_branch
 __git_complete gbn git_checkout
 __git_complete gbd git_branch
 

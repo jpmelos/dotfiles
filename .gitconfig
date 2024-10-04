@@ -80,7 +80,8 @@
     l = "! f() { git log --color=always --oneline --graph --decorate $@ | awk -f ~/.git-log-prepend-number-awk | less -R; }; f"
 
     # b = branch
-    b = branch -vv --sort=-committerdate
+    b = branch
+    br = "! f() { git branch -vv --sort=-committerdate --color=always | head -n 20; }; f"
     bn = checkout -b  # n = new
     bd = branch -D  # d = delete
 
