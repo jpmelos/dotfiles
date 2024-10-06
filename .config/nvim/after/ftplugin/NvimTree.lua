@@ -1,3 +1,3 @@
 local K = vim.keymap.set
 
-K({ "n", "i" }, "<C-c>", "<CMD>q<CR>", { buffer = true })
+K("n", "<C-c>", "<CMD>q<CR>", { buffer = true })
