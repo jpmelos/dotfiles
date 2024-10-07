@@ -24,7 +24,7 @@
     showUntrackedFiles = all
 
 [diff]
-    colorMoved = default
+    colorMoved = no
 
 [merge]
     conflictStyle = diff3
