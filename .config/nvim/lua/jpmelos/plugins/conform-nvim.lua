@@ -40,6 +40,10 @@ return {
         -- InsertLeave: Every time we leave insert mode.
         vim.api.nvim_create_autocmd({ "BufWritePost" }, {
             callback = function()
+                if not vim.g.nvim_has_focus then
+                    return
+                end
+
                 -- Disable with a global or buffer-local variable.
                 if vim.g.disable_autoformat or vim.b.disable_autoformat then
                     return

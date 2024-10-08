@@ -1,3 +1,16 @@
+-- Check for focus.
+vim.g.nvim_has_focus = true
+vim.api.nvim_create_autocmd({ "FocusGained" }, {
+    callback = function()
+        vim.g.nvim_has_focus = true
+    end,
+})
+vim.api.nvim_create_autocmd({ "FocusLost" }, {
+    callback = function()
+        vim.g.nvim_has_focus = false
+    end,
+})
+
 -- Load local ./.nvim.lua file, if one exists.
 vim.api.nvim_create_autocmd({ "VimEnter" }, {
     callback = function()
