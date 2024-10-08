@@ -114,5 +114,3 @@ vim.api.nvim_exec2(
     ]],
     {}
 )
-
-return { PrintTable = PrintTable }
