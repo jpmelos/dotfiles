@@ -170,6 +170,11 @@ function module.apply_to_config(config)
                 mods = "LEADER",
                 action = action.CopyMode("Close"),
             },
+            {
+                key = "c",
+                mods = "CTRL",
+                action = action.CopyMode("Close"),
+            },
             -- Movement.
             { key = "h", action = action.CopyMode("MoveLeft") },
             { key = "j", action = action.CopyMode("MoveDown") },
