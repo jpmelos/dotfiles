@@ -52,7 +52,7 @@ export TERMINFO_DIRS=$HOME/.local/share/terminfo:$TERMINFO_DIRS
 #############################
 
 # How many commands to keep in history.
-export HISTSIZE=1000
+export HISTSIZE=100000
 export HISTFILESIZE=$HISTSIZE
 # Erase all duplicate lines, don't store lines starting with space.
 export HISTCONTROL=erasedups:ignoreboth
