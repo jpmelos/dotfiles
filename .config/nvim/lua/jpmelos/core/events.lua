@@ -1,18 +1,20 @@
+local au = vim.api.nvim_create_autocmd
+
 -- Check for focus.
 vim.g.nvim_has_focus = true
-vim.api.nvim_create_autocmd({ "FocusGained" }, {
+au({ "FocusGained" }, {
     callback = function()
         vim.g.nvim_has_focus = true
     end,
 })
-vim.api.nvim_create_autocmd({ "FocusLost" }, {
+au({ "FocusLost" }, {
     callback = function()
         vim.g.nvim_has_focus = false
     end,
 })
 
 -- Load local ./.nvim.lua file, if one exists.
-vim.api.nvim_create_autocmd({ "VimEnter" }, {
+au({ "VimEnter" }, {
     callback = function()
         local exrc_path = vim.fn.getcwd() .. "/.nvim.lua"
         if vim.secure.read(exrc_path) then
@@ -23,13 +25,21 @@ vim.api.nvim_create_autocmd({ "VimEnter" }, {
 })
 
 -- See `:help vim.highlight.on_yank()`.
-vim.api.nvim_create_autocmd("TextYankPost", {
+au("TextYankPost", {
     callback = function()
         vim.highlight.on_yank({ timeout = 1000 })
     end,
 })
 
 -- See `:help vim.highlight.on_yank()`.
-vim.api.nvim_create_autocmd({ "VimEnter", "FocusGained" }, {
+au({ "VimEnter", "FocusGained" }, {
     callback = UpdateGitBranch,
+})
+
+-- Reload files when coming back to Neovim.
+au({ "FocusGained" }, { command = "checktime" })
+-- Save files automatically when leaving Neovim.
+au({ "FocusLost" }, {
+    command = "wa",
+    nested = true,
 })
