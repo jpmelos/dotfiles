@@ -39,6 +39,7 @@ K(
     "v:count == 0 ? 'gj' : 'j'",
     { expr = true, silent = true, desc = "Navigate one screen line down" }
 )
+K("n", "-", "_")
 
 -- Lots of tools, like telescope and others, rely on V to make a vertical
 -- split, and X to make a horizontal split. Let's follow that lead here.
