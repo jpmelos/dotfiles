@@ -1,6 +1,7 @@
 {
   "bash-language-server": "5.4.2",
   "lua-language-server": "3.11.1",
+  "prettier": "3.3.3",
   "pyright": "1.1.384",
   "ruff": "0.6.9",
   "rust-analyzer": "2024-10-07",

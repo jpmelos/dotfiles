@@ -33,6 +33,14 @@ return {
                 lua = { "stylua" },
                 rust = { "rustfmt" },
                 sql = { "sqlfluff" },
+                html = { "prettier" },
+                css = { "prettier" },
+                scss = { "prettier" },
+                javascript = { "prettier" },
+                typescript = { "prettier" },
+                yaml = { "prettier" },
+                markdown = { "prettier" },
+                graphql = { "prettier" },
             },
         })
 

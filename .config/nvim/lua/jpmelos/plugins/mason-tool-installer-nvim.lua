@@ -24,6 +24,8 @@ return {
                 -- tools.
                 -- SQL
                 "sqlfluff",
+                -- HTML, CSS, SCSS, JS, TS, YAML, Markdown, GraphQL
+                "prettier",
             },
         })
     end,
