@@ -117,6 +117,14 @@ function module.apply_to_config(config)
             }),
         },
         {
+            key = "x",
+            mods = "LEADER|SHIFT",
+            action = action.SplitPane({
+                direction = "Down",
+                size = { Percent = 33 },
+            }),
+        },
+        {
             key = "h",
             mods = "CTRL",
             action = action.ActivatePaneDirection("Left"),
