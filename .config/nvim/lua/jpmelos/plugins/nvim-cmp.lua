@@ -34,14 +34,15 @@ return {
                 ["<S-Tab>"] = cmp.mapping.select_prev_item(),
                 -- Next suggestion.
                 ["<Tab>"] = cmp.mapping.select_next_item(),
-                -- Scroll documentation pane.
-                ["<C-b>"] = cmp.mapping.scroll_docs(-4),
-                -- Scroll documentation pane.
-                ["<C-f>"] = cmp.mapping.scroll_docs(4),
+                -- Scroll documentation pane up.
+                ["<C-f>"] = cmp.mapping.scroll_docs(-4),
+                -- Scroll documentation pane down.
+                ["<C-d>"] = cmp.mapping.scroll_docs(4),
                 -- Trigger the suggestions modal.
                 ["<C-Space>"] = cmp.mapping.complete(),
                 -- Close suggestions modal.
                 ["<C-e>"] = cmp.mapping.abort(),
+                ["<C-c>"] = cmp.mapping.abort(),
                 -- Insert suggestion.
                 ["<CR>"] = cmp.mapping.confirm({ select = false }),
             }),
