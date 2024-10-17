@@ -28,7 +28,7 @@ function module.apply_to_config(config)
 
     config.enable_kitty_keyboard = true
 
-    config.leader = { key = "a", mods = "CTRL" }
+    config.leader = { key = "a", mods = "CTRL", timeout_milliseconds = 10000 }
 
     config.keys = {
         -- Configuration.
