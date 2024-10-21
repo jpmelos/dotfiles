@@ -221,6 +221,28 @@ gnh() { # git no hooks
     echo "Re-enabled git hooks."
 }
 
+# Find current default interface.
+if [ "$JPMELOS_IS_MACOS" = "true" ]; then
+    default_if() {
+        route -n get default | grep 'interface:' | awk '{print $2}'
+    }
+else
+    default_if() {
+        echo "Implement for Linux..."
+    }
+fi
+
+# Find the IP of the interface to the default gateway.
+if [ "$JPMELOS_IS_MACOS" = "true" ]; then
+    default_if_ip() {
+        ifconfig "$(default_if)" | grep 'inet ' | awk '{print $2}'
+    }
+else
+    default_if_ip() {
+        echo "Implement for Linux..."
+    }
+fi
+
 # Updates the system.
 if [ "$JPMELOS_IS_MACOS" = "true" ]; then
     update() {
@@ -274,7 +296,7 @@ function fs() {
 
 # Start an HTTP server from a directory, optionally specifying the port
 function server() {
-    local addr="${1:-127.0.0.1}"
+    local addr="${1:-0.0.0.0}"
     local port="${2:-8000}"
 
     sleep 2 && open "http://$addr:$port/" &
