@@ -2,12 +2,12 @@
   "bash-language-server": "5.4.2",
   "lua-language-server": "3.11.1",
   "prettier": "3.3.3",
-  "pyright": "1.1.384",
-  "ruff": "0.6.9",
-  "rust-analyzer": "2024-10-07",
+  "pyright": "1.1.386",
+  "ruff": "0.7.1",
+  "rust-analyzer": "2024-10-28",
   "shellcheck": "v0.10.0",
-  "shfmt": "v3.9.0",
-  "sqlfluff": "3.2.3",
+  "shfmt": "v3.10.0",
+  "sqlfluff": "3.2.5",
   "sqlls": "1.7.0",
   "stylua": "v0.20.0"
 }
