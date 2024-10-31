@@ -46,17 +46,38 @@ opt.showbreak = "↪"
 -- Set text width for automatic formatting.
 opt.textwidth = 79
 -- Fine-tune formatting.
--- c: Automatically format comments.
--- r: Automatically add comment leader upon <Enter> in insert mode.
--- o: Automatically insert comment leader if using "o" or "O" for new line in a
---    comment in normal mode.
--- /: Only insert comment leader in next line if comment is the entire line. Do
---    not continue a comment that started after a statement in the preceding
---    line.
--- q: Allow formatting with `gq`.
--- n: Consider lists, as they are defined in `formatlistpat`.
--- ]: Respect `textwidth` strictly.
--- j: Remove comment leader when joining lines.
+-- -t: Automatically format text. Do not enable when working with code.
+-- +c: Automatically format comments.
+-- +r: Automatically add comment leader upon <Enter> in insert mode.
+-- +o: Automatically insert comment leader if using "o" or "O" for new line in a
+--     comment in normal mode.
+-- +/: Only insert comment leader in next line if comment is the entire line. Do
+--     not continue a comment that started after a statement in the preceding
+--     line.
+-- +q: Allow formatting with `gq`.
+-- -w: A trailing white space at the end of a line indicates the paragraph
+--     continues in the next line. In other words, it behaves like an empty
+--     line normally would.
+-- +a: Automatically format paragraphs. If 'c' is used, this only happens for
+--     recognized comments.
+-- +n: Consider lists, as they are defined in `formatlistpat`. Should not be
+--     used with '2'.
+-- -2: Always format text according to the indentation of the second line of
+--     paragraphs. This is to allow for paragraphs that have different
+--     indentation levels at the first line then the rest. Should not be used
+--     with 'n'.
+-- -v: Vi-compatible line wrapping. This is buggy, do not use.
+-- -b: Like 'v', but with a slight difference. Do not use too.
+-- -l: Do not format lines that were longer than `textwidth` when Insert-mode
+--     started.
+-- -m: Break inside multibyte characters. Horrible idea!
+-- -M: Related to multibyte characters. Do not use.
+-- -B: Related to multibyte characters. Do not use.
+-- -1: Don't break lines after 1-letter words, break before it.
+-- +]: Respect `textwidth` strictly.
+-- +j: Remove comment leader when joining lines.
+-- -p: Don't break lines at '.' followed by just one space. This is good for
+--     people who put two spaces after periods, which I don't.
 opt.formatoptions = "cro/qn]j"
 -- Use Vim's default formatter.
 opt.formatexpr = ""
