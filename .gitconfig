@@ -109,6 +109,9 @@
     can = commit -a -n
     cmn = commit --amend -n
     camn = commit -a --amend -n
+    cw = commit -a -n -m "WIP"
+    # Undo cw.
+    ucw = reset HEAD~1
 
     # cp = cherry-pick, intruding into c (commit) namespace
     cp = cherry-pick
