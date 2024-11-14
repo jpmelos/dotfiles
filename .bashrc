@@ -118,6 +118,9 @@ alias d='docker'
 alias dc='docker compose'
 alias docker-nuke-all-the-things='yes | docker system prune --volumes --all'
 
+# Always ignore the .git directory.
+alias tree='tree -I ''.git'''
+
 #####################################
 #                                   #
 #    git aliases and completions    #
