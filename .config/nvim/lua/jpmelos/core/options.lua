@@ -1,8 +1,4 @@
 local opt = vim.opt
-local opt_local = vim.opt_local
-local api = vim.api
-local cmd = vim.cmd
-local fn = vim.fn
 
 -- Disable swapfiles.
 opt.swapfile = false
@@ -104,14 +100,6 @@ opt.concealcursor = ""
 
 -- Disable folding everywhere.
 opt.foldenable = false
-
--- Specific colorcolumn setting for git commit files.
-api.nvim_create_autocmd("FileType", {
-    pattern = "gitcommit",
-    callback = function()
-        opt_local.colorcolumn = "51,73"
-    end,
-})
 
 -- Ignore case when searching...
 opt.ignorecase = true
