@@ -106,7 +106,7 @@ return {
         --
         K(
             "n",
-            "<leader>fs",
+            "<leader>fa",
             builtins.live_grep,
             { desc = "Find string in current directory" }
         )
