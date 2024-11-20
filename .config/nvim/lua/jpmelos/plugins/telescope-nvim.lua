@@ -118,20 +118,18 @@ return {
         )
         K("n", "<leader>fp", function()
             local ft = api.nvim_get_option_value("filetype", {})
-            local path
-
-            if ft == "NvimTree" then
-                local node = tree_api.tree.get_node_under_cursor()
-                path = node.absolute_path
-                if node.type ~= "directory" then
-                    path = get_parent(path)
-                end
-            else
-                path = api.nvim_buf_get_name(0)
-                path = get_parent(path)
+            if ft ~= "NvimTree" then
+                vim.notify("This command only works in NvimTree.")
+                return
             end
 
-            builtins.live_grep({ search_dirs = { path } })
+            local node = tree_api.tree.get_node_under_cursor()
+            if node.type ~= "directory" then
+                vim.notify("This command only works on directories.")
+                return
+            end
+
+            builtins.live_grep({ search_dirs = { node.absolute_path } })
         end, { desc = "Find string in current path" })
 
         --
