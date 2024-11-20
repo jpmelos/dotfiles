@@ -108,13 +108,13 @@ return {
             "n",
             "<leader>fa",
             builtins.live_grep,
-            { desc = "Find string in current directory" }
+            { desc = "Find in current directory" }
         )
         K(
             "n",
-            "<leader>fc",
+            "<leader>fca",
             builtins.grep_string,
-            { desc = "Find string under cursor in current directory" }
+            { desc = "Find in current directory" }
         )
         K("n", "<leader>fp", function()
             local ft = api.nvim_get_option_value("filetype", {})
