@@ -133,16 +133,6 @@ return {
         end, { desc = "Find string in current path" })
 
         --
-        -- Todos.
-        --
-        K(
-            "n",
-            "<leader>ft",
-            telescope.extensions["todo-comments"].todo,
-            { desc = "Find todos in current directory" }
-        )
-
-        --
         -- Vim.
         --
         K(
