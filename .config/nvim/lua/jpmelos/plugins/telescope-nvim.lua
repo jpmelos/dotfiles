@@ -170,7 +170,7 @@ return {
             "n",
             "<leader>fe",
             builtins.highlights,
-            { desc = "Find old searches" }
+            { desc = "Find color highlight classes" }
         )
 
         --
