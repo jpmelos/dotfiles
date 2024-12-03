@@ -1,10 +1,10 @@
 {
   "bash-language-server": "5.4.2",
   "lua-language-server": "3.13.2",
-  "prettier": "3.3.3",
+  "prettier": "3.4.1",
   "pyright": "1.1.389",
-  "ruff": "0.7.4",
-  "rust-analyzer": "2024-11-11",
+  "ruff": "0.8.1",
+  "rust-analyzer": "2024-12-02",
   "shellcheck": "v0.10.0",
   "shfmt": "v3.10.0",
   "sqlfluff": "3.2.5",
