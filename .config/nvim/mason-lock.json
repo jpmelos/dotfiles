@@ -1,9 +1,9 @@
 {
   "bash-language-server": "5.4.2",
-  "lua-language-server": "3.13.2",
-  "prettier": "3.4.1",
-  "pyright": "1.1.389",
-  "ruff": "0.8.1",
+  "lua-language-server": "3.13.3",
+  "prettier": "3.4.2",
+  "pyright": "1.1.390",
+  "ruff": "0.8.2",
   "rust-analyzer": "2024-12-02",
   "shellcheck": "v0.10.0",
   "shfmt": "v3.10.0",
