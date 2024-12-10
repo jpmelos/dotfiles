@@ -4,7 +4,7 @@ local WIDTH_RATIO = 0.5
 return {
     "nvim-tree/nvim-tree.lua",
     lazy = false,
-    dependencies = { "nvim-tree/nvim-web-devicons" },
+    dependencies = { "stevearc/dressing.nvim", "nvim-tree/nvim-web-devicons" },
     config = function()
         local K = vim.keymap.set
 
