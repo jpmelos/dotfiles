@@ -10,8 +10,12 @@ return {
         gs.setup()
 
         -- Navigation.
-        K("n", "]g", gs.next_hunk, { desc = "Next hunk" })
-        K("n", "[g", gs.prev_hunk, { desc = "Previous hunk" })
+        K("n", "]g", function()
+            gs.nav_hunk("next")
+        end, { desc = "Next hunk" })
+        K("n", "[g", function()
+            gs.nav_hunk("prev")
+        end, { desc = "Previous hunk" })
 
         -- Actions.
         K("n", "<leader>gs", gs.stage_hunk, { desc = "Stage hunk" })
@@ -33,7 +37,7 @@ return {
         K("n", "<leader>gf", gs.refresh, { desc = "Force-refresh git signs" })
 
         -- Reload files on focus.
-        api.nvim_create_autocmd({ "FileChangedShellPost" }, {
+        api.nvim_create_autocmd("FocusGained", {
             callback = gs.refresh,
         })
     end,
