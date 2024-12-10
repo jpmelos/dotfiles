@@ -2,17 +2,19 @@ return {
     "stevearc/conform.nvim",
     lazy = false,
     config = function()
+        local g = vim.g
+        local b = vim.b
+        local bo = vim.bo
+        local api = vim.api
         local K = vim.keymap.set
 
         local conform = require("conform")
 
-        -- Disable autoformat by default. Use repository-local .nvim.lua to
-        -- enable it for specific projects.
-        vim.g.disable_autoformat = true
-
+        -- Tools used here should be managed by Mason. See
+        -- `mason-tool-installer-nvim.lua`.
         conform.setup({
-            -- Use repository-local .nvim.lua to overwrite this for specific
-            -- projects. Something like:
+            -- Use a repository-local `.nvim.lua` file to overwrite this for
+            -- specific projects. Something like:
             -- ```
             --     local conform = require("conform")
             --     conform.formatters_by_ft = {
@@ -31,6 +33,8 @@ return {
                     "ruff_format",
                 },
                 lua = { "stylua" },
+                -- This is an exception, it's not managed by Mason. Instead,
+                -- install the Rust toolchain locally.
                 rust = { "rustfmt" },
                 sql = { "sqlfluff" },
                 css = { "prettier" },
@@ -43,37 +47,61 @@ return {
         })
 
         -- ButWritePost: After saving a buffer.
-        -- InsertLeave: Every time we leave insert mode.
-        vim.api.nvim_create_autocmd({ "BufWritePost" }, {
+        -- Note: Autoformat is disabled by default, since `g.enable_autoformat`
+        -- starts out as `nil`, which resolves to `false` in boolean contexts.
+        -- Use a repository-local `.nvim.lua` file to enable it for specific
+        -- projects.
+        api.nvim_create_autocmd("BufWritePost", {
             callback = function()
-                if not vim.g.nvim_has_focus then
+                -- Do not autoformat if we're saving because Neovim lost focus.
+                if not g.nvim_has_focus then
                     return
                 end
 
-                -- Disable with a global or buffer-local variable.
-                if vim.g.disable_autoformat or vim.b.disable_autoformat then
+                -- Give preference to any buffer-local settings. Since
+                -- `b.enable_autoformat` starts out as `nil`, which resolves to
+                -- `false` in boolean contexts, this means buffer-local
+                -- autosaving is disabled by default.
+                if b.enable_autoformat ~= nil then
+                    if b.enable_autoformat then
+                        -- Save, and then run the formatter. This may leave the
+                        -- buffer in an unsaved state again if the formatter
+                        -- changes the file.
+                        require("conform").format({ async = true })
+                    end
+
+                    -- Then it is `false`, which means we don't want to
+                    -- autoformat this buffer.
                     return
                 end
 
-                require("conform").format({ async = true })
+                if g.enable_autoformat then
+                    -- Save, and then run the formatter. This may leave the
+                    -- buffer in an unsaved state again if the formatter
+                    -- changes the file.
+                    require("conform").format({ async = true })
+                end
+
+                -- At this point, `g.enable_autoformat` is either `nil` or
+                -- `false`, and either way, we don't want to autoformat the
+                -- buffer: we only want to autoformat if it is explicitly
+                -- enabled.
             end,
         })
 
-        -- TODO: Figure this one out: how is this related to `conform.nvim` if
-        -- it acts upon `LspAttach`? Should this be in another file, like the
-        -- `lspconfig.nvim` file? Or do we even need this at all?
-        --
-        -- Use Vim's internal formatter, instead of `conform.nvim`, for `gq`.
-        vim.api.nvim_create_autocmd("LspAttach", {
+        -- Use Vim's internal formatter, instead of `conform.nvim` or an LSP's,
+        -- for `gq`. We already don't set this normally, but some LSPs will
+        -- change this when they attach to a buffer.
+        api.nvim_create_autocmd("LspAttach", {
             callback = function(args)
-                vim.bo[args.buf].formatexpr = ""
+                bo[args.buf].formatexpr = ""
             end,
         })
 
-        vim.api.nvim_create_user_command("Format", function(args)
+        api.nvim_create_user_command("Format", function(args)
             local range = nil
             if args.count ~= -1 then
-                local end_line = vim.api.nvim_buf_get_lines(
+                local end_line = api.nvim_buf_get_lines(
                     0,
                     args.line2 - 1,
                     args.line2,
@@ -91,42 +119,44 @@ return {
             })
         end, { range = true })
 
-        vim.api.nvim_create_user_command("FormatDisable", function(args)
+        api.nvim_create_user_command("FormatDisable", function(args)
             if args.bang then
                 -- FormatDisable! will disable formatting just for this buffer.
-                vim.b.disable_autoformat = true
+                b.enable_autoformat = false
             else
-                vim.g.disable_autoformat = true
+                g.enable_autoformat = false
             end
         end, {
             desc = "Disable autoformat on save",
             bang = true,
         })
-        vim.api.nvim_create_user_command("FormatEnable", function(args)
+        api.nvim_create_user_command("FormatEnable", function(args)
             if args.bang then
                 -- FormatEnable! will enable formatting just for this buffer.
-                vim.b.disable_autoformat = false
+                b.enable_autoformat = true
             else
-                vim.g.disable_autoformat = false
+                g.enable_autoformat = true
             end
         end, {
             desc = "Enable autoformat on save",
             bang = true,
         })
-        vim.api.nvim_create_user_command("FormatToggle", function(args)
+        api.nvim_create_user_command("FormatToggle", function(args)
             if args.bang then
-                if vim.b.disable_autoformat then
-                    -- FormatEnable! will enable formatting just for this buffer.
-                    vim.b.disable_autoformat = false
+                if b.enable_autoformat then
+                    -- FormatToggle! will enable formatting just for this
+                    -- buffer.
+                    b.enable_autoformat = false
                 else
-                    vim.b.disable_autoformat = true
+                    b.enable_autoformat = true
                 end
             else
-                if vim.g.disable_autoformat then
-                    -- FormatEnable! will enable formatting just for this buffer.
-                    vim.g.disable_autoformat = false
+                if g.enable_autoformat then
+                    -- FormatToggle! will enable formatting just for this
+                    -- buffer.
+                    g.enable_autoformat = false
                 else
-                    vim.g.disable_autoformat = true
+                    g.enable_autoformat = true
                 end
             end
         end, {
