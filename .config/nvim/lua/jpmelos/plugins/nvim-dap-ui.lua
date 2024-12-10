@@ -2,11 +2,8 @@ return {
     "rcarriga/nvim-dap-ui",
     lazy = false,
     dependencies = { "mfussenegger/nvim-dap", "nvim-neotest/nvim-nio" },
-    opts = {},
     config = function()
         local K = vim.keymap.set
-        local api = vim.api
-        local opt_local = vim.opt_local
 
         local dap = require("dap")
         local dapui = require("dapui")
@@ -18,24 +15,17 @@ return {
             layouts = {
                 {
                     elements = {
-                        {
-                            id = "scopes",
-                            size = 0.25,
-                        },
-                        {
-                            id = "breakpoints",
-                            size = 0.25,
-                        },
-                        {
-                            id = "stacks",
-                            size = 0.25,
-                        },
-                        {
-                            id = "watches",
-                            size = 0.25,
-                        },
+                        { id = "scopes", size = 0.25 },
+                        { id = "breakpoints", size = 0.25 },
+                        { id = "stacks", size = 0.25 },
+                        { id = "watches", size = 0.25 },
                     },
                     position = "left",
+                    size = 40,
+                },
+                {
+                    elements = { { id = "repl", size = 1 } },
+                    position = "bottom",
                     size = 40,
                 },
             },
