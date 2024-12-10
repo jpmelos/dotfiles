@@ -5,18 +5,16 @@ return {
         local K = vim.keymap.set
 
         require("auto-session").setup({
-            auto_session_enable_last_session = false,
-            auto_session_enabled = false,
-            auto_session_create_enabled = false,
-            auto_save_enabled = false,
-            auto_restore_enabled = false,
-            auto_session_use_git_branch = false,
-            auto_session_allowed_dirs = { "~/devel/*" },
-            cwd_change_handling = {
-                -- Do not restore session when changing working directory
-                -- inside Vim, like with `:cd`.
-                restore_upcoming_session = false,
-            },
+            -- Automatic behavior.
+            enabled = false,
+            auto_save = false,
+            auto_restore = false,
+            auto_create = false,
+            -- Do not restore last session if a session for the current
+            -- directory can't be found.
+            auto_restore_last_session = false,
+            -- Do not base sessions on git branches.
+            use_git_branch = false,
         })
 
         K(
