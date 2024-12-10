@@ -3,6 +3,9 @@ local opt = vim.opt
 -- Disable swapfiles.
 opt.swapfile = false
 
+-- How long to wait before firing `CursorHold` and `CursorHoldI`.
+opt.updatetime = 90
+
 -- Save undo history.
 opt.undofile = true
 
