@@ -12,12 +12,7 @@ return {
     "jackMort/ChatGPT.nvim",
     cmd = { "ChatGPT", "ChatGPTEditWithInstructions" },
     keys = {
-        {
-            "<leader>a",
-            "<cmd>ChatGPT<CR>",
-            mode = { "n" },
-            desc = "Open chat",
-        },
+        { "<leader>a", "<cmd>ChatGPT<CR>", desc = "Open chat" },
         {
             "<leader>a",
             "<cmd>ChatGPTEditWithInstructions<CR>",
@@ -28,7 +23,6 @@ return {
     dependencies = {
         "MunifTanjim/nui.nvim",
         "nvim-lua/plenary.nvim",
-        "folke/trouble.nvim",
         "nvim-telescope/telescope.nvim",
     },
     config = function()
