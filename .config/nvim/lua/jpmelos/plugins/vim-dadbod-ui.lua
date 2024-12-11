@@ -1,6 +1,5 @@
 return {
     "kristijanhusak/vim-dadbod-ui",
-    lazy = false,
     dependencies = {
         { "tpope/vim-dadbod" },
         { "kristijanhusak/vim-dadbod-completion" },

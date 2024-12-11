@@ -1,6 +1,5 @@
 return {
     "folke/todo-comments.nvim",
-    lazy = false,
     dependencies = { "nvim-lua/plenary.nvim" },
     config = function()
         local K = vim.keymap.set

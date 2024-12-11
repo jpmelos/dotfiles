@@ -1,1 +1,1 @@
-return { "glts/vim-magnum", lazy = false }
+return { "glts/vim-magnum" }

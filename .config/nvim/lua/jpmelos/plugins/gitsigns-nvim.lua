@@ -1,6 +1,5 @@
 return {
     "lewis6991/gitsigns.nvim",
-    lazy = false,
     config = function()
         local K = vim.keymap.set
         local api = vim.api

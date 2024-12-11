@@ -1,6 +1,5 @@
 return {
     "windwp/nvim-autopairs",
-    lazy = false,
     dependencies = { "hrsh7th/nvim-cmp" },
     config = function()
         require("nvim-autopairs").setup({})

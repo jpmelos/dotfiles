@@ -1,6 +1,5 @@
 return {
     "numToStr/Comment.nvim",
-    lazy = false,
     dependencies = {
         -- Identify correct comment syntax based on current context, with the
         -- help of tree-sitter. Supports nested languages, for example.

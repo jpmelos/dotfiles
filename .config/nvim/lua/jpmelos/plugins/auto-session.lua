@@ -1,6 +1,5 @@
 return {
     "rmagatti/auto-session",
-    lazy = false,
     config = function()
         local K = vim.keymap.set
 

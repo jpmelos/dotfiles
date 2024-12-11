@@ -1,4 +1,1 @@
-return {
-    "farmergreg/vim-lastplace",
-    lazy = false,
-}
+return { "farmergreg/vim-lastplace" }

@@ -1,5 +1,1 @@
-return {
-    "hrsh7th/cmp-nvim-lsp",
-    lazy = false,
-    opts = {},
-}
+return { "hrsh7th/cmp-nvim-lsp" }

@@ -109,7 +109,6 @@ end
 
 return {
     "mfussenegger/nvim-dap",
-    lazy = false,
     config = function()
         local K = vim.keymap.set
 

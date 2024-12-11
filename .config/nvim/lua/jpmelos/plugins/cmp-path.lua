@@ -1,1 +1,1 @@
-return { "hrsh7th/cmp-path", lazy = false }
+return { "hrsh7th/cmp-path" }

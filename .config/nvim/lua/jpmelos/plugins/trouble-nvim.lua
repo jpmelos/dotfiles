@@ -1,6 +1,5 @@
 return {
     "folke/trouble.nvim",
-    lazy = false,
     dependencies = {
         "nvim-tree/nvim-web-devicons",
         "folke/todo-comments.nvim",
@@ -22,5 +21,4 @@ return {
             desc = "Toggle todos in trouble list",
         },
     },
-    opts = {},
 }

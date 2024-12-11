@@ -1,1 +1,1 @@
-return { "tpope/vim-dadbod", lazy = false }
+return { "tpope/vim-dadbod" }

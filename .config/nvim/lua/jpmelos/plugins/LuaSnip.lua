@@ -1,1 +1,1 @@
-return { "L3MON4D3/LuaSnip", version = "v2.*", lazy = false }
+return { "L3MON4D3/LuaSnip" }

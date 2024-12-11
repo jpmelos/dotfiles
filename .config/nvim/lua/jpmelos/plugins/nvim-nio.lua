@@ -1,1 +1,1 @@
-return { "nvim-neotest/nvim-nio", lazy = false }
+return { "nvim-neotest/nvim-nio" }

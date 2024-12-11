@@ -1,1 +1,1 @@
-return { "hrsh7th/cmp-buffer", lazy = false }
+return { "hrsh7th/cmp-buffer" }

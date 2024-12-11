@@ -1,1 +1,1 @@
-return { "jghauser/mkdir.nvim", lazy = false }
+return { "jghauser/mkdir.nvim" }

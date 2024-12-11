@@ -1,6 +1,5 @@
 return {
     "mfussenegger/nvim-lint",
-    lazy = false,
     config = function()
         local K = vim.keymap.set
 

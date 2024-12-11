@@ -1,6 +1,5 @@
 return {
     "stevearc/conform.nvim",
-    lazy = false,
     config = function()
         local g = vim.g
         local b = vim.b

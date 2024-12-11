@@ -1,6 +1,5 @@
 return {
     "hrsh7th/nvim-cmp",
-    lazy = false,
     dependencies = {
         "hrsh7th/cmp-buffer",
         "hrsh7th/cmp-path",

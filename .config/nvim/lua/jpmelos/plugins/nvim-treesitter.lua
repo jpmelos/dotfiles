@@ -1,6 +1,5 @@
 return {
     "nvim-treesitter/nvim-treesitter",
-    lazy = false,
     -- Make sure we always update all parsers when we update tree-sitter.
     build = ":TSUpdate",
     dependencies = {

@@ -1,6 +1,5 @@
 return {
     "numToStr/Navigator.nvim",
-    lazy = false,
     config = function()
         local K = vim.keymap.set
 

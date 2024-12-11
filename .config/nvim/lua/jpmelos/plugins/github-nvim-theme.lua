@@ -1,8 +1,5 @@
 return {
     "projekt0n/github-nvim-theme",
-    -- Make sure to load this during startup, since this is the main
-    -- colorscheme.
-    lazy = false,
     -- Make sure to load this before all the other plugins. This way, we can
     -- always set highlight groups in the other plugins' startup logic.
     priority = 1000,

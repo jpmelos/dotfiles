@@ -1,6 +1,5 @@
 return {
     "ruifm/gitlinker.nvim",
-    lazy = false,
     config = function()
         local K = vim.keymap.set
 

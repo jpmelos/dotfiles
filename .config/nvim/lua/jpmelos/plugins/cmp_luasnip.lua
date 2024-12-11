@@ -1,1 +1,1 @@
-return { "saadparwaiz1/cmp_luasnip", lazy = false }
+return { "saadparwaiz1/cmp_luasnip" }

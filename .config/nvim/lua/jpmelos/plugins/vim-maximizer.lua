@@ -1,6 +1,5 @@
 return {
     "szw/vim-maximizer",
-    lazy = false,
     keys = {
         {
             "<leader>sm",

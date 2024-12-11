@@ -1,6 +1,5 @@
 return {
     "nvim-treesitter/nvim-treesitter-refactor",
-    lazy = false,
     dependencies = { "nvim-treesitter/nvim-treesitter" },
     config = function()
         require("nvim-treesitter.configs").setup({

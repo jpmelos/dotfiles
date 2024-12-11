@@ -1,6 +1,5 @@
 return {
     "iamcco/markdown-preview.nvim",
-    lazy = false,
     init = function()
         local K = vim.keymap.set
 

@@ -1,6 +1,5 @@
 return {
     "sindrets/winshift.nvim",
-    lazy = false,
     keys = {
         {
             "<leader>sb",
@@ -13,5 +12,4 @@ return {
             desc = "Swap windows",
         },
     },
-    opts = {},
 }

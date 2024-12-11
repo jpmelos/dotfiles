@@ -1,5 +1,1 @@
-return {
-    "tpope/vim-surround",
-    lazy = false,
-    dependencies = { "tpope/vim-repeat" },
-}
+return { "tpope/vim-surround", dependencies = { "tpope/vim-repeat" } }

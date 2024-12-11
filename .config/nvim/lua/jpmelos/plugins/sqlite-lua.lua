@@ -1,4 +1,1 @@
-return {
-    "kkharji/sqlite.lua",
-    lazy = false,
-}
+return { "kkharji/sqlite.lua" }
