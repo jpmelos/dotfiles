@@ -25,7 +25,7 @@ return {
                 {
                     elements = { { id = "repl", size = 1 } },
                     position = "bottom",
-                    size = 40,
+                    size = 20,
                 },
             },
         })
