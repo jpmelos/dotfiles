@@ -157,9 +157,11 @@ __git_complete gbd git_branch
 alias gd='g d'
 alias gdst='g dst'
 alias gdca='g dca'
+alias gdm='g dm'
 __git_complete gd git_diff
 __git_complete gdst git_diff
 __git_complete gdca git_diff
+__git_complete gdm git_diff
 
 alias go='g o'
 alias gom='g om'

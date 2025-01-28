@@ -89,6 +89,7 @@
     d = diff
     dst = diff --name-status
     dca = diff --cached
+    dm = diff master...HEAD
 
     # o = checkout
     o = checkout
