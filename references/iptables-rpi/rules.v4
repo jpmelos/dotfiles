@@ -1,0 +1,28 @@
+# /etc/iptables/rules.v4 in Raspberry Pi.
+
+*filter
+:INPUT DROP [0:0]
+:FORWARD DROP [0:0]
+:OUTPUT DROP [0:0]
+
+# Drop invalid packets.
+-A INPUT -m conntrack --ctstate INVALID -j DROP
+# Allow established and related incoming connections.
+-A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+# Allow traffic on the loopback interface.
+-A INPUT -i lo -j ACCEPT
+# Allow incoming traffic from the local network 192.168.42.0/24.
+-A INPUT -s 192.168.42.0/24 -j ACCEPT
+# Allow incoming traffic from 62.102.148.204 on port 1637.
+-A INPUT -s 62.102.148.204 -p tcp --dport 1637 -j ACCEPT
+
+# Allow outgoing established connections.
+-A OUTPUT -m conntrack --ctstate ESTABLISHED -j ACCEPT
+# Allow traffic on the loopback interface.
+-A OUTPUT -o lo -j ACCEPT
+# Allow outgoing traffic to the local network 192.168.42.0/24.
+-A OUTPUT -d 192.168.42.0/24 -j ACCEPT
+# Allow outgoing traffic to 62.102.148.204 on port 1637.
+-A OUTPUT -d 62.102.148.204 -p tcp --sport 1637 -j ACCEPT
+
+COMMIT

@@ -1,14 +1,20 @@
+# /etc/iptables/rules.v4 in personal laptop.
+
 *filter
 :INPUT DROP [0:0]
 :FORWARD DROP [0:0]
 :OUTPUT DROP [0:0]
 
+# Drop invalid packets.
 -A INPUT -m conntrack --ctstate INVALID -j DROP
+# Allow established and related incoming connections.
 -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+# Allow traffic on the loopback interface.
 -A INPUT -i lo -j ACCEPT
+# Allow incoming traffic from the local network 192.168.42.0/24.
 -A INPUT -s 192.168.42.0/24 -j ACCEPT
 
+# Allow outgoing new and established connections.
 -A OUTPUT -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
--A OUTPUT -o lo -j ACCEPT
 
 COMMIT
