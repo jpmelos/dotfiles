@@ -24,7 +24,7 @@
 # Allow outgoing traffic to the local network 192.168.42.0/24.
 -A OUTPUT -d 192.168.42.0/24 -j ACCEPT
 # Allow outgoing traffic to 62.102.148.204 on port 1637/UDP.
--A OUTPUT -d 62.102.148.204 --dport 1637 -p udp  -j ACCEPT
+-A OUTPUT -d 62.102.148.204 -p udp --dport 1637  -j ACCEPT
 # Allow outgoing traffic through the VPN tunnel `wg0`.
 -A OUTPUT -o wg0 -j ACCEPT
 
