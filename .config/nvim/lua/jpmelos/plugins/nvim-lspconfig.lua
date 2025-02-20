@@ -71,8 +71,10 @@ return {
                         pyright = { disableOrganizeImports = true },
                         python = {
                             analysis = {
-                                diagnosticMode = "workspace",
+                                autoImportCompletions = true,
+                                diagnosticMode = "openFilesOnly",
                                 typeCheckingMode = "off",
+                                useLibraryCodeForTypes = false,
                                 -- Do not mess with my path.
                                 autoSearchPaths = false,
                             },
