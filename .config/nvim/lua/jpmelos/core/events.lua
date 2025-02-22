@@ -40,6 +40,6 @@ au({ "VimEnter", "FocusGained" }, {
 au({ "FocusGained" }, { command = "checktime" })
 -- Save files automatically when leaving Neovim.
 au({ "FocusLost" }, {
-    command = "wa",
+    command = "silent! wa",
     nested = true,
 })
