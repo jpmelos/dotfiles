@@ -65,8 +65,13 @@ export PROMPT_COMMAND="history -a; history -n; run_autoenv_on_init; ${PROMPT_COM
 #                      #
 ########################
 
+# Sets the default pager for various commands. Useful when working with tools
+# like `psql` which can have large outputs that are more easily viewed in a
+# larger canvas than the usual terminal size.
+export PAGER="less -S"
+
 # Sets the default editor for various commands.
-export EDITOR=nvim
+export EDITOR="nvim"
 
 # Configure ripgrep to use a configuration file.
 export RIPGREP_CONFIG_PATH="$HOME/.ripgreprc"
