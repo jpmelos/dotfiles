@@ -1,0 +1,3 @@
+\echo 'Expanded view with \\x.'
+\pset null '[NULL]'
+\echo ''
