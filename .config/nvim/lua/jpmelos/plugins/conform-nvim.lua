@@ -44,6 +44,17 @@ return {
             },
         })
 
+        -- Customize built-in formatters and add your own.
+        conform.formatters.shfmt = {
+            prepend_args = {
+                "--language-dialect=bash",
+                "--indent=4",
+                "--binary-next-line",
+                "--case-indent",
+                "--space-redirects",
+            },
+        }
+
         -- ButWritePost: After saving a buffer.
         -- Note: Autoformat is disabled by default, since `g.enable_autoformat`
         -- starts out as `nil`, which resolves to `false` in boolean contexts.
