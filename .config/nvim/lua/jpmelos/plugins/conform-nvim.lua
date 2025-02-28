@@ -31,7 +31,7 @@ return {
                 -- This is an exception, it's not managed by Mason. Instead,
                 -- install the Rust toolchain locally.
                 rust = { "rustfmt" },
-                sql = { "sqlfluff" },
+                sql = { "sql_formatter" },
                 css = { "prettier" },
                 scss = { "prettier" },
                 javascript = { "prettier" },
