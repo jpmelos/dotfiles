@@ -14,11 +14,14 @@ return {
         conform.setup({
             -- Use a repository-local `.nvim.lua` file to overwrite this for
             -- specific projects. Something like:
+            --
             -- ```
-            --     local conform = require("conform")
-            --     conform.formatters_by_ft.python = {
-            --        "ruff_fix", "ruff_organize_imports", "black"
-            --     }
+            -- local conform = require("conform")
+            -- conform.formatters_by_ft.python = {
+            --     "ruff_fix",
+            --     "ruff_organize_imports",
+            --     "black",
+            -- }
             -- ```
             formatters_by_ft = {
                 sh = { "shfmt" },
