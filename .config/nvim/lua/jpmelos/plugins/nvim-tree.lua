@@ -84,13 +84,13 @@ return {
         K(
             "n",
             "<leader>ee",
-            "<cmd>NvimTreeOpen<CR>",
+            "<cmd>NvimTreeOpen " .. vim.loop.cwd() .. "<CR>",
             { desc = "Open/focus file explorer" }
         )
         K(
             "n",
             "<leader>ef",
-            "<cmd>NvimTreeFindFile<CR>",
+            "<cmd>NvimTreeFindFile!<CR>",
             { desc = "Open/focus file explorer on current file" }
         )
         K(
