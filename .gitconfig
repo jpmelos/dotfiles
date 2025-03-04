@@ -17,6 +17,9 @@
 [init]
     defaultBranch = main
 
+[branch]
+    sort = -committerdate
+
 [log]
     date = local
 
@@ -81,7 +84,7 @@
 
     # b = branch
     b = branch
-    br = "! f() { git branch -vv --sort=-committerdate --color=always | head -n 20; }; f"
+    br = "! f() { git branch -vv --color=always | head -n 20; }; f"
     bn = checkout -b  # n = new
     bd = branch -D  # d = delete
 
