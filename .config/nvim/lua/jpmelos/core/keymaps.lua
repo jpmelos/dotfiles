@@ -65,6 +65,15 @@ K("n", "/", "/\\v", { noremap = true })
 K("n", "?", "?\\v", { noremap = true })
 K("n", "\\", ":%s/\\v", { noremap = true })
 
+-- Make `n` always search forward and `N` always search backward, no matter
+-- what was the original direction of the search operation.
+vim.keymap.set("n", "n", function()
+    return vim.v.searchforward == 1 and "n" or "N"
+end, { expr = true })
+vim.keymap.set("n", "N", function()
+    return vim.v.searchforward == 1 and "N" or "n"
+end, { expr = true })
+
 -- Clear search highlights like this, since we use C-l to navigate through
 -- splits. See plugin Navigator.nvim.
 K(
