@@ -1,5 +1,6 @@
 {
   "bash-language-server": "5.4.3",
+  "jq": "jq-1.7",
   "lua-language-server": "3.13.6",
   "prettier": "3.5.2",
   "pyright": "1.1.395",

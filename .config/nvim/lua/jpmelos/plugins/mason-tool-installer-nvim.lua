@@ -25,6 +25,8 @@ return {
                 "sql-formatter",
                 -- CSS, SCSS, JS, TS, YAML, GraphQL.
                 "prettier",
+                -- JSON.
+                "jq",
             },
         })
     end,
