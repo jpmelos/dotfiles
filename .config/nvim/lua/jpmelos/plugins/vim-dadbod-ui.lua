@@ -65,12 +65,6 @@ return {
             callback = function()
                 K(
                     "n",
-                    "<CR>",
-                    "<Plug>(DBUI_JumpToForeignKey)",
-                    { desc = "Jump to foreign key", buffer = true }
-                )
-                K(
-                    "n",
                     "yic",
                     "<Plug>(DBUI_YankCellValue)y",
                     { desc = "Select cell value", buffer = true }
@@ -79,7 +73,7 @@ return {
                     "n",
                     "<leader>vr",
                     "<Plug>(DBUI_ToggleResultLayout)",
-                    { desc = "Run another query", buffer = true }
+                    { desc = "Toggle result layout", buffer = true }
                 )
             end,
         })
