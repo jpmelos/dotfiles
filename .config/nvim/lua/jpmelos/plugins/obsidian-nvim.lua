@@ -54,10 +54,13 @@ return {
             end,
             follow_url_func = function(url)
                 if vim.loop.os_uname().sysname == "Darwin" then
-                    vim.fn.jobstart({ "open", url }) -- Mac OS
+                    -- MacOS
+                    vim.fn.jobstart({ "open", url })
                 else
+                    -- Linux
                     vim.notify(
-                        "Fix this, make it specific for Linux in obsidian.nvim."
+                        "Fix this, make it specific for Linux in"
+                            .. "obsidian.nvim."
                     )
                     vim.fn.jobstart({ "xdg-open", url }) -- linux
                 end
