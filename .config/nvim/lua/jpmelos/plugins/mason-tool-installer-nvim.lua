@@ -27,6 +27,19 @@ return {
                 "prettier",
                 -- JSON.
                 "jq",
+                -- Markdown.
+                -- Install mdformat manually like below:
+                -- pipx install mdformat
+                -- pipx inject mdformat \
+                --     mdformat-config \
+                --     mdformat-ruff \
+                --     mdformat-rustfmt \
+                --     mdformat-shfmt \
+                --     mdformat-web \
+                --     mdformat-frontmatter \
+                --     mdformat-gfm \
+                --     mdformat-gfm-alerts \
+                --     mdformat-tables
             },
         })
     end,

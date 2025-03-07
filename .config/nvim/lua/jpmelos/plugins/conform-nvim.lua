@@ -46,6 +46,7 @@ return {
                 graphql = { "prettier" },
                 toml = { "prettier" },
                 json = { "jq" },
+                markdown = { "mdformat" },
             },
         })
 
