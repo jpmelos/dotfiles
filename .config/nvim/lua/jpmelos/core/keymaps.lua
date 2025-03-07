@@ -5,8 +5,10 @@ local K = vim.keymap.set
 
 -- Disable using <ESC> to leave insert mode.
 K("i", "jj", "<ESC>l", { noremap = true, silent = true })
-K("i", "<C-c>", "<ESC>l", { noremap = true, silent = true })
 K({ "i", "v", "c" }, "<ESC>", "<NOP>", { noremap = true, silent = true })
+
+-- Disable leaving insert mode via <C-c>
+K("i", "<C-c>", "<NOP>", { noremap = true, silent = true })
 
 -- Tab management.
 K("n", "<leader>to", "<cmd>tabnew<CR>", { desc = "Open new tab" })
