@@ -44,6 +44,7 @@ return {
                 typescript = { "prettier" },
                 yaml = { "prettier" },
                 graphql = { "prettier" },
+                toml = { "prettier" },
                 json = { "jq" },
             },
         })
