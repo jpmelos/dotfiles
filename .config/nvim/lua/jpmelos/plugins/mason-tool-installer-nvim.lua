@@ -22,7 +22,7 @@ return {
                 -- rustfmt: Deprecated to install via Mason. Use Rust default
                 -- tools.
                 -- SQL
-                "sql-formatter",
+                -- Still deciding what to use here.
                 -- CSS, SCSS, JS, TS, YAML, GraphQL.
                 "prettier",
                 -- JSON.

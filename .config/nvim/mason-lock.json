@@ -8,7 +8,6 @@
   "rust-analyzer": "2025-03-04",
   "shellcheck": "v0.10.0",
   "shfmt": "v3.10.0",
-  "sql-formatter": "15.4.11",
   "sqlls": "1.7.1",
   "stylua": "v2.0.2"
 }

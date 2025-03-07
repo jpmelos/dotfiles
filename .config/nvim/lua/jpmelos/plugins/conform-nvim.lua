@@ -34,7 +34,10 @@ return {
                 -- This is an exception, it's not managed by Mason. Instead,
                 -- install the Rust toolchain locally.
                 rust = { "rustfmt" },
-                sql = { "sql_formatter" },
+                -- SQL formatters evaluated so far:
+                -- - sql_formatter: Formats ON clauses (in JOINs) wrong, and
+                --   aligns AND clauses weirdly.
+                sql = {},
                 css = { "prettier" },
                 scss = { "prettier" },
                 javascript = { "prettier" },
