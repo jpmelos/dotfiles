@@ -1,3 +1,4 @@
+local already_in_session = false
 local waiting_for_breakpoint = nil
 
 local function broadcast(sessions, fn)
@@ -42,14 +43,19 @@ end
 local register_waiting_for_breakpoint_handler = function()
     local dap = require("dap")
 
-    local handle_stopped_or_terminated_event = function()
+    local handle_stopped_event = function()
         unset_saved_bp()
     end
 
-    dap.listeners.before["event_stopped"]["jpmelos"] =
-        handle_stopped_or_terminated_event
+    local handle_terminated_event = function()
+        unset_saved_bp()
+        vim.cmd("tabclose")
+        already_in_session = false
+    end
+
+    dap.listeners.before["event_stopped"]["jpmelos"] = handle_stopped_event
     dap.listeners.before["event_terminated"]["jpmelos"] =
-        handle_stopped_or_terminated_event
+        handle_terminated_event
 end
 
 local debug_with_host_port = function(callback, host_port)
@@ -181,6 +187,10 @@ return {
         -- This is our custom `run_to_cursor` mapping. It works even when there
         -- isn't a session running. It starts a session.
         K("n", "<leader>dr", function()
+            if not already_in_session then
+                OpenCurrentBufferInNewTab()
+                already_in_session = true
+            end
             waiting_for_breakpoint = toggle_bp_current_line()
             dap.continue()
         end, { desc = "Run to cursor" })

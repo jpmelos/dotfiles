@@ -71,6 +71,12 @@ function GetLspServers()
     return "[" .. clients:sub(1, -2) .. "]"
 end
 
+function OpenCurrentBufferInNewTab()
+    local pos = vim.fn.getpos(".")
+    vim.cmd("tabnew %")
+    vim.fn.setpos(".", { 0, pos[2], pos[3], 0 })
+end
+
 vim.api.nvim_create_user_command("Redir", function(ctx)
     local lines = vim.split(
         vim.api.nvim_exec2(ctx.args, { output = true }).output,

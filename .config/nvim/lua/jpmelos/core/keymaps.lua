@@ -13,11 +13,12 @@ K("i", "<C-c>", "<NOP>", { noremap = true, silent = true })
 -- Tab management.
 K("n", "<leader>to", "<cmd>tabnew<CR>", { desc = "Open new tab" })
 K("n", "<leader>tx", "<cmd>tabclose<CR>", { desc = "Close current tab" })
-K("n", "<leader>tf", function()
-    local pos = vim.fn.getpos(".")
-    vim.cmd("tabnew %")
-    vim.fn.setpos(".", { 0, pos[2], pos[3], 0 })
-end, { desc = "Open current buffer in new tab" })
+K(
+    "n",
+    "<leader>tf",
+    OpenCurrentBufferInNewTab,
+    { desc = "Open current buffer in new tab" }
+)
 
 -- Tab navigation.
 K("n", "<C-M-h>", "<cmd>tabp<CR>", { desc = "Previous tab" })
