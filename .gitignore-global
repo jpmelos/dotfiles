@@ -5,6 +5,9 @@ jpenv*
 .autoenv.enter
 .autoenv.leave
 
+# Ignore common cache folders.
+.cache
+
 # Python virtual environments.
 /.venv
 
