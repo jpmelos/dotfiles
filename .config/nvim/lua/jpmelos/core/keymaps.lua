@@ -4,7 +4,14 @@ vim.g.mapleader = " "
 local K = vim.keymap.set
 
 -- Disable using <ESC> to leave insert mode.
-K("i", "jj", "<ESC>l", { noremap = true, silent = true })
+K("i", "jj", function()
+    local current_column = vim.api.nvim_win_get_cursor(0)[2]
+    if current_column == 0 then
+        return "<ESC>"
+    else
+        return "<ESC>l"
+    end
+end, { noremap = true, silent = true, expr = true })
 K({ "i", "v", "c" }, "<ESC>", "<NOP>", { noremap = true, silent = true })
 
 -- Disable leaving insert mode via <C-c>
