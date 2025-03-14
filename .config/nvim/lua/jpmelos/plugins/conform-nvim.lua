@@ -24,6 +24,7 @@ return {
             -- }
             -- ```
             formatters_by_ft = {
+                -- BE coding.
                 sh = { "shfmt" },
                 python = {
                     "ruff_fix",
@@ -38,15 +39,20 @@ return {
                 -- - sql_formatter: Formats ON clauses (in JOINs) wrong, and
                 --   aligns AND clauses weirdly.
                 sql = {},
+                -- Web technologies.
+                html = { "prettier" },
                 css = { "prettier" },
                 scss = { "prettier" },
                 javascript = { "prettier" },
                 typescript = { "prettier" },
+                -- Writing.
+                markdown = { "mdformat" },
+                -- Configuration.
                 yaml = { "prettier" },
-                graphql = { "prettier" },
                 toml = { "prettier" },
                 json = { "jq" },
-                markdown = { "mdformat" },
+                -- Others.
+                graphql = { "prettier" },
             },
         })
 
