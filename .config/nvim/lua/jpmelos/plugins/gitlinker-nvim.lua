@@ -22,19 +22,7 @@ return {
             })
         end, {})
 
-        K(
-            "n",
-            "<leader>gy",
-            "<cmd>GetGitLink<CR>",
-            { desc = "Copy permalink" }
-        )
         K("n", "gy", "<cmd>GetGitLink<CR>", { desc = "Copy permalink" })
-        K(
-            "v",
-            "<leader>gy",
-            "<cmd>GetGitLinkV<CR>",
-            { desc = "Copy permalink" }
-        )
         K("v", "gy", "<cmd>GetGitLinkV<CR>", { desc = "Copy permalink" })
     end,
 }
