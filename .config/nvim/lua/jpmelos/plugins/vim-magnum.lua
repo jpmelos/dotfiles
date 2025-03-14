@@ -1,1 +1,0 @@
-return { "glts/vim-magnum" }
