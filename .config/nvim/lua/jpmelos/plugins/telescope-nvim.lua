@@ -1,7 +1,3 @@
-local get_parent = function(path)
-    return path:match("(.*" .. "/" .. ")")
-end
-
 return {
     "nvim-telescope/telescope.nvim",
     dependencies = {
