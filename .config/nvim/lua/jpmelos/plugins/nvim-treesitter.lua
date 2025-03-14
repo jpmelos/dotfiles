@@ -5,8 +5,16 @@ return {
     dependencies = {
         -- Automatically open and close HTML tags.
         "windwp/nvim-ts-autotag",
+        -- nvim-dap REPL syntax highlighting.
+        "mfussenegger/nvim-dap",
+        "rcarriga/nvim-dap-ui",
+        "LiadOz/nvim-dap-repl-highlights",
     },
     config = function()
+        -- We need to run this before installing `dap_repl` parser, otherwise
+        -- it won't work.
+        require("nvim-dap-repl-highlights").setup()
+
         require("nvim-treesitter.configs").setup({
             -- Better syntax highlighting.
             highlight = { enable = true },
