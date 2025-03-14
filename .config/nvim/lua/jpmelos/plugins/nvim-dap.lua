@@ -115,6 +115,10 @@ end
 
 return {
     "mfussenegger/nvim-dap",
+    dependencies = {
+        -- We use this in our custom setup for this plugin.
+        "MunifTanjim/nui.nvim",
+    },
     config = function()
         local K = vim.keymap.set
 
