@@ -1,13 +1,13 @@
 {
   "bash-language-server": "5.4.3",
   "jq": "jq-1.7",
-  "lua-language-server": "3.13.6",
+  "lua-language-server": "3.13.9",
   "prettier": "3.5.3",
   "pyright": "1.1.396",
-  "ruff": "0.9.9",
-  "rust-analyzer": "2025-03-04",
+  "ruff": "0.11.0",
+  "rust-analyzer": "2025-03-10",
   "shellcheck": "v0.10.0",
-  "shfmt": "v3.10.0",
+  "shfmt": "v3.11.0",
   "sqlls": "1.7.1",
   "stylua": "v2.0.2"
 }
