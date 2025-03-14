@@ -1,8 +1,8 @@
 return {
     "kristijanhusak/vim-dadbod-ui",
     dependencies = {
-        { "tpope/vim-dadbod" },
-        { "kristijanhusak/vim-dadbod-completion" },
+        "tpope/vim-dadbod",
+        "kristijanhusak/vim-dadbod-completion",
     },
     init = function()
         local K = vim.keymap.set
