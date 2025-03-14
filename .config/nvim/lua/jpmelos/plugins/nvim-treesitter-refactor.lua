@@ -6,7 +6,7 @@ return {
             refactor = {
                 highlight_definitions = {
                     enable = true,
-                    clear_on_cursor_move = true,
+                    clear_on_cursor_move = false,
                 },
             },
         })
