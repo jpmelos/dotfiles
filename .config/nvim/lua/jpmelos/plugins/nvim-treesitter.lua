@@ -3,8 +3,6 @@ return {
     -- Make sure we always update all parsers when we update tree-sitter.
     build = ":TSUpdate",
     dependencies = {
-        -- Automatically open and close HTML tags.
-        "windwp/nvim-ts-autotag",
         -- nvim-dap REPL syntax highlighting.
         "mfussenegger/nvim-dap",
         "rcarriga/nvim-dap-ui",
