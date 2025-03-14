@@ -9,7 +9,7 @@ jpenv*
 .cache
 
 # Python virtual environments.
-/.venv
+/.venv*
 
 # Compiled Python files.
 __pycache__
