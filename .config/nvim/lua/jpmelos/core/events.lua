@@ -24,14 +24,12 @@ au({ "VimEnter" }, {
     end,
 })
 
--- See `:help vim.highlight.on_yank()`.
 au("TextYankPost", {
     callback = function()
         vim.highlight.on_yank({ timeout = 1000 })
     end,
 })
 
--- See `:help vim.highlight.on_yank()`.
 au({ "VimEnter", "FocusGained" }, {
     callback = UpdateGitBranch,
 })
