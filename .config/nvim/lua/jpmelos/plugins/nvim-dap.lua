@@ -8,19 +8,32 @@ local function broadcast(sessions, fn)
     end
 end
 
-local function toggle_bp_current_line()
+local function set_saved_bp()
     local api = vim.api
     local dap = require("dap")
+
+    if not already_in_session then
+        OpenCurrentBufferInNewTab()
+        already_in_session = true
+    end
 
     local bufnr = api.nvim_get_current_buf()
     local lnum = api.nvim_win_get_cursor(0)[1]
     dap.set_breakpoint()
-    return { bufnr = bufnr, lnum = lnum }
+    waiting_for_breakpoint = { bufnr = bufnr, lnum = lnum }
 end
 
-local function unset_bp(bufnr, lnum)
+local function unset_saved_bp()
     local dap = require("dap")
     local dap_breakpoints = require("dap.breakpoints")
+
+    if waiting_for_breakpoint == nil then
+        -- Nothing to do.
+        return
+    end
+
+    local bufnr = waiting_for_breakpoint.bufnr
+    local lnum = waiting_for_breakpoint.lnum
 
     dap_breakpoints.toggle({ replace = true }, bufnr, lnum)
     dap_breakpoints.toggle({}, bufnr, lnum)
@@ -28,16 +41,6 @@ local function unset_bp(bufnr, lnum)
     broadcast(dap.sessions(), function(s)
         s:set_breakpoints(bps)
     end)
-end
-
-local function unset_saved_bp()
-    if waiting_for_breakpoint ~= nil then
-        -- Make sure it's set so toggle removes it.
-        local bufnr = waiting_for_breakpoint.bufnr
-        local lnum = waiting_for_breakpoint.lnum
-        unset_bp(bufnr, lnum)
-    end
-    waiting_for_breakpoint = nil
 end
 
 local register_waiting_for_breakpoint_handler = function()
@@ -142,20 +145,16 @@ return {
                         vim.g.remote_debug_debugpy_path_mappings
                     local dap_mappings = {}
 
-                    if path_mappings then
-                        for mapping in path_mappings:gmatch("([^;]+)") do
-                            local localRoot, remoteRoot =
-                                mapping:match("(.+)=(.+)")
-                            table.insert(dap_mappings, {
-                                localRoot = localRoot,
-                                remoteRoot = remoteRoot,
-                            })
-                        end
-
-                        return dap_mappings
+                    for mapping in path_mappings:gmatch("([^;]+)") do
+                        local localRoot, remoteRoot =
+                            mapping:match("(.+)=(.+)")
+                        table.insert(dap_mappings, {
+                            localRoot = localRoot,
+                            remoteRoot = remoteRoot,
+                        })
                     end
 
-                    return {}
+                    return dap_mappings
                 end,
             },
         }
@@ -186,16 +185,10 @@ return {
 
         -- Register handler to handle our `run_to_cursor`.
         register_waiting_for_breakpoint_handler()
-
-        K("n", "<leader>dh", dap.continue, { desc = "Continue" })
         -- This is our custom `run_to_cursor` mapping. It works even when there
-        -- isn't a session running. It starts a session.
+        -- isn't a session running: it starts a session.
         K("n", "<leader>dr", function()
-            if not already_in_session then
-                OpenCurrentBufferInNewTab()
-                already_in_session = true
-            end
-            waiting_for_breakpoint = toggle_bp_current_line()
+            set_saved_bp()
             dap.continue()
         end, { desc = "Run to cursor" })
         K("n", "<leader>dx", dap.disconnect, { desc = "End current session" })
@@ -211,6 +204,7 @@ return {
             vim.cmd("vertical DapEval")
         end, { desc = "Open REPL" })
 
+        K("n", "<leader>dh", dap.continue, { desc = "Continue" })
         K("n", "<leader>dj", dap.step_into, { desc = "Step into" })
         K("n", "<leader>dk", dap.step_out, { desc = "Step out" })
         K("n", "<leader>dl", dap.step_over, { desc = "Step over" })
