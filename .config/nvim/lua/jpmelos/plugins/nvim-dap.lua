@@ -64,6 +64,7 @@ end
 local debug_with_host_port = function(callback, host_port)
     local host, port = host_port:match("(.-):(.*)")
     port = tonumber(port)
+
     if host == nil or port == nil or host == "" or port == "" then
         vim.notify("Invalid host:port configuration!", "error")
         return
@@ -104,11 +105,9 @@ local function get_host_port_and_debug(callback)
         end)
         input:map("n", "<C-c>", function()
             input:unmount()
-            unset_saved_bp()
         end, { noremap = true })
         input:map("i", "<C-c>", function()
             input:unmount()
-            unset_saved_bp()
         end, { noremap = true })
         input:mount()
     else
