@@ -72,7 +72,7 @@ local debug_with_host_port = function(callback, host_port)
     callback({ type = "server", host = host, port = port })
 end
 
-local function getHostPortAndDebug(callback)
+local function get_host_port_and_debug(callback)
     local Input = require("nui.input")
     local event = require("nui.utils.autocmd").event
 
@@ -158,7 +158,7 @@ return {
                 end,
             },
         }
-        dap.adapters.debugpy = getHostPortAndDebug
+        dap.adapters.debugpy = get_host_port_and_debug
 
         vim.cmd("hi DapBreakpoint guifg=#ff0000")
 
