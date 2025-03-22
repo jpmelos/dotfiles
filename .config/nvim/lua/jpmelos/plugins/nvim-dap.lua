@@ -8,9 +8,11 @@ local function broadcast(sessions, fn)
     end
 end
 
-local function set_saved_bp()
+local function set_saved_bp_and_run(ask_for_condition)
     local api = vim.api
     local dap = require("dap")
+    local Input = require("nui.input")
+    local event = require("nui.utils.autocmd").event
 
     if not already_in_session then
         OpenCurrentBufferInNewTab()
@@ -19,8 +21,56 @@ local function set_saved_bp()
 
     local bufnr = api.nvim_get_current_buf()
     local lnum = api.nvim_win_get_cursor(0)[1]
-    dap.set_breakpoint()
     waiting_for_breakpoint = { bufnr = bufnr, lnum = lnum }
+
+    if ask_for_condition then
+        local input = Input({
+            position = "50%",
+            size = { width = 80 },
+            border = {
+                style = "rounded",
+                text = {
+                    top = " Breakpoint Condition ",
+                    top_align = "center",
+                },
+            },
+            win_options = {
+                winhighlight = "Normal:Normal,FloatBorder:Normal",
+            },
+        }, {
+            prompt = "> ",
+            on_submit = function(condition)
+                local condition_hit = tonumber(condition)
+                if condition_hit then
+                    dap.set_breakpoint(nil, condition)
+                    dap.continue()
+                    return
+                end
+
+                if condition ~= "" and condition ~= nil then
+                    dap.set_breakpoint(condition)
+                    dap.continue()
+                    return
+                end
+
+                dap.set_breakpoint()
+                dap.continue()
+            end,
+        })
+        input:on(event.BufLeave, function()
+            input:unmount()
+        end)
+        input:map("n", "<C-c>", function()
+            input:unmount()
+        end, { noremap = true })
+        input:map("i", "<C-c>", function()
+            input:unmount()
+        end, { noremap = true })
+        input:mount()
+    else
+        dap.set_breakpoint()
+        dap.continue()
+    end
 end
 
 local function unset_saved_bp()
@@ -187,8 +237,10 @@ return {
         -- This is our custom `run_to_cursor` mapping. It works even when there
         -- isn't a session running: it starts a session.
         K("n", "<leader>dr", function()
-            set_saved_bp()
-            dap.continue()
+            set_saved_bp_and_run()
+        end, { desc = "Run to cursor" })
+        K("n", "<leader>dR", function()
+            set_saved_bp_and_run(true)
         end, { desc = "Run to cursor" })
         K("n", "<leader>dx", dap.disconnect, { desc = "End current session" })
 
