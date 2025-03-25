@@ -11,11 +11,11 @@ K("i", "jj", function()
     else
         return "<ESC>l"
     end
-end, { noremap = true, silent = true, expr = true })
-K({ "i", "v", "c" }, "<ESC>", "<NOP>", { noremap = true, silent = true })
+end, { noremap = true, expr = true })
+K({ "i", "v", "c" }, "<ESC>", "<NOP>")
 
 -- Disable leaving insert mode via <C-c>
-K("i", "<C-c>", "<NOP>", { noremap = true, silent = true })
+K("i", "<C-c>", "<NOP>")
 
 -- Disable toggling case with `u` in Visual mode.
 K("v", "u", "<NOP>")
@@ -45,13 +45,13 @@ K(
     { "n", "v" },
     "k",
     "v:count == 0 ? 'gk' : 'k'",
-    { expr = true, silent = true, desc = "Navigate one screen line up" }
+    { expr = true, desc = "Navigate one screen line up" }
 )
 K(
     { "n", "v" },
     "j",
     "v:count == 0 ? 'gj' : 'j'",
-    { expr = true, silent = true, desc = "Navigate one screen line down" }
+    { expr = true, desc = "Navigate one screen line down" }
 )
 K("n", "-", "_")
 
