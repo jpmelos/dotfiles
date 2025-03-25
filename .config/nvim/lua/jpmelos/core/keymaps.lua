@@ -17,6 +17,9 @@ K({ "i", "v", "c" }, "<ESC>", "<NOP>", { noremap = true, silent = true })
 -- Disable leaving insert mode via <C-c>
 K("i", "<C-c>", "<NOP>", { noremap = true, silent = true })
 
+-- Disable toggling case with `u` in Visual mode.
+K("v", "u", "<NOP>")
+
 -- Tab management.
 K("n", "<leader>to", "<cmd>tabnew<CR>", { desc = "Open new tab" })
 K("n", "<leader>tx", "<cmd>tabclose<CR>", { desc = "Close current tab" })
