@@ -11,3 +11,5 @@ api.nvim_create_autocmd("FileType", {
         ol.colorcolumn = "80"
     end,
 })
+
+g.augment_workspace_folders = { vim.fn.getcwd() }
