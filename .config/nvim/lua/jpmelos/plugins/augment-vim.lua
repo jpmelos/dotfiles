@@ -13,14 +13,14 @@ return {
         return os.getenv("AUGMENT_CODE_AI_ENABLED") == "1"
     end,
     cmd = { "Augment" },
+    keys = {
+        { "<leader>a", "<cmd>Augment chat<CR>", desc = "AI chat" },
+    },
     init = function()
         local g = vim.g
-        local K = vim.keymap.set
 
         g.augment_disable_tab_mapping = true
         g.augment_disable_completions = true
         g.augment_suppress_version_warning = true
-
-        K("n", "<leader>a", "<cmd>Augment chat<CR>", { desc = "AI chat" })
     end,
 }
