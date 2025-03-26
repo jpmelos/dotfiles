@@ -1,0 +1,11 @@
+# vim: set ft=sh :
+
+if [ -z "$AUTOENV_DOTFILES" ]; then
+    return
+fi
+
+unset AUTOENV_DOTFILES
+
+if [ -n "$AUGMENT_CODE_AI_ENABLED" ]; then
+    unset AUGMENT_CODE_AI_ENABLED
+fi

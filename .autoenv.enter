@@ -1,0 +1,11 @@
+# vim: set ft=sh :
+
+if [ -n "$AUTOENV_DOTFILES" ]; then
+    return
+fi
+
+AUTOENV_DOTFILES=1
+
+if [ -z "$AUGMENT_CODE_AI_ENABLED" ]; then
+    export AUGMENT_CODE_AI_ENABLED="1"
+fi
