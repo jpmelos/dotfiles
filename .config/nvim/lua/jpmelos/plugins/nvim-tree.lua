@@ -84,7 +84,7 @@ return {
         K(
             "n",
             "<leader>ee",
-            "<cmd>NvimTreeOpen " .. vim.loop.cwd() .. "<CR>",
+            "<cmd>NvimTreeOpen " .. vim.fn.getcwd() .. "<CR>",
             { desc = "Open/focus file explorer" }
         )
         K(

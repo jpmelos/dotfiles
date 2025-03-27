@@ -10,7 +10,7 @@ return {
         -- When changing the buffer, also update the preview.
         vim.g.mkdp_combine_preview_auto_refresh = true
         -- Set the browser to use in each OS.
-        if vim.loop.os_uname().sysname == "Darwin" then
+        if vim.fn.system("uname -s"):gsub("%s+$", "") == "Darwin" then
             -- MacOS
             vim.g.mkdp_browser =
                 "/Applications/Firefox.app/Contents/MacOS/firefox"

@@ -53,7 +53,7 @@ return {
                 return note_id
             end,
             follow_url_func = function(url)
-                if vim.loop.os_uname().sysname == "Darwin" then
+                if vim.fn.system("uname -s"):gsub("%s+$", "") == "Darwin" then
                     -- MacOS
                     vim.fn.jobstart({ "open", url })
                 else

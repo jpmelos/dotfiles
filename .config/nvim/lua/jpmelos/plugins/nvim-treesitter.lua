@@ -88,10 +88,11 @@ return {
             },
             -- Disable tree-sitter syntax highlighting for large files.
             disable = function(lang, buf)
-                local max_filesize = 1024 * 1024 -- 1MB
-                local ok, stats =
-                    pcall(vim.loop.fs_stat, vim.api.nvim_buf_get_name(buf))
-                if ok and stats and stats.size > max_filesize then
+                local max_size = 1024 * 1024 -- 1MB
+                local size = vim.fn.getfsize(vim.api.nvim_buf_get_name(buf))
+                -- size == -2 means the size is so big it doesn't fit in
+                -- Neovim's Number type.
+                if size > max_size or size == -2 then
                     return true
                 end
                 return false

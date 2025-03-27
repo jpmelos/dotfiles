@@ -34,8 +34,8 @@ function os.capture(cmd, raw)
 end
 
 function UpdateGitBranch()
-    local dot_git_path = vim.loop.cwd() .. "/.git"
-    local in_git_root, _ = vim.loop.fs_stat(dot_git_path)
+    local dot_git_path = vim.fn.getcwd() .. "/.git"
+    local in_git_root = vim.fn.isdirectory(dot_git_path) == 1
 
     if not in_git_root then
         vim.g.git_branch = "not in git root"
