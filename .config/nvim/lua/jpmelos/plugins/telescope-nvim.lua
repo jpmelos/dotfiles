@@ -2,6 +2,7 @@ return {
     "nvim-telescope/telescope.nvim",
     dependencies = {
         "nvim-lua/plenary.nvim",
+        "nvim-telescope/telescope-ui-select.nvim",
         "nvim-telescope/telescope-fzf-native.nvim",
         "nvim-tree/nvim-web-devicons",
         "folke/trouble.nvim",
@@ -16,6 +17,7 @@ return {
         local telescope = require("telescope")
         local builtins = require("telescope.builtin")
         local actions = require("telescope.actions")
+        local themes = require("telescope.themes")
 
         local trouble_telescope = require("trouble.sources.telescope")
 
@@ -80,9 +82,11 @@ return {
                         ["<C-c>"] = actions.close,
                     },
                 },
+                extensions = { ["ui-select"] = { themes.get_dropdown({}) } },
             },
         })
         telescope.load_extension("fzf")
+        telescope.load_extension("ui-select")
 
         --
         -- Files.
