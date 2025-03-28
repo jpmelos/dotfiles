@@ -1,11 +1,14 @@
 -- This plugin is enabled only if the environment variable
 -- `AUGMENT_CODE_AI_ENABLED` is set at the time Neovim starts. We don't want to
--- unexpectedly share code with them.
+-- unexpectedly share proprietary code with them.
 --
--- To configure this plugin, set the following in the project's `nvim.lua`
--- file:
+-- The workspace is set to the current working directory by default. To
+-- configure a different workspace (for example, because you want to add code
+-- that is outside of the current working directory), set this in the project's
+-- `.nvim.lua` file (make sure to include `vim.fn.getcwd()` explicitly if you
+-- what that to be included):
 -- ```
--- vim.g.augment_workspace_folders = { vim.fn.getcwd() }
+-- vim.g.augment_workspace_folders = { vim.fn.getcwd(), "/Users/..." }
 -- ```
 return {
     "augmentcode/augment.vim",
@@ -49,9 +52,12 @@ return {
         local g = vim.g
         local api = vim.api
 
+        -- Disable Augment Code suggestions.
         g.augment_disable_tab_mapping = true
         g.augment_disable_completions = true
         g.augment_suppress_version_warning = true
+
+        g.augment_workspace_folders = { vim.fn.getcwd() }
 
         api.nvim_create_autocmd("BufWinLeave", {
             pattern = "augment-code-prompt.md",

@@ -9,3 +9,6 @@ AUTOENV_DOTFILES=1
 if [ -z "$AUGMENT_CODE_AI_ENABLED" ]; then
     export AUGMENT_CODE_AI_ENABLED="1"
 fi
+if [ -z "$GH_COPILOT_ENABLED" ]; then
+    export GH_COPILOT_ENABLED="1"
+fi
