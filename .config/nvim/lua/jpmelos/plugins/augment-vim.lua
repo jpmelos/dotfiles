@@ -42,7 +42,7 @@ return {
             desc = "AI chat, edit prompt",
         },
         {
-            "<leader>at",
+            "<leader>ac",
             "<cmd>Augment chat-toggle<CR>",
             mode = { "n", "v" },
             desc = "Open AI chat window",
@@ -63,10 +63,10 @@ return {
             pattern = "augment-code-prompt.md",
             callback = function()
                 local lines = api.nvim_buf_get_lines(0, 0, -1, false)
-                if #lines == 0 then
+                local text = table.concat(lines, "\n"):match("^%s*(.-)%s*$")
+                if text == "" then
                     return
                 end
-                local text = table.concat(lines, "\n")
 
                 vim.schedule(function()
                     -- The function expects the number of lines included in a
