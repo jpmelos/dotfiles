@@ -1,5 +1,49 @@
+-- Use a repository-local `.nvim.lua` file to overwrite this for specific
+-- projects. Something like:
+--
+-- ```
+-- local conform = require("conform")
+-- conform.formatters_by_ft.python = {
+--     "ruff_fix",
+--     "ruff_organize_imports",
+--     "black",
+-- }
+-- ```
+local formatters_by_ft = {
+    -- BE coding.
+    sh = { "shfmt" },
+    python = {
+        "ruff_fix",
+        "ruff_organize_imports",
+        "ruff_format",
+    },
+    lua = { "stylua" },
+    -- This is an exception: it's not managed by Mason. Instead,
+    -- install the Rust toolchain locally.
+    rust = { "rustfmt" },
+    -- SQL formatters evaluated so far:
+    -- - sql_formatter: Formats ON clauses (in JOINs) wrong, and
+    --   aligns AND clauses weirdly.
+    -- sql = {},
+    -- Web technologies.
+    html = { "prettier" },
+    css = { "prettier" },
+    scss = { "prettier" },
+    javascript = { "prettier" },
+    typescript = { "prettier" },
+    -- Writing.
+    markdown = { "mdformat" },
+    -- Configuration.
+    yaml = { "prettier" },
+    toml = { "prettier" },
+    json = { "jq" },
+    -- Others.
+    graphql = { "prettier" },
+}
+
 return {
     "stevearc/conform.nvim",
+    ft = vim.tbl_keys(formatters_by_ft),
     config = function()
         local g = vim.g
         local b = vim.b
@@ -11,50 +55,9 @@ return {
 
         -- Tools used here should be managed by Mason. See
         -- `mason-tool-installer-nvim.lua`.
-        conform.setup({
-            -- Use a repository-local `.nvim.lua` file to overwrite this for
-            -- specific projects. Something like:
-            --
-            -- ```
-            -- local conform = require("conform")
-            -- conform.formatters_by_ft.python = {
-            --     "ruff_fix",
-            --     "ruff_organize_imports",
-            --     "black",
-            -- }
-            -- ```
-            formatters_by_ft = {
-                -- BE coding.
-                sh = { "shfmt" },
-                python = {
-                    "ruff_fix",
-                    "ruff_organize_imports",
-                    "ruff_format",
-                },
-                lua = { "stylua" },
-                -- This is an exception, it's not managed by Mason. Instead,
-                -- install the Rust toolchain locally.
-                rust = { "rustfmt" },
-                -- SQL formatters evaluated so far:
-                -- - sql_formatter: Formats ON clauses (in JOINs) wrong, and
-                --   aligns AND clauses weirdly.
-                sql = {},
-                -- Web technologies.
-                html = { "prettier" },
-                css = { "prettier" },
-                scss = { "prettier" },
-                javascript = { "prettier" },
-                typescript = { "prettier" },
-                -- Writing.
-                markdown = { "mdformat" },
-                -- Configuration.
-                yaml = { "prettier" },
-                toml = { "prettier" },
-                json = { "jq" },
-                -- Others.
-                graphql = { "prettier" },
-            },
-        })
+        -- To configure this for a specific project, see `formatters_by_ft`
+        -- defined above.
+        conform.setup({ formatters_by_ft = formatters_by_ft })
 
         -- Customize built-in formatters and add your own.
         conform.formatters.shfmt = {
