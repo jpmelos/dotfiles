@@ -1,22 +1,31 @@
+local workspaces = { { name = "second-brain", path = "~/second-brain" } }
+
 return {
     "epwalsh/obsidian.nvim",
-    -- Use latest release instead of latest commit.
     dependencies = {
         "nvim-lua/plenary.nvim",
         "hrsh7th/nvim-cmp",
         "nvim-telescope/telescope.nvim",
         "nvim-treesitter/nvim-treesitter",
     },
+    -- Only load when we are in one of the defined workspaces.
+    cond = function()
+        local cwd = vim.fn.getcwd()
+
+        for _, workspace in ipairs(workspaces) do
+            local expanded_path = vim.fn.expand(workspace.path)
+            if cwd == expanded_path then
+                return true
+            end
+        end
+
+        return false
+    end,
     config = function()
         local K = vim.keymap.set
 
         require("obsidian").setup({
-            workspaces = {
-                {
-                    name = "second-brain",
-                    path = "~/second-brain",
-                },
-            },
+            workspaces = workspaces,
             -- When using ':ObsidianOpen'.
             open_app_foreground = false,
             completion = {
@@ -69,32 +78,7 @@ return {
                 name = "telescope.nvim",
                 mappings = { insert_link = "<C-l>" },
             },
-            ui = {
-                enable = false,
-                -- checkboxes = {
-                --     [" "] = { char = "󰄱", hl_group = "ObsidianTodo" },
-                --     ["x"] = { char = "", hl_group = "ObsidianDone" },
-                -- },
-                -- bullets = { char = "-", hl_group = "ObsidianBullet" },
-                -- external_link_icon = {
-                --     char = "",
-                --     hl_group = "ObsidianExtLinkIcon",
-                -- },
-                -- reference_text = { hl_group = "ObsidianRefText" },
-                -- highlight_text = { hl_group = "ObsidianHighlightText" },
-                -- tags = { hl_group = "ObsidianTag" },
-                -- block_ids = { hl_group = "ObsidianBlockID" },
-                -- hl_groups = {
-                --     ObsidianTodo = { bold = true, fg = "#f78c6c" },
-                --     ObsidianDone = { bold = true, fg = "#89ddff" },
-                --     ObsidianBullet = { bold = true },
-                --     ObsidianExtLinkIcon = { fg = "#c792ea" },
-                --     ObsidianRefText = { underline = true, fg = "#c792ea" },
-                --     ObsidianHighlightText = { bg = "#75662e" },
-                --     ObsidianTag = { italic = true, fg = "#89ddff" },
-                --     ObsidianBlockID = { italic = true, fg = "#89ddff" },
-                -- },
-            },
+            ui = { enable = false },
         })
 
         K("n", "gf", function()

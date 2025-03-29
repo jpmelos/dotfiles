@@ -4,9 +4,39 @@ local WIDTH_RATIO = 0.5
 return {
     "nvim-tree/nvim-tree.lua",
     dependencies = { "stevearc/dressing.nvim", "nvim-tree/nvim-web-devicons" },
+    keys = {
+        {
+            "<leader>ee",
+            "<cmd>NvimTreeOpen " .. vim.fn.getcwd() .. "<CR>",
+            mode = "n",
+            desc = "Open/focus file explorer",
+        },
+        {
+            "<leader>ef",
+            "<cmd>NvimTreeFindFile!<CR>",
+            mode = "n",
+            desc = "Open/focus file explorer on current file",
+        },
+        {
+            "<leader>ec",
+            "<cmd>NvimTreeCollapse<CR>",
+            mode = "n",
+            desc = "Collapse entries in file explorer",
+        },
+        {
+            "<leader>er",
+            "<cmd>NvimTreeRefresh<CR>",
+            mode = "n",
+            desc = "Refresh file explorer",
+        },
+        {
+            "<leader>ex",
+            "<cmd>NvimTreeClose<CR>",
+            mode = "n",
+            desc = "Close file explorer",
+        },
+    },
     config = function()
-        local K = vim.keymap.set
-
         -- Recommended settings from documentation.
         vim.g.loaded_netrw = 1
         vim.g.loaded_netrwPlugin = 1
@@ -80,36 +110,5 @@ return {
                 end
             end,
         })
-
-        K(
-            "n",
-            "<leader>ee",
-            "<cmd>NvimTreeOpen " .. vim.fn.getcwd() .. "<CR>",
-            { desc = "Open/focus file explorer" }
-        )
-        K(
-            "n",
-            "<leader>ef",
-            "<cmd>NvimTreeFindFile!<CR>",
-            { desc = "Open/focus file explorer on current file" }
-        )
-        K(
-            "n",
-            "<leader>ec",
-            "<cmd>NvimTreeCollapse<CR>",
-            { desc = "Collapse entries in file explorer" }
-        )
-        K(
-            "n",
-            "<leader>er",
-            "<cmd>NvimTreeRefresh<CR>",
-            { desc = "Refresh file explorer" }
-        )
-        K(
-            "n",
-            "<leader>ex",
-            "<cmd>NvimTreeClose<CR>",
-            { desc = "Close file explorer" }
-        )
     end,
 }

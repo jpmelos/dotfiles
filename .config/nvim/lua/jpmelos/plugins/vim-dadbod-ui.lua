@@ -4,6 +4,7 @@ return {
         "tpope/vim-dadbod",
         "kristijanhusak/vim-dadbod-completion",
     },
+    keys = { "<leader>vo" },
     init = function()
         local K = vim.keymap.set
 

@@ -3,11 +3,13 @@ return {
     dependencies = {
         "nvim-lua/plenary.nvim",
         "nvim-telescope/telescope-ui-select.nvim",
-        "nvim-telescope/telescope-fzf-native.nvim",
         "nvim-tree/nvim-web-devicons",
         "folke/trouble.nvim",
         "folke/todo-comments.nvim",
         "nvim-tree/nvim-tree.lua",
+        -- This is needed for performance improvements in how Telescope sorts
+        -- entries.
+        { "nvim-telescope/telescope-fzf-native.nvim", build = "make" },
     },
     config = function()
         local api = vim.api

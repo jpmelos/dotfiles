@@ -10,6 +10,7 @@ return {
         "williamboman/mason-lspconfig.nvim",
         "hrsh7th/cmp-nvim-lsp",
     },
+    ft = { "bash", "python", "lua", "rust", "sql" },
     config = function()
         local K = vim.keymap.set
 
@@ -56,8 +57,10 @@ return {
         end
 
         mason_lspconfig.setup_handlers({
-            -- When adding a server here, at a minimum you need to send it
-            -- the capabilities table. See below for examples.
+            -- When adding a server here, at a minimum you need to send it the
+            -- capabilities table and set the `on_attach` handler. See below
+            -- for examples. Also keep the `ft` lazy-loading configuration for
+            -- this plugin up-to-date.
             bashls = function()
                 lspconfig.bashls.setup({
                     on_attach = lsp_on_attach,

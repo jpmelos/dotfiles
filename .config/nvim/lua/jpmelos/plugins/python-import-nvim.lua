@@ -1,5 +1,6 @@
 return {
     "kiyoon/python-import.nvim",
+    ft = { "python" },
     build = "pipx install . --force",
     config = function()
         local K = vim.keymap.set
