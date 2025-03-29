@@ -3,11 +3,7 @@
 --
 -- ```
 -- local conform = require("conform")
--- conform.formatters_by_ft.python = {
---     "ruff_fix",
---     "ruff_organize_imports",
---     "black",
--- }
+-- conform.formatters_by_ft.python = { ... }
 -- ```
 local formatters_by_ft = {
     -- BE coding.
@@ -43,6 +39,12 @@ local formatters_by_ft = {
 
 return {
     "stevearc/conform.nvim",
+    cond = function()
+        if #vim.tbl_keys(formatters_by_ft) == 0 then
+            return false
+        end
+        return true
+    end,
     ft = vim.tbl_keys(formatters_by_ft),
     config = function()
         local g = vim.g
