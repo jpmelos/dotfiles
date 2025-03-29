@@ -2,17 +2,7 @@ return {
     "nvim-treesitter/nvim-treesitter",
     -- Make sure we always update all parsers when we update tree-sitter.
     build = ":TSUpdate",
-    dependencies = {
-        -- nvim-dap REPL syntax highlighting.
-        "mfussenegger/nvim-dap",
-        "rcarriga/nvim-dap-ui",
-        "LiadOz/nvim-dap-repl-highlights",
-    },
     config = function()
-        -- We need to run this before installing `dap_repl` parser, otherwise
-        -- it won't work.
-        require("nvim-dap-repl-highlights").setup()
-
         require("nvim-treesitter.configs").setup({
             -- Better syntax highlighting.
             highlight = { enable = true },
@@ -27,7 +17,8 @@ return {
                     node_decremental = "<bs>",
                 },
             },
-            -- Better indentation. But for markdown, it's worse...
+            -- Better indentation. But for markdown, it's worse... We'll use
+            -- `mdformat` with `conform.nvim` instead.
             indent = { enable = true, disable = { "markdown" } },
             -- Ensure these language parsers are installed.
             ensure_installed = {
@@ -44,7 +35,6 @@ return {
                 "cpp",
                 "css",
                 "csv",
-                "dap_repl",
                 "diff",
                 "dockerfile",
                 "editorconfig",

@@ -1,9 +1,10 @@
 return {
     "rcarriga/nvim-dap-ui",
     dependencies = { "mfussenegger/nvim-dap", "nvim-neotest/nvim-nio" },
+    keys = function(_, opts)
+        return require("lazy.core.config").spec.plugins["nvim-dap"].keys
+    end,
     config = function()
-        local K = vim.keymap.set
-
         local dap = require("dap")
         local dapui = require("dapui")
 
@@ -42,15 +43,5 @@ return {
         dap.listeners.before.event_exited.dapui_config = function()
             dapui.close()
         end
-
-        K("n", "<leader>do", function()
-            dapui.open({ reset = true })
-        end, { desc = "Open DAP UI" })
-        K("n", "<leader>dc", dapui.close, { desc = "Close DAP UI" })
-
-        K({ "n", "v" }, "<leader>de", function()
-            ---@diagnostic disable-next-line: missing-fields
-            dapui.eval(nil, { enter = true })
-        end, { desc = "Evaluate under cursor" })
     end,
 }

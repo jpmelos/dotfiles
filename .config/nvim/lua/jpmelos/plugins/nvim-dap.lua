@@ -33,10 +33,7 @@ local function ask_for_breakpoint_condition(on_submit_cb)
         input:unmount()
     end)
 
-    input:map("n", "<C-c>", function()
-        input:unmount()
-    end, { noremap = true })
-    input:map("i", "<C-c>", function()
+    input:map("n", "q", function()
         input:unmount()
     end, { noremap = true })
 
@@ -182,10 +179,7 @@ local function get_host_port_and_debug(callback)
         input:on(event.BufLeave, function()
             input:unmount()
         end)
-        input:map("n", "<C-c>", function()
-            input:unmount()
-        end, { noremap = true })
-        input:map("i", "<C-c>", function()
+        input:map("n", "q", function()
             input:unmount()
         end, { noremap = true })
         input:mount()
@@ -200,14 +194,27 @@ return {
         -- We use this in our custom setup for this plugin.
         "MunifTanjim/nui.nvim",
     },
+    keys = {
+        "<leader>dr",
+        "<leader>dR",
+        "<leader>db",
+        "<leader>dB",
+        "<leader>dpc",
+    },
     config = function()
         local K = vim.keymap.set
 
         local dap = require("dap")
 
-        vim.g.remote_debug_debugpy_just_my_code = "true"
-        vim.g.remote_debug_debugpy_path_mappings = ""
-        vim.g.remote_debug_debugpy_host_port = ""
+        if vim.g.remote_debug_debugpy_just_my_code == nil then
+            vim.g.remote_debug_debugpy_just_my_code = "true"
+        end
+        if vim.g.remote_debug_debugpy_path_mappings == nil then
+            vim.g.remote_debug_debugpy_path_mappings = ""
+        end
+        if vim.g.remote_debug_debugpy_host_port == nil then
+            vim.g.remote_debug_debugpy_host_port = ""
+        end
 
         dap.configurations.python = {
             {
