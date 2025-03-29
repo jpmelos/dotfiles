@@ -8,5 +8,11 @@ return {
     keys = function(_, opts)
         return require("lazy.core.config").spec.plugins["nvim-dap"].keys
     end,
-    config = true,
+    config = function()
+        local parsers = require("nvim-treesitter.parsers")
+        if not parsers.has_parser("dap_repl") then
+            vim.cmd("TSInstall dap_repl")
+        end
+        require("nvim-dap-repl-highlights").setup()
+    end,
 }
