@@ -51,6 +51,7 @@ return {
     init = function()
         local g = vim.g
         local api = vim.api
+        local K = vim.keymap.set
 
         -- Disable Augment Code suggestions.
         g.augment_disable_tab_mapping = true
@@ -59,6 +60,18 @@ return {
 
         g.augment_workspace_folders = { vim.fn.getcwd() }
 
+        -- <Enter> in normal mode saves and closes the buffer.
+        api.nvim_create_autocmd("BufEnter", {
+            pattern = "augment-code-prompt.md",
+            callback = function()
+                K("n", "<Enter>", function()
+                    vim.cmd("wq")
+                end, { buffer = true })
+                K({ "n", "i" }, "<S-Enter>", function()
+                    vim.cmd("wq | stopinsert")
+                end, { buffer = true })
+            end,
+        })
         api.nvim_create_autocmd("BufWinLeave", {
             pattern = "augment-code-prompt.md",
             callback = function()
