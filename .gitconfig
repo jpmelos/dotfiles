@@ -3,6 +3,7 @@
     email = jpmelos@gmail.com
 
 [core]
+    editor = nvim
     pager = delta
     excludesFile = ~/.gitignore-global
 
@@ -19,6 +20,9 @@
 
 [branch]
     sort = -committerdate
+
+[fetch]
+    prune = true
 
 [log]
     date = local
@@ -48,6 +52,9 @@
 [push]
     default = simple
     autoSetupRemote = true
+
+[pull]
+    rebase = true
 
 [color "branch"]
     current = green dim bold
