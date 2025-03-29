@@ -20,6 +20,10 @@ K("i", "<C-c>", "<NOP>")
 -- Disable toggling case with `u` in Visual mode.
 K("v", "u", "<NOP>")
 
+-- Indent while remaining in visual mode.
+vim.keymap.set("v", "<", "<gv")
+vim.keymap.set("v", ">", ">gv")
+
 -- Tab management.
 K("n", "<leader>to", "<cmd>tabnew<CR>", { desc = "Open new tab" })
 K("n", "<leader>tx", "<cmd>tabclose<CR>", { desc = "Close current tab" })
