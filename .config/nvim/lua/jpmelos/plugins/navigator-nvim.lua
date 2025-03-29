@@ -1,13 +1,10 @@
 return {
     "numToStr/Navigator.nvim",
-    config = function()
-        local K = vim.keymap.set
-
-        require("Navigator").setup()
-
-        K("n", "<C-h>", "<cmd>NavigatorLeft<cr>")
-        K("n", "<C-l>", "<cmd>NavigatorRight<cr>")
-        K("n", "<C-k>", "<cmd>NavigatorUp<cr>")
-        K("n", "<C-j>", "<cmd>NavigatorDown<cr>")
-    end,
+    keys = {
+        { "<C-h>", "<cmd>NavigatorLeft<cr>", mode = "n" },
+        { "<C-l>", "<cmd>NavigatorRight<cr>", mode = "n" },
+        { "<C-k>", "<cmd>NavigatorUp<cr>", mode = "n" },
+        { "<C-j>", "<cmd>NavigatorDown<cr>", mode = "n" },
+    },
+    config = true,
 }

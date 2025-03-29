@@ -1,5 +1,13 @@
 return {
     "iamcco/markdown-preview.nvim",
+    keys = {
+        {
+            "<leader>mp",
+            "<cmd>MarkdownPreviewToggle<cr>",
+            mode = "n",
+            desc = "Toggle Markdown preview",
+        },
+    },
     init = function()
         local K = vim.keymap.set
 
@@ -22,13 +30,6 @@ return {
             )
             vim.g.mkdp_browser = ""
         end
-
-        K(
-            "n",
-            "<leader>mp",
-            "<cmd>MarkdownPreviewToggle<cr>",
-            { desc = "Toggle Markdown preview" }
-        )
     end,
     build = function()
         vim.fn["mkdp#util#install"]()
