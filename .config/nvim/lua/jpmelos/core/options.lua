@@ -101,9 +101,6 @@ opt.conceallevel = 0
 -- Conceal in all modes.
 opt.concealcursor = ""
 
--- Disable folding everywhere.
-opt.foldenable = false
-
 -- Ignore case when searching...
 opt.ignorecase = true
 -- ... unless you have mixed case in your search, then assume case-sensitive.
