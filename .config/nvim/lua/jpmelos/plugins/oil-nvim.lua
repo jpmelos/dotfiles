@@ -1,7 +1,7 @@
 return {
     "stevearc/oil.nvim",
     dependencies = { "nvim-tree/nvim-web-devicons" },
-    keys = { "<leader>eo" },
+    keys = { { "<leader>eo", desc = "Open oil.nvim" } },
     config = function()
         local K = vim.keymap.set
 
@@ -16,6 +16,6 @@ return {
             float = { padding = 10 },
         })
 
-        K("n", "<leader>eo", oil.toggle_float, { desc = "Open oil" })
+        K("n", "<leader>eo", oil.toggle_float, { desc = "Open oil.nvim" })
     end,
 }

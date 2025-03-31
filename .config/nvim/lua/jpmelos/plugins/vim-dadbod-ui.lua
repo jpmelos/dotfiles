@@ -4,7 +4,7 @@ return {
         "tpope/vim-dadbod",
         "kristijanhusak/vim-dadbod-completion",
     },
-    keys = { "<leader>vo" },
+    keys = { { "<leader>vo", mode = "n", desc = "Toggle DBUI" } },
     init = function()
         local K = vim.keymap.set
 

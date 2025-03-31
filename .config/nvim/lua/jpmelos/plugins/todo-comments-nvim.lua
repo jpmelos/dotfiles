@@ -1,7 +1,10 @@
 return {
     "folke/todo-comments.nvim",
     dependencies = { "nvim-lua/plenary.nvim" },
-    keys = { "]c", "[c" },
+    keys = {
+        { "]c", mode = "n", desc = "Next todo comment" },
+        { "[c", mode = "n", desc = "Previous todo comment" },
+    },
     config = function()
         local K = vim.keymap.set
 

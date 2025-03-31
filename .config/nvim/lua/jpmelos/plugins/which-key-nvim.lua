@@ -1,5 +1,6 @@
 return {
     "folke/which-key.nvim",
+    priority = 999, -- Load right after the colorscheme.
     init = function()
         vim.o.timeout = true
         vim.o.timeoutlen = 500
@@ -12,6 +13,8 @@ return {
                 scroll_up = "<C-f>",
             },
             spec = {
+                { "gb", group = "Toggle comments, block-style" },
+                { "gc", group = "Toggle comments" },
                 { "gp", group = "LSP previews" },
                 { "<leader>b", group = "+ Current buffer" },
                 { "<leader>c", group = "+ Code actions" },

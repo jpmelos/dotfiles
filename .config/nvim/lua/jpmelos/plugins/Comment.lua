@@ -1,6 +1,14 @@
 return {
     "numToStr/Comment.nvim",
-    keys = { "gcc", "gbb", "gc", "gb", "gcO", "gco", "gcA" },
+    keys = {
+        { "gcc", mode = "n", desc = "Toggle line comment" },
+        { "gbb", mode = "n", desc = "Toggle line comment, block-style" },
+        { "gc", mode = "v", desc = "Toggle selection comment " },
+        { "gb", mode = "v", desc = "Toggle selection comment, block-style" },
+        { "gcO", mode = "n", desc = "Add comment at line above" },
+        { "gco", mode = "n", desc = "Add comment at line below" },
+        { "gcA", mode = "n", desc = "Add comment at end of line" },
+    },
     dependencies = {
         -- Identify correct comment syntax based on current context, with the
         -- help of tree-sitter. Supports nested languages, for example.

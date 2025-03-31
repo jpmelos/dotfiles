@@ -195,11 +195,11 @@ return {
         "MunifTanjim/nui.nvim",
     },
     keys = {
-        "<leader>dr",
-        "<leader>dR",
-        "<leader>db",
-        "<leader>dB",
-        "<leader>dpc",
+        { "<leader>dr", mode = "n", desc = "Run to cursor" },
+        { "<leader>dR", mode = "n", desc = "Run to cursor conditionally" },
+        { "<leader>db", mode = "n", desc = "Toggle breakpoint" },
+        { "<leader>dB", mode = "n", desc = "Toggle conditional breakpoint" },
+        { "<leader>dpc", mode = "n", desc = "debugpy: Toggle justMyCode" },
     },
     config = function()
         local K = vim.keymap.set

@@ -6,5 +6,10 @@
 return {
     "glts/vim-radical",
     dependencies = { "glts/vim-magnum" },
-    keys = { "crd", "crx", "cro", "crb" },
+    keys = {
+        { "crd", mode = "n", desc = "Base to decimal" },
+        { "crb", mode = "n", desc = "Base to binary" },
+        { "cro", mode = "n", desc = "Base to octal" },
+        { "crx", mode = "n", desc = "Base to hexadecimal" },
+    },
 }
