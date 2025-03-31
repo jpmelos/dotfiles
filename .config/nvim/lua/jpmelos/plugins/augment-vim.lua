@@ -79,7 +79,7 @@ return {
             "<leader>ac",
             "<cmd>Augment chat-toggle<CR>",
             mode = { "n", "v" },
-            desc = "Open AI chat window",
+            desc = "Toggle AI chat window",
         },
     },
     init = function()
