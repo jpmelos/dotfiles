@@ -35,6 +35,7 @@ return {
                 { "<leader>t", group = "+ Tabs" },
                 { "<leader>v", group = "+ Database" },
                 { "<leader>w", group = "+ Sessions" },
+                { "<leader>x", group = "+ Diff" },
             },
         })
     end,
