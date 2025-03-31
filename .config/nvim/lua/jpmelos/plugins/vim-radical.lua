@@ -1,15 +1,36 @@
 -- Converts numbers between bases.
--- `gA` shows the four representations of the number under the cursor (or
--- selected in Visual mode).
--- `crd`, `crx`, `cro`, `crb` converts the number under the cursor to decimal,
--- hex, octal, or binary, respectively.
 return {
     "glts/vim-radical",
     dependencies = { "glts/vim-magnum" },
     keys = {
-        { "crd", mode = "n", desc = "Base to decimal" },
-        { "crb", mode = "n", desc = "Base to binary" },
-        { "cro", mode = "n", desc = "Base to octal" },
-        { "crx", mode = "n", desc = "Base to hexadecimal" },
+        { "gA", "<Plug>RadicalView", mode = "n", desc = "Views in bases" },
+        {
+            "crd",
+            "<Plug>RadicalCoerceToDecimal",
+            mode = "n",
+            desc = "Base to decimal",
+        },
+        {
+            "crb",
+            "<Plug>RadicalCoerceToBinary",
+            mode = "n",
+            desc = "Base to binary",
+        },
+        {
+            "cro",
+            "<Plug>RadicalCoerceToOctal",
+            mode = "n",
+            desc = "Base to octal",
+        },
+        {
+            "crx",
+            "<Plug>RadicalCoerceToHex",
+            mode = "n",
+            desc = "Base to hexadecimal",
+        },
     },
+    init = function()
+        -- Disable default mappings.
+        vim.g.radical_no_mappings = true
+    end,
 }

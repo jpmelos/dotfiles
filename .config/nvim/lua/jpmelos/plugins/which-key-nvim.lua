@@ -13,6 +13,7 @@ return {
                 scroll_up = "<C-f>",
             },
             spec = {
+                { "cr", group = "Change base" },
                 { "gb", group = "Toggle comments, block-style" },
                 { "gc", group = "Toggle comments" },
                 { "gp", group = "LSP previews" },
