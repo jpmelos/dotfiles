@@ -1,51 +1,51 @@
--- Use a repository-local `.nvim.lua` file to overwrite this for specific
+-- Use a repository-local `.nvim.lua` file to configure formatters for specific
 -- projects. Something like:
---
 -- ```
--- local conform = require("conform")
--- conform.formatters_by_ft.python = { ... }
+-- vim.g.formatters_by_ft = { python = { ... } }
 -- ```
-local formatters_by_ft = {
-    -- BE coding.
-    sh = { "shfmt" },
-    python = {
-        "ruff_fix",
-        "ruff_organize_imports",
-        "ruff_format",
-    },
-    lua = { "stylua" },
-    -- This is an exception: it's not managed by Mason. Instead,
-    -- install the Rust toolchain locally.
-    rust = { "rustfmt" },
-    -- SQL formatters evaluated so far:
-    -- - sql_formatter: Formats ON clauses (in JOINs) wrong, and
-    --   aligns AND clauses weirdly.
-    -- sql = {},
-    -- Web technologies.
-    html = { "prettier" },
-    css = { "prettier" },
-    scss = { "prettier" },
-    javascript = { "prettier" },
-    typescript = { "prettier" },
-    -- Writing.
-    markdown = { "mdformat" },
-    -- Configuration.
-    yaml = { "prettier" },
-    toml = { "prettier" },
-    json = { "jq" },
-    -- Others.
-    graphql = { "prettier" },
-}
+if vim.g.formatters_by_ft == nil then
+    vim.g.formatters_by_ft = {
+        -- BE coding.
+        sh = { "shfmt" },
+        python = {
+            "ruff_fix",
+            "ruff_organize_imports",
+            "ruff_format",
+        },
+        lua = { "stylua" },
+        -- This is an exception: it's not managed by Mason. Instead,
+        -- install the Rust toolchain locally.
+        rust = { "rustfmt" },
+        -- SQL formatters evaluated so far:
+        -- - sql_formatter: Formats ON clauses (in JOINs) wrong, and
+        --   aligns AND clauses weirdly.
+        -- sql = {},
+        -- Web technologies.
+        html = { "prettier" },
+        css = { "prettier" },
+        scss = { "prettier" },
+        javascript = { "prettier" },
+        typescript = { "prettier" },
+        -- Writing.
+        markdown = { "mdformat" },
+        -- Configuration.
+        yaml = { "prettier" },
+        toml = { "prettier" },
+        json = { "jq" },
+        -- Others.
+        graphql = { "prettier" },
+    }
+end
 
 return {
     "stevearc/conform.nvim",
     cond = function()
-        if #vim.tbl_keys(formatters_by_ft) == 0 then
+        if #vim.tbl_keys(vim.g.formatters_by_ft) == 0 then
             return false
         end
         return true
     end,
-    ft = vim.tbl_keys(formatters_by_ft),
+    ft = vim.tbl_keys(vim.g.formatters_by_ft),
     config = function()
         local g = vim.g
         local b = vim.b
@@ -57,9 +57,9 @@ return {
 
         -- Tools used here should be managed by Mason. See
         -- `mason-tool-installer-nvim.lua`.
-        -- To configure this for a specific project, see `formatters_by_ft`
-        -- defined above.
-        conform.setup({ formatters_by_ft = formatters_by_ft })
+        -- To configure this for a specific project, see
+        -- `vim.g.formatters_by_ft` defined above.
+        conform.setup({ formatters_by_ft = vim.g.formatters_by_ft })
 
         -- Customize built-in formatters and add your own.
         conform.formatters.shfmt = {

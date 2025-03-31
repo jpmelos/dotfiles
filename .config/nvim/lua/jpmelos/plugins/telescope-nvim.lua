@@ -177,5 +177,10 @@ return {
             builtins.git_bcommits,
             { desc = "Find changes on this file" }
         )
+
+        vim.api.nvim_exec_autocmds(
+            "User",
+            { pattern = "JpmelosTelescopeLoaded" }
+        )
     end,
 }
