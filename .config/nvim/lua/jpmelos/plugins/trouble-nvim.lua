@@ -6,17 +6,17 @@ return {
     },
     keys = {
         {
-            "<leader>xs",
+            "<leader>qs",
             "<cmd>Trouble symbols toggle focus=false<cr>",
             desc = "Toggle symbols table",
         },
         {
-            "<leader>xx",
+            "<leader>qx",
             "<cmd>Trouble telescope toggle focus=true<cr>",
             desc = "Toggle telescope selected results",
         },
         {
-            "<leader>xt",
+            "<leader>qt",
             "<cmd>Trouble todo toggle focus=true<cr>",
             desc = "Toggle todos in trouble list",
         },

@@ -29,12 +29,12 @@ return {
                 { "<leader>m", group = "+ Markdown" },
                 { "<leader>o", group = "+ Obsidian" },
                 { "<leader>p", group = "+ Format" },
+                { "<leader>q", group = "+ Quickfix" },
                 { "<leader>r", group = "+ Requests" },
                 { "<leader>s", group = "+ Splits" },
                 { "<leader>t", group = "+ Tabs" },
                 { "<leader>v", group = "+ Database" },
                 { "<leader>w", group = "+ Sessions" },
-                { "<leader>x", group = "+ Quickfix" },
             },
         })
     end,
