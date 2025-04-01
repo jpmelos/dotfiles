@@ -85,6 +85,8 @@ return {
     init = function()
         local g = vim.g
         local api = vim.api
+        local opt_local = vim.opt_local
+
         local K = vim.keymap.set
 
         -- Disable Augment Code suggestions.
@@ -93,6 +95,13 @@ return {
         g.augment_suppress_version_warning = true
 
         g.augment_workspace_folders = { vim.fn.getcwd() }
+
+        api.nvim_create_autocmd("BufNew", {
+            pattern = "AugmentChatHistory",
+            callback = function()
+                opt_local.winfixwidth = true
+            end,
+        })
 
         -- <Enter> in normal mode saves and closes the buffer.
         api.nvim_create_autocmd("BufEnter", {
