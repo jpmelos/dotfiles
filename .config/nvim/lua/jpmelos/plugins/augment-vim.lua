@@ -53,7 +53,7 @@ local function open_augment_prompt_buffer(preserve_old_prompt)
 end
 
 return {
-    "augmentcode/augment.vim",
+    dir = vim.fn.expand("~/devel/augment.vim"),
     cond = function()
         return os.getenv("AUGMENT_CODE_AI_ENABLED") == "1"
     end,
