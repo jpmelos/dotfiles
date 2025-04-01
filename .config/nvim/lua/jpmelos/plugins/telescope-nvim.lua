@@ -4,7 +4,6 @@ return {
         "nvim-lua/plenary.nvim",
         "nvim-telescope/telescope-ui-select.nvim",
         "nvim-tree/nvim-web-devicons",
-        "folke/trouble.nvim",
         "folke/todo-comments.nvim",
         "nvim-tree/nvim-tree.lua",
         -- This is needed for performance improvements in how Telescope sorts
@@ -21,13 +20,7 @@ return {
         local actions = require("telescope.actions")
         local themes = require("telescope.themes")
 
-        local trouble_telescope = require("trouble.sources.telescope")
-
         local tree_api = require("nvim-tree.api")
-
-        local open_in_trouble_focus = function(telescope_bufnr)
-            trouble_telescope.open(telescope_bufnr, { focus = true })
-        end
 
         -- ripgrep arguments come from ~/.ripgreprc.
         telescope.setup({
@@ -62,7 +55,8 @@ return {
                     n = {
                         ["<C-k>"] = actions.move_selection_previous,
                         ["<C-j>"] = actions.move_selection_next,
-                        ["<C-q>"] = open_in_trouble_focus,
+                        ["<C-q>"] = actions.smart_send_to_qflist
+                            + actions.open_qflist,
                         ["<C-o>"] = actions.cycle_history_prev,
                         ["<C-p>"] = actions.cycle_history_next,
                         ["<C-d>"] = actions.preview_scrolling_down,
@@ -74,7 +68,8 @@ return {
                     i = {
                         ["<C-k>"] = actions.move_selection_previous,
                         ["<C-j>"] = actions.move_selection_next,
-                        ["<C-q>"] = open_in_trouble_focus,
+                        ["<C-q>"] = actions.smart_send_to_qflist
+                            + actions.open_qflist,
                         ["<C-o>"] = actions.cycle_history_prev,
                         ["<C-p>"] = actions.cycle_history_next,
                         ["<C-d>"] = actions.preview_scrolling_down,
