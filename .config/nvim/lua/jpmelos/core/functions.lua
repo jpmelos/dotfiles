@@ -1,20 +1,5 @@
 vim.g.git_branch = nil
 
-function PrintTable(o)
-    if type(o) == "table" then
-        local s = "{ "
-        for k, v in pairs(o) do
-            if type(k) ~= "number" then
-                k = '"' .. k .. '"'
-            end
-            s = s .. "[" .. k .. "] = " .. PrintTable(v) .. ","
-        end
-        return s .. "} "
-    else
-        return tostring(o)
-    end
-end
-
 function string.startswith(str, start)
     return str.sub(str, 1, str.len(start)) == start
 end
