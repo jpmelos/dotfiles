@@ -103,7 +103,8 @@ return {
             end,
         })
 
-        -- <Enter> in normal mode saves and closes the buffer.
+        -- <Enter> in normal mode saves and closes the buffer. In insert mode
+        -- and normal mode, <S-Enter> saves and closes the buffer.
         api.nvim_create_autocmd("BufEnter", {
             pattern = "augment-code-prompt.md",
             callback = function()
@@ -111,7 +112,7 @@ return {
                     vim.cmd("wq")
                 end, { buffer = true })
                 K({ "n", "i" }, "<S-Enter>", function()
-                    vim.cmd("wq | stopinsert")
+                    vim.cmd("stopinsert | wq")
                 end, { buffer = true })
             end,
         })
