@@ -29,6 +29,7 @@ return {
                 { "<leader>m", group = "+ Markdown" },
                 { "<leader>o", group = "+ Obsidian" },
                 { "<leader>p", group = "+ Format" },
+                { "<leader>q", group = "+ Quickfix" },
                 { "<leader>r", group = "+ Requests" },
                 { "<leader>s", group = "+ Splits" },
                 { "<leader>t", group = "+ Tabs" },
