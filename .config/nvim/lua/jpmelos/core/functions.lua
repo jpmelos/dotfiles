@@ -31,6 +31,44 @@ function Input(title, default_value, callback)
     input:mount()
 end
 
+function GetVisualSelection()
+    if
+        vim.fn.mode() == "v"
+        or vim.fn.mode() == "V"
+        or vim.fn.mode() == "\22"
+    then
+        return { vim.fn.mode(), vim.fn.getpos("v"), vim.fn.getpos(".") }
+    end
+    return nil
+end
+
+function RestoreVisualSelection(mode, start_pos, end_pos)
+    if mode ~= "v" and mode ~= "V" and mode ~= "\22" then
+        return
+    end
+
+    if mode == "\22" then
+        mode = "<C-v>"
+    end
+
+    vim.fn.setpos("'<", start_pos)
+    vim.fn.setpos("'>", end_pos)
+    vim.api.nvim_feedkeys(
+        vim.api.nvim_replace_termcodes("`<" .. mode .. "`>", true, false, true),
+        "nx",
+        false
+    )
+end
+
+function GetBufferContents(bufnr)
+    if bufnr == nil then
+        bufnr = 0
+    end
+
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    return table.concat(lines, "\n"):match("^%s*(.-)%s*$")
+end
+
 function string.startswith(str, start)
     return str.sub(str, 1, str.len(start)) == start
 end

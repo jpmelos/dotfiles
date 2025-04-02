@@ -10,33 +10,8 @@
 -- ```
 -- vim.g.augment_workspace_folders = { vim.fn.getcwd(), "/Users/..." }
 -- ```
-local function get_visual_selection()
-    if
-        vim.fn.mode() == "v"
-        or vim.fn.mode() == "V"
-        or vim.fn.mode() == "\22"
-    then
-        return { vim.fn.mode(), vim.fn.getpos("v"), vim.fn.getpos(".") }
-    end
-    return nil
-end
-
-local function restore_visual_selection(mode, start_pos, end_pos)
-    if mode == "\22" then
-        mode = "<C-v>"
-    end
-
-    vim.fn.setpos("'<", start_pos)
-    vim.fn.setpos("'>", end_pos)
-    vim.api.nvim_feedkeys(
-        vim.api.nvim_replace_termcodes("`<" .. mode .. "`>", true, false, true),
-        "nx",
-        false
-    )
-end
-
 local function open_augment_prompt_buffer(preserve_old_prompt)
-    local visual_selection = get_visual_selection()
+    local visual_selection = GetVisualSelection()
 
     local cmd = "vs /tmp/augment-code-prompt.md"
         .. " | setlocal bufhidden=delete nobuflisted"
@@ -111,6 +86,7 @@ return {
                 K("n", "<Enter>", function()
                     vim.cmd("wq")
                 end, { buffer = true })
+                -- TODO: Write function to enter normal mode.
                 K({ "n", "i" }, "<S-Enter>", function()
                     vim.cmd("stopinsert | wq")
                 end, { buffer = true })
@@ -127,30 +103,17 @@ return {
                     v_end_pos = vim.b.original_visual_selection_end_pos
                 end
 
-                -- Get contents of buffer.
-                local lines = api.nvim_buf_get_lines(0, 0, -1, false)
-                local text = table.concat(lines, "\n"):match("^%s*(.-)%s*$")
+                local text = GetBufferContents()
 
                 vim.schedule(function()
+                    if v_mode then
+                        RestoreVisualSelection(v_mode, v_start_pos, v_end_pos)
+                    end
+
                     -- If no prompt was provided, restore selection but don't
                     -- send anything to Augment.
                     if text == "" then
-                        if v_mode then
-                            restore_visual_selection(
-                                v_mode,
-                                v_start_pos,
-                                v_end_pos
-                            )
-                        end
                         return
-                    end
-
-                    if v_mode then
-                        restore_visual_selection(
-                            v_mode,
-                            v_start_pos,
-                            v_end_pos
-                        )
                     end
 
                     -- The function expects the number of lines included in a
