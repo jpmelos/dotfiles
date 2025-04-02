@@ -131,3 +131,6 @@ K("n", "<leader>qq", function()
         vim.cmd("copen")
     end
 end, { desc = "Toggle quickfix" })
+
+-- Disable the command history buffer.
+K("n", "q:", "<NOP>")
