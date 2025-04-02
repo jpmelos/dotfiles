@@ -11,7 +11,7 @@ return {
         {
             "<leader>xn",
             function()
-                require("jpmelos.core.ui").Input(
+                require("jpmelos.core.ui").make_input(
                     "Scratch File Name",
                     os.date("%Y-%m-%d-"),
                     function(filename)

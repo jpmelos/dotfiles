@@ -1,4 +1,4 @@
-function Input(title, default_value, callback)
+local function make_input(title, default_value, callback)
     local Input = require("nui.input")
     local event = require("nui.utils.autocmd").event
 
@@ -31,4 +31,4 @@ function Input(title, default_value, callback)
     input:mount()
 end
 
-return { Input = Input }
+return { make_input = make_input }
