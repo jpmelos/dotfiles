@@ -86,9 +86,12 @@ return {
                 K("n", "<Enter>", function()
                     vim.cmd("wq")
                 end, { buffer = true })
-                -- TODO: Write function to enter normal mode.
-                K({ "n", "i" }, "<S-Enter>", function()
-                    vim.cmd("stopinsert | wq")
+                K("n", "<S-Enter>", function()
+                    vim.cmd("wq")
+                end, { buffer = true })
+                K("i", "<S-Enter>", function()
+                    NormalMode()
+                    vim.cmd("wq")
                 end, { buffer = true })
             end,
         })

@@ -69,6 +69,11 @@ function GetBufferContents(bufnr)
     return table.concat(lines, "\n"):match("^%s*(.-)%s*$")
 end
 
+function NormalMode()
+    local esc = vim.api.nvim_replace_termcodes("<esc>", true, false, true)
+    vim.api.nvim_feedkeys(esc, "x", false)
+end
+
 function string.startswith(str, start)
     return str.sub(str, 1, str.len(start)) == start
 end
@@ -92,6 +97,7 @@ function RemoveEntriesFromQuickfix()
         vim.notify(
             "Operation only available in normal mode and visual line modes"
         )
+        NormalMode()
         return
     end
 
@@ -121,7 +127,7 @@ function RemoveEntriesFromQuickfix()
 
     if #qf_entries > 0 then
         if vim.fn.mode() == "V" then
-            vim.cmd("normal! V")
+            NormalMode()
         end
         vim.cmd(del_idx + 1 .. "")
     else
