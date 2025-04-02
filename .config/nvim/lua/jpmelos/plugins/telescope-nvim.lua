@@ -22,7 +22,9 @@ return {
 
         local tree_api = require("nvim-tree.api")
 
-        -- ripgrep arguments come from ~/.ripgreprc.
+        -- ripgrep arguments come from `$RIPGREP_CONFIG_PATH`. By default, it
+        -- is `~/.ripgreprc`, but it may be overridden for projects with
+        -- `.autoenv.enter`.
         telescope.setup({
             defaults = {
                 pickers = {
