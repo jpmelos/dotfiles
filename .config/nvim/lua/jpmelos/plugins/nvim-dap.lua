@@ -229,6 +229,21 @@ local function set_up_python_debugger(dap)
     dap.adapters.debugpy = get_host_port_and_debug
 end
 
+local function set_up_lua_debugger(dap)
+    dap.configurations.lua = {
+        {
+            type = "nlua",
+            request = "attach",
+            name = "Attach to running Neovim instance",
+        },
+    }
+    -- Make sure this host and port matches what's configured for
+    -- "jbyuki/one-small-step-for-vimkind".
+    dap.adapters.nlua = function(callback)
+        callback({ type = "server", host = "127.0.0.1", port = 8086 })
+    end
+end
+
 return {
     "mfussenegger/nvim-dap",
     dependencies = {
@@ -247,6 +262,7 @@ return {
 
         local dap = require("dap")
         set_up_python_debugger(dap)
+        set_up_lua_debugger(dap)
 
         vim.cmd("hi DapBreakpoint guifg=#ff0000")
 
