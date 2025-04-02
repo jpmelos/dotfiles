@@ -8,7 +8,7 @@ local function broadcast(sessions, fn)
 end
 
 local function ask_for_breakpoint_condition(on_submit_cb)
-    require("jpmelos.libs.ui").make_input("Breakpoint Condition", on_submit_cb)
+    Input("Breakpoint Condition", on_submit_cb)
 end
 
 local function toggle_breakpoint(ask_for_condition)
@@ -123,13 +123,9 @@ end
 local function get_host_port_and_debug(callback)
     local host_port_env = vim.g.remote_debug_debugpy_host_port
     if host_port_env == nil then
-        require("jpmelos.libs.ui").make_input(
-            "host:port",
-            "localhost:27027",
-            function(host_port)
-                debug_with_host_port(callback, host_port)
-            end
-        )
+        Input("host:port", "localhost:27027", function(host_port)
+            debug_with_host_port(callback, host_port)
+        end)
     else
         debug_with_host_port(callback, host_port_env)
     end
