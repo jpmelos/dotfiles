@@ -21,13 +21,10 @@ return {
         backends = { "treesitter", "markdown", "asciidoc", "man" },
 
         layout = {
-            max_width = { 40, 0.2 },
-            width = nil,
-            min_width = 10,
+            width = 40,
             default_direction = "left",
             placement = "edge",
-            resize_to_content = true,
-            preserve_equality = false,
+            preserve_equality = true,
         },
         show_guides = true,
 
@@ -41,7 +38,7 @@ return {
         highlight_closest = true,
         highlight_on_hover = true,
 
-        autojump = false,
+        autojump = true,
         highlight_on_jump = 300,
 
         ignore = {
