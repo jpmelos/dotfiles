@@ -23,7 +23,7 @@ return {
                 { "<leader>dp", group = "+ Python" },
                 { "<leader>e", group = "+ Explorer" },
                 { "<leader>f", group = "+ Finder" },
-                { "<leader>fc", group = "+ Finder under cursor" },
+                { "<leader>fc", group = "+ Find under cursor" },
                 { "<leader>g", group = "+ Git" },
                 { "<leader>l", group = "+ LSP/Lint" },
                 { "<leader>m", group = "+ Markdown" },
