@@ -1,7 +1,7 @@
+require("jpmelos.core.options")
 require("jpmelos.core.globals")
 require("jpmelos.core.functions")
 require("jpmelos.core.events")
-require("jpmelos.core.options")
 require("jpmelos.core.keymaps")
 
 -- Load local ./.nvim.lua file, if one exists.
