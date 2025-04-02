@@ -137,7 +137,7 @@ local function register_event_handlers()
         handle_terminated_event
 end
 
-local debug_with_host_port = function(callback, host_port)
+local function debug_with_host_port(callback, host_port)
     local host, port = host_port:match("(.-):(.*)")
     port = tonumber(port)
 
