@@ -20,7 +20,6 @@ return {
                 { "<leader>b", group = "+ Current buffer" },
                 { "<leader>c", group = "+ Code actions" },
                 { "<leader>d", group = "+ Debug" },
-                { "<leader>dp", group = "+ Python" },
                 { "<leader>e", group = "+ Explorer" },
                 { "<leader>f", group = "+ Finder" },
                 { "<leader>fc", group = "+ Find under cursor" },
