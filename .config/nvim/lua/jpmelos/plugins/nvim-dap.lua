@@ -8,36 +8,7 @@ local function broadcast(sessions, fn)
 end
 
 local function ask_for_breakpoint_condition(on_submit_cb)
-    local Input = require("nui.input")
-    local event = require("nui.utils.autocmd").event
-
-    local input = Input({
-        position = "50%",
-        size = { width = 80 },
-        border = {
-            style = "rounded",
-            text = {
-                top = " Breakpoint Condition ",
-                top_align = "center",
-            },
-        },
-        win_options = {
-            winhighlight = "Normal:Normal,FloatBorder:Normal",
-        },
-    }, {
-        prompt = "> ",
-        on_submit = on_submit_cb,
-    })
-
-    input:on(event.BufLeave, function()
-        input:unmount()
-    end)
-
-    input:map("n", "q", function()
-        input:unmount()
-    end, { noremap = true })
-
-    input:mount()
+    require("jpmelos.core.ui").Input("Breakpoint Condition", on_submit_cb)
 end
 
 local function toggle_breakpoint(ask_for_condition)
@@ -150,39 +121,15 @@ local function debug_with_host_port(callback, host_port)
 end
 
 local function get_host_port_and_debug(callback)
-    local Input = require("nui.input")
-    local event = require("nui.utils.autocmd").event
-
     local host_port_env = vim.g.remote_debug_debugpy_host_port
     if host_port_env == nil then
-        local input = Input({
-            position = "50%",
-            size = { width = 40 },
-            border = {
-                style = "rounded",
-                text = {
-                    top = " host:port ",
-                    top_align = "center",
-                },
-            },
-            win_options = {
-                winhighlight = "Normal:Normal,FloatBorder:Normal",
-            },
-        }, {
-            prompt = "> ",
-            default_value = "localhost:27027",
-            on_submit = function(host_port)
+        require("jpmelos.core.ui").Input(
+            "host:port",
+            "localhost:27027",
+            function(host_port)
                 debug_with_host_port(callback, host_port)
-            end,
-        })
-
-        input:on(event.BufLeave, function()
-            input:unmount()
-        end)
-        input:map("n", "q", function()
-            input:unmount()
-        end, { noremap = true })
-        input:mount()
+            end
+        )
     else
         debug_with_host_port(callback, host_port_env)
     end
