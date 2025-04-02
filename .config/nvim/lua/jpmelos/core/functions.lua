@@ -1,5 +1,3 @@
-vim.g.git_branch = nil
-
 function string.startswith(str, start)
     return str.sub(str, 1, str.len(start)) == start
 end

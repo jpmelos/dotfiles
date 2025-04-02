@@ -1,3 +1,4 @@
+require("jpmelos.core.globals")
 require("jpmelos.core.functions")
 require("jpmelos.core.events")
 require("jpmelos.core.options")
