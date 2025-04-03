@@ -16,10 +16,10 @@ vim.opt.rtp:prepend(lazypath)
 
 -- Configure lazy.
 require("lazy").setup("jpmelos.plugins", {
-    checker = {
-        enabled = false, -- Do not check for updates automatically.
-    },
-    change_detection = {
-        enabled = false, -- Do not auto-detect changes to configuration files.
-    },
+    -- Do not check for updates automatically.
+    checker = { enabled = false },
+    -- Do not auto-detect changes to configuration files.
+    change_detection = { enabled = false },
+    -- Do not install plugins with luarocks.
+    rocks = { enabled = false },
 })
