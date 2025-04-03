@@ -70,8 +70,18 @@ function GetBufferContents(bufnr)
 end
 
 function NormalMode()
-    local esc = vim.api.nvim_replace_termcodes("<esc>", true, false, true)
-    vim.api.nvim_feedkeys(esc, "x", false)
+    if vim.fn.mode() == "i" then
+        vim.cmd("stopinsert")
+        return
+    end
+    if vim.fn.mode() == "v" then
+        vim.cmd("normal! v")
+        return
+    end
+    if vim.fn.mode() == "V" or vim.fn.mode() == "\22" then
+        vim.cmd("normal! vv")
+        return
+    end
 end
 
 function string.startswith(str, start)
