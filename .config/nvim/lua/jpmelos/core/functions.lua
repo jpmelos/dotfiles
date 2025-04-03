@@ -66,7 +66,7 @@ function GetBufferContents(bufnr)
     end
 
     local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    return table.concat(lines, "\n"):match("^%s*(.-)%s*$")
+    return table.concat(lines, "\n"):trim()
 end
 
 function NormalMode()
@@ -84,22 +84,26 @@ function NormalMode()
     end
 end
 
-function string.startswith(str, start)
-    return str.sub(str, 1, str.len(start)) == start
-end
-
-function os.capture(cmd, raw)
-    local f = assert(io.popen(cmd, "r"))
-    local s = assert(f:read("*a"))
-    f:close()
-
-    if raw then
-        return s
+function RunForOutput(cmd, raw)
+    local output = vim.system({ "bash", "-c", cmd }, { text = true }):wait()
+    if output.code ~= 0 then
+        return nil,
+            "Command failed with: " .. (output.stderr or "unknown error")
     end
 
-    s = string.gsub(s, "^%s+", "")
-    s = string.gsub(s, "%s+$", "")
-    return s
+    local stdout = output.stdout
+    local stderr = output.stderr
+    if not stdout or stdout == "" then
+        if stderr and stderr ~= "" then
+            return nil, stderr
+        end
+        return nil, "No output"
+    end
+
+    if raw then
+        return stdout, nil
+    end
+    return stdout:trim(), nil
 end
 
 function RemoveEntriesFromQuickfix()
@@ -146,20 +150,16 @@ function RemoveEntriesFromQuickfix()
 end
 
 function UpdateGitBranch()
-    local dot_git_path = vim.fn.getcwd() .. "/.git"
-    local in_git_root = vim.fn.isdirectory(dot_git_path) == 1
-
-    if not in_git_root then
-        vim.g.git_branch = "not in git root"
+    local git_branch, _ = RunForOutput("git branch | grep '^* '")
+    if git_branch == nil then
+        vim.g.git_branch = "(error)"
     else
-        local git_branch = os.capture("git branch | grep '^* '")
-        if git_branch:find("no branch, rebasing") then
+        if git_branch:match("no branch, rebasing") then
             vim.g.git_branch = "(rebasing)"
         else
             vim.g.git_branch = git_branch:sub(3)
         end
     end
-
     vim.cmd("redrawtabline")
 end
 

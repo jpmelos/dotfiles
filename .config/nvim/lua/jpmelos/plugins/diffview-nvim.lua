@@ -6,7 +6,11 @@ return {
         {
             "<leader>xm",
             function()
-                local main_branch = os.capture("git main-branch")
+                local main_branch, err = RunForOutput("git main-branch")
+                if main_branch == nil then
+                    vim.notify("Error getting git main branch: " .. err)
+                    return
+                end
                 return ":DiffviewOpen " .. main_branch .. "...HEAD<CR>"
             end,
             mode = "n",
