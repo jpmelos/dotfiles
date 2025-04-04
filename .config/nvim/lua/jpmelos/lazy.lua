@@ -1,18 +1,14 @@
--- Set directory that will hold lazy-related stuff.
-local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
 -- Install lazy.
-if not vim.fn.isdirectory(lazypath) then
+if not vim.fn.isdirectory(vim.g.lazypath) then
     vim.fn.system({
         "git",
         "clone",
         "--filter=blob:none",
         "https://github.com/folke/lazy.nvim",
         "--branch=stable",
-        lazypath,
+        vim.g.lazypath,
     })
 end
--- Add lazy's path to Vim's `PATH`.
-vim.opt.rtp:prepend(lazypath)
 
 -- Configure lazy.
 require("lazy").setup("jpmelos.plugins", {

@@ -5,6 +5,12 @@ require("jpmelos.core.functions")
 require("jpmelos.core.events")
 require("jpmelos.core.keymaps")
 
+-- Add lazy's path to Vim's `PATH`. This will allow things like
+-- `require("jpmelos.plugins.conform-nvim")` to be used from `.nvim.lua`
+-- project files.
+vim.g.lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
+vim.opt.rtp:prepend(vim.g.lazypath)
+
 -- Load local ./.nvim.lua file, if one exists.
 local exrc_path = vim.fn.getcwd() .. "/.nvim.lua"
 if vim.secure.read(exrc_path) then
