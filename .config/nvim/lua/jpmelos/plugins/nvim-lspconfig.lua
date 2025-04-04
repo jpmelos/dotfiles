@@ -1,6 +1,5 @@
 local fix_pyright_hover_doc = function(value)
-    value = string.gsub(value, "\\_", "_")
-    return value
+    return value:gsub("\\_", "_")
 end
 
 return {
@@ -10,6 +9,7 @@ return {
         "williamboman/mason-lspconfig.nvim",
         "hrsh7th/cmp-nvim-lsp",
     },
+    -- Keep this and the language servers in sync.
     ft = { "bash", "python", "lua", "rust", "sql" },
     config = function()
         local K = vim.keymap.set
@@ -29,6 +29,7 @@ return {
         mason_lspconfig.setup({
             -- These are `nvim-lspconfig` names, which will be translated to
             -- Mason package names by `mason-lspconfig.nvim`.
+            -- Keep this and `ft` in sync.
             ensure_installed = {
                 -- bash
                 "bashls",
