@@ -206,28 +206,6 @@ return {
             })
         end, { range = true })
 
-        api.nvim_create_user_command("FormatDisable", function(args)
-            if args.bang then
-                -- FormatDisable! will disable formatting just for this buffer.
-                b.enable_autoformat = false
-            else
-                g.enable_autoformat = false
-            end
-        end, {
-            desc = "Disable autoformat on save",
-            bang = true,
-        })
-        api.nvim_create_user_command("FormatEnable", function(args)
-            if args.bang then
-                -- FormatEnable! will enable formatting just for this buffer.
-                b.enable_autoformat = true
-            else
-                g.enable_autoformat = true
-            end
-        end, {
-            desc = "Enable autoformat on save",
-            bang = true,
-        })
         api.nvim_create_user_command("FormatToggle", function(args)
             if args.bang then
                 if b.enable_autoformat then
@@ -248,6 +226,28 @@ return {
             end
         end, {
             desc = "Toggle autoformat on save",
+            bang = true,
+        })
+        api.nvim_create_user_command("FormatEnable", function(args)
+            if args.bang then
+                -- FormatEnable! will enable formatting just for this buffer.
+                b.enable_autoformat = true
+            else
+                g.enable_autoformat = true
+            end
+        end, {
+            desc = "Enable autoformat on save",
+            bang = true,
+        })
+        api.nvim_create_user_command("FormatDisable", function(args)
+            if args.bang then
+                -- FormatDisable! will disable formatting just for this buffer.
+                b.enable_autoformat = false
+            else
+                g.enable_autoformat = false
+            end
+        end, {
+            desc = "Disable autoformat on save",
             bang = true,
         })
 
