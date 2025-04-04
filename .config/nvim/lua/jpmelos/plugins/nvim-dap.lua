@@ -135,7 +135,7 @@ local function set_up_python_debugger(dap)
     local g = vim.g
 
     if g.remote_debug_debugpy_just_my_code == nil then
-        g.remote_debug_debugpy_just_my_code = "true"
+        g.remote_debug_debugpy_just_my_code = true
     end
     if g.remote_debug_debugpy_path_mappings == nil then
         g.remote_debug_debugpy_path_mappings = ""
@@ -151,7 +151,10 @@ local function set_up_python_debugger(dap)
             name = "Debug Python by attaching to debugpy",
             -- Things below are passed as arguments to debugpy.
             justMyCode = function()
-                return g.remote_debug_debugpy_just_my_code
+                if g.remote_debug_debugpy_just_my_code then
+                    return "true"
+                end
+                return "false"
             end,
             pathMappings = function()
                 local path_mappings = g.remote_debug_debugpy_path_mappings
@@ -209,6 +212,7 @@ return {
 
         vim.cmd("hi DapBreakpoint guifg=#ff0000")
 
+        -- TODO: These are causing `vim.deprecated` warnings.
         vim.fn.sign_define(
             "DapStopped",
             { text = "→", texthl = "DapBreakpoint" }
@@ -242,6 +246,7 @@ return {
         end, { desc = "Run to cursor conditionally" })
         K("n", "<leader>dx", dap.disconnect, { desc = "End current session" })
 
+        -- TODO: Find out why these sometimes don't work.
         K("n", "<leader>db", toggle_breakpoint, { desc = "Toggle breakpoint" })
         K("n", "<leader>dB", function()
             toggle_breakpoint(true)
@@ -260,11 +265,8 @@ return {
         K("n", "<leader>dJ", dap.down, { desc = "Go down in the stacktrace" })
 
         K("n", "<leader>dp", function()
-            if vim.g.remote_debug_debugpy_just_my_code == "true" then
-                vim.g.remote_debug_debugpy_just_my_code = "false"
-            else
-                vim.g.remote_debug_debugpy_just_my_code = "true"
-            end
+            vim.g.remote_debug_debugpy_just_my_code =
+                not vim.g.remote_debug_debugpy_just_my_code
         end, { desc = "debugpy: Toggle justMyCode" })
     end,
 }
