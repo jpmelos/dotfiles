@@ -1,3 +1,15 @@
+-- To enable formatting globally:
+-- ```
+-- vim.g.enable_autoformat = true
+-- ```
+-- To enable formatting for some filetypes only:
+-- ```
+-- vim.g.enable_autoformat = { "python", "lua" }
+-- ```
+-- To disable formatting for some filetypes only:
+-- ```
+-- vim.g.disable_autoformat = { "sql" }
+-- ```
 -- Use a repository-local `.nvim.lua` file to configure formatters for specific
 -- projects. Something like:
 -- ```
@@ -83,9 +95,12 @@ return {
 
         -- ButWritePost: After saving a buffer.
         -- Note: Autoformat is disabled by default, since `g.enable_autoformat`
-        -- starts out as `nil`, which resolves to `false` in boolean contexts.
-        -- Use a repository-local `.nvim.lua` file to enable it for specific
-        -- projects.
+        -- and `b.enable_autoformat` start out as `nil`, which resolves to
+        -- `false` in boolean contexts. Use a repository-local `.nvim.lua` file
+        -- to enable autoformatting for specific projects, and the commands
+        -- `FormatToggle[!]`, `FormatEnable[!]`, and `FormatDisable[!]` to
+        -- enable and disable autoformatting globally or for a specific buffer
+        -- (with a bang).
         api.nvim_create_autocmd("BufWritePost", {
             callback = function()
                 -- Do not autoformat if we're saving because Neovim lost focus.
@@ -96,7 +111,7 @@ return {
                 -- Give preference to any buffer-local settings. Since
                 -- `b.enable_autoformat` starts out as `nil`, which resolves to
                 -- `false` in boolean contexts, this means buffer-local
-                -- autosaving is disabled by default.
+                -- autoformatting is disabled by default.
                 if b.enable_autoformat ~= nil then
                     if b.enable_autoformat then
                         -- Save, and then run the formatter. This may leave the
@@ -110,15 +125,46 @@ return {
                     return
                 end
 
-                if g.enable_autoformat then
+                if g.disable_autoformat then
+                    if type(g.disable_autoformat) == "string" then
+                        g.disable_autoformat = { g.disable_autoformat }
+                    end
+
+                    -- If the filetype of the current buffer is in
+                    -- `g.disable_autoformat`, then do not format it.
+                    if type(g.disable_autoformat) == "table" then
+                        for _, ft in ipairs(g.disable_autoformat) do
+                            if ft == vim.bo.filetype then
+                                return
+                            end
+                        end
+                    end
+                end
+
+                if g.enable_autoformat == true then
                     -- Save, and then run the formatter. This may leave the
                     -- buffer in an unsaved state again if the formatter
                     -- changes the file.
                     require("conform").format({ async = true })
                 end
 
+                if type(g.enable_autoformat) == "string" then
+                    g.enable_autoformat = { g.enable_autoformat }
+                end
+
+                if type(g.enable_autoformat) == "table" then
+                    -- If the filetype of the current buffer is in
+                    -- `g.enable_autoformat`, then format it.
+                    for _, ft in ipairs(g.enable_autoformat) do
+                        if ft == vim.bo.filetype then
+                            require("conform").format({ async = true })
+                            break
+                        end
+                    end
+                end
+
                 -- At this point, `g.enable_autoformat` is either `nil` or
-                -- `false`, and either way, we don't want to autoformat the
+                -- `false`, and either way we don't want to autoformat the
                 -- buffer: we only want to autoformat if it is explicitly
                 -- enabled.
             end,
@@ -203,19 +249,19 @@ return {
             { "n" },
             "<leader>pt",
             "<cmd>FormatToggle<CR>",
-            { desc = "Toggle auto-format on save" }
+            { desc = "Toggle autoformat on save" }
         )
         K(
             { "n" },
             "<leader>pd",
             "<cmd>FormatDisable<CR>",
-            { desc = "Disable auto-format on save" }
+            { desc = "Disable autoformat on save" }
         )
         K(
             { "n" },
             "<leader>pe",
             "<cmd>FormatEnable<CR>",
-            { desc = "Enable auto-format on save" }
+            { desc = "Enable autoformat on save" }
         )
     end,
     get_default_formatters_by_ft = get_default_formatters_by_ft,
