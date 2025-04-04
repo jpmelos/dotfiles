@@ -115,8 +115,7 @@ return {
             { desc = "Find in current directory" }
         )
         K("n", "<leader>fp", function()
-            local ft = api.nvim_get_option_value("filetype", {})
-            if ft ~= "NvimTree" then
+            if vim.bo.filetype ~= "NvimTree" then
                 vim.notify("This command only works in NvimTree.")
                 return
             end
