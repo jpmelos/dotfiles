@@ -10,6 +10,9 @@
 -- ```
 -- vim.g.disable_autoformat = { "sql" }
 -- ```
+-- `vim.g.enable_autoformat` and `vim.g.disable_autoformat` will also accept
+-- glob patterns.
+--
 -- Use a repository-local `.nvim.lua` file to configure formatters for specific
 -- projects. Something like:
 -- ```
@@ -125,16 +128,22 @@ return {
                     return
                 end
 
+                -- Filename as a relative path to `vim.fn.getcwd`.
+                local filename = vim.fn.fnamemodify(vim.fn.bufname(), ":.")
+
                 if g.disable_autoformat then
                     if type(g.disable_autoformat) == "string" then
                         g.disable_autoformat = { g.disable_autoformat }
                     end
 
-                    -- If the filetype of the current buffer is in
+                    -- If the filetype or filename of the current buffer is in
                     -- `g.disable_autoformat`, then do not format it.
                     if type(g.disable_autoformat) == "table" then
-                        for _, ft in ipairs(g.disable_autoformat) do
-                            if ft == vim.bo.filetype then
+                        for _, pattern in ipairs(g.disable_autoformat) do
+                            if
+                                filename:matchglob(pattern) ~= ""
+                                or vim.bo.filetype == pattern
+                            then
                                 return
                             end
                         end
@@ -153,10 +162,13 @@ return {
                 end
 
                 if type(g.enable_autoformat) == "table" then
-                    -- If the filetype of the current buffer is in
+                    -- If the filetype or filename of the current buffer is in
                     -- `g.enable_autoformat`, then format it.
-                    for _, ft in ipairs(g.enable_autoformat) do
-                        if ft == vim.bo.filetype then
+                    for _, pattern in ipairs(g.enable_autoformat) do
+                        if
+                            filename:matchglob(pattern) ~= ""
+                            or vim.bo.filetype == pattern
+                        then
                             require("conform").format({ async = true })
                             break
                         end

@@ -23,3 +23,7 @@ end
 function string.join(delimiter, seq)
     return table.concat(seq, delimiter)
 end
+
+function string.matchglob(str, glob)
+    return vim.fn.matchstr(str, vim.fn.glob2regpat(glob))
+end
