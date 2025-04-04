@@ -3,8 +3,17 @@
 -- ```
 -- vim.g.linters_by_ft = { python = { ... } }
 -- ```
+-- If all you need is to override some values from the default configuration:
+-- ```
+-- vim.g.linters_by_ft =
+--     require("jpmelos.plugins.conform-nvim").get_default_linters_by_ft()
+-- vim.g.linters_by_ft.python = { ... }
+-- ```
+local function get_default_linters_by_ft()
+    return {}
+end
 if vim.g.linters_by_ft == nil then
-    vim.g.linters_by_ft = {}
+    vim.g.linters_by_ft = get_default_linters_by_ft()
 end
 
 return {
@@ -33,4 +42,5 @@ return {
             lint.try_lint()
         end, { desc = "Lint current file" })
     end,
+    get_default_linters_by_ft = get_default_linters_by_ft,
 }

@@ -3,8 +3,14 @@
 -- ```
 -- vim.g.formatters_by_ft = { python = { ... } }
 -- ```
-if vim.g.formatters_by_ft == nil then
-    vim.g.formatters_by_ft = {
+-- If all you need is to override some values from the default configuration:
+-- ```
+-- vim.g.formatters_by_ft =
+--     require("jpmelos.plugins.conform-nvim").get_default_formatters_by_ft()
+-- vim.g.formatters_by_ft.python = { ... }
+-- ```
+local function get_default_formatters_by_ft()
+    return {
         -- BE coding.
         sh = { "shfmt" },
         python = {
@@ -35,6 +41,9 @@ if vim.g.formatters_by_ft == nil then
         -- Others.
         graphql = { "prettier" },
     }
+end
+if vim.g.formatters_by_ft == nil then
+    vim.g.formatters_by_ft = get_default_formatters_by_ft()
 end
 
 return {
@@ -209,4 +218,5 @@ return {
             { desc = "Enable auto-format on save" }
         )
     end,
+    get_default_formatters_by_ft = get_default_formatters_by_ft,
 }
