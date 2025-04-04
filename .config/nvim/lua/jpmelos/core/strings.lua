@@ -25,5 +25,10 @@ function string.join(delimiter, seq)
 end
 
 function string.matchglob(str, glob)
-    return vim.fn.matchstr(str, vim.fn.glob2regpat(glob))
+    for _, pattern in ipairs(GenerateVimGlobs(glob)) do
+        if vim.fn.matchstr(str, vim.fn.glob2regpat(pattern)) ~= "" then
+            return true
+        end
+    end
+    return false
 end

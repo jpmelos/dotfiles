@@ -141,7 +141,7 @@ return {
                     if type(g.disable_autoformat) == "table" then
                         for _, pattern in ipairs(g.disable_autoformat) do
                             if
-                                filename:matchglob(pattern) ~= ""
+                                filename:matchglob(pattern)
                                 or vim.bo.filetype == pattern
                             then
                                 return
@@ -166,7 +166,7 @@ return {
                     -- `g.enable_autoformat`, then format it.
                     for _, pattern in ipairs(g.enable_autoformat) do
                         if
-                            filename:matchglob(pattern) ~= ""
+                            filename:matchglob(pattern)
                             or vim.bo.filetype == pattern
                         then
                             require("conform").format({ async = true })
