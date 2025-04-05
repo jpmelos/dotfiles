@@ -8,7 +8,7 @@ local function broadcast(sessions, fn)
 end
 
 local function ask_for_breakpoint_condition(on_submit_cb)
-    Input("Breakpoint Condition", on_submit_cb)
+    Input("Breakpoint Condition", "", on_submit_cb)
 end
 
 local function toggle_breakpoint(ask_for_condition)
