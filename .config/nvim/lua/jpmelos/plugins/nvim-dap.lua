@@ -196,13 +196,6 @@ return {
         -- We use this in our custom setup for this plugin.
         "MunifTanjim/nui.nvim",
     },
-    keys = {
-        { "<leader>dr", mode = "n", desc = "Run to cursor" },
-        { "<leader>dR", mode = "n", desc = "Run to cursor conditionally" },
-        { "<leader>db", mode = "n", desc = "Toggle breakpoint" },
-        { "<leader>dB", mode = "n", desc = "Toggle conditional breakpoint" },
-        { "<leader>dp", mode = "n", desc = "debugpy: Toggle justMyCode" },
-    },
     config = function()
         local K = vim.keymap.set
 
@@ -246,7 +239,6 @@ return {
         end, { desc = "Run to cursor conditionally" })
         K("n", "<leader>dx", dap.disconnect, { desc = "End current session" })
 
-        -- TODO: Find out why these sometimes don't work.
         K("n", "<leader>db", toggle_breakpoint, { desc = "Toggle breakpoint" })
         K("n", "<leader>dB", function()
             toggle_breakpoint(true)
