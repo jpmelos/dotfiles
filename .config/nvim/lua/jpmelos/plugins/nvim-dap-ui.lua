@@ -1,9 +1,7 @@
 return {
     "rcarriga/nvim-dap-ui",
+    lazy = true,
     dependencies = { "mfussenegger/nvim-dap", "nvim-neotest/nvim-nio" },
-    keys = function(_, opts)
-        return require("lazy.core.config").spec.plugins["nvim-dap"].keys
-    end,
     config = function()
         local dap = require("dap")
         local dapui = require("dapui")

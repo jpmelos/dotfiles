@@ -196,8 +196,16 @@ return {
         -- We use this in our custom setup for this plugin.
         "MunifTanjim/nui.nvim",
     },
+    keys = {
+        { "<leader>dr", mode = "n", desc = "Run to cursor" },
+        { "<leader>dR", mode = "n", desc = "Run to cursor conditionally" },
+        { "<leader>db", mode = "n", desc = "Toggle breakpoint" },
+        { "<leader>dB", mode = "n", desc = "Toggle conditional breakpoint" },
+        { "<leader>dp", mode = "n", desc = "debugpy: Toggle justMyCode" },
+    },
     config = function()
         local K = vim.keymap.set
+        local lazy = require("lazy")
 
         local dap = require("dap")
         set_up_python_debugger(dap)
@@ -259,5 +267,14 @@ return {
             vim.g.remote_debug_debugpy_just_my_code =
                 not vim.g.remote_debug_debugpy_just_my_code
         end, { desc = "debugpy: Toggle justMyCode" })
+
+        -- Load plugins that depend on this.
+        lazy.load({
+            plugins = {
+                "nvim-dap-repl-highlights",
+                "nvim-dap-ui",
+                "nvim-dap-virtual-text",
+            },
+        })
     end,
 }
