@@ -205,7 +205,6 @@ return {
 
         vim.cmd("hi DapBreakpoint guifg=#ff0000")
 
-        -- TODO: These are causing `vim.deprecated` warnings.
         vim.fn.sign_define(
             "DapStopped",
             { text = "→", texthl = "DapBreakpoint" }
