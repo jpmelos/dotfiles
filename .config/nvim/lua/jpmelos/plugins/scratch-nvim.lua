@@ -30,7 +30,7 @@ return {
     },
     opts = {
         scratch_file_dir = vim.fn.getcwd() .. "/jpenv-scratch",
-        window_cmd = "vsplit",
+        window_cmd = "edit",
         use_telescope = true,
         file_picker = "telescope",
     },
