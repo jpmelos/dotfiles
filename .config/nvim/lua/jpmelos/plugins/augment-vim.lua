@@ -1,6 +1,6 @@
 -- This plugin is enabled only if the environment variable
 -- `AUGMENT_CODE_AI_ENABLED` is set at the time Neovim starts. We don't want to
--- unexpectedly share proprietary code with them.
+-- unexpectedly share proprietary code with AI models.
 --
 -- The workspace is set to the current working directory by default. To
 -- configure a different workspace (for example, because you want to add code
@@ -69,7 +69,9 @@ return {
         g.augment_disable_completions = true
         g.augment_suppress_version_warning = true
 
-        g.augment_workspace_folders = { vim.fn.getcwd() }
+        if g.augment_workspace_folders == nil then
+            g.augment_workspace_folders = { vim.fn.getcwd() }
+        end
 
         api.nvim_create_autocmd("BufNew", {
             pattern = "AugmentChatHistory",
