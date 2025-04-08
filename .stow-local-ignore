@@ -1,3 +1,5 @@
+^/.autoenv.enter
+^/.autoenv.leave
 ^/.git
 ^/.gitignore
 ^/.nvim.lua
