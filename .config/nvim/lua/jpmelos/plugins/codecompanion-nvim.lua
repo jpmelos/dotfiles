@@ -12,24 +12,28 @@ return {
             desc = "Open AI chat",
         },
     },
-    opts = {
-        display = {
-            chat = {
-                auto_scroll = false,
-                start_in_insert_mode = true,
+    config = function()
+        require("codecompanion").setup({
+            display = {
+                chat = {
+                    auto_scroll = false,
+                    start_in_insert_mode = true,
+                },
             },
-        },
-        strategies = {
-            chat = {
-                keymaps = {
-                    send = {
-                        modes = { n = "<S-Enter>", i = "<S-Enter>" },
-                    },
-                    close = {
-                        modes = { n = "q" },
+            strategies = {
+                chat = {
+                    keymaps = {
+                        send = {
+                            modes = { n = "<S-Enter>", i = "<S-Enter>" },
+                        },
+                        close = {
+                            modes = { n = "q" },
+                        },
                     },
                 },
             },
-        },
-    },
+        })
+
+        require("lazy").load({ plugins = { "copilot.vim" } })
+    end,
 }
