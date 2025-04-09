@@ -1,8 +1,11 @@
 return {
     "olimorris/codecompanion.nvim",
+    enabled = false,
     dependencies = {
         "nvim-lua/plenary.nvim",
         "nvim-treesitter/nvim-treesitter",
+        "github/copilot.vim",
+        "Davidyz/VectorCode",
     },
     keys = {
         {
@@ -30,10 +33,16 @@ return {
                             modes = { n = "q" },
                         },
                     },
+                    tools = {
+                        vectorcode = {
+                            description = "Run VectorCode to retrieve the project context.",
+                            callback = require("vectorcode.integrations").codecompanion.chat.make_tool({
+                                auto_submit = { ls = true, query = true },
+                            }),
+                        },
+                    },
                 },
             },
         })
-
-        require("lazy").load({ plugins = { "copilot.vim" } })
     end,
 }
