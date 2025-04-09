@@ -17,6 +17,7 @@ return {
                 { "gb", group = "Toggle comments, block-style" },
                 { "gc", group = "Toggle comments" },
                 { "gp", group = "LSP previews" },
+                { "<leader>a", group = "+ AI" },
                 { "<leader>b", group = "+ Current buffer" },
                 { "<leader>c", group = "+ Code actions" },
                 { "<leader>d", group = "+ Debug" },
