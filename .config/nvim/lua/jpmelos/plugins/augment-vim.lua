@@ -1,6 +1,6 @@
--- This plugin is enabled only if the environment variable
--- `AUGMENT_CODE_AI_ENABLED` is set at the time Neovim starts. We don't want to
--- unexpectedly share proprietary code with AI models.
+-- This plugin is enabled only if `vim.g.enable_augment_code == true`. at the
+-- time Neovim starts. We don't want to unexpectedly share proprietary code
+-- with AI models. Use a project-local `.nvim.lua` file to set that variable.
 --
 -- The workspace is set to the current working directory by default. To
 -- configure a different workspace (for example, because you want to add code
@@ -30,7 +30,7 @@ end
 return {
     dir = vim.fn.expand("~/devel/augment.vim"),
     cond = function()
-        return os.getenv("AUGMENT_CODE_AI_ENABLED") == "1"
+        return vim.g.enable_augment_code == true
     end,
     cmd = { "Augment" },
     keys = {

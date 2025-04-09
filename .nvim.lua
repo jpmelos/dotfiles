@@ -12,4 +12,4 @@ api.nvim_create_autocmd("FileType", {
     end,
 })
 
-g.augment_workspace_folders = { vim.fn.getcwd() }
+g.enable_augment_code = true

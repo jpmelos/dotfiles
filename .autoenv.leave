@@ -5,10 +5,3 @@ if [ -z "$AUTOENV_DOTFILES" ]; then
 fi
 
 unset AUTOENV_DOTFILES
-
-if [ -n "$AUGMENT_CODE_AI_ENABLED" ]; then
-    unset AUGMENT_CODE_AI_ENABLED
-fi
-if [ -n "$GH_COPILOT_ENABLED" ]; then
-    unset GH_COPILOT_ENABLED
-fi
