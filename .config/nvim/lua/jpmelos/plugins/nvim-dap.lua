@@ -138,7 +138,7 @@ local function set_up_python_debugger(dap)
         g.remote_debug_debugpy_just_my_code = true
     end
     if g.remote_debug_debugpy_path_mappings == nil then
-        g.remote_debug_debugpy_path_mappings = ""
+        g.remote_debug_debugpy_path_mappings = {}
     end
     if g.remote_debug_debugpy_host_port == nil then
         g.remote_debug_debugpy_host_port = ""
@@ -150,26 +150,12 @@ local function set_up_python_debugger(dap)
             request = "attach",
             name = "Debug Python by attaching to debugpy",
             -- Things below are passed as arguments to debugpy.
+            -- `justMyCode` is a function because it can be changed during
+            -- runtime via a keybinding.
             justMyCode = function()
-                if g.remote_debug_debugpy_just_my_code then
-                    return "true"
-                end
-                return "false"
+                return tostring(g.remote_debug_debugpy_just_my_code)
             end,
-            pathMappings = function()
-                local path_mappings = g.remote_debug_debugpy_path_mappings
-                local dap_mappings = {}
-
-                for mapping in path_mappings:gmatch("([^;]+)") do
-                    local localRoot, remoteRoot = mapping:match("(.+)=(.+)")
-                    table.insert(dap_mappings, {
-                        localRoot = localRoot,
-                        remoteRoot = remoteRoot,
-                    })
-                end
-
-                return dap_mappings
-            end,
+            pathMappings = vim.g.remote_debug_debugpy_path_mappings,
         },
     }
     dap.adapters.debugpy = get_host_port_and_debug
