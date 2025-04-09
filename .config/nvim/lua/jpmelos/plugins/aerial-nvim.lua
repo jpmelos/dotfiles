@@ -38,7 +38,7 @@ return {
         highlight_closest = true,
         highlight_on_hover = true,
 
-        autojump = true,
+        autojump = false,
         highlight_on_jump = 300,
 
         ignore = {
