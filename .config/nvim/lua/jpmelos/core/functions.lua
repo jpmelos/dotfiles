@@ -37,7 +37,11 @@ function GetVisualSelection()
         or vim.fn.mode() == "V"
         or vim.fn.mode() == "\22"
     then
-        return { vim.fn.mode(), vim.fn.getpos("v"), vim.fn.getpos(".") }
+        return {
+            mode = vim.fn.mode(),
+            start_pos = vim.fn.getpos("v"),
+            end_pos = vim.fn.getpos("."),
+        }
     end
     return nil
 end

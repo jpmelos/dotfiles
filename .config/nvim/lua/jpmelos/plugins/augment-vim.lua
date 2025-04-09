@@ -10,21 +10,76 @@
 -- ```
 -- vim.g.augment_workspace_folders = { vim.fn.getcwd(), "/Users/..." }
 -- ```
-local function open_augment_prompt_buffer(preserve_old_prompt)
-    local visual_selection = GetVisualSelection()
+local CHAT_HISTORY_BUFFER_NAME = "AugmentChatHistory"
+local CHAT_PROMPT_BUFFER_NAME = "/tmp/augment-code-prompt.md"
 
-    local cmd = "vs /tmp/augment-code-prompt.md"
-        .. " | setlocal bufhidden=delete nobuflisted"
-    if not preserve_old_prompt then
-        cmd = cmd .. " | %delete _ | startinsert"
+local function open_augment_prompt_buffer(preserve_old_prompt)
+    local current_buf_state = {
+        winnr = vim.api.nvim_get_current_win(),
+        visual_selection = GetVisualSelection(),
+    }
+
+    -- Find the Augment chat window in the current tab.
+    local chat_winnr = nil
+    for _, winnr in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+        local bufnr = vim.api.nvim_win_get_buf(winnr)
+        local buf_name = vim.api.nvim_buf_get_name(bufnr)
+        if buf_name:find(CHAT_HISTORY_BUFFER_NAME) then
+            chat_winnr = winnr
+            break
+        end
     end
+
+    local base_cmd
+    if chat_winnr then
+        vim.api.nvim_set_current_win(chat_winnr)
+        base_cmd = "split"
+    else
+        base_cmd = "vsplit"
+    end
+    local cmd_parts = {
+        base_cmd .. CHAT_PROMPT_BUFFER_NAME,
+        "setlocal bufhidden=delete nobuflisted",
+    }
+    if not preserve_old_prompt then
+        table.insert(cmd_parts, "%delete _")
+        table.insert(cmd_parts, "startinsert")
+    end
+    local cmd = table.concat(cmd_parts, " | ")
     vim.cmd(cmd)
 
-    if visual_selection then
-        vim.b.original_visual_selection_mode = visual_selection[1]
-        vim.b.original_visual_selection_start_pos = visual_selection[2]
-        vim.b.original_visual_selection_end_pos = visual_selection[3]
-    end
+    vim.api.nvim_create_autocmd("BufWinLeave", {
+        pattern = CHAT_PROMPT_BUFFER_NAME,
+        callback = function()
+            local text = GetBufferContents()
+
+            vim.schedule(function()
+                vim.api.nvim_set_current_win(current_buf_state.winnr)
+
+                if current_buf_state.visual_selection then
+                    RestoreVisualSelection(
+                        current_buf_state.visual_selection.mode,
+                        current_buf_state.visual_selection.start_pos,
+                        current_buf_state.visual_selection.end_pos
+                    )
+                end
+
+                -- If no prompt was provided, restore selection but don't
+                -- send anything to Augment.
+                if text ~= "" then
+                    -- The function expects the number of lines included in a
+                    -- selected range. However, the function will still check
+                    -- the current mode and, if it's visual, will get the
+                    -- selected text anyway. So we can pass any numeric value
+                    -- here and rely on the mode check.
+                    -- https://github.com/augmentcode/augment.vim/blob/97418c9dfc1918fa9bdd23863ea3d2e49130727f/autoload/augment.vim#L249-L278
+                    -- https://github.com/augmentcode/augment.vim/blob/97418c9dfc1918fa9bdd23863ea3d2e49130727f/autoload/augment.vim#L166-L226
+                    vim.fn["augment#Command"](1, "chat " .. text)
+                end
+            end)
+        end,
+        once = true,
+    })
 end
 
 return {
@@ -74,7 +129,7 @@ return {
         end
 
         api.nvim_create_autocmd("BufNew", {
-            pattern = "AugmentChatHistory",
+            pattern = CHAT_HISTORY_BUFFER_NAME,
             callback = function()
                 opt_local.winfixwidth = true
             end,
@@ -83,7 +138,7 @@ return {
         -- <Enter> in normal mode saves and closes the buffer. In insert mode
         -- and normal mode, <S-Enter> saves and closes the buffer.
         api.nvim_create_autocmd("BufEnter", {
-            pattern = "augment-code-prompt.md",
+            pattern = CHAT_PROMPT_BUFFER_NAME,
             callback = function()
                 K("n", "<Enter>", function()
                     vim.cmd("wq")
@@ -95,41 +150,6 @@ return {
                     NormalMode()
                     vim.cmd("wq")
                 end, { buffer = true })
-            end,
-        })
-        api.nvim_create_autocmd("BufWinLeave", {
-            pattern = "augment-code-prompt.md",
-            callback = function()
-                -- Recover visual selection positions if they were stored.
-                local v_mode, v_start_pos, v_end_pos
-                if vim.b.original_visual_selection_mode then
-                    v_mode = vim.b.original_visual_selection_mode
-                    v_start_pos = vim.b.original_visual_selection_start_pos
-                    v_end_pos = vim.b.original_visual_selection_end_pos
-                end
-
-                local text = GetBufferContents()
-
-                vim.schedule(function()
-                    if v_mode then
-                        RestoreVisualSelection(v_mode, v_start_pos, v_end_pos)
-                    end
-
-                    -- If no prompt was provided, restore selection but don't
-                    -- send anything to Augment.
-                    if text == "" then
-                        return
-                    end
-
-                    -- The function expects the number of lines included in a
-                    -- selected range. However, the function will still check
-                    -- the current mode and, if it's visual, will get the
-                    -- selected text anyway. So we can pass any numeric value
-                    -- here and rely on the mode check.
-                    -- https://github.com/augmentcode/augment.vim/blob/97418c9dfc1918fa9bdd23863ea3d2e49130727f/autoload/augment.vim#L249-L278
-                    -- https://github.com/augmentcode/augment.vim/blob/97418c9dfc1918fa9bdd23863ea3d2e49130727f/autoload/augment.vim#L166-L226
-                    vim.fn["augment#Command"](1, "chat " .. text)
-                end)
             end,
         })
     end,
