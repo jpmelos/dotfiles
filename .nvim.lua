@@ -8,7 +8,7 @@ g.enable_autoformat = true
 api.nvim_create_autocmd("FileType", {
     pattern = "lua",
     callback = function()
-        ol.colorcolumn = "80"
+        ol.colorcolumn = { 80 }
     end,
 })
 
