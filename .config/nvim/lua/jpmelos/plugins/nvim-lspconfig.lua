@@ -198,12 +198,11 @@ return {
             "<cmd>Telescope lsp_workspace_symbols<CR>",
             { desc = "Show LSP symbols in workspace" }
         )
-        K(
-            "n",
-            "K",
-            vim.lsp.buf.hover,
-            { desc = "Show documentation for what is under cursor" }
-        )
+        K("n", "K", function()
+            vim.lsp.buf.hover({
+                border = "rounded",
+            })
+        end, { desc = "Show documentation for what is under cursor" })
 
         K(
             { "n", "v" },
