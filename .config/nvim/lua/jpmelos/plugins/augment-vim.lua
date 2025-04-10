@@ -143,14 +143,6 @@ return {
             g.augment_workspace_folders = { vim.fn.getcwd() }
         end
 
-        api.nvim_create_autocmd("BufNew", {
-            pattern = CHAT_HISTORY_BUFFER_NAME,
-            callback = function()
-                opt_local.scrolloff = 1000
-                opt_local.winfixwidth = true
-            end,
-        })
-
         -- <Enter> in normal mode saves and closes the buffer. In insert mode
         -- and normal mode, <S-Enter> saves and closes the buffer.
         api.nvim_create_autocmd("BufEnter", {
