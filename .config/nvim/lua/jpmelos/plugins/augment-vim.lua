@@ -75,6 +75,18 @@ local function open_augment_prompt_buffer(preserve_old_prompt)
                     -- https://github.com/augmentcode/augment.vim/blob/97418c9dfc1918fa9bdd23863ea3d2e49130727f/autoload/augment.vim#L249-L278
                     -- https://github.com/augmentcode/augment.vim/blob/97418c9dfc1918fa9bdd23863ea3d2e49130727f/autoload/augment.vim#L166-L226
                     vim.fn["augment#Command"](1, "chat " .. text)
+
+                    -- When opening a new chat window, visual selection is
+                    -- lost. We need to restore it to have a consistent
+                    -- behavior with the case when the chat window is already
+                    -- open.
+                    if chat_winnr == nil then
+                        RestoreVisualSelection(
+                            current_buf_state.visual_selection.mode,
+                            current_buf_state.visual_selection.start_pos,
+                            current_buf_state.visual_selection.end_pos
+                        )
+                    end
                 end
             end)
         end,
