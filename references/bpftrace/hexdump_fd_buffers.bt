@@ -1,0 +1,64 @@
+/*
+ * hexdump_fd_buffers.bt
+ *
+ * Usage:
+ *   sudo bpftrace -v TARGET_PID=<pid> hexdump_fd_buffers.bt > output.log
+ *
+ * This script taps into the standard file descriptors of the target
+ * process. For `write` calls on stdout and stderr, it copies the raw
+ * data from user memory and prints each byte as a two-digit hexadecimal
+ * value.
+ *
+ * For `read` calls on stdin, it saves the buffer pointer on entry and
+ * then on exit it prints the raw bytes read.
+ */
+
+BEGIN {
+  printf("Tracing stdin, stdout, and stderr for process %d...\n", TARGET_PID);
+}
+
+tracepoint:syscalls:sys_enter_write
+/ pid == TARGET_PID && (args->fd == 1 || args->fd == 2) /
+{
+    $data = copyin(args->buf, args->count);
+
+    printf("PID %d: write(fd=%d, len=%d):\n", pid, args->fd, args->count);
+
+    printf("Data (hex):\n");
+    $i = 0;
+    while ($i < args->count) {
+        printf("%02x ", $data[$i]);
+        $i++;
+    }
+    printf("\n");
+    printf("\n");
+}
+
+tracepoint:syscalls:sys_enter_read
+/ pid == TARGET_PID && args->fd == 0 /
+{
+    @rd_buf[tid] = args->buf;
+}
+
+tracepoint:syscalls:sys_exit_read
+/ pid == TARGET_PID /
+{
+    if (args->ret == 0) {
+        delete(@rd_buf[tid]);
+        return;
+    }
+
+    $data = copyin(@rd_buf[tid], args->ret);
+    delete(@rd_buf[tid]);
+
+    printf("PID %d: read(fd=0, len=%d):\n", pid, args->ret);
+
+    printf("Data (hex): ");
+    $i = 0;
+    while ($i < args->ret) {
+        printf("%02x ", $data[$i]);
+        $i++;
+    }
+    printf("\n")
+    printf("\n")
+}

@@ -1,0 +1,49 @@
+/*
+ * dump_fd_buffers.bt
+ *
+ * Usage:
+ *   sudo bpftrace -v TARGET_PID=<pid> dump_fd_buffers.bt > output.log
+ *
+ * This script taps into the standard file descriptors of the target
+ * process. For `write` calls on stdout and stderr, it copies the string
+ * from user memory and prints it to stdout.
+ *
+ * For `read` calls on stdin, it saves the buffer pointer on entry and
+ * then on exit it copies and prints the string read.
+ */
+
+BEGIN {
+  printf("Tracing stdin, stdout, and stderr for process %d...\n", TARGET_PID);
+}
+
+tracepoint:syscalls:sys_enter_write
+/ pid == TARGET_PID && (args->fd == 1 || args->fd == 2) /
+{
+    $data = copyin(args->buf, args->count);
+
+    printf("PID %d: write(fd=%d, len=%d):\n", pid, args->fd, args->count);
+    printf("%s\n", str($data));
+    printf("\n");
+}
+
+tracepoint:syscalls:sys_enter_read
+/ pid == TARGET_PID && args->fd == 0 /
+{
+    @rd_buf[tid] = args->buf;
+}
+
+tracepoint:syscalls:sys_exit_read
+/ pid == TARGET_PID /
+{
+    if (args->ret == 0) {
+        delete(@rd_buf[tid]);
+        return;
+    }
+
+    $data = copyin(@rd_buf[tid], args->ret);
+    delete(@rd_buf[tid]);
+
+    printf("PID %d: read(fd=0, len=%d):\n", pid, args->ret);
+    printf("%s\n", str($data));
+    printf("\n");
+}
