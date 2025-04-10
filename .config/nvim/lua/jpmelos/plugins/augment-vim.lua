@@ -143,6 +143,7 @@ return {
         api.nvim_create_autocmd("BufNew", {
             pattern = CHAT_HISTORY_BUFFER_NAME,
             callback = function()
+                opt_local.scrolloff = 1000
                 opt_local.winfixwidth = true
             end,
         })
