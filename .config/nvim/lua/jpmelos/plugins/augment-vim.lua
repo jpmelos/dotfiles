@@ -80,7 +80,10 @@ local function open_augment_prompt_buffer(preserve_old_prompt)
                     -- lost. We need to restore it to have a consistent
                     -- behavior with the case when the chat window is already
                     -- open.
-                    if chat_winnr == nil then
+                    if
+                        chat_winnr == nil
+                        and current_buf_state.visual_selection
+                    then
                         RestoreVisualSelection(
                             current_buf_state.visual_selection.mode,
                             current_buf_state.visual_selection.start_pos,
