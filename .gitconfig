@@ -102,7 +102,7 @@
     d = diff
     dst = diff --name-status
     dca = diff --cached
-    dm = diff master...HEAD
+    dm = ! git diff $(git main-branch)...HEAD  # m = master or main
 
     # o = checkout
     o = checkout
