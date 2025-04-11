@@ -13,7 +13,7 @@
 local CHAT_HISTORY_BUFFER_NAME = "AugmentChatHistory"
 local CHAT_PROMPT_BUFFER_NAME = "/tmp/augment-code-prompt.md"
 
-local function open_augment_prompt_buffer(preserve_old_prompt)
+local function open_augment_prompt_buffer(preserve_old_prompt, new_chat)
     local current_buf_state = {
         winnr = vim.api.nvim_get_current_win(),
         visual_selection = GetVisualSelection(),
@@ -74,6 +74,9 @@ local function open_augment_prompt_buffer(preserve_old_prompt)
                     -- here and rely on the mode check.
                     -- https://github.com/augmentcode/augment.vim/blob/97418c9dfc1918fa9bdd23863ea3d2e49130727f/autoload/augment.vim#L249-L278
                     -- https://github.com/augmentcode/augment.vim/blob/97418c9dfc1918fa9bdd23863ea3d2e49130727f/autoload/augment.vim#L166-L226
+                    if new_chat then
+                        vim.fn["augment#Command"](1, "chat-new")
+                    end
                     vim.fn["augment#Command"](1, "chat " .. text)
 
                     -- When opening a new chat window, visual selection is
@@ -105,9 +108,17 @@ return {
     cmd = { "Augment" },
     keys = {
         {
+            "<leader>an",
+            function()
+                open_augment_prompt_buffer(false, true)
+            end,
+            mode = { "n", "v" },
+            desc = "AI chat, new prompt",
+        },
+        {
             "<leader>aa",
             function()
-                open_augment_prompt_buffer(false)
+                open_augment_prompt_buffer(false, false)
             end,
             mode = { "n", "v" },
             desc = "AI chat, new prompt",
@@ -115,7 +126,7 @@ return {
         {
             "<leader>as",
             function()
-                open_augment_prompt_buffer(true)
+                open_augment_prompt_buffer(true, false)
             end,
             mode = { "n", "v" },
             desc = "AI chat, edit prompt",
