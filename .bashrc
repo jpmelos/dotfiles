@@ -207,9 +207,13 @@ __git_complete gcp git_cherry_pick
 alias gr='g r'
 alias gri='g ri'
 alias grim='g rim'
+alias grc='g rc'
+alias gra='g ra'
 __git_complete gr git_rebase
 __git_complete gri git_rebase
 __git_complete grim git_rebase
+__git_complete grc git_rebase
+__git_complete gra git_rebase
 
 alias gp='g p'
 alias gpf='g pf'

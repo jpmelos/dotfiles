@@ -134,6 +134,8 @@
     r = rebase
     ri = rebase -i
     rim = ! git rebase -i $(git main-branch)  # m = master or main
+    rc = rebase --continue
+    ra = rebase --abort
 
     # p = push (except pu for pull)
     p = push
