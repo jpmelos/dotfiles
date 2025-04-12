@@ -21,6 +21,8 @@ return {
                 -- Rust
                 -- rustfmt: Deprecated to install via Mason. Use Rust default
                 -- tools.
+                -- clippy: Deprecated to install via Mason. Use Rust default
+                -- tools.
                 -- SQL
                 -- Still deciding what to use here.
                 -- CSS, SCSS, JS, TS, YAML, GraphQL.
