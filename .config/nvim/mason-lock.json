@@ -9,5 +9,6 @@
   "shellcheck": "v0.10.0",
   "shfmt": "v3.11.0",
   "sqlls": "1.7.1",
-  "stylua": "v2.0.2"
+  "stylua": "v2.0.2",
+  "taplo": "0.9.3"
 }

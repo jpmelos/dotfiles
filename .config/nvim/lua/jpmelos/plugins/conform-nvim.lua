@@ -51,7 +51,7 @@ local function get_default_formatters_by_ft()
         markdown = { "mdformat" },
         -- Configuration.
         yaml = { "prettier" },
-        toml = { "prettier" },
+        toml = { "taplo" },
         json = { "jq" },
         -- Others.
         graphql = { "prettier" },

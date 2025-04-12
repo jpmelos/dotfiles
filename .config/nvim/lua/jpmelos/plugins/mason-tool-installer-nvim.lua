@@ -27,6 +27,8 @@ return {
                 "prettier",
                 -- JSON.
                 "jq",
+                -- TOML
+                "taplo",
                 -- Markdown.
                 -- Install mdformat manually like below:
                 -- pipx install mdformat
