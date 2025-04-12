@@ -10,7 +10,7 @@ return {
         "hrsh7th/cmp-nvim-lsp",
     },
     -- Keep this and the language servers in sync.
-    ft = { "bash", "python", "lua", "rust", "sql", "toml" },
+    ft = { "bash", "python", "lua", "rust", "sql", "toml", "yaml" },
     config = function()
         local K = vim.keymap.set
 
@@ -43,6 +43,8 @@ return {
                 "sqlls",
                 -- TOML
                 "taplo",
+                -- YAML
+                "yamlls",
             },
         })
 
@@ -138,6 +140,12 @@ return {
             end,
             taplo = function()
                 lspconfig.taplo.setup({
+                    on_attach = lsp_on_attach,
+                    capabilities = capabilities,
+                })
+            end,
+            yamlls = function()
+                lspconfig.yamlls.setup({
                     on_attach = lsp_on_attach,
                     capabilities = capabilities,
                 })
