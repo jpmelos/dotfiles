@@ -61,7 +61,6 @@ return {
                         local top_y = math.floor((screen_h - window_h) / 2)
 
                         return {
-                            border = "rounded",
                             relative = "editor",
 
                             col = top_x,

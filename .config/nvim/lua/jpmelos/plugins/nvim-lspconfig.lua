@@ -165,16 +165,6 @@ return {
                     fix_pyright_hover_doc(result.contents.value)
             end
 
-            if config == nil then
-                config = { border = "rounded" }
-            else
-                config = vim.tbl_deep_extend(
-                    "force",
-                    config,
-                    { border = "rounded" }
-                )
-            end
-
             return vim.lsp.handlers.hover(_, result, ctx, config)
         end
 
@@ -214,11 +204,12 @@ return {
             "<cmd>Telescope lsp_workspace_symbols<CR>",
             { desc = "Show LSP symbols in workspace" }
         )
-        K("n", "K", function()
-            vim.lsp.buf.hover({
-                border = "rounded",
-            })
-        end, { desc = "Show documentation for what is under cursor" })
+        K(
+            "n",
+            "K",
+            vim.lsp.buf.hover,
+            { desc = "Show documentation for what is under cursor" }
+        )
 
         K(
             { "n", "v" },
@@ -229,9 +220,12 @@ return {
         K("n", "<leader>cr", vim.lsp.buf.rename, { desc = "Smart rename" })
 
         K("n", "<leader>lr", "<cmd>LspRestart<CR>", { desc = "Restart LSPs" })
-        K("n", "<leader>ld", function()
-            vim.diagnostic.open_float({ border = "rounded" })
-        end, { desc = "Show line diagnostic" })
+        K(
+            "n",
+            "<leader>ld",
+            vim.diagnostic.open_float,
+            { desc = "Show line diagnostic" }
+        )
         K(
             "n",
             "[d",

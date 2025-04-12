@@ -137,3 +137,6 @@ opt.sessionoptions = "blank,buffers,curdir,folds,help,tabpages,winsize"
 
 -- Make jumps behave like browser navigation.
 opt.jumpoptions = "stack"
+
+-- Set default window border everywhere.
+opt.winborder = "rounded"
