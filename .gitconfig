@@ -73,7 +73,7 @@
     whitespace = black red dim bold
 
 [alias]
-    main-branch = ! git symbolic-ref refs/remotes/origin/HEAD | cut -d'/' -f4
+    main-branch = ! ~/.check-for-git-remote-head.sh && git symbolic-ref refs/remotes/origin/HEAD | cut -d'/' -f4
     root = rev-parse --show-toplevel
     nuke = "! f() { source "$HOME/.gitfunctions"; __git_nuke; }; f"
     big-revert = "! f() { source "$HOME/.gitfunctions"; __git_big_revert; }; f"
