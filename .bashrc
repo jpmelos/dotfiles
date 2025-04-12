@@ -19,7 +19,7 @@ shopt -s histverify no_empty_cmd_completion
 run_autoenv_on_init() {
     if [ -z "$AUTOENV_RAN_ON_INIT" ]; then
         cd /
-        cd - >/dev/null
+        cd - > /dev/null
         AUTOENV_RAN_ON_INIT=1
     fi
 }
@@ -64,7 +64,7 @@ eval "$(pyenv init -)"
 #                              #
 ################################
 
-if type brew &>/dev/null; then
+if type brew &> /dev/null; then
     HOMEBREW_PREFIX="$(brew --prefix)"
 
     for COMPLETION in "${HOMEBREW_PREFIX}/etc/bash_completion.d/"*; do
@@ -277,18 +277,18 @@ fi
 extract() {
     if [ -f "$1" ]; then
         case "$1" in
-        *.tar.bz2) tar xjf "$1" ;;
-        *.tar.gz) tar xzf "$1" ;;
-        *.bz2) bunzip2 "$1" ;;
-        *.rar) rar x "$1" ;;
-        *.gz) gunzip "$1" ;;
-        *.tar) tar xf "$1" ;;
-        *.tbz2) tar xjf "$1" ;;
-        *.tgz) tar xzf "$1" ;;
-        *.zip) unzip "$1" ;;
-        *.Z) uncompress "$1" ;;
-        *.7z) 7z x "$1" ;;
-        *) echo "'$1' cannot be extracted via extract()" ;;
+            *.tar.bz2) tar xjf "$1" ;;
+            *.tar.gz) tar xzf "$1" ;;
+            *.bz2) bunzip2 "$1" ;;
+            *.rar) rar x "$1" ;;
+            *.gz) gunzip "$1" ;;
+            *.tar) tar xf "$1" ;;
+            *.tbz2) tar xjf "$1" ;;
+            *.tgz) tar xzf "$1" ;;
+            *.zip) unzip "$1" ;;
+            *.Z) uncompress "$1" ;;
+            *.7z) 7z x "$1" ;;
+            *) echo "'$1' cannot be extracted via extract()" ;;
         esac
     else
         echo "'$1' is not a valid file"
@@ -298,7 +298,7 @@ extract() {
 # Determine actual size of a file in disk (considers entire blocks) or total
 # size of a directory.
 function fs() {
-    if du -b /dev/null >/dev/null 2>&1; then
+    if du -b /dev/null > /dev/null 2>&1; then
         local arg=-sbh
     else
         local arg=-sh
@@ -321,7 +321,7 @@ function server() {
 
 # Compare original and gzipped file size.
 function gz() {
-    local origsize=$(wc -c <"$1")
+    local origsize=$(wc -c < "$1")
     local gzipsize=$(gzip -c "$1" | wc -c)
     local ratio=$(echo "$gzipsize * 100 / $origsize" | bc -l)
     printf "orig: %d bytes\n" "$origsize"
@@ -350,5 +350,5 @@ function o() {
 }
 
 function is_in_path() {
-    builtin type -P "$1" &>/dev/null
+    builtin type -P "$1" &> /dev/null
 }
