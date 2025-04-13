@@ -121,6 +121,11 @@ alias d='docker'
 alias dc='docker compose'
 alias docker-nuke-all-the-things='yes | docker system prune --volumes --all'
 
+# Adjust `act` according to the environment.
+if [ "$JPMELOS_IS_MACOS" = "true" ]; then
+    alias act="act --container-architecture linux/amd64"
+fi
+
 #####################################
 #                                   #
 #    git aliases and completions    #
