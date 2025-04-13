@@ -12,7 +12,9 @@
 -- ```
 -- `vim.g.enable_autoformat` and `vim.g.disable_autoformat` will also accept
 -- glob patterns.
---
+-- ```
+-- vim.g.disable_autoformat = { "Cargo.lock" }
+-- ```
 -- Use a repository-local `.nvim.lua` file to configure formatters for specific
 -- projects. Something like:
 -- ```
