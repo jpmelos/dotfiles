@@ -119,7 +119,7 @@ alias tree='tree -I ''.git'''
 # Docker aliases.
 alias d='docker'
 alias dc='docker compose'
-alias docker-nuke-all-the-things='yes | docker system prune --volumes --all'
+alias docker-nuke-all-the-things='docker rm -f $(docker ps -aq) && yes | docker system prune --volumes --all'
 
 # Adjust `act` according to the environment.
 if [ "$JPMELOS_IS_MACOS" = "true" ]; then
