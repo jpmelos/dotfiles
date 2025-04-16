@@ -30,6 +30,24 @@ return {
 
         local lint = require("lint")
 
+        lint.linters.clippy.args = {
+            "clippy",
+            "--message-format=json",
+            "--all-targets",
+            "--all-features",
+            "--",
+            "-D",
+            "warnings",
+            "-D",
+            "clippy::all",
+            "-D",
+            "clippy::pedantic",
+            "-D",
+            "clippy::nursery",
+            "-D",
+            "clippy::cargo",
+        }
+
         lint.linters_by_ft = vim.g.linters_by_ft
 
         vim.api.nvim_create_autocmd({ "BufWritePost", "InsertLeave" }, {
