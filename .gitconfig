@@ -133,7 +133,7 @@
     # r = rebase
     r = rebase
     ri = rebase -i
-    rim = ! git rebase -i $(git main-branch)  # m = master or main
+    rim = ! git rebase -i origin/$(git main-branch)  # m = master or main
     rc = rebase --continue
     ra = rebase --abort
 
