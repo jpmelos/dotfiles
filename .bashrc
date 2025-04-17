@@ -126,9 +126,6 @@ if [ "$JPMELOS_IS_MACOS" = "true" ]; then
     alias act="act --container-architecture linux/amd64"
 fi
 
-# Rust.
-alias clippy='cargo clippy --all-targets --all-features -- -D warnings -D clippy::all -D clippy::pedantic -D clippy::nursery -D clippy::cargo'
-
 #####################################
 #                                   #
 #    git aliases and completions    #
