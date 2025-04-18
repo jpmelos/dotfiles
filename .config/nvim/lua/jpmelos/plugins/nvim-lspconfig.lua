@@ -81,13 +81,9 @@ return {
                         python = {
                             analysis = {
                                 autoImportCompletions = true,
-                                -- Don't change this to `openFilesOnly`,
-                                -- otherwise global auto-import hints won't
-                                -- work.
-                                diagnosticMode = "workspace",
+                                diagnosticMode = "openFilesOnly",
                                 typeCheckingMode = "off",
                                 useLibraryCodeForTypes = false,
-                                -- Do not mess with my path.
                                 autoSearchPaths = false,
                             },
                         },
