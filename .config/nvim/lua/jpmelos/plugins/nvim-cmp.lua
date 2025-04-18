@@ -29,18 +29,17 @@ return {
                 documentation = cmp.config.window.bordered(),
             },
             mapping = cmp.mapping.preset.insert({
-                -- Previous suggestion.
-                ["<S-Tab>"] = cmp.mapping.select_prev_item(),
+                -- Trigger the suggestions modal.
+                ["<C-Space>"] = cmp.mapping.complete(),
                 -- Next suggestion.
                 ["<Tab>"] = cmp.mapping.select_next_item(),
+                -- Previous suggestion.
+                ["<S-Tab>"] = cmp.mapping.select_prev_item(),
                 -- Scroll documentation pane up.
                 ["<C-f>"] = cmp.mapping.scroll_docs(-4),
                 -- Scroll documentation pane down.
-                ["<C-d>"] = cmp.mapping.scroll_docs(4),
-                -- Trigger the suggestions modal.
-                ["<C-Space>"] = cmp.mapping.complete(),
+                ["<C-b>"] = cmp.mapping.scroll_docs(4),
                 -- Close suggestions modal.
-                ["<C-e>"] = cmp.mapping.abort(),
                 ["<C-c>"] = cmp.mapping.abort(),
                 -- Insert suggestion.
                 ["<CR>"] = cmp.mapping.confirm({ select = false }),
