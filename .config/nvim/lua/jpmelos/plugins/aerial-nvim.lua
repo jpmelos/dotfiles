@@ -15,13 +15,13 @@ return {
     },
     opts = {
         open_automatic = true,
-        attach_mode = "global",
         close_on_select = false,
+        attach_mode = "global",
 
         backends = { "treesitter", "markdown", "asciidoc", "man" },
 
         layout = {
-            width = 40,
+            width = 20,
             default_direction = "left",
             placement = "edge",
             preserve_equality = true,
