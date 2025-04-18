@@ -102,11 +102,11 @@
     d = diff
     dst = diff --name-status
     dca = diff --cached
-    dm = ! git diff $(git main-branch)...HEAD  # m = master or main
+    dm = ! git diff $(git main-branch)...HEAD
 
     # o = checkout
     o = checkout
-    om = ! git checkout $(git main-branch)  # m = master or main
+    om = ! git checkout $(git main-branch)
     of = checkout -f
 
     # a = add
@@ -132,8 +132,9 @@
 
     # r = rebase
     r = rebase
+    rbm = ! git rebase origin/$(git main-branch)  # `rm` is taking by the "git delete" logic
     ri = rebase -i
-    rim = ! git rebase -i origin/$(git main-branch)  # m = master or main
+    rim = ! git rebase -i origin/$(git main-branch)
     rc = rebase --continue
     ra = rebase --abort
 
