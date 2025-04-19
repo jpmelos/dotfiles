@@ -1,3 +1,19 @@
+-- For things to work properly with project context, make sure ChromaDB is
+-- running with:
+-- ```
+-- docker run -d -v $HOME/chroma-data:/data -p 8000:8000 --name chroma \
+--     chromadb/chroma:0.6.3
+-- ```
+-- There is a bash function for this named `vecdb`.
+--
+-- Make sure the version of VectorCode always matches the version installed
+-- with pipx.
+--
+-- Make sure to always vectorise the project with:
+-- ```
+-- vectorcode init; vectorcode vectorise --include-hidden -r .
+-- ```
+-- This is alised as `vec`.
 return {
     "olimorris/codecompanion.nvim",
     dependencies = {

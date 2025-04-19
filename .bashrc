@@ -351,3 +351,24 @@ function o() {
 function is_in_path() {
     builtin type -P "$1" &> /dev/null
 }
+
+function vec() {
+    if docker ps -a --format '{{.Names}}' | grep -q '^chroma$'; then
+        if ! docker ps --format '{{.Names}}' | grep -q '^chroma$'; then
+            echo "Container 'chroma' exists but is not running. Starting it..."
+            docker start chroma
+        else
+            echo "Container 'chroma' is already running."
+        fi
+    else
+        echo "Container 'chroma' does not exist. Creating and starting it..."
+        docker run -d \
+            -v "$HOME/chroma-data:/data" \
+            -p 8000:8000 \
+            --name chroma \
+            chromadb/chroma:0.6.3
+    fi
+
+    vectorcode init
+    vectorcode vectorise --include-hidden -r .
+}
