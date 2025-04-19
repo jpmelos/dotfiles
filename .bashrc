@@ -236,14 +236,6 @@ __git_complete gpu git_pull
 #                 #
 ###################
 
-gnh() { # git no hooks
-    echo "Disabling git hooks..."
-    mv "$(git root)/.git/hooks" "$(git root)/.git/hooks_dead"
-    eval $*
-    mv "$(git root)/.git/hooks_dead" "$(git root)/.git/hooks"
-    echo "Re-enabled git hooks."
-}
-
 # Find current default interface.
 if [ "$JPMELOS_IS_MACOS" = "true" ]; then
     default_if() {
