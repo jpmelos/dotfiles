@@ -2,7 +2,6 @@
 -- `codecompanion.nvim`.
 return {
     "github/copilot.vim",
-    enabled = false,
     lazy = true,
     config = function()
         vim.g.copilot_no_tab_map = true

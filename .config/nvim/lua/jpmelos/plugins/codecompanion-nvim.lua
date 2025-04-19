@@ -1,9 +1,9 @@
 return {
     "olimorris/codecompanion.nvim",
-    enabled = false,
     dependencies = {
         "nvim-lua/plenary.nvim",
         "nvim-treesitter/nvim-treesitter",
+        "hrsh7th/nvim-cmp",
         "github/copilot.vim",
         "Davidyz/VectorCode",
     },
@@ -14,8 +14,17 @@ return {
             mode = "n",
             desc = "Open AI chat",
         },
+        {
+            "<leader>aa",
+            "<cmd>CodeCompanionChat Add<cr>",
+            mode = "v",
+            desc = "Open AI chat, send selection",
+        },
     },
     config = function()
+        local vectorcode_make_tool =
+            require("vectorcode.integrations").codecompanion.chat.make_tool
+
         require("codecompanion").setup({
             display = {
                 chat = {
@@ -35,8 +44,9 @@ return {
                     },
                     tools = {
                         vectorcode = {
-                            description = "Run VectorCode to retrieve the project context.",
-                            callback = require("vectorcode.integrations").codecompanion.chat.make_tool({
+                            description = "Run VectorCode to retrieve the"
+                                .. " project context.",
+                            callback = vectorcode_make_tool({
                                 auto_submit = { ls = true, query = true },
                             }),
                         },
