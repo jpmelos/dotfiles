@@ -123,6 +123,11 @@ K("v", "<leader>bP", function()
 end, { desc = "Copy absolute path with line numbers to clipboard" })
 
 -- Copy current buffer's contents to clipboard.
+K("n", "<leader>br", function()
+    vim.fn.setreg("+", GetBufferContents())
+    vim.notify("Buffer copied to clipboard with filename")
+    NormalMode()
+end, { desc = "Copy buffer contents to clipboard" })
 K("n", "<leader>by", function()
     local rel_path = vim.fn.expand("%:.")
 
