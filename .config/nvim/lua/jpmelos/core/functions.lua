@@ -193,6 +193,17 @@ function OpenCurrentBufferInNewTab()
     vim.fn.setpos(".", { 0, pos[2], pos[3], 0 })
 end
 
+function GetGitHubLineFormatForSelection()
+    local start_line = vim.fn.line("'<")
+    local end_line = vim.fn.line("'>")
+
+    if start_line == end_line then
+        return "#L" .. start_line
+    else
+        return "#L" .. start_line .. "-L" .. end_line
+    end
+end
+
 vim.api.nvim_create_user_command("Redir", function(ctx)
     local lines = vim.split(
         vim.api.nvim_exec2(ctx.args, { output = true }).output,

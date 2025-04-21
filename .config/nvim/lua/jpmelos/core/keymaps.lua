@@ -101,19 +101,26 @@ K(
     { desc = "Clear search highlights" }
 )
 
--- Copy path of current buffer to clipboard.
-K(
-    "n",
-    "<leader>by",
-    '<cmd>let @+ = expand("%:.")<cr>',
-    { desc = "Copy relative path to clipboard" }
-)
-K(
-    "n",
-    "<leader>bY",
-    '<cmd>let @+ = expand("%:p")<cr>',
-    { desc = "Copy absolute path to clipboard" }
-)
+-- Copy path of current buffer to clipboard. If in Visual Mode, put the
+-- selected lines at the end of the path too, in GitHub format.
+K("n", "<leader>bp", function()
+    vim.fn.setreg("+", vim.fn.expand("%:."))
+end, { desc = "Copy relative path to clipboard" })
+K("n", "<leader>bP", function()
+    vim.fn.setreg("+", vim.fn.expand("%:p"))
+end, { desc = "Copy absolute path to clipboard" })
+K("v", "<leader>bp", function()
+    vim.fn.setreg(
+        "+",
+        vim.fn.expand("%:.") .. GetGitHubLineFormatForSelection()
+    )
+end, { desc = "Copy relative path with line numbers to clipboard" })
+K("v", "<leader>bP", function()
+    vim.fn.setreg(
+        "+",
+        vim.fn.expand("%:p") .. GetGitHubLineFormatForSelection()
+    )
+end, { desc = "Copy absolute path with line numbers to clipboard" })
 
 -- Quickfix list
 K("n", "<leader>qq", function()
