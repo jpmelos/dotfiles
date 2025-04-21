@@ -64,13 +64,55 @@ function RestoreVisualSelection(mode, start_pos, end_pos)
     )
 end
 
-function GetBufferContents(bufnr)
+function GetVisualSelectionLines()
+    local visual_selection = GetVisualSelection()
+    if visual_selection == nil then
+        return nil
+    end
+
+    local start_line = visual_selection.start_pos[2]
+    local end_line = visual_selection.end_pos[2]
+    if start_line > end_line then
+        start_line, end_line = end_line, start_line
+    end
+
+    return { start_line, end_line }
+end
+
+function GetGitHubLineFormatForSelection()
+    local visual_selection_lines = GetVisualSelectionLines()
+    if visual_selection_lines == nil then
+        return nil
+    end
+
+    local start_line = visual_selection_lines[1]
+    local end_line = visual_selection_lines[2]
+
+    if start_line == end_line then
+        return "#L" .. start_line
+    else
+        return "#L" .. start_line .. "-L" .. end_line
+    end
+end
+
+function GetBufferContents(bufnr, lines)
     if bufnr == nil then
         bufnr = 0
     end
 
-    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    return table.concat(lines, "\n"):trim()
+    local start_line, end_line
+    if lines == nil then
+        start_line = 0
+        end_line = -1
+    else
+        start_line = lines[1]
+        end_line = lines[2]
+    end
+
+    return table.concat(
+        vim.api.nvim_buf_get_lines(bufnr, start_line, end_line, false),
+        "\n"
+    )
 end
 
 function NormalMode()
@@ -191,17 +233,6 @@ function OpenCurrentBufferInNewTab()
     local pos = vim.fn.getpos(".")
     vim.cmd("tabnew %")
     vim.fn.setpos(".", { 0, pos[2], pos[3], 0 })
-end
-
-function GetGitHubLineFormatForSelection()
-    local start_line = vim.fn.line("'<")
-    local end_line = vim.fn.line("'>")
-
-    if start_line == end_line then
-        return "#L" .. start_line
-    else
-        return "#L" .. start_line .. "-L" .. end_line
-    end
 end
 
 vim.api.nvim_create_user_command("Redir", function(ctx)

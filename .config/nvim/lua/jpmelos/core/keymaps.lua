@@ -122,6 +122,46 @@ K("v", "<leader>bP", function()
     )
 end, { desc = "Copy absolute path with line numbers to clipboard" })
 
+-- Copy current buffer's contents to clipboard.
+K("n", "<leader>by", function()
+    local rel_path = vim.fn.expand("%:.")
+    local buffer_content = GetBufferContents()
+    local formatted_content = "File " .. rel_path .. ":\n\n" .. buffer_content
+    vim.fn.setreg("+", formatted_content)
+    vim.notify("Buffer copied to clipboard with filename")
+end, { desc = "Copy buffer contents with filename to clipboard" })
+K("v", "<leader>by", function()
+    local rel_path = vim.fn.expand("%:.")
+
+    local lines = GetVisualSelectionLines()
+    if lines == nil then
+        return
+    end
+    local start_line = lines[1]
+    local end_line = lines[2]
+
+    local selected_content = GetBufferContents(0, { start_line - 1, end_line })
+
+    local line_info
+    if start_line == end_line then
+        line_info = "line " .. start_line
+    else
+        line_info = "lines " .. start_line .. "-" .. end_line
+    end
+
+    local formatted_content = "File "
+        .. rel_path
+        .. " ("
+        .. line_info
+        .. "):\n\n"
+        .. selected_content
+
+    vim.fn.setreg("+", formatted_content)
+    vim.notify("Selected lines copied to clipboard with filename")
+end, {
+    desc = "Copy selected lines with filename and line numbers to clipboard",
+})
+
 -- Quickfix list
 K("n", "<leader>qq", function()
     local qf_exists = false
