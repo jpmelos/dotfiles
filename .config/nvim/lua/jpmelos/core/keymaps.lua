@@ -105,44 +105,39 @@ K(
 -- selected lines at the end of the path too, in GitHub format.
 K("n", "<leader>bp", function()
     vim.fn.setreg("+", vim.fn.expand("%:."))
-end, { desc = "Copy relative path to clipboard" })
+end, { desc = "Copy relative path" })
 K("n", "<leader>bP", function()
     vim.fn.setreg("+", vim.fn.expand("%:p"))
-end, { desc = "Copy absolute path to clipboard" })
+end, { desc = "Copy absolute path" })
 K("v", "<leader>bp", function()
     vim.fn.setreg(
         "+",
         vim.fn.expand("%:.") .. GetGitHubLineFormatForSelection()
     )
-end, { desc = "Copy relative path with line numbers to clipboard" })
+end, { desc = "Copy relative path" })
 K("v", "<leader>bP", function()
     vim.fn.setreg(
         "+",
         vim.fn.expand("%:p") .. GetGitHubLineFormatForSelection()
     )
-end, { desc = "Copy absolute path with line numbers to clipboard" })
+end, { desc = "Copy absolute path" })
 
 -- Copy current buffer's contents to clipboard.
 K("n", "<leader>br", function()
     vim.fn.setreg("+", GetBufferContents())
-    vim.notify("Buffer copied to clipboard with filename")
     NormalMode()
-end, { desc = "Copy buffer contents to clipboard" })
+end, { desc = "Copy buffer contents" })
 K("n", "<leader>by", function()
     local rel_path = vim.fn.expand("%:.")
-
     local buffer_content = GetBufferContents()
-
     local formatted_content = "File `"
         .. rel_path
         .. "`:\n\n"
         .. buffer_content
 
     vim.fn.setreg("+", formatted_content)
-    vim.notify("Buffer copied to clipboard with filename")
-
     NormalMode()
-end, { desc = "Copy buffer contents with filename to clipboard" })
+end, { desc = "Copy buffer contents" })
 K("v", "<leader>by", function()
     local rel_path = vim.fn.expand("%:.")
 
@@ -170,11 +165,9 @@ K("v", "<leader>by", function()
         .. selected_content
 
     vim.fn.setreg("+", formatted_content)
-    vim.notify("Selected lines copied to clipboard with filename")
-
     NormalMode()
 end, {
-    desc = "Copy selected lines with filename and line numbers to clipboard",
+    desc = "Copy selected lines",
 })
 
 -- Quickfix list
