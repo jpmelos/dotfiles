@@ -30,3 +30,14 @@ au({ "FocusLost" }, {
     command = "silent! wa",
     nested = true,
 })
+
+au("QuitPre", {
+    callback = function()
+        for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+            local name = vim.api.nvim_buf_get_name(buf)
+            if name == "" then
+                vim.api.nvim_buf_delete(buf, { force = true })
+            end
+        end
+    end,
+})
