@@ -6,7 +6,7 @@ local K = vim.keymap.set
 -- Disable using <ESC> to leave insert mode.
 K("i", "jj", function()
     local current_column = vim.fn.getpos(".")[3]
-    if current_column == 0 then
+    if current_column == 1 then
         return "<ESC>"
     else
         return "<ESC>l"
