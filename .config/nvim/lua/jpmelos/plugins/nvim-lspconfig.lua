@@ -198,12 +198,11 @@ return {
         K("n", "<leader>ld", function()
             vim.diagnostic.open_float({ border = "rounded" })
         end, { desc = "Show line diagnostic" })
-        K(
-            "n",
-            "[d",
-            vim.diagnostic.goto_prev,
-            { desc = "Previous diagnostic" }
-        )
-        K("n", "]d", vim.diagnostic.goto_next, { desc = "Next diagnostic" })
+        K("n", "[d", function()
+            vim.diagnostic.goto_prev({ float = { border = "rounded" } })
+        end, { desc = "Previous diagnostic" })
+        K("n", "]d", function()
+            vim.diagnostic.goto_next({ float = { border = "rounded" } })
+        end, { desc = "Next diagnostic" })
     end,
 }
