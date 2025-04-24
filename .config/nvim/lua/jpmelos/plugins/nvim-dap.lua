@@ -121,13 +121,13 @@ local function debug_with_host_port(callback, host_port)
 end
 
 local function get_host_port_and_debug(callback)
-    local host_port_env = vim.g.remote_debug_debugpy_host_port
-    if host_port_env == nil then
+    if vim.g.remote_debug_debugpy_host_port == "" then
         Input("host:port", "localhost:27027", function(host_port)
+            vim.g.remote_debug_debugpy_host_port = host_port
             debug_with_host_port(callback, host_port)
         end)
     else
-        debug_with_host_port(callback, host_port_env)
+        debug_with_host_port(callback, vim.g.remote_debug_debugpy_host_port)
     end
 end
 
