@@ -395,6 +395,6 @@ function cm() {
         -e TERM="$TERM" \
         -v "$profile_json:$claude_manager_home/.claude.json" \
         -v "$profile_claude_dir:$claude_manager_home/.claude" \
-        -v ".:$claude_manager_home/workspace/$project_name" \
+        -v "$(pwd):$claude_manager_home/workspace/$project_name" \
         claude-manager
 }
