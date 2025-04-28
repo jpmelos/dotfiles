@@ -24,7 +24,6 @@ return {
             width = 20,
             default_direction = "left",
             placement = "edge",
-            preserve_equality = true,
         },
         show_guides = true,
 

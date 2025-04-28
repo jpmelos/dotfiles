@@ -26,7 +26,7 @@ K("v", ">", ">gv")
 
 -- Tab management.
 K("n", "<leader>to", "<cmd>tabnew<CR>", { desc = "Open new tab" })
-K("n", "<leader>tx", "<cmd>tabclose<CR>", { desc = "Close current tab" })
+K("n", "<leader>tc", "<cmd>tabclose<CR>", { desc = "Close current tab" })
 K(
     "n",
     "<leader>tf",
@@ -59,10 +59,10 @@ K(
 )
 K("n", "-", "_")
 
--- Lots of tools, like telescope and others, rely on V to make a vertical
--- split, and X to make a horizontal split. Let's follow that lead here.
-K("n", "<C-w>x", "<cmd>split<cr>")
-K("n", "<C-w>v", "<cmd>vsplit<cr>")
+K("n", "<leader>sx", "<CMD>split<CR>", { desc = "Split vertically" })
+K("n", "<leader>sv", "<CMD>vsplit<CR>", { desc = "Split horizontally" })
+K("n", "<leader>se", "<C-w>=", { desc = "Distribute splits equally" })
+K("n", "<leader>sc", "<CMD>q<CR>", { desc = "Close split" })
 
 -- C-u and C-d only jump half screen.
 K({ "n", "v" }, "<C-u>", function()
