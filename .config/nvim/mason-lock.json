@@ -3,13 +3,13 @@
   "jq": "jq-1.7",
   "lua-language-server": "3.14.0",
   "prettier": "3.5.3",
-  "pyright": "1.1.399",
-  "ruff": "0.11.6",
-  "rust-analyzer": "2025-04-14",
+  "pyright": "1.1.400",
+  "ruff": "0.11.7",
+  "rust-analyzer": "2025-04-28",
   "shellcheck": "v0.10.0",
   "shfmt": "v3.11.0",
   "sqlls": "1.7.1",
-  "stylua": "v2.0.2",
+  "stylua": "v2.1.0",
   "taplo": "0.9.3",
-  "yaml-language-server": "1.17.0"
+  "yaml-language-server": "1.18.0"
 }
