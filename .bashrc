@@ -396,8 +396,6 @@ function cm() {
         fi
     fi
 
-    project_name="$(echo $project_relative_path | sed 's|/|--|g')"
-
     profile_dir="$HOME/.claude-manager/profiles/$profile"
     profile_claude_dir="$profile_dir/.claude"
     profile_json="$profile_dir/.claude.json"
@@ -407,11 +405,16 @@ function cm() {
         echo "{}" > "$profile_json"
     fi
 
+    project_name="$(echo $project_relative_path | sed 's|/|--|g')"
+    claude_manager_home="/home/user"
+
     docker build -t claude-manager ~/devel/dotfiles/claude-manager/
     docker run --rm -ti --name claude-code \
+        --user $(id -u):$(id -g) \
+        -e HOME="$claude_manager_home" \
         -e TERM="$TERM" \
-        -v "$profile_json:/root/.claude.json" \
-        -v "$profile_claude_dir:/root/.claude" \
-        -v ".:/workspace/$project_name" \
+        -v "$profile_json:$claude_manager_home/.claude.json" \
+        -v "$profile_claude_dir:$claude_manager_home/.claude" \
+        -v ".:$claude_manager_home/workspace/$project_name" \
         claude-manager
 }
