@@ -409,7 +409,8 @@ function cm() {
     claude_manager_home="/home/user"
 
     docker build -t claude-manager ~/devel/dotfiles/claude-manager/
-    docker run --rm -ti --name claude-code \
+    docker run --rm -ti \
+        --name "claude-code-$project_name" \
         --user $(id -u):$(id -g) \
         -e HOME="$claude_manager_home" \
         -e TERM="$TERM" \
