@@ -132,8 +132,9 @@ K("n", "<leader>by", function()
     local buffer_content = GetBufferContents()
     local formatted_content = "File `"
         .. rel_path
-        .. "`:\n\n"
+        .. "`:\n\n```\n"
         .. buffer_content
+        .. "\n```"
 
     vim.fn.setreg("+", formatted_content)
     NormalMode()
@@ -161,8 +162,9 @@ K("v", "<leader>by", function()
         .. rel_path
         .. "` ("
         .. line_info
-        .. "):\n\n"
+        .. "):\n\n```\n"
         .. selected_content
+        .. "\n```"
 
     vim.fn.setreg("+", formatted_content)
     NormalMode()
