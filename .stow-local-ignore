@@ -4,6 +4,7 @@
 ^/.gitignore
 ^/.nvim.lua
 ^/.stow-local-ignore
-^/README.md
-^/references
 ^/.stowrc
+^/README.md
+^/claude-manager
+^/references

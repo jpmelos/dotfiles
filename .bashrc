@@ -374,3 +374,44 @@ function vec() {
     vectorcode init
     vectorcode vectorise --include-hidden -r .
 }
+
+function cm() {
+    current_dir="$(pwd)"
+    devel_dir="$HOME/devel"
+
+    if [[ "$current_dir" == "$devel_dir"* ]]; then
+        project_relative_path="${current_dir#$devel_dir/}"
+    else
+        echo "Error: not inside ~/devel" >&2
+        return
+    fi
+
+    profile="$1"
+    if [ -z "$profile" ]; then
+        first_component=$(echo "$project_relative_path" | cut -d'/' -f1)
+        if [ -d "$HOME/.claude-manager/profiles/$first_component" ]; then
+            profile="$first_component"
+        else
+            profile="jpmelos"
+        fi
+    fi
+
+    project_name="$(echo $project_relative_path | sed 's|/|--|g')"
+
+    profile_dir="$HOME/.claude-manager/profiles/$profile"
+    profile_claude_dir="$profile_dir/.claude"
+    profile_json="$profile_dir/.claude.json"
+
+    mkdir -p "$profile_claude_dir"
+    if [ ! -f "$profile_json" ]; then
+        echo "{}" > "$profile_json"
+    fi
+
+    docker build -t claude-manager ~/devel/dotfiles/claude-manager/
+    docker run --rm -ti --name claude-code \
+        -e TERM="$TERM" \
+        -v "$profile_json:/root/.claude.json" \
+        -v "$profile_claude_dir:/root/.claude" \
+        -v ".:/workspace/$project_name" \
+        claude-manager
+}
