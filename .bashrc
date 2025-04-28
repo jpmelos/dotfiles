@@ -387,7 +387,11 @@ function cm() {
     project_name="$(echo $project_relative_path | sed 's|/|--|g')"
     claude_manager_home="/home/user"
 
-    docker build -t claude-manager ~/devel/dotfiles/claude-manager/
+    docker build \
+        --build-arg TODAY=$(date +%Y-%m-%d) \
+        -t claude-manager \
+        ~/devel/dotfiles/claude-manager/
+
     docker run --rm -ti \
         --name "claude-code-$project_name" \
         --user $(id -u):$(id -g) \

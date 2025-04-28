@@ -10,4 +10,5 @@ cat ~/.claude.json | jq '.oauthAccount.emailAddress' | tr -d '"'
 echo
 read -r -p "Press Enter to continue, CTRL+D to quit..."
 
+claude config set -g autoUpdaterStatus disabled
 exec claude
