@@ -1,3 +1,9 @@
+local function fix_pyright_hover_doc(err, result, ctx, config)
+    result.contents.value = result.contents.value:gsub("\\_", "_")
+    config = vim.tbl_extend("force", config or {}, { border = "rounded" })
+    return vim.lsp.handlers.hover(err, result, ctx, config)
+end
+
 return {
     "neovim/nvim-lspconfig",
     dependencies = {
@@ -53,8 +59,30 @@ return {
             cmp_nvim_lsp.default_capabilities()
         )
 
-        local lsp_on_attach = function()
+        local lsp_on_attach = function(client, bufnr)
             vim.cmd("redrawstatus")
+
+            if client.name == "pyright" then
+                vim.api.nvim_buf_create_user_command(
+                    bufnr,
+                    "HoverPyright",
+                    function()
+                        client.request(
+                            "textDocument/hover",
+                            vim.lsp.util.make_position_params(0, "utf-8"),
+                            fix_pyright_hover_doc
+                        )
+                    end,
+                    { desc = "Show documentation for what is under cursor" }
+                )
+                vim.api.nvim_buf_set_keymap(
+                    bufnr,
+                    "n",
+                    "K",
+                    "<CMD>HoverPyright<CR>",
+                    { desc = "Show documentation for what is under cursor" }
+                )
+            end
         end
 
         mason_lspconfig.setup_handlers({
