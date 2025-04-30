@@ -201,11 +201,14 @@ return {
                     ["end"] = { args.line2, math.maxinteger },
                 }
             end
+
             conform.format({
                 async = true,
                 lsp_format = "never",
                 range = range,
             })
+
+            NormalMode()
         end, { range = true })
 
         api.nvim_create_user_command("FormatToggle", function(args)
