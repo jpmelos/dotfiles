@@ -387,10 +387,14 @@ function cm() {
     project_name="$(echo $project_relative_path | sed 's|/|--|g')"
     claude_manager_home="/home/user"
 
-    docker build \
-        --build-arg TODAY=$(date +%Y-%m-%d) \
-        -t claude-manager \
-        ~/devel/dotfiles/claude-manager/
+    today="$(date +%Y-%m-%d)"
+
+    if ! docker images "claude-manager-$today" | grep -q "claude-manager-$today"; then
+        docker build \
+            --build-arg "TODAY=$today" \
+            -t "claude-manager-$today" \
+            ~/devel/dotfiles/claude-manager/
+    fi
 
     docker run --rm -ti \
         --name "claude-code-$project_name" \
@@ -399,5 +403,5 @@ function cm() {
         -v "$profile_json:$claude_manager_home/.claude.json" \
         -v "$profile_claude_dir:$claude_manager_home/.claude" \
         -v "$(pwd):$claude_manager_home/workspace/$project_name" \
-        claude-manager
+        "claude-manager-$today"
 }
