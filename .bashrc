@@ -395,7 +395,6 @@ function cm() {
     docker run --rm -ti \
         --name "claude-code-$project_name" \
         --user $(id -u):$(id -g) \
-        -e HOME="$claude_manager_home" \
         -e TERM="$TERM" \
         -v "$profile_json:$claude_manager_home/.claude.json" \
         -v "$profile_claude_dir:$claude_manager_home/.claude" \
