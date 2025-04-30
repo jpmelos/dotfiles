@@ -253,17 +253,13 @@ return {
             bang = true,
         })
 
-        K(
-            { "n", "v" },
-            "<leader>pf",
-            "<cmd>Format<CR>",
-            { desc = "Format file (or range in visual mode)" }
-        )
+        K("n", "<leader>pf", "<cmd>Format<CR>", { desc = "Format file" })
+        K("v", "<leader>pf", "<cmd>Format<CR>", { desc = "Format selection" })
         K(
             { "n" },
-            "<leader>pt",
-            "<cmd>FormatToggle<CR>",
-            { desc = "Toggle autoformat on save" }
+            "<leader>pe",
+            "<cmd>FormatEnable<CR>",
+            { desc = "Enable autoformat on save" }
         )
         K(
             { "n" },
@@ -273,9 +269,9 @@ return {
         )
         K(
             { "n" },
-            "<leader>pe",
-            "<cmd>FormatEnable<CR>",
-            { desc = "Enable autoformat on save" }
+            "<leader>pt",
+            "<cmd>FormatToggle<CR>",
+            { desc = "Toggle autoformat on save" }
         )
     end,
     get_default_formatters_by_ft = get_default_formatters_by_ft,
