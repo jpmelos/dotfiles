@@ -3,7 +3,7 @@ vim.g.mapleader = " "
 
 local K = vim.keymap.set
 
--- Disable using <ESC> to leave insert mode.
+-- Use `jj` to leave insert mode, disable using <ESC>.
 K("i", "jj", function()
     local current_column = vim.fn.getpos(".")[3]
     if current_column == 1 then
@@ -23,6 +23,22 @@ K("v", "u", "<NOP>")
 -- Indent while remaining in visual mode.
 K("v", "<", "<gv")
 K("v", ">", ">gv")
+
+-- Visual mode management.
+-- When in visual mode, pressing keys that usually enter visual mode will leave
+-- instead of changing the visual mode type.
+K("v", "v", function()
+    NormalMode()
+end, { desc = "Exit visual mode" })
+K("v", "V", function()
+    NormalMode()
+end, { desc = "Exit visual mode" })
+K("v", "<C-v>", function()
+    NormalMode()
+end, { desc = "Exit visual mode" })
+K("v", "gv", function()
+    NormalMode()
+end, { desc = "Exit visual mode" })
 
 -- Tab management.
 K("n", "<leader>to", "<cmd>tabnew<CR>", { desc = "Open new tab" })
@@ -59,6 +75,7 @@ K(
 )
 K("n", "-", "_")
 
+-- Split management.
 K("n", "<leader>sx", "<CMD>split<CR>", { desc = "Split vertically" })
 K("n", "<leader>sv", "<CMD>vsplit<CR>", { desc = "Split horizontally" })
 K("n", "<leader>se", "<C-w>=", { desc = "Distribute splits equally" })
