@@ -358,14 +358,60 @@ function cm() {
     current_dir="$(pwd)"
     devel_dir="$HOME/devel"
 
+    profile=""
+    rebuild=false
+    claude_resume=false
+    claude_help=false
+    show_help=false
+
+    args=()
+    for arg in "$@"; do
+        case "$arg" in
+            --rebuild)
+                rebuild=true
+                ;;
+            --resume)
+                claude_resume=true
+                ;;
+            --claude-help)
+                claude_help=true
+                ;;
+            --help)
+                show_help=true
+                ;;
+            *)
+                if [[ -z "$profile" && "$arg" != "" ]]; then
+                    profile="$arg"
+                else
+                    args+=("$arg")
+                fi
+                ;;
+        esac
+    done
+    if [ ${#args[@]} -gt 0 ]; then
+        echo "Error: Unrecognized arguments: ${args[*]}" >&2
+        echo "Run 'cm --help' for usage information" >&2
+        return 1
+    fi
+
+    if [[ "$show_help" == "true" ]]; then
+        echo "Usage: cm [options] [profile]"
+        echo "Options:"
+        echo "  --rebuild      Rebuild the Docker image"
+        echo "  --resume       Resume previous Claude session"
+        echo "  --claude-help  Show Claude help"
+        echo "  --help         Show this help"
+        return 0
+    fi
+
+    # Check if we're in the devel directory
     if [[ "$current_dir" == "$devel_dir"* ]]; then
         project_relative_path="${current_dir#$devel_dir/}"
     else
         echo "Error: not inside ~/devel" >&2
-        return
+        return 1
     fi
 
-    profile="$1"
     if [ -z "$profile" ]; then
         first_component=$(echo "$project_relative_path" | cut -d'/' -f1)
         if [ -d "$HOME/.claude-manager/profiles/$first_component" ]; then
@@ -379,6 +425,14 @@ function cm() {
     profile_claude_dir="$profile_dir/.claude"
     profile_json="$profile_dir/.claude.json"
 
+    if [ ! -d "$profile_dir" ]; then
+        read -p "Profile '$profile' does not exist. Create it? [y/N] " create_profile
+        if [[ "${create_profile,,}" != "y" && "${create_profile,,}" != "yes" ]]; then
+            echo "Profile not created. Exiting."
+            return 0
+        fi
+    fi
+
     mkdir -p "$profile_claude_dir"
     if [ ! -f "$profile_json" ]; then
         echo "{}" > "$profile_json"
@@ -389,7 +443,7 @@ function cm() {
 
     today="$(date +%Y-%m-%d)"
 
-    if ! docker images "claude-manager-$today" | grep -q "claude-manager-$today"; then
+    if [[ "$rebuild" == "true" ]] || ! docker images "claude-manager-$today" | grep -q "claude-manager-$today"; then
         docker build \
             --build-arg "TODAY=$today" \
             -t "claude-manager-$today" \
@@ -400,6 +454,8 @@ function cm() {
         --name "claude-code-$project_name" \
         --user $(id -u):$(id -g) \
         -e TERM="$TERM" \
+        -e CLAUDE_HELP="$claude_help" \
+        -e CLAUDE_RESUME="$claude_resume" \
         -v "$profile_json:$claude_manager_home/.claude.json" \
         -v "$profile_claude_dir:$claude_manager_home/.claude" \
         -v "$(pwd):$claude_manager_home/workspace/$project_name" \
