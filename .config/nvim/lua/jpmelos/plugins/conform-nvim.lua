@@ -13,56 +13,21 @@
 -- `vim.g.enable_autoformat` and `vim.g.disable_autoformat` will also accept
 -- glob patterns.
 -- ```
--- vim.g.disable_autoformat = { "Cargo.lock" }
+-- vim.g.disable_autoformat = { "**/Cargo.lock" }
 -- ```
 -- Use a repository-local `.nvim.lua` file to configure formatters for specific
--- projects. Something like:
+-- projects. Like this:
 -- ```
 -- vim.g.formatters_by_ft = { python = { ... } }
 -- ```
--- If all you need is to override some values from the default configuration:
+-- If all you need is to override some values from the default configuration,
+-- do it like this. Changing `vim.g.formatters_by_ft` directly doesn't work as
+-- expected:
 -- ```
--- vim.g.formatters_by_ft =
---     require("jpmelos.plugins.conform-nvim").get_default_formatters_by_ft()
--- vim.g.formatters_by_ft.python = { ... }
+-- local formatters_by_ft = vim.g.formatters_by_ft
+-- formatters_by_ft.python = { ... }
+-- vim.g.formatters_by_ft = formatters_by_ft
 -- ```
-local function get_default_formatters_by_ft()
-    return {
-        -- BE coding.
-        sh = { "shfmt" },
-        python = {
-            "ruff_fix",
-            "ruff_organize_imports",
-            "ruff_format",
-        },
-        lua = { "stylua" },
-        -- This is an exception: it's not managed by Mason. Instead,
-        -- install the Rust toolchain locally.
-        rust = { "rustfmt" },
-        -- SQL formatters evaluated so far:
-        -- - sql_formatter: Formats ON clauses (in JOINs) wrong, and
-        --   aligns AND clauses weirdly.
-        -- sql = {},
-        -- Web technologies.
-        html = { "prettier" },
-        css = { "prettier" },
-        scss = { "prettier" },
-        javascript = { "prettier" },
-        typescript = { "prettier" },
-        -- Writing.
-        markdown = { "mdformat" },
-        -- Configuration.
-        yaml = { "prettier" },
-        toml = { "taplo" },
-        json = { "jq" },
-        -- Others.
-        graphql = { "prettier" },
-    }
-end
-if vim.g.formatters_by_ft == nil then
-    vim.g.formatters_by_ft = get_default_formatters_by_ft()
-end
-
 return {
     "stevearc/conform.nvim",
     cond = function()
@@ -277,5 +242,4 @@ return {
             { desc = "Toggle autoformat on save" }
         )
     end,
-    get_default_formatters_by_ft = get_default_formatters_by_ft,
 }

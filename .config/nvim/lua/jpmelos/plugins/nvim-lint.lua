@@ -1,21 +1,16 @@
 -- Use a repository-local `.nvim.lua` file to configure linters for specific
--- projects. Something like:
+-- projects. Like this:
 -- ```
 -- vim.g.linters_by_ft = { rust = { ... } }
 -- ```
--- If all you need is to override some values from the default configuration:
+-- If all you need is to override some values from the default configuration,
+-- do it like this. Changing `vim.g.linters_by_ft` directly doesn't work as
+-- expected:
 -- ```
--- vim.g.linters_by_ft =
---     require("jpmelos.plugins.nvim-lint").get_default_linters_by_ft()
--- vim.g.linters_by_ft.rust = { ... }
+-- local linters_by_ft = vim.g.linters_by_ft
+-- linters_by_ft.rust = { ... }
+-- vim.g.linters_by_ft = linters_by_ft
 -- ```
-local function get_default_linters_by_ft()
-    return { rust = { "clippy" } }
-end
-if vim.g.linters_by_ft == nil then
-    vim.g.linters_by_ft = get_default_linters_by_ft()
-end
-
 return {
     "mfussenegger/nvim-lint",
     cond = function()
@@ -42,5 +37,4 @@ return {
             lint.try_lint()
         end, { desc = "Lint current file" })
     end,
-    get_default_linters_by_ft = get_default_linters_by_ft,
 }
