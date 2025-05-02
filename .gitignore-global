@@ -24,3 +24,6 @@ __pycache__
 # Project-specific IDE configuration files.
 /.nvim.lua
 /.idea
+
+# Claude Code local settings.
+**/.claude/settings.local.json
