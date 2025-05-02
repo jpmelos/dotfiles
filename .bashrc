@@ -379,6 +379,9 @@ function cm() {
             --help)
                 show_help=true
                 ;;
+            -*)
+                args+=("$arg")
+                ;;
             *)
                 if [[ -z "$profile" && "$arg" != "" ]]; then
                     profile="$arg"
