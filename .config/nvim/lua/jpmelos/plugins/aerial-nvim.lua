@@ -14,17 +14,26 @@ return {
         },
     },
     opts = {
-        open_automatic = true,
-        close_on_select = false,
-        attach_mode = "global",
-
         backends = { "treesitter", "markdown", "asciidoc", "man" },
 
         layout = {
-            width = 20,
-            default_direction = "left",
-            placement = "edge",
+            default_direction = "float",
+            min_width = 0.2,
+            max_width = 0.9,
+            resize_to_content = "false",
         },
+        float = {
+            border = "rounded",
+            relative = "editor",
+            min_height = 0.5,
+            max_height = 0.9,
+        },
+
+        open_automatic = false,
+        close_on_select = true,
+        close_automatic_events = { "unfocus", "switch_buffer" },
+
+        attach_mode = "window",
         show_guides = true,
 
         -- To see all supported values, use `:h SymbolKind`.
@@ -33,7 +42,7 @@ return {
             python = { "Class", "Function" },
         },
 
-        highlight_mode = "split_width",
+        highlight_mode = "last",
         highlight_closest = true,
         highlight_on_hover = true,
 
@@ -53,8 +62,12 @@ return {
         link_tree_to_folds = true,
 
         on_attach = function(bufnr)
-            vim.keymap.set("n", "{", "<cmd>AerialPrev<cr>", { buffer = bufnr })
-            vim.keymap.set("n", "}", "<cmd>AerialNext<cr>", { buffer = bufnr })
+            vim.keymap.set(
+                "n",
+                "<leader>es",
+                "<cmd>AerialToggle<cr>",
+                { buffer = bufnr, desc = "Toggle symbol nav" }
+            )
         end,
     },
 }
