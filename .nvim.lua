@@ -11,5 +11,3 @@ api.nvim_create_autocmd("FileType", {
         ol.colorcolumn = { 80 }
     end,
 })
-
-g.enable_augment_code = true
