@@ -25,5 +25,6 @@ __pycache__
 /.nvim.lua
 /.idea
 
-# Claude Code local settings.
+# Claude Code local settings and memory.
+**/CLAUDE.local.md
 **/.claude/settings.local.json
