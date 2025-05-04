@@ -1,30 +1,16 @@
-# Ignore all personal environment files.
+# Personal environment files.
 jpenv*
 
 # autoenv files.
 .autoenv.enter
 .autoenv.leave
 
-# Ignore common cache folders.
-.cache
-
 # Python virtual environments.
-/.venv*
+.venv*
 
-# Compiled Python files.
-__pycache__
-*.py[co]
-
-# Python distributions.
-/dist
-
-# Python's test running frameworks.
-/.tox
-
-# Project-specific IDE configuration files.
-/.nvim.lua
-/.idea
+# Personal IDE configuration file.
+.nvim.lua
 
 # Claude Code local settings and memory.
-**/CLAUDE.local.md
-**/.claude/settings.local.json
+CLAUDE.local.md
+.claude/settings.local.json
