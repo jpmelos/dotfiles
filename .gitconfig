@@ -89,6 +89,7 @@
     # l = log (except ls for list)
     l = "! f() { git log --color=always --oneline --graph --decorate $@ | awk -f ~/.git-log-prepend-number-awk | less -R; }; f"
     lf = log -p --follow --stat --
+    lp = log -p --pretty=fuller --stat
 
     # ls = list
     ls = ls-tree HEAD --

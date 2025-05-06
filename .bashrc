@@ -149,8 +149,10 @@ __git_complete gshh git_show
 
 alias gl='g l'
 alias glf='g lf'
+alias glp='g lp'
 __git_complete gl git_log
 __git_complete glf git_log
+__git_complete glp git_log
 
 alias gls='g ls'
 __git_complete gls git_ls_tree
