@@ -105,6 +105,7 @@
     dst = diff --name-status
     dca = diff --cached
     dm = ! git diff $(git main-branch)...HEAD
+    dom = ! git diff origin/$(git main-branch)...HEAD
 
     # o = checkout
     o = checkout
