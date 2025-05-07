@@ -30,6 +30,26 @@
 -- ```
 
 local function do_format(conform, range)
+    -- Exclude Markdown frontmatter, which is not dealt with very well by
+    -- `mdformat`, my current Markdown formatter.
+    if range == nil and vim.bo.filetype == "markdown" then
+        local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+        local delimiter = nil
+
+        if #lines > 0 and (lines[1] == "---" or lines[1] == "+++") then
+            delimiter = lines[1]
+            for i = 2, #lines do
+                if lines[i] == delimiter then
+                    range = {
+                        start = { i + 1, 0 },
+                        ["end"] = { #lines, math.maxinteger },
+                    }
+                    break
+                end
+            end
+        end
+    end
+
     conform.format({
         async = true,
         lsp_format = "never",
