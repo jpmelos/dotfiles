@@ -28,6 +28,15 @@
 -- formatters_by_ft.python = { ... }
 -- vim.g.formatters_by_ft = formatters_by_ft
 -- ```
+
+local function do_format(conform, range)
+    conform.format({
+        async = true,
+        lsp_format = "never",
+        range = range,
+    })
+end
+
 return {
     "stevearc/conform.nvim",
     cond = function()
@@ -87,7 +96,7 @@ return {
                         -- Save, and then run the formatter. This may leave the
                         -- buffer in an unsaved state again if the formatter
                         -- changes the file.
-                        require("conform").format({ async = true })
+                        do_format(conform)
                     end
 
                     -- Then it is `false`, which means we don't want to
@@ -121,7 +130,7 @@ return {
                     -- Save, and then run the formatter. This may leave the
                     -- buffer in an unsaved state again if the formatter
                     -- changes the file.
-                    require("conform").format({ async = true })
+                    do_format(conform)
                 end
 
                 if type(g.enable_autoformat) == "string" then
@@ -136,7 +145,7 @@ return {
                             filename:matchglob(pattern)
                             or vim.bo.filetype == pattern
                         then
-                            require("conform").format({ async = true })
+                            do_format(conform)
                             break
                         end
                     end
@@ -167,11 +176,7 @@ return {
                 }
             end
 
-            conform.format({
-                async = true,
-                lsp_format = "never",
-                range = range,
-            })
+            do_format(conform, range)
 
             NormalMode()
         end, { range = true })
