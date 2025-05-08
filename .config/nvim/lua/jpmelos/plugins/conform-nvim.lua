@@ -82,6 +82,7 @@ return {
         conform.setup({ formatters_by_ft = vim.g.formatters_by_ft })
 
         -- Customize built-in formatters and add your own.
+        conform.formatters.rustfmt = { options = { default_edition = "2024" } }
         conform.formatters.shfmt = {
             prepend_args = {
                 "--language-dialect=bash",
