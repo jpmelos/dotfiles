@@ -6,9 +6,6 @@ ENV PATH="$HOME/.cargo/bin:$PATH"
 
 RUN apt update && apt install -y nodejs npm curl git jq
 
-ARG TODAY
-RUN echo "Updating image on: $TODAY"
-
 RUN npm install -g @anthropic-ai/claude-code
 
 # Claude Code is smart enough to read local Rust documentation, so we want to
