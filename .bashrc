@@ -450,6 +450,7 @@ function cm() {
 
     if [[ "$rebuild" == "true" ]]; then
         docker build \
+            --no-cache \
             -t "claude-manager" \
             ~/devel/dotfiles/claude-manager/
     fi
