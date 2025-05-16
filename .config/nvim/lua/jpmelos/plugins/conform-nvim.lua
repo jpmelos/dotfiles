@@ -113,7 +113,9 @@ local function do_format(conform, range)
             -- If didn't format anything, then just undo the replacements
             -- instead.
             if not did_edit then
-                vim.cmd("undo")
+                vim.cmd(
+                    "let save_cursor = getpos('.') | undo | call setpos('.', save_cursor)"
+                )
                 return
             end
 
