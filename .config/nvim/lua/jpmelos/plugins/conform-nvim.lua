@@ -30,23 +30,110 @@
 -- ```
 
 local function do_format(conform, range)
-    -- Exclude Markdown frontmatter, which is not dealt with very well by
-    -- `mdformat`, my current Markdown formatter.
-    if range == nil and vim.bo.filetype == "markdown" then
-        local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
-        local delimiter = nil
+    local cb = function(err, did_edit)
+        -- If didn't format anything, there's nothing to do.
+        if not did_edit then
+            return
+        end
 
-        if #lines > 0 and (lines[1] == "---" or lines[1] == "+++") then
-            delimiter = lines[1]
-            for i = 2, #lines do
-                if lines[i] == delimiter then
-                    range = {
-                        start = { i + 1, 0 },
-                        ["end"] = { #lines, math.maxinteger },
-                    }
-                    break
+        -- Save the buffer after formatting.
+        vim.cmd("write")
+    end
+
+    -- When formatting Markdown files, exclude:
+    -- - The frontmatter, which is not dealt with very well by `mdformat`, my
+    --   current Markdown formatter.
+    -- - Any lines that start with `{{`. This mustache notation is used by
+    --   Zola, the static site generator that I use, and many other generators,
+    --   to interpolate values in Markdown. `mdformat` may break these lines in
+    --   ways that will break the interpolation, thus we don't want them to be
+    --   changed in any way.
+    if vim.bo.filetype == "markdown" then
+        local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+        if #lines == 0 then
+            return
+        end
+
+        -- First pass: Exclude frontmatter from the formatting range.
+        if range == nil then
+            if lines[1] == "---" or lines[1] == "+++" then
+                local frontmatter_delimiter = lines[1]
+                for i = 2, #lines do
+                    if lines[i] == frontmatter_delimiter then
+                        range = {
+                            start = { i + 1, 0 },
+                            ["end"] = { #lines, math.maxinteger },
+                        }
+                        break
+                    end
                 end
             end
+        end
+        -- -- If `range` is still `nil` here, that just means we want to format
+        -- -- the entire file. Let's set `range` here to make the logic that
+        -- -- follows simpler, since it depends on `range`.
+        -- if range == nil then
+        --     range = {
+        --         start = { 1, 0 },
+        --         ["end"] = { #lines, math.maxinteger },
+        --     }
+        -- end
+
+        -- Second pass: Exclude `{{` interpolation code from the file before
+        -- formatting, and put them back in later, to stop `mdformat` from
+        -- breaking them.
+        local replacements = {}
+        local random_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            .. "abcdefghijklmnopqrstuvwxyz"
+            .. "0123456789"
+
+        local start_line = 1
+        local end_line = #lines
+        if range ~= nil then
+            start_line = range.start[1]
+            end_line = range["end"][1]
+        end
+
+        for i = start_line, end_line do
+            if lines[i]:match("^{{") then
+                local random_id = ""
+                for _ = 1, 100 do
+                    local random_index = math.random(1, #random_chars)
+                    random_id = random_id
+                        .. random_chars:sub(random_index, random_index)
+                end
+
+                replacements[random_id] = lines[i]
+
+                vim.api.nvim_buf_set_lines(0, i - 1, i, false, { random_id })
+            end
+        end
+
+        cb = function(err, did_edit)
+            -- If didn't format anything, then just undo the replacements
+            -- instead.
+            if not did_edit then
+                vim.cmd("undo")
+                return
+            end
+
+            local post_format_lines =
+                vim.api.nvim_buf_get_lines(0, 0, -1, false)
+
+            for i, line in ipairs(post_format_lines) do
+                if replacements[line] then
+                    vim.api.nvim_buf_set_lines(
+                        0,
+                        i - 1,
+                        i,
+                        false,
+                        { replacements[line] }
+                    )
+                end
+            end
+
+            -- Save the buffer after formatting.
+            vim.cmd("write")
         end
     end
 
@@ -54,7 +141,7 @@ local function do_format(conform, range)
         async = true,
         lsp_format = "never",
         range = range,
-    })
+    }, cb)
 end
 
 return {
