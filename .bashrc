@@ -466,3 +466,43 @@ function cm() {
         -v "$(pwd):$claude_manager_home/workspace/$project_name" \
         "claude-manager"
 }
+
+function pending_devel() {
+    local devel_dir="$HOME/devel"
+
+    if [ ! -d "$devel_dir" ]; then
+        echo "Error: $devel_dir does not exist."
+        return 1
+    fi
+
+    local current_dir="$(pwd)"
+
+    find_git_repos() {
+        local dir="$1"
+
+        if [ -d "$dir/.git" ]; then
+            cd "$dir"
+
+            if [ "$(git status --porcelain | wc -l)" -gt 0 ]; then
+                local repo_path="${dir#$devel_dir/}"
+                echo ""
+                echo -e "* \e[1m$repo_path\e[0m"
+                echo ""
+                git status --porcelain | head -n 10 | sed 's/^/    /'
+            fi
+
+            return
+        fi
+
+        for subdir in "$dir"/*; do
+            if [ -d "$subdir" ]; then
+                find_git_repos "$subdir"
+            fi
+        done
+    }
+
+    echo -e "Checking for uncommitted changes in \e[1m~/devel\e[0m repositories..."
+    find_git_repos "$devel_dir"
+
+    cd "$current_dir"
+}
