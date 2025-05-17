@@ -483,12 +483,38 @@ function pending_devel() {
         if [ -d "$dir/.git" ]; then
             cd "$dir"
 
+            local main_branch=$(git main-branch)
+            local repo_path="${dir#$devel_dir/}"
+
             if [ "$(git status --porcelain | wc -l)" -gt 0 ]; then
-                local repo_path="${dir#$devel_dir/}"
                 echo ""
                 echo -e "* \e[1m$repo_path\e[0m"
                 echo ""
                 git status --porcelain | head -n 10 | sed 's/^/    /'
+            else
+                local current_branch=$(git rev-parse --abbrev-ref HEAD)
+                local upstream=$(git rev-parse --abbrev-ref --symbolic-full-name @{upstream} 2> /dev/null)
+
+                if [ -n "$upstream" ]; then
+                    local ahead=$(git rev-list --count @{upstream}..HEAD)
+                    if [ "$ahead" -gt 0 ]; then
+                        echo ""
+                        echo -e "* \e[1m$repo_path\e[0m"
+                        echo "    $current_branch needs to be pushed, $ahead commit(s) ahead"
+                    fi
+                fi
+
+                if [ "$current_branch" != "$main_branch" ]; then
+                    local main_upstream=$(git for-each-ref --format='%(upstream:short)' refs/heads/"$main_branch" 2> /dev/null)
+                    if [ -n "$main_upstream" ]; then
+                        local ahead=$(git rev-list --count "$main_upstream".."$main_branch")
+                        if [ "$ahead" -gt 0 ]; then
+                            echo ""
+                            echo -e "* \e[1m$repo_path\e[0m"
+                            echo -e "    $main_branch needs to be pushed, $ahead commit(s) ahead"
+                        fi
+                    fi
+                fi
             fi
 
             return
