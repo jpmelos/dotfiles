@@ -62,22 +62,13 @@ local function do_format(conform, range)
                     if lines[i] == frontmatter_delimiter then
                         range = {
                             start = { i + 1, 0 },
-                            ["end"] = { #lines, math.maxinteger },
+                            ["end"] = { #lines, 99999 },
                         }
                         break
                     end
                 end
             end
         end
-        -- -- If `range` is still `nil` here, that just means we want to format
-        -- -- the entire file. Let's set `range` here to make the logic that
-        -- -- follows simpler, since it depends on `range`.
-        -- if range == nil then
-        --     range = {
-        --         start = { 1, 0 },
-        --         ["end"] = { #lines, math.maxinteger },
-        --     }
-        -- end
 
         -- Second pass: Exclude `{{` interpolation code from the file before
         -- formatting, and put them back in later, to stop `mdformat` from
@@ -113,7 +104,12 @@ local function do_format(conform, range)
             -- If didn't format anything, then just undo the replacements
             -- instead.
             if not did_edit then
-                if #replacements > 0 then
+                local n_replacements = 0
+                for _ in pairs(replacements) do
+                    n_replacements = n_replacements + 1
+                end
+
+                if n_replacements > 0 then
                     vim.cmd(
                         "let save_cursor = getpos('.')"
                             .. "| undo "
@@ -281,19 +277,21 @@ return {
             end,
         })
 
-        api.nvim_create_user_command("Format", function(args)
+        api.nvim_create_user_command("Format", function()
             local range = nil
-            if args.count ~= -1 then
+
+            local lines = GetVisualSelectionLines()
+            if lines ~= nil then
                 range = {
-                    start = { args.line1, 0 },
-                    ["end"] = { args.line2, math.maxinteger },
+                    start = { lines[1], 0 },
+                    ["end"] = { lines[2], 99999 },
                 }
             end
 
             do_format(conform, range)
 
             NormalMode()
-        end, { range = true })
+        end, { desc = "Format" })
 
         api.nvim_create_user_command("FormatToggle", function(args)
             if args.bang then
