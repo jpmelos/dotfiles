@@ -13,6 +13,7 @@ vim.g.formatters_by_ft = {
     lua = { "stylua" },
     -- Shell.
     sh = { "shfmt" },
+    bash = { "shfmt" },
     -- SQL formatters evaluated so far:
     -- - sql_formatter: Formats ON clauses (in JOINs) wrong, and aligns AND
     -- clauses weirdly.
