@@ -1,4 +1,4 @@
-local workspaces = { { name = "second-brain", path = "~/second-brain" } }
+local workspaces = { { name = "second-brain", path = "~/devel/second-brain" } }
 
 return {
     "epwalsh/obsidian.nvim",
