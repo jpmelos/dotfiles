@@ -363,7 +363,7 @@ function cm() {
     devel_dir="$HOME/devel"
 
     profile=""
-    rebuild=false
+    build=false
     claude_resume=false
     claude_help=false
     show_help=false
@@ -371,8 +371,8 @@ function cm() {
     args=()
     for arg in "$@"; do
         case "$arg" in
-            --rebuild)
-                rebuild=true
+            --build)
+                build=true
                 ;;
             --resume)
                 claude_resume=true
@@ -404,7 +404,7 @@ function cm() {
     if [[ "$show_help" == "true" ]]; then
         echo "Usage: cm [options] [profile]"
         echo "Options:"
-        echo "  --rebuild      Rebuild the Docker image"
+        echo "  --build        Build the Docker image"
         echo "  --resume       Resume previous Claude session"
         echo "  --claude-help  Show Claude help"
         echo "  --help         Show this help"
@@ -448,7 +448,7 @@ function cm() {
     project_name="$(echo $project_relative_path | sed 's|/|--|g')"
     claude_manager_home="/home/user"
 
-    if [[ "$rebuild" == "true" ]]; then
+    if [[ "$build" == "true" ]] || ! docker image inspect claude-manager &> /dev/null; then
         docker build \
             --no-cache \
             -t "claude-manager" \
