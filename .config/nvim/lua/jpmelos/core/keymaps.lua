@@ -202,7 +202,7 @@ K("n", "<leader>qq", function()
     if qf_exists then
         vim.cmd("cclose")
     else
-        vim.cmd("copen")
+        vim.cmd("botright copen")
     end
 end, { desc = "Toggle quickfix" })
 
