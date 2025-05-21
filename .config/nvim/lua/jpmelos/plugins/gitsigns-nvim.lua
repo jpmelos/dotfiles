@@ -6,7 +6,7 @@ return {
 
         local gs = require("gitsigns")
 
-        gs.setup()
+        gs.setup({ attach_to_untracked = true })
 
         -- Navigation.
         K("n", "]g", function()
