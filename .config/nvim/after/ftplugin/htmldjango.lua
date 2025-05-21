@@ -1,4 +1,4 @@
 -- 2 spaces for tabs.
-vim.opt.tabstop = 2
+vim.opt_local.tabstop = 2
 -- 2 spaces for indent width.
-vim.opt.shiftwidth = 2
+vim.opt_local.shiftwidth = 2
