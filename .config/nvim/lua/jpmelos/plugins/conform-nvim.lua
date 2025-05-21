@@ -30,7 +30,7 @@
 -- ```
 
 local function do_format(conform, range)
-    local cb = function(err, did_edit)
+    local cb = function(did_edit)
         -- If didn't format anything, there's nothing to do.
         if not did_edit then
             return
@@ -100,7 +100,7 @@ local function do_format(conform, range)
             end
         end
 
-        cb = function(err, did_edit)
+        cb = function(did_edit)
             -- If didn't format anything, then just undo the replacements
             -- instead.
             if not did_edit then
@@ -139,11 +139,16 @@ local function do_format(conform, range)
         end
     end
 
+    local bufnr = vim.api.nvim_get_current_buf()
     conform.format({
         async = true,
         lsp_format = "never",
         range = range,
-    }, cb)
+    }, function(err, did_edit)
+        vim.api.nvim_buf_call(bufnr, function()
+            cb(did_edit)
+        end)
+    end)
 end
 
 return {
