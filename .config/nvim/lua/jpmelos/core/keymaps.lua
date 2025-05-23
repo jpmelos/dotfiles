@@ -147,9 +147,9 @@ end, { desc = "Copy buffer contents" })
 K("n", "<leader>by", function()
     local rel_path = vim.fn.expand("%:.")
     local buffer_content = GetBufferContents()
-    local formatted_content = "File `"
+    local formatted_content = "File @"
         .. rel_path
-        .. "`:\n\n```\n"
+        .. ":\n\n```\n"
         .. buffer_content
         .. "\n```"
 
@@ -175,9 +175,9 @@ K("v", "<leader>by", function()
         line_info = "lines " .. start_line .. "-" .. end_line
     end
 
-    local formatted_content = "File `"
+    local formatted_content = "File @"
         .. rel_path
-        .. "` ("
+        .. " ("
         .. line_info
         .. "):\n\n```\n"
         .. selected_content
