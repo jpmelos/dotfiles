@@ -1,12 +1,12 @@
-local ol = vim.opt_local
-
 -- 2 spaces for tabs.
-ol.tabstop = 2
+vim.opt_local.tabstop = 2
 -- 2 spaces for indent width.
-ol.shiftwidth = 2
+vim.opt_local.shiftwidth = 2
 -- Shift broken lines by the same number of columns as the tab stop, to make it
 -- move obvious it'a broken.
-ol.breakindentopt = "shift:2"
+vim.opt_local.breakindentopt = "shift:2"
 
 -- Same as in optionsl.lua, look at that file to see what each of these mean.
-ol.formatoptions = "cro/qn]j"
+vim.opt_local.formatoptions = "cro/qn]j"
+
+vim.opt_local.colorcolumn = { 80 }
