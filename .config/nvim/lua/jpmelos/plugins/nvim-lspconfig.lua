@@ -12,7 +12,7 @@ return {
         "hrsh7th/cmp-nvim-lsp",
     },
     -- Keep this and the language servers in sync.
-    ft = { "bash", "python", "lua", "rust", "sql", "toml", "yaml" },
+    ft = { "sh", "bash", "python", "lua", "rust", "sql", "toml", "yaml" },
     config = function()
         local K = vim.keymap.set
 
@@ -70,7 +70,6 @@ return {
         vim.lsp.config("bashls", {
             on_attach = lsp_on_attach,
             capabilities = capabilities,
-            filetypes = { "sh", "bash" },
         })
         vim.lsp.config("pyright", {
             on_attach = lsp_on_attach,
