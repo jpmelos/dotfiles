@@ -16,7 +16,6 @@ return {
     config = function()
         local K = vim.keymap.set
 
-        local lspconfig = require("lspconfig")
         local mason_lspconfig = require("mason-lspconfig")
         local cmp_nvim_lsp = require("cmp_nvim_lsp")
 
@@ -27,28 +26,6 @@ return {
             local hl = "DiagnosticSign" .. type
             vim.fn.sign_define(hl, { text = icon, texthl = hl, numhl = "" })
         end
-
-        mason_lspconfig.setup({
-            -- These are `nvim-lspconfig` names, which will be translated to
-            -- Mason package names by `mason-lspconfig.nvim`.
-            -- Keep this and `ft` in sync.
-            ensure_installed = {
-                -- bash
-                "bashls",
-                -- Python
-                "pyright",
-                -- Lua
-                "lua_ls",
-                -- Rust
-                "rust_analyzer",
-                -- SQL
-                "sqlls",
-                -- TOML
-                "taplo",
-                -- YAML
-                "yamlls",
-            },
-        })
 
         -- Capabilities, with the ones added by `nvim-cmp`.
         local capabilities = vim.tbl_deep_extend(
@@ -85,91 +62,101 @@ return {
             end
         end
 
-        mason_lspconfig.setup_handlers({
-            -- When adding a server here, at a minimum you need to send it the
-            -- capabilities table and set the `on_attach` handler. See below
-            -- for examples. Also keep the `ft` lazy-loading configuration for
-            -- this plugin up-to-date.
-            bashls = function()
-                lspconfig.bashls.setup({
-                    on_attach = lsp_on_attach,
-                    capabilities = capabilities,
-                })
-            end,
-            pyright = function()
-                lspconfig.pyright.setup({
-                    on_attach = lsp_on_attach,
-                    capabilities = capabilities,
-                    settings = {
-                        pyright = { disableOrganizeImports = true },
-                        python = {
-                            analysis = {
-                                autoImportCompletions = true,
-                                diagnosticMode = "openFilesOnly",
-                                typeCheckingMode = "off",
-                                useLibraryCodeForTypes = false,
-                                autoSearchPaths = false,
-                            },
+        -- When adding a server here, at a minimum you need to send it the
+        -- capabilities table and set the `on_attach` handler. See below for
+        -- examples. Also keep the `ft` lazy-loading configuration for this
+        -- plugin up-to-date, and the `ensure_installed` list for
+        -- `mason-lspconfig`.
+        vim.lsp.config("bashls", {
+            on_attach = lsp_on_attach,
+            capabilities = capabilities,
+            filetypes = { "sh", "bash" },
+        })
+        vim.lsp.config("pyright", {
+            on_attach = lsp_on_attach,
+            capabilities = capabilities,
+            settings = {
+                pyright = { disableOrganizeImports = true },
+                python = {
+                    analysis = {
+                        autoImportCompletions = true,
+                        diagnosticMode = "openFilesOnly",
+                        typeCheckingMode = "off",
+                        useLibraryCodeForTypes = false,
+                        autoSearchPaths = false,
+                    },
+                },
+            },
+        })
+        vim.lsp.config("lua_ls", {
+            on_attach = lsp_on_attach,
+            capabilities = capabilities,
+            settings = {
+                Lua = {
+                    diagnostics = {
+                        disable = { "type-check" },
+                        -- Make the language server recognize the "vim"
+                        -- global. Useful when working with Neovim
+                        -- configuration.
+                        globals = { "vim" },
+                    },
+                },
+            },
+        })
+        vim.lsp.config("rust_analyzer", {
+            on_attach = lsp_on_attach,
+            capabilities = capabilities,
+            settings = {
+                ["rust-analyzer"] = {
+                    completion = {
+                        fullFunctionSignatures = {
+                            enable = true,
+                        },
+                        hideDeprecated = true,
+                    },
+                    diagnostics = {
+                        styleLints = {
+                            enable = true,
                         },
                     },
-                })
-            end,
-            lua_ls = function()
-                lspconfig.lua_ls.setup({
-                    on_attach = lsp_on_attach,
-                    capabilities = capabilities,
-                    settings = {
-                        Lua = {
-                            diagnostics = {
-                                disable = { "type-check" },
-                                -- Make the language server recognize the "vim"
-                                -- global. Useful when working with Neovim
-                                -- configuration.
-                                globals = { "vim" },
-                            },
-                        },
-                    },
-                })
-            end,
-            rust_analyzer = function()
-                lspconfig.rust_analyzer.setup({
-                    on_attach = lsp_on_attach,
-                    capabilities = capabilities,
-                    settings = {
-                        ["rust-analyzer"] = {
-                            completion = {
-                                fullFunctionSignatures = {
-                                    enable = true,
-                                },
-                                hideDeprecated = true,
-                            },
-                            diagnostics = {
-                                styleLints = {
-                                    enable = true,
-                                },
-                            },
-                        },
-                    },
-                })
-            end,
-            sqlls = function()
-                lspconfig.sqlls.setup({
-                    on_attach = lsp_on_attach,
-                    capabilities = capabilities,
-                })
-            end,
-            taplo = function()
-                lspconfig.taplo.setup({
-                    on_attach = lsp_on_attach,
-                    capabilities = capabilities,
-                })
-            end,
-            yamlls = function()
-                lspconfig.yamlls.setup({
-                    on_attach = lsp_on_attach,
-                    capabilities = capabilities,
-                })
-            end,
+                },
+            },
+        })
+        vim.lsp.config("sqlls", {
+            on_attach = lsp_on_attach,
+            capabilities = capabilities,
+        })
+        vim.lsp.config("taplo", {
+            on_attach = lsp_on_attach,
+            capabilities = capabilities,
+        })
+        vim.lsp.config("yamlls", {
+            on_attach = lsp_on_attach,
+            capabilities = capabilities,
+        })
+
+        local ensure_installed = {
+            -- These are `nvim-lspconfig` names, which will be translated to
+            -- Mason package names by `mason-lspconfig.nvim`. Keep this and
+            -- `ft` in sync.
+            -- bash
+            "bashls",
+            -- Python
+            "pyright",
+            -- Lua
+            "lua_ls",
+            -- Rust
+            "rust_analyzer",
+            -- SQL
+            "sqlls",
+            -- TOML
+            "taplo",
+            -- YAML
+            "yamlls",
+        }
+        mason_lspconfig.setup({
+            ensure_installed = ensure_installed,
+            automatic_enable = ensure_installed,
         })
 
         K(

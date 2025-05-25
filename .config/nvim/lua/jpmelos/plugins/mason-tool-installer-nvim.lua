@@ -5,8 +5,8 @@ return {
     },
     config = function()
         require("mason-tool-installer").setup({
-            -- Install language servers with `mason-lspconfig.nvim` to
-            -- ensure automatic configuration.
+            -- Install language servers with `mason-lspconfig.nvim` in
+            -- `nvim-lspconfig` to ensure automatic configuration.
             ensure_installed = {
                 -- bash
                 -- shellcheck: Not explicitly referenced in these dotfiles, but
