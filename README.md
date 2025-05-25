@@ -2,10 +2,25 @@
 
 ## Installing these dotfiles
 
-1. Install `stow`.
+1. Clone the Git template directory:
 
-1. Run:
+   ```
+   mkdir -p ~/devel
+   cd ~/devel
+   git clone git@github.com:jpmelos/git-template.git
+   ```
+
+2. Clone these dotfiles:
+
+   ```
+   git clone --template=~/devel/git-template git@github.com:jpmelos/dotfiles.git
+   ```
+
+3. Install `stow`.
+
+4. Run:
 
    ```bash
+   cd ~/devel/dotfiles
    stow .
    ```
