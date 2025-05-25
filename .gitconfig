@@ -17,7 +17,7 @@
 
 [init]
     defaultBranch = main
-	templateDir = /Users/jpmelos/devel/.git-template
+	templateDir = /Users/jpmelos/devel/git-template
 
 [branch]
     sort = -committerdate
