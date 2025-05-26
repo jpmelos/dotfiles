@@ -1,0 +1,7 @@
+repos:
+  - repo: local
+    hooks:
+      - id: no-commit-files
+        name: Check for files with `! NO COMMIT !`
+        language: script
+        entry: /Users/jpmelos/devel/dotfiles/references/pre-commit/no-commit.sh

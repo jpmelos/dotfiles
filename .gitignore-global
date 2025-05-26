@@ -1,5 +1,6 @@
 # Personal environment files.
 jpenv*
+/.pre-commit-config-local.yaml
 
 # autoenv files.
 .autoenv.enter
