@@ -22,6 +22,19 @@ return {
 
         local tree_api = require("nvim-tree.api")
 
+        local mappings = {
+            ["<C-k>"] = actions.move_selection_previous,
+            ["<C-j>"] = actions.move_selection_next,
+            ["<C-q>"] = actions.smart_send_to_qflist + actions.open_qflist,
+            ["<C-o>"] = actions.cycle_history_prev,
+            ["<C-p>"] = actions.cycle_history_next,
+            ["<C-d>"] = actions.preview_scrolling_down,
+            ["<C-f>"] = actions.preview_scrolling_up,
+            ["<C-x>"] = actions.file_split,
+            ["<C-v>"] = actions.file_vsplit,
+            ["<C-t>"] = actions.file_tab,
+            ["<C-c>"] = actions.close,
+        }
         -- ripgrep arguments come from `$RIPGREP_CONFIG_PATH`. By default, it
         -- is `~/.ripgreprc`, but it may be overridden for projects with
         -- `.autoenv.enter`.
@@ -53,35 +66,9 @@ return {
                     ignore_empty_prompt = true,
                 },
 
-                mappings = {
-                    n = {
-                        ["<C-k>"] = actions.move_selection_previous,
-                        ["<C-j>"] = actions.move_selection_next,
-                        ["<C-q>"] = actions.smart_send_to_qflist
-                            + actions.open_qflist,
-                        ["<C-o>"] = actions.cycle_history_prev,
-                        ["<C-p>"] = actions.cycle_history_next,
-                        ["<C-d>"] = actions.preview_scrolling_down,
-                        ["<C-f>"] = actions.preview_scrolling_up,
-                        ["<C-x>"] = actions.file_split,
-                        ["<C-v>"] = actions.file_vsplit,
-                        ["<C-c>"] = actions.close,
-                    },
-                    i = {
-                        ["<C-k>"] = actions.move_selection_previous,
-                        ["<C-j>"] = actions.move_selection_next,
-                        ["<C-q>"] = actions.smart_send_to_qflist
-                            + actions.open_qflist,
-                        ["<C-o>"] = actions.cycle_history_prev,
-                        ["<C-p>"] = actions.cycle_history_next,
-                        ["<C-d>"] = actions.preview_scrolling_down,
-                        ["<C-f>"] = actions.preview_scrolling_up,
-                        ["<C-x>"] = actions.file_split,
-                        ["<C-v>"] = actions.file_vsplit,
-                        ["<C-c>"] = actions.close,
-                    },
-                },
                 extensions = { ["ui-select"] = { themes.get_dropdown({}) } },
+
+                mappings = { n = mappings, i = mappings },
             },
         })
         telescope.load_extension("fzf")

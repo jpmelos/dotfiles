@@ -43,6 +43,25 @@ return {
 
         local tree = require("nvim-tree")
         local tree_view = require("nvim-tree.view")
+        local tree_api = require("nvim-tree.api")
+
+        local function on_attach(bufnr)
+            local function opts(desc)
+                return {
+                    desc = desc,
+                    buffer = bufnr,
+                    noremap = true,
+                    silent = true,
+                    nowait = true,
+                }
+            end
+
+            -- default mappings
+            tree_api.config.mappings.default_on_attach(bufnr)
+
+            -- custom mappings
+            vim.keymap.set("n", "<C-c>", "<cmd>q<cr>", opts("Close"))
+        end
 
         tree.setup({
             view = {
@@ -100,6 +119,7 @@ return {
             git = {
                 ignore = false, -- Do not omit files ignored by git.
             },
+            on_attach = on_attach,
         })
 
         vim.api.nvim_create_autocmd({ "VimResized" }, {
