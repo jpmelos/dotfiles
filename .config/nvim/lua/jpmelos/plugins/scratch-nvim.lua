@@ -4,7 +4,15 @@ return {
     keys = {
         {
             "<leader>xo",
-            "<cmd>ScratchOpen<cr>",
+            function()
+                local telescope_builtins = require("telescope.builtin")
+                local config_data = vim.g.scratch_config
+
+                telescope_builtins.find_files({
+                    cwd = config_data.scratch_file_dir,
+                    default_text = os.date("%Y-%m-%d-"),
+                })
+            end,
             mode = "n",
             desc = "Open a scratch file",
         },
