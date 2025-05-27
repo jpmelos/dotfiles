@@ -61,7 +61,12 @@ function RestoreVisualSelection(mode, start_pos, end_pos)
     vim.fn.setpos("'<", start_pos)
     vim.fn.setpos("'>", end_pos)
     vim.api.nvim_feedkeys(
-        vim.api.nvim_replace_termcodes("`<" .. mode .. "`>", true, false, true),
+        vim.api.nvim_replace_termcodes(
+            "`<" .. mode .. "`>",
+            true,
+            false,
+            true
+        ),
         "nx",
         false
     )
