@@ -62,18 +62,9 @@ return {
             end
         end
 
-        -- When adding a server here, at a minimum you need to send it the
-        -- capabilities table and set the `on_attach` handler. See below for
-        -- examples. Also keep the `ft` lazy-loading configuration for this
-        -- plugin up-to-date, and the `ensure_installed` list for
-        -- `mason-lspconfig`.
-        vim.lsp.config("bashls", {
-            on_attach = lsp_on_attach,
-            capabilities = capabilities,
-        })
+        -- Keep the `ft` lazy-loading configuration for this plugin up-to-date,
+        -- and the `ensure_installed` list for `mason-lspconfig`.
         vim.lsp.config("pyright", {
-            on_attach = lsp_on_attach,
-            capabilities = capabilities,
             settings = {
                 pyright = { disableOrganizeImports = true },
                 python = {
@@ -88,8 +79,6 @@ return {
             },
         })
         vim.lsp.config("lua_ls", {
-            on_attach = lsp_on_attach,
-            capabilities = capabilities,
             settings = {
                 Lua = {
                     diagnostics = {
@@ -103,8 +92,6 @@ return {
             },
         })
         vim.lsp.config("rust_analyzer", {
-            on_attach = lsp_on_attach,
-            capabilities = capabilities,
             settings = {
                 ["rust-analyzer"] = {
                     completion = {
@@ -121,15 +108,7 @@ return {
                 },
             },
         })
-        vim.lsp.config("sqlls", {
-            on_attach = lsp_on_attach,
-            capabilities = capabilities,
-        })
-        vim.lsp.config("taplo", {
-            on_attach = lsp_on_attach,
-            capabilities = capabilities,
-        })
-        vim.lsp.config("yamlls", {
+        vim.lsp.config("*", {
             on_attach = lsp_on_attach,
             capabilities = capabilities,
         })
