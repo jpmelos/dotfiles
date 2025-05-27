@@ -24,7 +24,10 @@ function Input(title, default_value, callback)
         input:unmount()
     end)
 
-    input:map("n", "q", function()
+    input:map("i", "<C-c>", function()
+        input:unmount()
+    end, { noremap = true })
+    input:map("n", "<C-c>", function()
         input:unmount()
     end, { noremap = true })
 
