@@ -283,6 +283,10 @@ vim.api.nvim_exec2(
         function! LspServers() abort
             return luaeval("GetLspServers()")
         endfunction
+
+        function! StatusLineFileName() abort
+            return expand("%:.")
+        endfunction
     ]],
     {}
 )
