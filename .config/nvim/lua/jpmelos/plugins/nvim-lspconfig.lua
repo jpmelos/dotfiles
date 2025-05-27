@@ -111,6 +111,7 @@ return {
         vim.lsp.config("*", {
             on_attach = lsp_on_attach,
             capabilities = capabilities,
+            root_dir = vim.fn.getcwd(),
         })
 
         local ensure_installed = {
