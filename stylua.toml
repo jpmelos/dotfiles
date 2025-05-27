@@ -1,4 +1,6 @@
-column_width = 79
+# This actually is 79, since Stylua is lenient with lines that go over the
+# limit by one character.
+column_width = 78
 line_endings = "Unix"
 indent_type = "Spaces"
 indent_width = 4
