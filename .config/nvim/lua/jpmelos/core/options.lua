@@ -42,6 +42,8 @@ opt.breakindentopt = "shift:4"
 -- Show ↪ in front of broken lines.
 opt.showbreak = "↪"
 
+opt.colorcolumn = { "80" }
+
 -- Set text width for automatic formatting.
 opt.textwidth = 79
 -- Fine-tune formatting.

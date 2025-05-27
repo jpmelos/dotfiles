@@ -8,5 +8,3 @@ vim.opt_local.breakindentopt = "shift:2"
 
 -- Same as in optionsl.lua, look at that file to see what each of these mean.
 vim.opt_local.formatoptions = "cro/qn]j"
-
-vim.opt_local.colorcolumn = { 80 }
