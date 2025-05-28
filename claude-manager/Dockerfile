@@ -4,7 +4,7 @@ RUN mkdir -p /home/user/workspace
 ENV HOME=/home/user
 ENV PATH="$HOME/.cargo/bin:$PATH"
 
-RUN apt update && apt install -y nodejs npm curl git jq
+RUN apt update && apt install -y nodejs npm curl git jq ripgrep
 
 RUN npm install -g @anthropic-ai/claude-code
 
