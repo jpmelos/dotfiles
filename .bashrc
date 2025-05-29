@@ -429,6 +429,7 @@ function cm() {
     fi
 
     profile_dir="$HOME/.claude-manager/profiles/$profile"
+    profile_git_dir="$HOME/devel/dotfiles-secret/claude-manager/$profile"
     profile_claude_dir="$profile_dir/.claude"
     profile_json="$profile_dir/.claude.json"
 
@@ -443,6 +444,15 @@ function cm() {
     mkdir -p "$profile_claude_dir"
     if [ ! -f "$profile_json" ]; then
         echo "{}" > "$profile_json"
+    fi
+
+    memories_source_path="$profile_git_dir/CLAUDE.md"
+    memories_dest_path="$profile_claude_dir/CLAUDE.md"
+    if [ ! -f "$memories_source_path" ]; then
+        echo "Warning: No memories to restore"
+    else
+        \cp "$memories_source_path" "$memories_dest_path"
+        echo "Memories restored."
     fi
 
     project_name="$(echo $project_relative_path | sed 's|/|--|g')"
@@ -465,6 +475,15 @@ function cm() {
         -v "$profile_claude_dir:$claude_manager_home/.claude" \
         -v "$(pwd):$claude_manager_home/workspace/$project_name" \
         "claude-manager"
+
+    if [ ! -f "$memories_dest_path" ]; then
+        echo ""
+        echo "Warning: No memories to save"
+    else
+        mkdir -p "$profile_git_dir"
+        \cp "$memories_dest_path" "$memories_source_path"
+        echo "Memories saved."
+    fi
 }
 
 function pending_devel() {
