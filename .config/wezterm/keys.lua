@@ -106,7 +106,7 @@ function module.apply_to_config(config)
             mods = "LEADER|SHIFT",
             action = action.SplitPane({
                 direction = "Right",
-                size = { Percent = 33 },
+                size = { Percent = 25 },
             }),
         },
         {
@@ -121,7 +121,7 @@ function module.apply_to_config(config)
             mods = "LEADER|SHIFT",
             action = action.SplitPane({
                 direction = "Down",
-                size = { Percent = 33 },
+                size = { Percent = 25 },
             }),
         },
         {
