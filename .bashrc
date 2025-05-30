@@ -446,15 +446,6 @@ function cm() {
         echo "{}" > "$profile_json"
     fi
 
-    memories_source_path="$profile_git_dir/CLAUDE.md"
-    memories_dest_path="$profile_claude_dir/CLAUDE.md"
-    if [ ! -f "$memories_source_path" ]; then
-        echo "Warning: No memories to restore"
-    else
-        \cp "$memories_source_path" "$memories_dest_path"
-        echo "Memories restored."
-    fi
-
     project_name="$(echo $project_relative_path | sed 's|/|--|g')"
     claude_manager_home="/home/user"
 
@@ -463,6 +454,15 @@ function cm() {
             --no-cache \
             -t "claude-manager" \
             ~/devel/dotfiles/claude-manager/
+    fi
+
+    memories_source_path="$profile_git_dir/CLAUDE.md"
+    memories_dest_path="$profile_claude_dir/CLAUDE.md"
+    if [ ! -f "$memories_source_path" ]; then
+        echo "Warning: No memories to restore"
+    else
+        \cp "$memories_source_path" "$memories_dest_path"
+        echo "Memories restored."
     fi
 
     docker run --rm -ti \
