@@ -8,7 +8,8 @@ echo
 echo -n "Running as: "
 cat ~/.claude.json | jq '.oauthAccount.emailAddress' | tr -d '"'
 echo
-read -r -p "Press any key to continue, CTRL+D to quit..."
+trap 'exit 0' INT
+read -r -p "Press any key to continue, CTRL+C or CTRL+D to quit..."
 
 claude config set -g autoUpdaterStatus disabled
 
