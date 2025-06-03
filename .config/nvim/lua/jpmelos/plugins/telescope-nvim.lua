@@ -26,6 +26,7 @@ return {
             ["<C-k>"] = actions.move_selection_previous,
             ["<C-j>"] = actions.move_selection_next,
             ["<C-q>"] = actions.smart_send_to_qflist + actions.open_qflist,
+            ["<C-w>"] = actions.smart_add_to_qflist + actions.open_qflist,
             ["<C-o>"] = actions.cycle_history_prev,
             ["<C-p>"] = actions.cycle_history_next,
             ["<C-d>"] = actions.preview_scrolling_down,
