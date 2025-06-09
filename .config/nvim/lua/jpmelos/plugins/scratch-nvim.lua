@@ -14,6 +14,19 @@ return {
                 })
             end,
             mode = "n",
+            desc = "Open a scratch file (with today's date)",
+        },
+        {
+            "<leader>xO",
+            function()
+                local telescope_builtins = require("telescope.builtin")
+                local config_data = vim.g.scratch_config
+
+                telescope_builtins.find_files({
+                    cwd = config_data.scratch_file_dir,
+                })
+            end,
+            mode = "n",
             desc = "Open a scratch file",
         },
         {
