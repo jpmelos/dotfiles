@@ -88,8 +88,11 @@ end
 local function register_event_handlers()
     local dap = require("dap")
 
+    local debugging_tab = nil
+
     local function handle_initialized_event()
         OpenCurrentBufferInNewTab()
+        debugging_tab = vim.api.nvim_get_current_tabpage()
     end
 
     local function handle_stopped_event()
@@ -98,7 +101,11 @@ local function register_event_handlers()
 
     local function handle_terminated_event()
         unset_saved_breakpoint()
-        vim.cmd("tabclose")
+        if debugging_tab and vim.api.nvim_tabpage_is_valid(debugging_tab) then
+            vim.cmd(
+                "tabclose " .. vim.api.nvim_tabpage_get_number(debugging_tab)
+            )
+        end
     end
 
     dap.listeners.before["event_initialized"]["jpmelos"] =
@@ -232,7 +239,12 @@ return {
         end, { desc = "Run to cursor conditionally" })
         K("n", "<leader>dx", dap.disconnect, { desc = "End current session" })
 
-        K("n", "<leader>db", toggle_breakpoint, { desc = "Toggle breakpoint" })
+        K(
+            "n",
+            "<leader>db",
+            toggle_breakpoint,
+            { desc = "Toggle breakpoint" }
+        )
         K("n", "<leader>dB", function()
             toggle_breakpoint(true)
         end, { desc = "Toggle conditional breakpoint" })
