@@ -2,9 +2,12 @@
 ^/.autoenv.leave
 ^/.git
 ^/.gitignore
+^/.mdformat.toml
 ^/.nvim.lua
 ^/.stow-local-ignore
 ^/.stowrc
 ^/README.md
 ^/claude-manager
+^/jpenv-scratch
 ^/references
+^/stylua.toml
