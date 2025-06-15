@@ -359,11 +359,22 @@ function is_in_path() {
 }
 
 function cm() {
-    current_dir="$(pwd)"
+    if [[ ! -f "$HOME/.claude/settings.json" ]]; then
+        ln \
+            -s "$HOME/devel/dotfiles/claude-manager/settings.json" \
+            "$HOME/.claude/settings.json"
+    fi
+
     devel_dir="$HOME/devel"
+    current_dir="$(pwd)"
+    if [[ "$current_dir" != "$devel_dir"* ]]; then
+        echo "Error: not inside ~/devel" >&2
+        return 1
+    fi
+
+    project_relative_dir="${current_dir#"$devel_dir"/}"
 
     profile=""
-    build=false
     claude_resume=false
     claude_help=false
     show_help=false
@@ -371,9 +382,6 @@ function cm() {
     args=()
     for arg in "$@"; do
         case "$arg" in
-            --build)
-                build=true
-                ;;
             --resume)
                 claude_resume=true
                 ;;
@@ -404,85 +412,42 @@ function cm() {
     if [[ "$show_help" == "true" ]]; then
         echo "Usage: cm [options] [profile]"
         echo "Options:"
-        echo "  --build        Build the Docker image"
         echo "  --resume       Resume previous Claude session"
         echo "  --claude-help  Show Claude help"
         echo "  --help         Show this help"
         return 0
     fi
 
-    # Check if we're in the devel directory
-    if [[ "$current_dir" == "$devel_dir"* ]]; then
-        project_relative_path="${current_dir#$devel_dir/}"
-    else
-        echo "Error: not inside ~/devel" >&2
-        return 1
-    fi
-
     if [ -z "$profile" ]; then
-        first_component=$(echo "$project_relative_path" | cut -d'/' -f1)
-        if [ -d "$HOME/.claude-manager/profiles/$first_component" ]; then
-            profile="$first_component"
+        component_count=$(echo "$project_relative_dir" | tr '/' '\n' | wc -l)
+        if [ "$component_count" -gt 1 ]; then
+            profile="$(echo "$project_relative_dir" | cut -d'/' -f1)"
         else
             profile="jpmelos"
         fi
     fi
 
-    profile_dir="$HOME/.claude-manager/profiles/$profile"
-    profile_git_dir="$HOME/devel/dotfiles-secret/claude-manager/$profile"
-    profile_claude_dir="$profile_dir/.claude"
-    profile_json="$profile_dir/.claude.json"
-
-    if [ ! -d "$profile_dir" ]; then
-        read -p "Profile '$profile' does not exist. Create it? [y/N] " create_profile
-        if [[ "${create_profile,,}" != "y" && "${create_profile,,}" != "yes" ]]; then
-            echo "Profile not created. Exiting."
-            return 0
-        fi
+    CLAUDE_CODE_API_KEY=$(
+        toml get <(
+            op item get "Claude Code API Keys" \
+                --vault "Private" --format json \
+                | jq -r ".fields[0].value"
+        ) . | jq -r ".profiles.$profile"
+    )
+    if [[ "$CLAUDE_CODE_API_KEY" == "null" ]]; then
+        echo "Error: no API key for profile '$profile'" >&2
+        return 1
     fi
+    export CLAUDE_CODE_API_KEY
 
-    mkdir -p "$profile_claude_dir"
-    if [ ! -f "$profile_json" ]; then
-        echo "{}" > "$profile_json"
-    fi
+    echo "Running Claude Code with profile '$profile'"
 
-    project_name="$(echo $project_relative_path | sed 's|/|--|g')"
-    claude_manager_home="/home/user"
-
-    if [[ "$build" == "true" ]] || ! docker image inspect claude-manager &> /dev/null; then
-        docker build \
-            --no-cache \
-            -t "claude-manager" \
-            ~/devel/dotfiles/claude-manager/
-    fi
-
-    memories_source_path="$profile_git_dir/CLAUDE.md"
-    memories_dest_path="$profile_claude_dir/CLAUDE.md"
-    if [ ! -f "$memories_source_path" ]; then
-        echo "Warning: No memories to restore"
+    if [[ "$claude_help" == "true" ]]; then
+        claude --help
+    elif [[ "$claude_resume" == "true" ]]; then
+        claude --resume
     else
-        \cp "$memories_source_path" "$memories_dest_path"
-        echo "Memories restored."
-    fi
-
-    docker run --rm -ti \
-        --name "claude-code-$project_name" \
-        --user $(id -u):$(id -g) \
-        -e TERM="$TERM" \
-        -e CLAUDE_HELP="$claude_help" \
-        -e CLAUDE_RESUME="$claude_resume" \
-        -v "$profile_json:$claude_manager_home/.claude.json" \
-        -v "$profile_claude_dir:$claude_manager_home/.claude" \
-        -v "$(pwd):$claude_manager_home/workspace/$project_name" \
-        "claude-manager"
-
-    if [ ! -f "$memories_dest_path" ]; then
-        echo ""
-        echo "Warning: No memories to save"
-    else
-        mkdir -p "$profile_git_dir"
-        \cp "$memories_dest_path" "$memories_source_path"
-        echo "Memories saved."
+        claude
     fi
 }
 
