@@ -368,14 +368,18 @@ function cm() {
 
     project_relative_dir="${current_dir#"$devel_dir"/}"
 
-    profile=""
+    add_mcp=false
     claude_resume=false
     claude_help=false
     show_help=false
+    profile=""
 
     args=()
     for arg in "$@"; do
         case "$arg" in
+            --add-mcp)
+                add_mcp=true
+                ;;
             --resume)
                 claude_resume=true
                 ;;
@@ -406,6 +410,7 @@ function cm() {
     if [[ "$show_help" == "true" ]]; then
         echo "Usage: cm [options] [profile]"
         echo "Options:"
+        echo "  --add-mcp      Add MCP servers"
         echo "  --resume       Resume previous Claude session"
         echo "  --claude-help  Show Claude help"
         echo "  --help         Show this help"
@@ -421,12 +426,13 @@ function cm() {
         fi
     fi
 
+    CLAUDE_CODE_SECRET=$(
+        op item get "Claude Code Configuration" \
+            --vault "Private" --format json \
+            | jq -r ".fields[0].value"
+    )
     CLAUDE_CODE_API_KEY=$(
-        toml get <(
-            op item get "Claude Code API Keys" \
-                --vault "Private" --format json \
-                | jq -r ".fields[0].value"
-        ) . | jq -r ".profiles.$profile"
+        toml get <(echo "$CLAUDE_CODE_SECRET") . | jq -r ".api_keys.$profile"
     )
     if [[ "$CLAUDE_CODE_API_KEY" == "null" ]]; then
         echo "Error: no API key for profile '$profile'" >&2
@@ -440,6 +446,18 @@ function cm() {
     export MCP_TOOL_TIMEOUT=10000
 
     echo "Running Claude Code with profile '$profile'"
+
+    if [[ "$add_mcp" == "true" ]]; then
+        GITHUB_MCP_API_KEY=$(
+            toml get <(echo "$CLAUDE_CODE_SECRET") . \
+                | jq -r ".mcp.github_api_token"
+        )
+        local github_mcp_server_config=$(
+            cat ~/devel/dotfiles/claude-manager/github-mcp-serser.json \
+                | sed "s/{{github_api_token}}/$GITHUB_MCP_API_KEY/g"
+        )
+        claude mcp add-json --scope user github "$github_mcp_server_config"
+    fi
 
     if [[ "$claude_help" == "true" ]]; then
         claude --help
