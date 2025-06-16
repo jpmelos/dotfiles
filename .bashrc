@@ -359,12 +359,6 @@ function is_in_path() {
 }
 
 function cm() {
-    if [[ ! -f "$HOME/.claude/settings.json" ]]; then
-        ln \
-            -s "$HOME/devel/dotfiles/claude-manager/settings.json" \
-            "$HOME/.claude/settings.json"
-    fi
-
     devel_dir="$HOME/devel"
     current_dir="$(pwd)"
     if [[ "$current_dir" != "$devel_dir"* ]]; then
