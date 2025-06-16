@@ -434,6 +434,11 @@ function cm() {
     fi
     export CLAUDE_CODE_API_KEY
 
+    export BASH_DEFAULT_TIMEOUT_MS=30000
+    export BASH_MAX_TIMEOUT_MS=30000
+    export MCP_TIMEOUT=10000
+    export MCP_TOOL_TIMEOUT=10000
+
     echo "Running Claude Code with profile '$profile'"
 
     if [[ "$claude_help" == "true" ]]; then
