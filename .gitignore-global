@@ -1,6 +1,11 @@
-# Personal environment files.
+# Generic marker for personal environment files.
 jpenv*
+
+# Pre-commit hooks.
 /.pre-commit-config-local.yaml
+
+# IDE configuration.
+.nvim.lua
 
 # autoenv files.
 .autoenv.enter
@@ -8,10 +13,3 @@ jpenv*
 
 # Python virtual environments.
 .venv*
-
-# Personal IDE configuration file.
-.nvim.lua
-
-# Claude Code local settings and memory.
-CLAUDE.local.md
-.claude/settings.local.json
