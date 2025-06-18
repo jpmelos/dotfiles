@@ -1,3 +1,17 @@
 {
-  "apiKeyHelper": "/Users/jpmelos/devel/dotfiles/claude-manager/api-key-helper.sh"
+  "apiKeyHelper": "/Users/jpmelos/devel/dotfiles/claude-manager/api-key-helper.sh",
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(sed:*)",
+      "Bash(git:*)",
+      "Bash(gh:*)",
+      "Bash(cargo check:*)",
+      "Bash(cargo clippy:*)",
+      "WebFetch(domain:docs.rs)"
+    ]
+  }
 }
