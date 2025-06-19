@@ -448,6 +448,8 @@ function cm() {
     echo "Running Claude Code with profile '$profile'"
 
     if [[ "$add_mcp" == "true" ]]; then
+        claude mcp list | cut -d: -f1 | xargs -I {} claude mcp remove {}
+
         GITHUB_MCP_API_KEY=$(
             toml get <(echo "$CLAUDE_CODE_SECRET") . \
                 | jq -r ".mcp.github_api_token"
