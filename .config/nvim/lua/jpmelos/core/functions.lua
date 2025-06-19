@@ -224,6 +224,17 @@ function GetGitBranchForStatusLine()
     return " " .. vim.g.git_branch
 end
 
+function GetProjectNameForStatusLine()
+    local cwd = vim.fn.getcwd()
+    local devel_path = vim.fn.expand("~") .. "/devel"
+
+    if #cwd > #devel_path and cwd:sub(1, #devel_path) == devel_path then
+        return "  " .. cwd:sub(#devel_path + 2)
+    else
+        return cwd
+    end
+end
+
 function GetLspServers()
     local clients = ""
     for _, client in pairs(vim.lsp.get_clients({ bufnr = 0 })) do
@@ -278,6 +289,10 @@ vim.api.nvim_exec2(
 
         function! GitBranch() abort
             return luaeval("GetGitBranchForStatusLine()")
+        endfunction
+
+        function! ProjectName() abort
+            return luaeval("GetProjectNameForStatusLine()")
         endfunction
 
         function! LspServers() abort
