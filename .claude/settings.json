@@ -11,7 +11,8 @@
       "Bash(gh:*)",
       "Bash(cargo check:*)",
       "Bash(cargo clippy:*)",
-      "WebFetch(domain:docs.rs)"
+      "WebFetch(domain:docs.rs)",
+      "mcp__github"
     ]
   }
 }

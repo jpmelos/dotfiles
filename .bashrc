@@ -452,11 +452,13 @@ function cm() {
             toml get <(echo "$CLAUDE_CODE_SECRET") . \
                 | jq -r ".mcp.github_api_token"
         )
-        local github_mcp_server_config=$(
-            cat ~/devel/dotfiles/claude-manager/github-mcp-serser.json \
-                | sed "s/{{github_api_token}}/$GITHUB_MCP_API_KEY/g"
-        )
-        claude mcp add-json --scope user github "$github_mcp_server_config"
+        claude mcp add \
+            github https://api.githubcopilot.com/mcp/ \
+            --scope user \
+            --transport http \
+            --header "Authorization: Bearer $GITHUB_MCP_API_KEY" \
+            --header "X-MCP-Toolsets: repos,issues,pull_requests" \
+            --header "X-MCP-Readonly: true"
     fi
 
     if [[ "$claude_help" == "true" ]]; then
