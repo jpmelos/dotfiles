@@ -141,3 +141,8 @@ opt.sessionoptions = "blank,buffers,curdir,folds,help,tabpages,winsize"
 
 -- Make jumps behave like browser navigation.
 opt.jumpoptions = "stack"
+
+-- Do not change <EOL> of existing files.
+opt.fixeol = false
+-- But new files should be created with <EOL>.
+opt.eol = true
