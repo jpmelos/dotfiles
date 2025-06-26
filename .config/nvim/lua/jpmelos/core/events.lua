@@ -2,12 +2,12 @@ local au = vim.api.nvim_create_autocmd
 
 -- Check for focus.
 vim.g.nvim_has_focus = true
-au({ "FocusGained" }, {
+au("FocusGained", {
     callback = function()
         vim.g.nvim_has_focus = true
     end,
 })
-au({ "FocusLost" }, {
+au("FocusLost", {
     callback = function()
         vim.g.nvim_has_focus = false
     end,
@@ -24,9 +24,9 @@ au({ "VimEnter", "FocusGained" }, {
 })
 
 -- Reload files when coming back to Neovim.
-au({ "FocusGained" }, { command = "checktime" })
+au("FocusGained", { command = "checktime" })
 -- Save files automatically when leaving Neovim.
-au({ "FocusLost" }, {
+au("FocusLost", {
     command = "silent! wa",
     nested = true,
 })
