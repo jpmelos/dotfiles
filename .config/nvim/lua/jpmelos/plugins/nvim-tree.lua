@@ -42,7 +42,6 @@ return {
         vim.g.loaded_netrwPlugin = 1
 
         local tree = require("nvim-tree")
-        local tree_view = require("nvim-tree.view")
         local tree_api = require("nvim-tree.api")
 
         local function on_attach(bufnr)
@@ -124,9 +123,8 @@ return {
 
         vim.api.nvim_create_autocmd({ "VimResized" }, {
             callback = function()
-                if tree_view.is_visible() then
-                    tree_view.close()
-                    tree.open()
+                if tree_api.tree.is_visible() then
+                    tree_api.tree.resize()
                 end
             end,
         })
