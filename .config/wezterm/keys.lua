@@ -124,26 +124,6 @@ function module.apply_to_config(config)
                 size = { Percent = 25 },
             }),
         },
-        {
-            key = "h",
-            mods = "CTRL",
-            action = action.ActivatePaneDirection("Left"),
-        },
-        {
-            key = "j",
-            mods = "CTRL",
-            action = action.ActivatePaneDirection("Down"),
-        },
-        {
-            key = "k",
-            mods = "CTRL",
-            action = action.ActivatePaneDirection("Up"),
-        },
-        {
-            key = "l",
-            mods = "CTRL",
-            action = action.ActivatePaneDirection("Right"),
-        },
         bind_if(
             nvim_integration.is_outside_vim,
             "h",
