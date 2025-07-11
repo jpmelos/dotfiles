@@ -216,10 +216,7 @@ function module.apply_to_config(config)
             -- Copy.
             {
                 key = "y",
-                action = action.Multiple({
-                    { CopyTo = "Clipboard" },
-                    { CopyMode = "Close" },
-                }),
+                action = action.CopyTo("Clipboard"),
             },
         },
     }
