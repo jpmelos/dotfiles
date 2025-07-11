@@ -53,7 +53,7 @@ return {
                 vimgrep_arguments = { "rg", "--color=never" },
 
                 path_display = { "smart" },
-                previewer = { timeout = 1000 },
+                preview = { timeout = 1000 },
 
                 history = {
                     path = vim.fn.stdpath("data")
