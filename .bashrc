@@ -369,7 +369,6 @@ function cm() {
     project_relative_dir="${current_dir#"$devel_dir"/}"
 
     add_mcp=false
-    claude_resume=false
     claude_help=false
     show_help=false
     profile=""
@@ -379,9 +378,6 @@ function cm() {
         case "$arg" in
             --add-mcp)
                 add_mcp=true
-                ;;
-            --resume)
-                claude_resume=true
                 ;;
             --claude-help)
                 claude_help=true
@@ -411,7 +407,6 @@ function cm() {
         echo "Usage: cm [options] [profile]"
         echo "Options:"
         echo "  --add-mcp      Add MCP servers"
-        echo "  --resume       Resume previous Claude session"
         echo "  --claude-help  Show Claude help"
         echo "  --help         Show this help"
         return 0
@@ -465,8 +460,6 @@ function cm() {
 
     if [[ "$claude_help" == "true" ]]; then
         claude --help
-    elif [[ "$claude_resume" == "true" ]]; then
-        claude --resume
     else
         claude
     fi
