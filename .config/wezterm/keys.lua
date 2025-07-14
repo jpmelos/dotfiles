@@ -216,7 +216,11 @@ function module.apply_to_config(config)
             -- Copy.
             {
                 key = "y",
-                action = action.CopyTo("Clipboard"),
+                action = action.Multiple({
+                    action.CopyTo("Clipboard"),
+                    action.ClearSelection,
+                    action.CopyMode("ClearSelectionMode"),
+                }),
             },
         },
     }
