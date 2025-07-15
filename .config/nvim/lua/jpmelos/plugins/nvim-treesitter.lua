@@ -52,6 +52,7 @@ return {
                 "http",
                 "javascript",
                 "json",
+                "just",
                 "latex",
                 "liquid",
                 "make",
