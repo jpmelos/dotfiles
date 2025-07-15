@@ -543,7 +543,7 @@ function j() {
         for script in "$local_bin_dir"/*.bash; do
             if [ -f "$script" ]; then
                 has_scripts=true
-                echo "$(basename "$script"):"
+                echo "$(basename "$script" .bash):"
                 sed -n '/^#/p; /^[^#]/q' "$script"
                 echo
             fi
