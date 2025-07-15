@@ -35,6 +35,9 @@ function run_autoenv_on_init() {
 # Find authorized and unauthorized autoenvs in these files.
 [ -f ~/.autoenv_authorized ] || touch ~/.autoenv_authorized
 [ -f ~/.autoenv_not_authorized ] || touch ~/.autoenv_not_authorized
+
+# The variables below don't need to be exported because we're sourcing the
+# autoenv activation script.
 # Enable autoenv leave too.
 AUTOENV_ENABLE_LEAVE=1
 # Rename autoenv files to less generic names.
