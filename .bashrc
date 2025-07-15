@@ -567,7 +567,7 @@ _j_completion() {
     if [ "${COMP_CWORD}" -eq 1 ] && [ -d "$jpenv_bin_dir" ]; then
         local scripts
         mapfile -t scripts < <(
-            find "$jpenv_bin_dir" -name "*.bash" -type f -exec \
+            find -L "$jpenv_bin_dir" -name "*.bash" -type f -exec \
                 basename {} .bash \
                 \;
         )
