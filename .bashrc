@@ -16,7 +16,9 @@ export GPG_TTY=$(tty)
 #   possible commands.
 shopt -s histverify no_empty_cmd_completion
 
-run_autoenv_on_init() {
+# This is called from the `$PROMPT_COMMAND`, which is defined in
+# `.bash_profile`.
+function run_autoenv_on_init() {
     if [ -z "$AUTOENV_RAN_ON_INIT" ]; then
         cd /
         cd - > /dev/null
