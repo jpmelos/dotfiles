@@ -121,9 +121,6 @@ alias d='docker'
 alias dc='docker compose'
 alias docker-nuke-all-the-things='docker rm -f $(docker ps -aq); docker system prune --all --volumes --force'
 
-# just
-alias j='just --justfile jpenv-justfile'
-
 # Adjust `act` according to the environment.
 if [ "$JPMELOS_IS_MACOS" = "true" ]; then
     alias act="act --container-architecture linux/amd64"
@@ -533,3 +530,53 @@ function pending_devel() {
 
     cd "$current_dir"
 }
+
+function j() {
+    local local_bin_dir="./jpenv-bin"
+    if [ ! -d "$local_bin_dir" ]; then
+        echo "Local binaries directory not found" >&2
+        return 1
+    fi
+
+    if [ $# -eq 0 ]; then
+        local has_scripts=false
+        for script in "$local_bin_dir"/*.bash; do
+            if [ -f "$script" ]; then
+                has_scripts=true
+                echo "$(basename "$script"):"
+                sed -n '/^#/p; /^[^#]/q' "$script"
+                echo
+            fi
+        done
+        if [ "$has_scripts" = false ]; then
+            echo "No .bash scripts found in $local_bin_dir" >&2
+            return 1
+        fi
+        return
+    fi
+
+    script_name="$1"
+    shift
+    bash "./jpenv-bin/${script_name}.bash" "$@"
+}
+
+_j_completion() {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    local jpenv_bin_dir="./jpenv-bin"
+
+    if [ "${COMP_CWORD}" -eq 1 ] && [ -d "$jpenv_bin_dir" ]; then
+        local scripts
+        mapfile -t scripts < <(
+            find "$jpenv_bin_dir" -name "*.bash" -type f -exec \
+                basename {} .bash \
+                \;
+        )
+        mapfile -t COMPREPLY < <(compgen -W "${scripts[*]}" -- "$cur")
+    else
+        COMPREPLY=()
+        compopt -o filenames
+        mapfile -t COMPREPLY < <(compgen -f -- "$cur")
+    fi
+}
+
+complete -F _j_completion j
