@@ -544,8 +544,9 @@ function j() {
             if [ -f "$script" ]; then
                 has_scripts=true
                 echo "$(basename "$script" .bash):"
-                sed -n '/^#/p; /^[^#]/q' "$script"
-                echo
+                sed -n '/^#/p; /^[^#]/q' "$script" \
+                    | sed 's/^#//' \
+                    | sed 's/^/  /'
             fi
         done
         if [ "$has_scripts" = false ]; then
