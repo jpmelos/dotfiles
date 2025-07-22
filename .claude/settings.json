@@ -11,7 +11,7 @@
       "Bash(gh:*)",
       "Bash(cargo check:*)",
       "Bash(cargo clippy:*)",
-      "Bash(bash ./jpenv-bin/tests.bash)",
+      "Bash(bash ./jpenv-bin/tests.bash:*)",
       "WebFetch(domain:docs.rs)",
       "mcp__github"
     ]
