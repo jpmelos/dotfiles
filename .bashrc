@@ -544,8 +544,7 @@ function j() {
             if [ -f "$script" ]; then
                 has_scripts=true
                 echo "$(basename "$script" .bash):"
-                sed -n '/^#/p; /^[^#]/q' "$script" \
-                    | sed 's/^#//' \
+                awk '/^#\//{print substr($0,3); found=1; next} found{exit}' "$script" \
                     | sed 's/^/  /'
             fi
         done
