@@ -368,7 +368,6 @@ function cm() {
 
     project_relative_dir="${current_dir#"$devel_dir"/}"
 
-    add_mcp=false
     claude_help=false
     show_help=false
     profile=""
@@ -376,9 +375,6 @@ function cm() {
     args=()
     for arg in "$@"; do
         case "$arg" in
-            --add-mcp)
-                add_mcp=true
-                ;;
             --claude-help)
                 claude_help=true
                 ;;
@@ -406,7 +402,6 @@ function cm() {
     if [[ "$show_help" == "true" ]]; then
         echo "Usage: cm [options] [profile]"
         echo "Options:"
-        echo "  --add-mcp      Add MCP servers"
         echo "  --claude-help  Show Claude help"
         echo "  --help         Show this help"
         return 0
@@ -427,11 +422,14 @@ function cm() {
             | jq -r ".fields[0].value"
     )
     CLAUDE_CODE_API_KEY=$(
-        toml get <(echo "$CLAUDE_CODE_SECRET") . | jq -r ".api_keys.$profile"
+        toml get <(echo "$CLAUDE_CODE_SECRET") . | jq -r ".profile.$profile.api_key"
     )
     if [[ "$CLAUDE_CODE_API_KEY" == "null" ]]; then
-        echo "Error: no API key for profile '$profile'" >&2
-        return 1
+        echo "Warning: no API key for profile '$profile', defaulting to 'jpmelos'" >&2
+        profile="jpmelos"
+        CLAUDE_CODE_API_KEY=$(
+            toml get <(echo "$CLAUDE_CODE_SECRET") . | jq -r ".profile.$profile.api_key"
+        )
     fi
     export CLAUDE_CODE_API_KEY
 
@@ -440,23 +438,29 @@ function cm() {
     export MCP_TIMEOUT=10000
     export MCP_TOOL_TIMEOUT=10000
 
-    echo "Running Claude Code with profile '$profile'"
+    echo "Setting up MCPs"
 
-    if [[ "$add_mcp" == "true" ]]; then
-        claude mcp list | cut -d: -f1 | xargs -I {} claude mcp remove {}
+    claude mcp list \
+        | grep '^[a-z]*:' \
+        | cut -d: -f1 \
+        | xargs -I {} bash -c "claude mcp remove {} > /dev/null"
 
-        GITHUB_MCP_API_KEY=$(
-            toml get <(echo "$CLAUDE_CODE_SECRET") . \
-                | jq -r ".mcp.github_api_token"
-        )
+    GITHUB_MCP_API_KEY=$(
+        toml get <(echo "$CLAUDE_CODE_SECRET") . \
+            | jq -r ".profile.$profile.github_api_token"
+    )
+    if [[ "$GITHUB_MCP_API_KEY" != "null" ]]; then
         claude mcp add \
             github https://api.githubcopilot.com/mcp/ \
             --scope user \
             --transport http \
             --header "Authorization: Bearer $GITHUB_MCP_API_KEY" \
             --header "X-MCP-Toolsets: repos,issues,pull_requests" \
-            --header "X-MCP-Readonly: true"
+            --header "X-MCP-Readonly: true" \
+            > /dev/null
     fi
+
+    echo "Running Claude Code with profile '$profile'"
 
     if [[ "$claude_help" == "true" ]]; then
         claude --help
