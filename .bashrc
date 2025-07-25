@@ -127,6 +127,8 @@ alias d='docker'
 alias dc='docker compose'
 alias docker-nuke-all-the-things='docker rm -f $(docker ps -aq); docker system prune --all --volumes --force'
 
+alias curl='curl -iL'
+
 #####################################
 #                                   #
 #    git aliases and completions    #
