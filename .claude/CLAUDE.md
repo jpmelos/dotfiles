@@ -4,4 +4,4 @@
 - To run tests, run `./jpenv-bin/tests.bash`. Append test paths and/or names if
   necessary.
 - When writing comments, always use complete punctuation. For example, always
-  use a full stop at the end of comments.
+  place a period at the end of comments.
