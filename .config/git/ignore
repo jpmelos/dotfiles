@@ -5,11 +5,14 @@ jpenv*
 /.pre-commit-config-local.yaml
 
 # IDE configuration.
-.nvim.lua
+/.nvim.lua
 
 # autoenv files.
 .autoenv.enter
 .autoenv.leave
 
 # Python virtual environments.
-.venv*
+/.venv*
+
+# Claude Code
+/CLAUDE.local.md
