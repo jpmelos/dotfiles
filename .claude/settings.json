@@ -9,6 +9,7 @@
       "Bash(sed:*)",
       "Bash(git:*)",
       "Bash(gh:*)",
+      "Bash(whois:*)",
       "Bash(cargo check:*)",
       "Bash(cargo clippy:*)",
       "Bash(./jpenv-bin/tests.bash:*)",
