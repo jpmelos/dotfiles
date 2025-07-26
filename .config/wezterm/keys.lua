@@ -155,6 +155,7 @@ function module.apply_to_config(config)
             "CTRL",
             action.ActivatePaneDirection("Right")
         ),
+        { key = "l", mods = "SHIFT|CTRL", action = action.ShowDebugOverlay },
     }
 
     config.key_tables = {
