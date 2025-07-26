@@ -12,7 +12,7 @@ return {
         "hrsh7th/cmp-nvim-lsp",
     },
     -- Keep this and the language servers in sync.
-    ft = { "sh", "bash", "python", "lua", "rust", "sql", "toml", "yaml" },
+    ft = { "sh", "bash", "python", "lua", "rust", "toml", "yaml" },
     config = function()
         local K = vim.keymap.set
 
@@ -126,8 +126,6 @@ return {
             "lua_ls",
             -- Rust
             "rust_analyzer",
-            -- SQL
-            "sqlls",
             -- TOML
             "taplo",
             -- YAML

@@ -23,9 +23,6 @@ return {
                 -- tools.
                 -- clippy: Deprecated to install via Mason. Use Rust default
                 -- tools.
-                -- SQL
-                -- Still deciding what to use here. See note about SQL
-                -- formatters in `.config/nvim/lua/jpmelos/core/globals.lua`.
                 -- CSS, SCSS, JS, TS, YAML, GraphQL.
                 "prettier",
                 -- JSON.

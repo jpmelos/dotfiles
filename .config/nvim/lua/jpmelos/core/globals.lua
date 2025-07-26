@@ -14,10 +14,6 @@ vim.g.formatters_by_ft = {
     -- Shell.
     sh = { "shfmt" },
     bash = { "shfmt" },
-    -- SQL formatters evaluated so far:
-    -- - sql_formatter: Formats ON clauses (in JOINs) wrong, and aligns AND
-    -- clauses weirdly.
-    -- sql = {},
     -- Web technologies.
     html = { "prettier" },
     css = { "prettier" },

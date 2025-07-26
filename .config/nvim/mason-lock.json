@@ -8,7 +8,6 @@
   "rust-analyzer": "2025-07-07",
   "shellcheck": "v0.10.0",
   "shfmt": "v3.12.0",
-  "sqlls": "1.7.1",
   "stylua": "v2.1.0",
   "taplo": "0.10.0",
   "yaml-language-server": "1.18.0"
