@@ -4,15 +4,12 @@ local module = {}
 
 local nvim_integration = require("nvim-integration")
 
-local function bind_if(cond, key, mods, navigate_action)
+local function bind_if_else(cond, key, mods, if_action, else_action)
     local function callback(win, pane)
         if cond(pane) then
-            win:perform_action(navigate_action, pane)
+            win:perform_action(if_action, pane)
         else
-            win:perform_action(
-                action.SendKey({ key = key, mods = mods }),
-                pane
-            )
+            win:perform_action(else_action, pane)
         end
     end
 
@@ -21,6 +18,16 @@ local function bind_if(cond, key, mods, navigate_action)
         mods = mods,
         action = wezterm.action_callback(callback),
     }
+end
+
+local function bind_if(cond, key, mods, if_action)
+    return bind_if_else(
+        cond,
+        key,
+        mods,
+        if_action,
+        action.SendKey({ key = key, mods = mods })
+    )
 end
 
 function module.apply_to_config(config)
