@@ -105,7 +105,7 @@ alias src='source ~/.bash_profile'
 alias path='echo $PATH | tr : "\n"'
 
 # Allows alias checking in watch commands.
-alias watch='watch '
+alias watch='\watch '
 
 # Makes Neovim open multiple files in different buffers, all immediately
 # visible, in the same tab.
@@ -119,15 +119,15 @@ alias cp='cp -i'
 alias mv='mv -i'
 
 # Always ignore the .git directory.
-alias tree='tree -aF -I .git --gitignore'
-alias treea='tree -aF -I .git'
+alias tree='\tree -aF -I .git --gitignore'
+alias treea='\tree -aF -I .git'
 
 # Docker aliases.
 alias d='docker'
 alias dc='docker compose'
 alias docker-nuke-all-the-things='docker rm -f $(docker ps -aq); docker system prune --all --volumes --force'
 
-alias curl='curl -iL'
+alias curl='\curl -iL'
 
 #####################################
 #                                   #
