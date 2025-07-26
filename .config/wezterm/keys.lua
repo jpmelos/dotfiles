@@ -106,14 +106,7 @@ function module.apply_to_config(config)
             mods = "LEADER",
             action = action.SplitPane({
                 direction = "Right",
-            }),
-        },
-        {
-            key = "v",
-            mods = "LEADER|SHIFT",
-            action = action.SplitPane({
-                direction = "Right",
-                size = { Percent = 25 },
+                size = { Cells = 80 },
             }),
         },
         {
