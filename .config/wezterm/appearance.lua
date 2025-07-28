@@ -7,8 +7,6 @@ function module.apply_to_config(config)
     local padding_px = 5
 
     config.window_decorations = "RESIZE"
-    config.use_fancy_tab_bar = false
-    config.tab_bar_at_bottom = true
 
     config.colors = {
         foreground = foreground_color,
