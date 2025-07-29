@@ -166,7 +166,8 @@ K("v", "<leader>by", function()
     local start_line = lines[1]
     local end_line = lines[2]
 
-    local selected_content = GetBufferContents(0, { start_line - 1, end_line })
+    local selected_content =
+        GetBufferContents(0, { start_line - 1, end_line })
 
     local line_info
     if start_line == end_line then
