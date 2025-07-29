@@ -143,7 +143,7 @@ end, { desc = "Copy absolute path" })
 K("n", "<leader>br", function()
     vim.fn.setreg("+", GetBufferContents())
     NormalMode()
-end, { desc = "Copy buffer contents" })
+end, { desc = "Copy raw buffer contents" })
 K("n", "<leader>by", function()
     local rel_path = vim.fn.expand("%:.")
     local buffer_content = GetBufferContents()
@@ -155,7 +155,7 @@ K("n", "<leader>by", function()
 
     vim.fn.setreg("+", formatted_content)
     NormalMode()
-end, { desc = "Copy buffer contents" })
+end, { desc = "Copy buffer contents with file path" })
 K("v", "<leader>by", function()
     local rel_path = vim.fn.expand("%:.")
 
@@ -186,7 +186,7 @@ K("v", "<leader>by", function()
     vim.fn.setreg("+", formatted_content)
     NormalMode()
 end, {
-    desc = "Copy selected lines",
+    desc = "Copy selected lines with file path",
 })
 
 -- Quickfix list
