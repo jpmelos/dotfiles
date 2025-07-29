@@ -82,9 +82,8 @@
     st = status
 
     # sh = show
-    sh = show
-    shf = show --name-status
-    shh = "! f() { HEADN=$1; shift; git show "HEAD~$HEADN" $@; }; f"
+    sh = "! f() { HEADN="${1:-0}"; shift; git show "HEAD~$HEADN" $@; }; f"
+    shf = "! f() { HEADN="${1:-0}"; shift; git show --name-status $@ "HEAD~$HEADN"; }; f"
 
     # l = log (except ls for list)
     l = "! f() { git log --color=always --oneline --graph --decorate $@ | awk -f ~/.git-log-prepend-number-awk | less -R; }; f"
