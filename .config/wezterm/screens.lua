@@ -1,7 +1,9 @@
+local wezterm = require("wezterm")
+
 local module = {}
 
 function module.get_screen_width(win)
-    local dpi_baseline = 72 -- MacOS: 72. Linux: 96.
+    local dpi_baseline = wezterm.target_triple:find("darwin") and 72 or 96
     local dimensions = win:get_dimensions()
 
     local dpi_conversion_rate = dimensions.dpi / dpi_baseline
