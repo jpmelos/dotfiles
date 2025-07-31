@@ -1,14 +1,13 @@
 return {
     "stevearc/aerial.nvim",
-    lazy = false,
     dependencies = {
         "nvim-treesitter/nvim-treesitter",
         "nvim-tree/nvim-web-devicons",
     },
     keys = {
         {
-            "<leader>ln",
-            "<cmd>AerialOpen<cr>",
+            "<leader>es",
+            "<cmd>AerialToggle<cr>",
             mode = "n",
             desc = "Go to code navigation",
         },
@@ -28,6 +27,7 @@ return {
             min_height = 0.5,
             max_height = 0.9,
         },
+        keymaps = { ["<C-c>"] = "actions.close" },
 
         open_automatic = false,
         close_on_select = true,
@@ -60,14 +60,5 @@ return {
         link_folds_to_tree = false,
         -- When you folding in the Aerial buffer, update code buffers as well.
         link_tree_to_folds = true,
-
-        on_attach = function(bufnr)
-            vim.keymap.set(
-                "n",
-                "<leader>es",
-                "<cmd>AerialToggle<cr>",
-                { buffer = bufnr, desc = "Toggle symbol nav" }
-            )
-        end,
     },
 }
