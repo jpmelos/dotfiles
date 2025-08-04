@@ -112,6 +112,7 @@ function module.apply_to_config(config)
             action = action.SplitPane({
                 direction = "Right",
                 size = { Cells = 80 },
+                top_level = true
             }),
         },
         {
