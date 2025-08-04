@@ -16,8 +16,6 @@ opt.scrolloff = 1000
 
 -- Show line numbers.
 opt.number = true
--- Show relative numbers for all but the current line.
-opt.relativenumber = true
 -- Always show sign column so that text doesn't shift.
 opt.signcolumn = "yes"
 
