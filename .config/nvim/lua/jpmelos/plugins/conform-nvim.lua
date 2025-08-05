@@ -30,6 +30,15 @@
 -- ```
 
 local function do_format(conform, range)
+    -- Trim trailing whitespaces before formatting.
+    local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+    for i, line in ipairs(lines) do
+        local trimmed = line:gsub("%s+$", "")
+        if trimmed ~= line then
+            vim.api.nvim_buf_set_lines(0, i - 1, i, false, { trimmed })
+        end
+    end
+
     local cb = function(did_edit)
         -- If didn't format anything, there's nothing to do.
         if not did_edit then
@@ -176,7 +185,8 @@ return {
         conform.setup({ formatters_by_ft = vim.g.formatters_by_ft })
 
         -- Customize built-in formatters and add your own.
-        conform.formatters.rustfmt = { options = { default_edition = "2024" } }
+        conform.formatters.rustfmt =
+            { options = { default_edition = "2024" } }
         conform.formatters.shfmt = {
             prepend_args = {
                 "--language-dialect=bash",
