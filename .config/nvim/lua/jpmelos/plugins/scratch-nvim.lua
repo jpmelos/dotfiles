@@ -3,6 +3,25 @@ return {
     dependencies = { "nvim-telescope/telescope.nvim" },
     keys = {
         {
+            "<leader>xn",
+            function()
+                Input(
+                    "Scratch File Name",
+                    os.date("%Y-%m-%d-"),
+                    function(filename)
+                        if filename ~= nil and filename ~= "" then
+                            require("scratch.api").createScratchFileByName(
+                                filename
+                            )
+                            vim.cmd("startinsert")
+                        end
+                    end
+                )
+            end,
+            mode = "n",
+            desc = "Create a new scratch file",
+        },
+        {
             "<leader>xo",
             function()
                 local telescope_builtins = require("telescope.builtin")
@@ -30,23 +49,13 @@ return {
             desc = "Open a scratch file",
         },
         {
-            "<leader>xn",
-            function()
-                Input(
-                    "Scratch File Name",
-                    os.date("%Y-%m-%d-"),
-                    function(filename)
-                        if filename ~= nil and filename ~= "" then
-                            require("scratch.api").createScratchFileByName(
-                                filename
-                            )
-                            vim.cmd("startinsert")
-                        end
-                    end
-                )
-            end,
+            "<leader>xe",
+            "<cmd>NvimTreeOpen "
+                .. vim.fn.getcwd()
+                .. "/jpenv-scratch"
+                .. "<CR>",
             mode = "n",
-            desc = "Create a new scratch file",
+            desc = "Open the scratch folder",
         },
     },
     opts = {
