@@ -95,15 +95,8 @@ return {
             settings = {
                 ["rust-analyzer"] = {
                     completion = {
-                        fullFunctionSignatures = {
-                            enable = true,
-                        },
+                        fullFunctionSignatures = { enable = true },
                         hideDeprecated = true,
-                    },
-                    diagnostics = {
-                        styleLints = {
-                            enable = true,
-                        },
                     },
                 },
             },

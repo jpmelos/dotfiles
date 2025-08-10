@@ -30,4 +30,4 @@ vim.g.formatters_by_ft = {
     graphql = { "prettier" },
 }
 
-vim.g.linters_by_ft = { rust = { "clippy" } }
+vim.g.linters_by_ft = {}
