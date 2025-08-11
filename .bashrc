@@ -564,7 +564,52 @@ function j() {
 
     script_name="$1"
     shift
-    bash "./jpenv-bin/${script_name}.bash" "$@"
+
+    script_path="./jpenv-bin/${script_name}.bash"
+
+    if [ ! -f "$script_path" ]; then
+        echo "Error: Script '${script_name}' not found in ./jpenv-bin/" >&2
+        return 1
+    fi
+
+    bash "$script_path" "$@"
+}
+
+function je() {
+    local local_bin_dir="./jpenv-bin"
+    if [ ! -d "$local_bin_dir" ]; then
+        echo "Local binaries directory not found" >&2
+        return 1
+    fi
+
+    if [ $# -eq 0 ]; then
+        local has_scripts=false
+        for script in "$local_bin_dir"/*.bash; do
+            if [ -f "$script" ]; then
+                has_scripts=true
+                echo "$(basename "$script" .bash):"
+                awk '/^#\//{print substr($0,3); found=1; next} found{exit}' "$script" \
+                    | sed 's/^/  /'
+            fi
+        done
+        if [ "$has_scripts" = false ]; then
+            echo "No .bash scripts found in $local_bin_dir" >&2
+            return 1
+        fi
+        return
+    fi
+
+    script_name="$1"
+    shift
+
+    script_path="./jpenv-bin/${script_name}.bash"
+
+    if [ ! -f "$script_path" ]; then
+        echo "Error: Script '${script_name}' not found in ./jpenv-bin/" >&2
+        return 1
+    fi
+
+    $EDITOR "$script_path" "$@"
 }
 
 _j_completion() {
@@ -587,3 +632,4 @@ _j_completion() {
 }
 
 complete -F _j_completion j
+complete -F _j_completion je
