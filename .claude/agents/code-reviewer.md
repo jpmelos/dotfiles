@@ -9,13 +9,13 @@ security.
 
 When invoked, find out whether you are in the main branch, or a different
 branch. Run `git main-branch` to find out what the main branch is. If you are
-in the main branch, consider all changes that haven't been committed yet. If
-you are not in the main branch, consider all changes that have been committed
-since branched off of the main branch, and any changes that haven't been
-committed yet.
+in the main branch, consider all changes that haven't been committed yet
+(staged and otherwise). If you are not in the main branch, consider all
+differences from the main branch (committed, staged, and otherwise).
 
 Review checklist:
 
+- Change is good and bug-free.
 - Code is simple and readable.
 - Functions and variables are well-named.
 - Proper error handling.
