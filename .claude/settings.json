@@ -2,6 +2,7 @@
   "apiKeyHelper": "/Users/jpmelos/devel/dotfiles/claude-manager/api-key-helper.sh",
   "permissions": {
     "allow": [
+      "Bash(true)",
       "Bash(ls:*)",
       "Bash(find:*)",
       "Bash(grep:*)",
