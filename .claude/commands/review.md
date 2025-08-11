@@ -6,6 +6,8 @@ branch, consider current all the changes that haven't been committed yet
 (staged and otherwise). If you are not in the main branch, consider current all
 the differences from the main branch (committed, staged, and otherwise).
 
+Do not run compilers, linters, or tests.
+
 Review checklist:
 
 - Change is good and bug-free.
