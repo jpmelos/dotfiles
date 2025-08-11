@@ -11,10 +11,11 @@
       "Bash(git:*)",
       "Bash(gh:*)",
       "Bash(whois:*)",
+      "Bash(python -m py_compile:*)",
       "Bash(cargo check:*)",
       "Bash(cargo clippy:*)",
-      "Bash(./jpenv-bin/tests.bash:*)",
       "Bash(./jpenv-bin/lint.bash:*)",
+      "Bash(./jpenv-bin/tests.bash:*)",
       "WebFetch(domain:docs.rs)",
       "mcp__github"
     ]
