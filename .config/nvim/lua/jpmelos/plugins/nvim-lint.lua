@@ -27,6 +27,13 @@ return {
 
         lint.linters_by_ft = vim.g.linters_by_ft
 
+        vim.api.nvim_create_autocmd("FileType", {
+            pattern = vim.tbl_keys(vim.g.linters_by_ft),
+            callback = function()
+                lint.try_lint()
+            end,
+        })
+
         vim.api.nvim_create_autocmd({ "BufWritePost", "InsertLeave" }, {
             callback = function()
                 lint.try_lint()
