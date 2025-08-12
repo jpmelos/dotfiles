@@ -305,3 +305,15 @@ vim.api.nvim_exec2(
     ]],
     {}
 )
+
+function EscapePattern(text)
+    return text:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1")
+end
+
+function DropFromSubstringToEnd(s, substr)
+    return s:gsub(EscapePattern(substr) .. ".*", "")
+end
+
+function Trim(s)
+    return s:gsub("^%s+", ""):gsub("%s+$", "")
+end

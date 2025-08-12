@@ -17,7 +17,9 @@ opt.scrolloff = 1000
 -- Show line numbers.
 opt.number = true
 -- Always show sign column so that text doesn't shift.
-opt.signcolumn = "yes"
+-- This will always show the Git signs first, and then a diagnostic. See
+-- priorities defined for `gitsigns-nvim` and in our LSP configuration.
+opt.signcolumn = "yes:2"
 
 -- 4 spaces for tabs.
 opt.tabstop = 4

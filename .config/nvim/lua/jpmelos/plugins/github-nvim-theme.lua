@@ -45,5 +45,17 @@ return {
         vim.cmd("hi diffAdded guibg=none")
         vim.cmd("hi diffremoved guibg=none")
         vim.cmd("hi Special guifg=none")
+
+        -- Diagnostics.
+        vim.cmd("hi! link DiagnosticHint DiagnosticInfo")
+        vim.cmd(
+            "hi! link DiagnosticVirtualTextHint DiagnosticVirtualTextInfo"
+        )
+        vim.cmd(
+            "hi! link DiagnosticVirtualLinesHint DiagnosticVirtualLinesInfo"
+        )
+        vim.cmd("hi! link DiagnosticUnderlineHint DiagnosticUnderlineInfo")
+        vim.cmd("hi! link DiagnosticFloatingHint DiagnosticFloatingInfo")
+        vim.cmd("hi! link DiagnosticSignHint DiagnosticSignInfo")
     end,
 }

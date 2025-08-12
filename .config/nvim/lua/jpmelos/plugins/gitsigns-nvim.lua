@@ -6,7 +6,9 @@ return {
 
         local gs = require("gitsigns")
 
-        gs.setup({ attach_to_untracked = true })
+        -- Other priorities defined for diagnostics, in LSP configuration,
+        -- taking 1-4 for each severity level.
+        gs.setup({ attach_to_untracked = true, sign_priority = 5 })
 
         -- Navigation.
         K("n", "]g", function()
