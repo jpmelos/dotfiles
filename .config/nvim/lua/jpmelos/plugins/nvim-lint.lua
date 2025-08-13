@@ -25,6 +25,13 @@ return {
 
         local lint = require("lint")
 
+        lint.linters.clippy.args = {
+            "clippy",
+            "--message-format=json",
+            "--all-targets",
+            "--all-features",
+        }
+
         lint.linters_by_ft = vim.g.linters_by_ft
 
         vim.api.nvim_create_autocmd("FileType", {
