@@ -5,6 +5,7 @@ require("jpmelos.core.strings")
 require("jpmelos.core.functions")
 require("jpmelos.core.events")
 require("jpmelos.core.keymaps")
+require("jpmelos.core.diagnostics")
 
 -- Add lazy's path to Vim's `PATH`. This will allow things like
 -- `require("jpmelos.plugins.conform-nvim")` to be used from `.nvim.lua`
