@@ -436,10 +436,10 @@ function cm() {
     fi
     export CLAUDE_CODE_API_KEY
 
-    export BASH_DEFAULT_TIMEOUT_MS=30000
-    export BASH_MAX_TIMEOUT_MS=30000
+    export BASH_DEFAULT_TIMEOUT_MS=120000
+    export BASH_MAX_TIMEOUT_MS="$BASH_DEFAULT_TIMEOUT_MS"
     export MCP_TIMEOUT=10000
-    export MCP_TOOL_TIMEOUT=10000
+    export MCP_TOOL_TIMEOUT="$MCP_TIMEOUT"
 
     echo "Setting up MCPs"
 
