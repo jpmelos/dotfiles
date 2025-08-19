@@ -82,8 +82,8 @@
     st = status
 
     # sh = show
-    sh = "! f() { HEADN="${1:-0}"; shift; git show "HEAD~$HEADN" $@; }; f"
-    shf = "! f() { HEADN="${1:-0}"; shift; git show --name-status $@ "HEAD~$HEADN"; }; f"
+    sh = "! f() { if [[ \"$1\" =~ ^- ]]; then HEADN=\"${1#-}\"; shift; git show \"HEAD~$HEADN\" $@; else git show \"$@\"; fi; }; f"
+    shf = "! f() { if [[ \"$1\" =~ ^- ]]; then HEADN=\"${1#-}\"; shift; git show --name-status $@ \"HEAD~$HEADN\"; else git show --name-status \"$@\"; fi; }; f"
 
     # l = log (except ls for list)
     l = "! f() { git log --color=always --oneline --graph --decorate $@ | awk -f ~/.git-log-prepend-number-awk | less -R; }; f"
