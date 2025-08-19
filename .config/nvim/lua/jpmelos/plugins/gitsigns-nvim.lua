@@ -8,7 +8,11 @@ return {
 
         -- Other priorities defined for diagnostics, in LSP configuration,
         -- taking 1-4 for each severity level.
-        gs.setup({ attach_to_untracked = true, sign_priority = 5 })
+        gs.setup({
+            attach_to_untracked = true,
+            sign_priority = 5,
+            preview_config = { border = "rounded" },
+        })
 
         -- Navigation.
         K("n", "]g", function()
