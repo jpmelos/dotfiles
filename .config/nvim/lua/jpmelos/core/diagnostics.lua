@@ -57,6 +57,7 @@ vim.diagnostic.handlers.signs.show = show_deduped_diagnostics_in_signs
 vim.diagnostic.config({
     severity_sort = true,
     signs = {
+        -- This means ERROR has priority 4, WARN has priority 3, and so on.
         -- Other priority defined for Git signs, being prioritized as 5.
         priority = 1,
         text = {
