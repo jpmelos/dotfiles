@@ -67,3 +67,10 @@ vim.diagnostic.config({
         },
     },
 })
+
+vim.keymap.set(
+    "n",
+    "<leader>ld",
+    vim.diagnostic.open_float,
+    { desc = "Show line diagnostic" }
+)

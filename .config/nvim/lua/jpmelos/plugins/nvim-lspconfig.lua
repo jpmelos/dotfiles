@@ -174,11 +174,5 @@ return {
         K("n", "<leader>cr", vim.lsp.buf.rename, { desc = "Smart rename" })
 
         K("n", "<leader>lr", "<cmd>LspRestart<CR>", { desc = "Restart LSPs" })
-        K(
-            "n",
-            "<leader>ld",
-            vim.diagnostic.open_float,
-            { desc = "Show line diagnostic" }
-        )
     end,
 }
