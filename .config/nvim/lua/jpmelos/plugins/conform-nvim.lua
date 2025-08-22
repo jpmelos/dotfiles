@@ -58,7 +58,7 @@ local function do_format(conform, range)
     --   ways that will break the interpolation, thus we don't want them to be
     --   changed in any way.
     if vim.bo.filetype == "markdown" then
-        local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+        lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
         if #lines == 0 then
             return
         end
