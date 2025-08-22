@@ -1,3 +1,16 @@
+function LogEvent(tag, args)
+    local filename = vim.api.nvim_buf_get_name(args.buf)
+    print(
+        string.format(
+            "[%s] %s: %s: %s",
+            os.date("%Y-%m-%d %H:%M:%S"),
+            tag,
+            args.event,
+            filename
+        )
+    )
+end
+
 function Input(title, default_value, callback)
     local Input = require("nui.input")
     local event = require("nui.utils.autocmd").event
