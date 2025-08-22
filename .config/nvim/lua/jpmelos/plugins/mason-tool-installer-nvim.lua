@@ -20,9 +20,11 @@ return {
                 "stylua",
                 -- Rust
                 -- rustfmt: Deprecated to install via Mason. Use Rust default
-                -- tools.
+                -- tooling.
                 -- clippy: Deprecated to install via Mason. Use Rust default
-                -- tools.
+                -- tooling.
+                -- SQL
+                "sqruff",
                 -- CSS, SCSS, JS, TS, YAML, GraphQL.
                 "prettier",
                 -- JSON.
