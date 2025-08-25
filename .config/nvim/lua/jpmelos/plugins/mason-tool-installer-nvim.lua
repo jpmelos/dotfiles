@@ -23,8 +23,6 @@ return {
                 -- tooling.
                 -- clippy: Deprecated to install via Mason. Use Rust default
                 -- tooling.
-                -- SQL
-                "sqruff",
                 -- CSS, SCSS, JS, TS, YAML, GraphQL.
                 "prettier",
                 -- JSON.

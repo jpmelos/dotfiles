@@ -11,7 +11,6 @@ vim.g.formatters_by_ft = {
     -- Rust toolchain locally.
     rust = { "rustfmt" },
     lua = { "stylua" },
-    sql = { "sqruff" },
     -- Shell.
     sh = { "shfmt" },
     bash = { "shfmt" },
@@ -31,4 +30,4 @@ vim.g.formatters_by_ft = {
     graphql = { "prettier" },
 }
 
-vim.g.linters_by_ft = { rust = { "clippy" }, sql = { "sqruff" } }
+vim.g.linters_by_ft = { rust = { "clippy" } }
