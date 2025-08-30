@@ -3,12 +3,12 @@ return {
     keys = {
         {
             "<leader>wr",
-            "<cmd>SessionRestore<CR>",
+            "<cmd>AutoSession restore<CR>",
             desc = "Restore session for current directory",
         },
         {
             "<leader>ws",
-            "<cmd>SessionSave<CR>",
+            "<cmd>AutoSession save<CR>",
             desc = "Save session for current directory",
         },
     },
