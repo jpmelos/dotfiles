@@ -55,10 +55,10 @@ K("n", "<C-M-h>", "<cmd>tabp<CR>", { desc = "Previous tab" })
 K("n", "<C-M-l>", "<cmd>tabn<CR>", { desc = "Next tab" })
 
 -- These mappings control the size of splits (height/width)
-K("n", "<M-h>", "<c-W>5>")
+K("n", "<M-h>", "<c-W><")
 K("n", "<M-j>", "<C-W>-")
 K("n", "<M-k>", "<C-W>+")
-K("n", "<M-l>", "<c-W>5<")
+K("n", "<M-l>", "<c-W>>")
 
 -- Navigate line by line in soft-wrapped lines.
 K(
