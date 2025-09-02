@@ -146,3 +146,5 @@ opt.jumpoptions = "stack"
 opt.fixeol = false
 -- But new files should be created with <EOL>.
 opt.eol = true
+
+opt.completeopt = "menu,menuone,preview,noselect"

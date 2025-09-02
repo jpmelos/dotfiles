@@ -1,22 +1,19 @@
 return {
     "hrsh7th/nvim-cmp",
     dependencies = {
+        "hrsh7th/cmp-nvim-lsp",
         "hrsh7th/cmp-buffer",
         "hrsh7th/cmp-path",
-        "hrsh7th/cmp-nvim-lsp",
-        "L3MON4D3/LuaSnip",
-        "saadparwaiz1/cmp_luasnip",
-        "onsails/lspkind.nvim",
         "kristijanhusak/vim-dadbod-completion",
         "folke/lazydev.nvim",
+        "onsails/lspkind.nvim",
+        "L3MON4D3/LuaSnip",
     },
     config = function()
         local cmp = require("cmp")
 
         cmp.setup({
-            completion = {
-                completeopt = "menu,menuone,preview,noselect",
-            },
+            completion = { completeopt = "menu,menuone,preview,noselect" },
             -- Configure the snippet engine. This is required, otherwise
             -- `nvim-cmp` may show weird behavior.
             snippet = {
@@ -42,19 +39,31 @@ return {
                 -- Close suggestions modal.
                 ["<C-c>"] = cmp.mapping.abort(),
                 -- Insert suggestion.
-                ["<CR>"] = cmp.mapping.confirm({ select = false }),
+                ["<CR>"] = cmp.mapping.confirm(),
             }),
             -- Sources for autocompletion.
             sources = cmp.config.sources({
                 { name = "nvim_lsp" },
                 { name = "buffer" },
                 { name = "path", option = { trailing_slash = true } },
-                { name = "luasnip" },
                 { name = "vim-dadbod-completion" },
                 { name = "lazydev" },
             }),
             -- Configure pictograms from `onsails/lspkind.nvim`.
-            formatting = { format = require("lspkind").cmp_format({}) },
+            formatting = {
+                fields = { "abbr", "kind" },
+                format = require("lspkind").cmp_format({
+                    before = function(entry, vim_item)
+                        local item = entry:get_completion_item()
+                        if item.insertTextFormat == 2 then
+                            item.insertTextFormat = 1
+                            item.textEdit.newText =
+                                entry:get_completion_item().filterText
+                        end
+                        return vim_item
+                    end,
+                }),
+            },
         })
 
         -- SQL specific completion.
