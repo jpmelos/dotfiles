@@ -7,7 +7,6 @@ return {
         "kristijanhusak/vim-dadbod-completion",
         "folke/lazydev.nvim",
         "onsails/lspkind.nvim",
-        "L3MON4D3/LuaSnip",
     },
     config = function()
         local cmp = require("cmp")
@@ -16,11 +15,6 @@ return {
             preselect = cmp.PreselectMode.None,
             -- Configure the snippet engine. This is required, otherwise
             -- `nvim-cmp` may show weird behavior.
-            snippet = {
-                expand = function(args)
-                    require("luasnip").lsp_expand(args.body)
-                end,
-            },
             window = {
                 completion = cmp.config.window.bordered(),
                 documentation = cmp.config.window.bordered(),
