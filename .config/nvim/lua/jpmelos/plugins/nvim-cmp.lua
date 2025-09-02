@@ -13,7 +13,7 @@ return {
         local cmp = require("cmp")
 
         cmp.setup({
-            completion = { completeopt = "menu,menuone,preview,noselect" },
+            preselect = cmp.PreselectMode.None,
             -- Configure the snippet engine. This is required, otherwise
             -- `nvim-cmp` may show weird behavior.
             snippet = {
