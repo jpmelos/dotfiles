@@ -123,6 +123,12 @@ return {
             automatic_enable = ensure_installed,
         })
 
+        -- Unmap the built-in `gr` mappings to use it for LSP references.
+        vim.keymap.del("n", "grt")
+        vim.keymap.del("n", "gri")
+        vim.keymap.del("n", "grr")
+        vim.keymap.del("n", "gra")
+        vim.keymap.del("n", "grn")
         K(
             "n",
             "gr",
