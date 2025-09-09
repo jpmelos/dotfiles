@@ -119,8 +119,8 @@ alias cp='cp -i'
 alias mv='mv -i'
 
 # Always ignore the .git directory.
-alias tree='\tree -aF -I .git --gitignore'
-alias treea='\tree -aF -I .git'
+alias tree='\tree -alF -I .git --gitignore'
+alias treea='\tree -alF -I .git'
 
 # Docker aliases.
 alias d='docker'
