@@ -1,4 +1,4 @@
-Review the current changes. Current changes are defined as below:
+Review the current changes.
 
 Find out whether you are in the main branch, or a different branch. Run
 `git main-branch` to find out what the main branch is. If you are in the main
@@ -19,9 +19,9 @@ Review checklist:
 - No exposed secrets or API keys.
 - Input is validated.
 - Good test coverage.
-- Performance considerations addressed.
+- Code should have good performance characteristics.
 
-Provide feedback organized by priority:
+Summarize what the change is about, and provide feedback organized by priority:
 
 - Critical issues (must fix).
 - Warnings (should fix).

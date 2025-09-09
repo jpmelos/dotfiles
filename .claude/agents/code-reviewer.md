@@ -26,9 +26,9 @@ Review checklist:
 - No exposed secrets or API keys.
 - Input is validated.
 - Good test coverage.
-- Performance considerations addressed.
+- Code should have good performance characteristics.
 
-Provide feedback organized by priority:
+Summarize what the change is about, and provide feedback organized by priority:
 
 - Critical issues (must fix).
 - Warnings (should fix).
