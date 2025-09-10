@@ -44,6 +44,12 @@ function module.apply_to_config(config)
             mods = "LEADER",
             action = action.ReloadConfiguration,
         },
+        -- SHIFT + Enter for new lines.
+        {
+            key = "Enter",
+            mods = "SHIFT",
+            action = wezterm.action({ SendString = "\x1b\r" }),
+        },
         -- Clear screen.
         bind_if(
             nvim_integration.is_outside_vim,
@@ -112,7 +118,7 @@ function module.apply_to_config(config)
             action = action.SplitPane({
                 direction = "Right",
                 size = { Cells = 80 },
-                top_level = true
+                top_level = true,
             }),
         },
         {
@@ -152,6 +158,7 @@ function module.apply_to_config(config)
             "CTRL",
             action.ActivatePaneDirection("Right")
         ),
+        -- Debug overlay.
         { key = "l", mods = "SHIFT|CTRL", action = action.ShowDebugOverlay },
     }
 
