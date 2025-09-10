@@ -2,7 +2,7 @@ local wezterm = require("wezterm")
 local action = wezterm.action
 local module = {}
 
-local nvim_integration = require("nvim-integration")
+local process_integration = require("process-integration")
 
 local function bind_if_else(cond, key, mods, if_action, else_action)
     local function callback(win, pane)
@@ -44,15 +44,23 @@ function module.apply_to_config(config)
             mods = "LEADER",
             action = action.ReloadConfiguration,
         },
-        -- SHIFT + Enter for new lines.
-        {
-            key = "Enter",
-            mods = "SHIFT",
-            action = wezterm.action({ SendString = "\x1b\r" }),
-        },
+        -- Enter for new lines in Claude.
+        -- SHIFT + Enter to send the prompt in Claude.
+        bind_if(
+            process_integration.is_in_claude,
+            "Enter",
+            "",
+            wezterm.action({ SendString = "\x1b\r" })
+        ),
+        bind_if(
+            process_integration.is_in_claude,
+            "Enter",
+            "SHIFT",
+            wezterm.action({ SendString = "\r" })
+        ),
         -- Clear screen.
         bind_if(
-            nvim_integration.is_outside_vim,
+            process_integration.is_outside_vim,
             "n",
             "CTRL",
             action.SendKey({ key = "L", mods = "CTRL" })
@@ -135,25 +143,25 @@ function module.apply_to_config(config)
             }),
         },
         bind_if(
-            nvim_integration.is_outside_vim,
+            process_integration.is_outside_vim,
             "h",
             "CTRL",
             action.ActivatePaneDirection("Left")
         ),
         bind_if(
-            nvim_integration.is_outside_vim,
+            process_integration.is_outside_vim,
             "j",
             "CTRL",
             action.ActivatePaneDirection("Down")
         ),
         bind_if(
-            nvim_integration.is_outside_vim,
+            process_integration.is_outside_vim,
             "k",
             "CTRL",
             action.ActivatePaneDirection("Up")
         ),
         bind_if(
-            nvim_integration.is_outside_vim,
+            process_integration.is_outside_vim,
             "l",
             "CTRL",
             action.ActivatePaneDirection("Right")
