@@ -643,6 +643,13 @@ loop() {
     while true; do
         echo "Running: $*"
         "$@"
+
+        local exit_code=$?
+        if [ $exit_code -ne 0 ]; then
+            echo "Command failed with exit code $exit_code. Stopping loop."
+            return $exit_code
+        fi
+
         echo "Command completed. Restarting..."
         sleep 1
     done
