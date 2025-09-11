@@ -640,38 +640,10 @@ loop() {
         return 1
     fi
 
-    local pid
-    trap '_loop_cleanup "$pid"; return 0' INT
-
     while true; do
         echo "Running: $*"
-        "$@" &
-        pid=$!
-        wait "$pid"
+        "$@"
         echo "Command completed. Restarting..."
         sleep 1
     done
-}
-
-_loop_cleanup() {
-    local pid=$1
-
-    echo -e "\nStopping..."
-
-    local wait_time=10
-
-    if [ -n "$pid" ]; then
-        kill -TERM "$pid" 2> /dev/null
-
-        while [ $wait_time -gt 0 ] && kill -0 "$pid" 2> /dev/null; do
-            sleep 1
-            wait_time=$((wait_time - 1))
-        done
-
-        if kill -0 "$pid" 2> /dev/null; then
-            kill -KILL "$pid" 2> /dev/null
-        fi
-    fi
-
-    return 0
 }
