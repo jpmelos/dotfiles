@@ -3,7 +3,7 @@ set -e
 trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND"' ERR
 
 main_branch=$(git main-branch)
-diff=$(git diff "$main_branch")
+diff=$(git diff "$main_branch...")
 
 if [ -z "$diff" ]; then
     echo "There is nothing to review."
