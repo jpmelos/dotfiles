@@ -640,17 +640,20 @@ loop() {
         return 1
     fi
 
+    local run_count=0
+
     while true; do
-        echo "Running: $*"
+        ((run_count++))
+        echo "Run #$run_count: $*"
         "$@"
 
         local exit_code=$?
         if [ $exit_code -ne 0 ]; then
-            echo "Command failed with exit code $exit_code. Stopping loop."
+            echo "Command failed with exit code $exit_code after $run_count runs. Stopping loop."
             return $exit_code
         fi
 
-        echo "Command completed. Restarting..."
+        echo "Command completed ($run_count runs). Restarting..."
         sleep 1
     done
 }
