@@ -1,5 +1,4 @@
 {
-  "autoUpdates": false,
   "apiKeyHelper": "/Users/jpmelos/devel/dotfiles/claude-manager/api-key-helper.sh",
   "permissions": {
     "allow": [
@@ -20,5 +19,7 @@
       "WebFetch(domain:docs.rs)",
       "mcp__github"
     ]
-  }
+  },
+  "alwaysThinkingEnabled": false,
+  "autoUpdates": false
 }
