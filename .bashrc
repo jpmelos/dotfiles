@@ -410,6 +410,23 @@ function cm() {
         return 0
     fi
 
+    local last_update_file="$HOME/.claude/.last-update"
+    local today=$(date +%Y-%m-%d)
+
+    if [[ ! -f "$last_update_file" ]]; then
+        echo "Updating Claude Code..."
+        npm install -g @anthropic-ai/claude-code
+        mkdir -p "$(dirname "$last_update_file")"
+        echo "$today" > "$last_update_file"
+    else
+        local last_update_date=$(cat "$last_update_file")
+        if [[ "$last_update_date" != "$today" ]]; then
+            echo "Updating Claude Code..."
+            npm install -g @anthropic-ai/claude-code
+            echo "$today" > "$last_update_file"
+        fi
+    fi
+
     if [ -z "$profile" ]; then
         component_count=$(echo "$project_relative_dir" | tr '/' '\n' | wc -l)
         if [ "$component_count" -gt 1 ]; then
