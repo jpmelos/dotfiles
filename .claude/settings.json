@@ -1,28 +1,28 @@
 {
-  "apiKeyHelper": "/Users/jpmelos/devel/dotfiles/claude-manager/api-key-helper.sh",
-  "permissions": {
-    "allow": [
-      "Bash(true)",
-      "Bash(ls:*)",
-      "Bash(find:*)",
-      "Bash(grep:*)",
-      "Bash(cat:*)",
-      "Bash(head:*)",
-      "Bash(tail:*)",
-      "Bash(rg:*)",
-      "Bash(sed:*)",
-      "Bash(git:*)",
-      "Bash(gh:*)",
-      "Bash(whois:*)",
-      "Bash(python -m py_compile:*)",
-      "Bash(cargo check:*)",
-      "Bash(cargo clippy:*)",
-      "Bash(./jpenv-bin/lint.bash:*)",
-      "Bash(./jpenv-bin/tests.bash:*)",
-      "WebFetch(domain:docs.rs)",
-      "mcp__github"
-    ]
-  },
-  "alwaysThinkingEnabled": false,
-  "autoUpdates": false
+    "apiKeyHelper": "/Users/jpmelos/devel/dotfiles/claude-manager/api-key-helper.sh",
+    "permissions": {
+        "allow": [
+            "Bash(true)",
+            "Bash(ls:*)",
+            "Bash(find:*)",
+            "Bash(grep:*)",
+            "Bash(cat:*)",
+            "Bash(head:*)",
+            "Bash(tail:*)",
+            "Bash(rg:*)",
+            "Bash(sed:*)",
+            "Bash(git:*)",
+            "Bash(gh:*)",
+            "Bash(whois:*)",
+            "Bash(python -m py_compile:*)",
+            "Bash(cargo check:*)",
+            "Bash(cargo clippy:*)",
+            "Bash(./jpenv-bin/lint.bash:*)",
+            "Bash(./jpenv-bin/tests.bash:*)",
+            "WebFetch(domain:docs.rs)",
+            "mcp__github"
+        ]
+    },
+    "alwaysThinkingEnabled": false,
+    "autoUpdates": false
 }
