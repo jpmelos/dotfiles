@@ -3,11 +3,18 @@ set -e
 trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND"' ERR
 
 main_branch=$(git main-branch)
-diff=$(git diff "$main_branch...")
 
+diff=$(git diff)
 if [ -z "$diff" ]; then
-    echo "There is nothing to review."
-    exit 1
+    diff=$(git diff --cached)
+    if [ -z "$diff" ]; then
+        diff=$(git diff "$main_branch...")
+        if [ -z "$diff" ]; then
+            echo "There is nothing to review."
+            exit 1
+        fi
+        exit 1
+    fi
 fi
 
 cat << EOF
