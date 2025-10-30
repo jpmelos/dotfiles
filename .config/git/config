@@ -132,9 +132,15 @@
     # cp = cherry-pick, intruding into c (commit) namespace
     cp = cherry-pick
 
+    # m = merge
+    m = merge
+    mm = ! git merge $(git main-branch)
+    mc = merge --continue
+    ma = merge --abort
+
     # r = rebase
     r = rebase
-    rbm = ! git rebase origin/$(git main-branch)  # `rm` is taking by the "git delete" logic
+    rbm = ! git rebase origin/$(git main-branch)  # `rm` is taken by the "git delete" logic
     ri = rebase -i
     rim = ! git rebase -i origin/$(git main-branch)
     rc = rebase --continue

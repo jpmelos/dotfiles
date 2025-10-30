@@ -218,6 +218,15 @@ __git_complete gucw git_reset
 alias gcp='g cp'
 __git_complete gcp git_cherry_pick
 
+alias gm='g m'
+alias gmm='g mm'
+alias gmc='g mc'
+alias gma='g ma'
+__git_complete gm git_merge
+__git_complete gmm git_merge
+__git_complete gmc git_merge
+__git_complete gma git_merge
+
 alias gr='g r'
 alias grm='g rbm'
 alias gri='g ri'
