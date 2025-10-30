@@ -13,7 +13,6 @@ if [ -z "$diff" ]; then
             echo "There is nothing to review."
             exit 1
         fi
-        exit 1
     fi
 fi
 
