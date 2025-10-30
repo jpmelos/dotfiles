@@ -17,7 +17,7 @@ if [ -z "$diff" ]; then
 fi
 
 cat << EOF
-Changes to review:
+Review the changes below.
 
 =================
 
@@ -25,9 +25,8 @@ $diff
 
 =================
 
-Do not run compilers, linters, or tests.
-
-Ultrathink.
+Provide a detailed explanation on what the change is about, and if you can
+figure it out, also explain why the changes would be desirable. Ultrathink.
 
 Review checklist:
 
@@ -36,15 +35,17 @@ Review checklist:
 - Functions and variables are well-named.
 - Proper error handling.
 - No exposed secrets or API keys.
-- Input is validated.
+- Input is validated and sanitized.
 - Good test coverage.
 - Code should have good performance characteristics.
 
-Summarize what the change is about, and provide feedback organized by priority:
+Provide feedback organized by priority:
 
 - Critical issues (must fix).
 - Warnings (should fix).
 - Suggestions (consider improving).
 
 Include specific examples of how to fix issues.
+
+Do not run compilers, linters, or tests.
 EOF
