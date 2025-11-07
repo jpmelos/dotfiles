@@ -146,6 +146,9 @@
     rc = rebase --continue
     ra = rebase --abort
 
+    # ro = reset to origin
+    ro = reset --hard @{upstream}
+
     # p = push (except pu for pull)
     p = push
     pf = push --force-with-lease

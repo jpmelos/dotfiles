@@ -240,6 +240,9 @@ __git_complete grim git_rebase
 __git_complete grc git_rebase
 __git_complete gra git_rebase
 
+alias gro='g ro'
+__git_complete gro git_reset
+
 alias gp='g p'
 alias gpf='g pf'
 __git_complete gp git_push
