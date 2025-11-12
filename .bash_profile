@@ -56,8 +56,15 @@ export HISTSIZE=100000
 export HISTFILESIZE=$HISTSIZE
 # Erase all duplicate lines, don't store lines starting with space.
 export HISTCONTROL=erasedups:ignoreboth
+
+# Function to reset the terminal title.
+BASH_TERMINAL_TITLE="bash"
+function reset_terminal_title() {
+    echo -ne "\033]0;$BASH_TERMINAL_TITLE\007"
+}
+
 # Persist every command immediately, load new commands.
-export PROMPT_COMMAND="history -a; history -n; run_autoenv_on_init; ${PROMPT_COMMAND}"
+export PROMPT_COMMAND="history -a; history -n; run_autoenv_on_init; reset_terminal_title; ${PROMPT_COMMAND}"
 
 ########################
 #                      #
