@@ -114,6 +114,17 @@ function module.apply_to_config(config)
             mods = "CTRL|META",
             action = action.MoveTabRelative(1),
         },
+        -- Scrolling.
+        {
+            key = "j",
+            mods = "ALT",
+            action = action.ScrollByPage(0.5),
+        },
+        {
+            key = "k",
+            mods = "ALT",
+            action = action.ScrollByPage(-0.5),
+        },
         -- Panes.
         {
             key = "v",
