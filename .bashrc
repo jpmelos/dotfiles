@@ -490,6 +490,9 @@ function cm() {
             --header "X-MCP-Toolsets: repos,issues,pull_requests" \
             --header "X-MCP-Readonly: true" \
             > /dev/null
+        echo "Installed GitHub MCP"
+    else
+        echo "Skipped GitHub MCP: No API token"
     fi
 
     echo "Running Claude Code with profile '$profile'"
