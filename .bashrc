@@ -125,7 +125,13 @@ alias treea='\tree -alF -I .git'
 # Docker aliases.
 alias d='docker'
 alias dc='docker compose'
-alias docker-nuke-all-the-things='docker rm -f $(docker ps -aq); docker system prune --all --volumes --force'
+alias docker-nuke-all-the-things='
+    docker rm -f $(docker ps -aq);  # Containers
+    docker rmi -f $(docker images -aq);  # Images
+    docker volume rm $(docker volume ls -q);  # Volumes
+    docker network rm $(docker network ls -q);  # Networks
+    docker builder prune -a --force;  # Build cache
+    docker system prune -a --volumes --force  # All the rest'
 
 alias curl='\curl -iL'
 
