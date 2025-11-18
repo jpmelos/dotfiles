@@ -1,8 +1,6 @@
 ---
 description: Review the current changes
-allowed-tools: Bash(bash ~/.claude/commands/review-prompt.sh)
+allowed-tools: Bash(bash ~/.claude/commands/review-prompt.sh), Read, Glob, Grep
 ---
-
-Review the current changes.
 
 !`bash ~/.claude/commands/review-prompt.sh`
