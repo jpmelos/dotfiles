@@ -209,7 +209,6 @@ alias gcan='g can'
 alias gcmn='g cmn'
 alias gcamn='g camn'
 alias gcw='g cw'
-alias gucw='g ucw'
 __git_complete gc git_commit
 __git_complete gca git_commit
 __git_complete gcm git_commit
@@ -219,7 +218,9 @@ __git_complete gcan git_commit
 __git_complete gcmn git_commit
 __git_complete gcamn git_commit
 __git_complete gcw git_commit
-__git_complete gucw git_reset
+
+alias gu='g u'
+__git_complete gu git_reset
 
 alias gcp='g cp'
 __git_complete gcp git_cherry_pick
