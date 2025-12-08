@@ -6,3 +6,5 @@
 - Use the command line `gh` tool to browse GitHub when working with GitHub URLs
   or working with GitHub repositories. When needed, check the Git remotes to
   see if you're working with a GitHub repository.
+- Never directly run any default development tools from the repository like
+  test runners or `pre-commit`.
