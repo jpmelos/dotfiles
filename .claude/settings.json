@@ -25,6 +25,7 @@
             "WebFetch(domain:docs.rs)"
         ]
     },
+    "model": "opus",
     "alwaysThinkingEnabled": false,
     "autoUpdates": false
 }
