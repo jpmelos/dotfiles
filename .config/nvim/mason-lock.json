@@ -1,14 +1,14 @@
 {
   "bash-language-server": "5.6.0",
   "jq": "jq-1.7",
-  "lua-language-server": "3.15.0",
-  "prettier": "3.6.2",
+  "lua-language-server": "3.16.0",
+  "prettier": "3.7.4",
   "pyright": "1.1.407",
-  "ruff": "0.14.2",
-  "rust-analyzer": "2025-10-27",
+  "ruff": "0.14.8",
+  "rust-analyzer": "2025-12-01",
   "shellcheck": "v0.11.0",
   "shfmt": "v3.12.0",
-  "stylua": "v2.3.0",
+  "stylua": "v2.3.1",
   "taplo": "0.10.0",
   "yaml-language-server": "1.19.2"
 }
