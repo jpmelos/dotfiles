@@ -8,3 +8,13 @@
   see if you're working with a GitHub repository.
 - Never directly run any default development tools from the repository like
   test runners or `pre-commit`.
+  - When you need to lint, run `bash jpenv-bin/lint.bash`. If the script
+    doesn't exist, report that you can't lint because of that. If applicable,
+    pass the specific file paths you want to lint.
+  - When you need to run tests, run `bash jpenv-bin/tests.bash`. If the script
+    doesn't exist, report that you can't run the tests because of that. If
+    applicable, pass the specific file paths that contain the tests you want to
+    test.
+    - Consider specific test harness formats, like whether you can pass test
+      names in `pytest` format for Python projects, `cargo test` or
+      `cargo nextest` format for Rust projects.
