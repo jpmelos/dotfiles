@@ -3,7 +3,7 @@ description: Review a PR
 argument-hint: [pr_number]
 ---
 
-Review PR $1. Use the `gh` command to fetch PR details.
+Review PR $1.
 
 Provide a detailed explanation on what the change is about, and if you can
 figure it out, also explain why the changes would be desirable. Feel free to
