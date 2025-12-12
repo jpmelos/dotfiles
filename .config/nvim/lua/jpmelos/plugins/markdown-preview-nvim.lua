@@ -7,13 +7,8 @@ return {
             "<leader>mp",
             "<cmd>MarkdownPreview<cr>",
             mode = "n",
-            desc = "Toggle Markdown preview",
+            desc = "Open Markdown preview",
         },
-    },
-    cmd = {
-        "MarkdownPreviewToggle",
-        "MarkdownPreview",
-        "MarkdownPreviewStop",
     },
     init = function()
         -- Do not auto-close the preview window when closing Markdown buffer.
@@ -22,11 +17,15 @@ return {
         vim.g.mkdp_combine_preview = true
         -- When changing the buffer, also update the preview.
         vim.g.mkdp_combine_preview_auto_refresh = true
-        -- Set the browser to use in each OS.
+        -- Set up browser opening without stealing focus.
         if Trim(vim.fn.system("uname -s")) == "Darwin" then
-            -- MacOS
-            vim.g.mkdp_browser =
-                "/Applications/Firefox.app/Contents/MacOS/firefox"
+            -- macOS: Use `open -g` to open in background without focus.
+            vim.cmd([[
+                function! OpenMarkdownPreviewBrowser(url)
+                    silent execute "!open -g -a Firefox " . shellescape(a:url)
+                endfunction
+            ]])
+            vim.g.mkdp_browserfunc = "OpenMarkdownPreviewBrowser"
         else
             -- Linux
             vim.notify(

@@ -2,12 +2,14 @@ local workspaces =
     { { name = "second-brain", path = "~/devel/second-brain" } }
 
 return {
-    "epwalsh/obsidian.nvim",
+    "obsidian-nvim/obsidian.nvim",
+    version = "*",
     dependencies = {
         "nvim-lua/plenary.nvim",
         "hrsh7th/nvim-cmp",
         "nvim-telescope/telescope.nvim",
         "nvim-treesitter/nvim-treesitter",
+        "iamcco/markdown-preview.nvim",
     },
     -- Only load when we are in one of the defined workspaces.
     cond = function()
@@ -26,20 +28,18 @@ return {
         local K = vim.keymap.set
 
         require("obsidian").setup({
+            legacy_commands = false,
+            ui = { enable = false },
+            statusline = { enabled = false },
+            footer = { enabled = false },
+
             workspaces = workspaces,
-            -- When using ':ObsidianOpen'.
-            open_app_foreground = false,
+
             completion = {
                 nvim_cmp = true,
                 min_chars = 1,
             },
-            mappings = {},
-            daily_notes = {
-                folder = "02-dailies",
-                date_format = "%Y-%m-%d",
-                alias_format = "%Y-%m-%d",
-                template = "daily-note.md",
-            },
+
             templates = {
                 folder = "00-templates",
                 date_format = "%Y-%m-%d",
@@ -48,6 +48,13 @@ return {
                 -- variable and the value a function
                 substitutions = {},
             },
+            daily_notes = {
+                folder = "02-dailies",
+                date_format = "%Y-%m-%d",
+                alias_format = "%Y-%m-%d",
+                template = "daily-note.md",
+            },
+
             note_id_func = function(title)
                 if title ~= nil then
                     return title
@@ -62,6 +69,7 @@ return {
                 end
                 return note_id
             end,
+
             follow_url_func = function(url)
                 if vim.fn.system("uname -s"):trim() == "Darwin" then
                     -- MacOS
@@ -75,37 +83,41 @@ return {
                     vim.fn.jobstart({ "xdg-open", url }) -- linux
                 end
             end,
+
             picker = {
                 name = "telescope.nvim",
                 mappings = { insert_link = "<C-l>" },
             },
-            ui = { enable = false },
+
+            checkbox = {
+                enabled = true,
+                create_new = true,
+                order = { " ", "x" },
+            },
         })
 
-        K("n", "<leader>on", "<cmd>Obsidian<cr>", { desc = "Open new note" })
+        vim.api.nvim_create_autocmd("User", {
+            pattern = "ObsidianNoteEnter",
+            command = "MarkdownPreview",
+        })
+
+        K(
+            "n",
+            "<leader>on",
+            "<cmd>Obsidian new<cr>",
+            { desc = "Open new note" }
+        )
         K(
             "n",
             "<leader>ot",
-            "<cmd>ObsidianNewFromTemplate<cr>",
+            "<cmd>Obsidian new_from_template<cr>",
             { desc = "Open new note from template" }
         )
         K(
             "n",
             "<leader>od",
-            "<cmd>ObsidianToday<cr>",
+            "<cmd>Obsidian today<cr>",
             { desc = "Open today's daily note" }
         )
-
-        K("n", "gf", function()
-            return require("obsidian").util.gf_passthrough()
-        end, {
-            noremap = false,
-            expr = true,
-            desc = "Follow link",
-        })
-
-        K("n", "<leader>ox", function()
-            return require("obsidian").util.toggle_checkbox()
-        end, { desc = "Toggle checkbox" })
     end,
 }
