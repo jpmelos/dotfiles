@@ -34,13 +34,13 @@ return {
             },
             mappings = {},
             daily_notes = {
-                folder = "00-dailies",
+                folder = "02-dailies",
                 date_format = "%Y-%m-%d",
                 alias_format = "%Y-%m-%d",
                 template = nil,
             },
             templates = {
-                folder = "templates",
+                folder = "00-templates",
                 date_format = "%Y-%m-%d",
                 time_format = "%H:%M",
                 -- A map for custom variables, the key should be the
