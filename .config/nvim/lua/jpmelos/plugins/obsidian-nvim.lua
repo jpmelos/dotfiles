@@ -1,4 +1,5 @@
-local workspaces = { { name = "second-brain", path = "~/devel/second-brain" } }
+local workspaces =
+    { { name = "second-brain", path = "~/devel/second-brain" } }
 
 return {
     "epwalsh/obsidian.nvim",
@@ -81,6 +82,20 @@ return {
             ui = { enable = false },
         })
 
+        K("n", "<leader>on", "<cmd>Obsidian<cr>", { desc = "Open new note" })
+        K(
+            "n",
+            "<leader>ot",
+            "<cmd>ObsidianNewFromTemplate<cr>",
+            { desc = "Open new note from template" }
+        )
+        K(
+            "n",
+            "<leader>od",
+            "<cmd>ObsidianToday<cr>",
+            { desc = "Open today's daily note" }
+        )
+
         K("n", "gf", function()
             return require("obsidian").util.gf_passthrough()
         end, {
@@ -88,20 +103,9 @@ return {
             expr = true,
             desc = "Follow link",
         })
+
         K("n", "<leader>ox", function()
             return require("obsidian").util.toggle_checkbox()
         end, { desc = "Toggle checkbox" })
-        K(
-            { "n", "v" },
-            "<leader>on",
-            "<cmd>ObsidianLinkNew<cr>",
-            { desc = "Link to new note" }
-        )
-        K(
-            "n",
-            "<leader>ot",
-            "<cmd>ObsidianToday<cr>",
-            { desc = "Open today's daily" }
-        )
     end,
 }
