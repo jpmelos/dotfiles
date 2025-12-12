@@ -38,7 +38,7 @@ return {
                 folder = "02-dailies",
                 date_format = "%Y-%m-%d",
                 alias_format = "%Y-%m-%d",
-                template = nil,
+                template = "daily-note.md",
             },
             templates = {
                 folder = "00-templates",
