@@ -26,7 +26,7 @@
             "WebFetch(domain:docs.rs)"
         ]
     },
-    "model": "opus",
+    "model": "sonnet",
     "alwaysThinkingEnabled": false,
     "autoUpdates": false
 }
