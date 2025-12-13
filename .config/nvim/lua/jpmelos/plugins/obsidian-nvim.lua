@@ -27,7 +27,11 @@ return {
     config = function()
         local K = vim.keymap.set
 
-        require("obsidian").setup({
+        local obsidian = require("obsidian")
+
+        local default_template_name = "default"
+
+        obsidian.setup({
             legacy_commands = false,
             ui = { enable = false },
             statusline = { enabled = false },
@@ -79,6 +83,88 @@ return {
                 enabled = true,
                 create_new = true,
                 order = { " ", "x" },
+            },
+
+            callbacks = {
+                pre_write_note = function(note)
+                    local templates_dir = obsidian.api.templates_dir()
+                    if not templates_dir then
+                        -- No templates defined, nothing to do here.
+                        return
+                    end
+
+                    local ok = pcall(
+                        obsidian.templates.resolve_template,
+                        default_template_name,
+                        templates_dir
+                    )
+                    if not ok then
+                        -- The default template doesn't exist, nothing to do
+                        -- here.
+                        return
+                    end
+
+                    local buf = vim.api.nvim_get_current_buf()
+                    local lines =
+                        vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+
+                    -- Detect frontmatter boundaries.
+                    local frontmatter_end = 0
+                    if
+                        #lines > 0
+                        and (lines[1] == "---" or lines[1] == "+++")
+                    then
+                        local frontmatter_delimiter = lines[1]
+                        for i = 2, #lines do
+                            if lines[i] == frontmatter_delimiter then
+                                frontmatter_end = i
+                                break
+                            end
+                        end
+                    end
+
+                    -- Check if content after frontmatter is empty.
+                    local is_empty = true
+                    for i = frontmatter_end + 1, #lines do
+                        if lines[i] ~= "" then
+                            is_empty = false
+                            break
+                        end
+                    end
+
+                    if is_empty then
+                        -- Determine insertion line (after frontmatter).
+                        local insert_line = frontmatter_end + 1
+
+                        -- If there's frontmatter, delete everything after
+                        -- it (including any empty lines), add exactly one
+                        -- empty line, and insert template after that.
+                        if frontmatter_end > 0 then
+                            vim.api.nvim_buf_set_lines(
+                                buf,
+                                frontmatter_end,
+                                -1,
+                                false,
+                                { "" }
+                            )
+                            -- Insert after the empty line we just added.
+                            insert_line = frontmatter_end + 2
+                        end
+
+                        obsidian.templates.insert_template({
+                            template_name = default_template_name,
+                            templates_dir = templates_dir,
+                            template_opts = Obsidian.opts.templates,
+                            location = {
+                                buf,
+                                vim.api.nvim_get_current_win(),
+                                insert_line,
+                                0,
+                            },
+                            partial_note = note,
+                        })
+                    end
+                end,
             },
         })
 
