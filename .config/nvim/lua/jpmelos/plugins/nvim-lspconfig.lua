@@ -78,7 +78,7 @@ return {
                         -- Make the language server recognize the "vim"
                         -- global. Useful when working with Neovim
                         -- configuration.
-                        globals = { "vim" },
+                        globals = { "vim", "Obsidian" },
                     },
                 },
             },
