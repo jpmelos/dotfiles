@@ -29,9 +29,15 @@
 -- vim.g.formatters_by_ft = formatters_by_ft
 -- ```
 
+vim.g.inside_format_cb = false
+
 local function do_format(conform, range)
-    -- Trim trailing whitespaces before formatting.
     local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+    if #lines == 0 then
+        return
+    end
+
+    -- Trim trailing whitespaces before formatting.
     for i, line in ipairs(lines) do
         local trimmed = line:gsub("%s+$", "")
         if trimmed ~= line then
@@ -39,14 +45,11 @@ local function do_format(conform, range)
         end
     end
 
-    local cb = function(did_edit)
-        -- If didn't format anything, there's nothing to do.
-        if not did_edit then
-            return
-        end
-
+    local cb = function()
         -- Save the buffer after formatting.
+        vim.g.inside_format_cb = true
         vim.cmd("write")
+        vim.g.inside_format_cb = false
     end
 
     -- When formatting Markdown files, exclude:
@@ -58,23 +61,46 @@ local function do_format(conform, range)
     --   ways that will break the interpolation, thus we don't want them to be
     --   changed in any way.
     if vim.bo.filetype == "markdown" then
+        -- `mdformat` does not support ranges.
+        range = nil
+
         lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
-        if #lines == 0 then
-            return
-        end
 
         -- First pass: Exclude frontmatter from the formatting range.
-        if range == nil then
-            if lines[1] == "---" or lines[1] == "+++" then
-                local frontmatter_delimiter = lines[1]
-                for i = 2, #lines do
-                    if lines[i] == frontmatter_delimiter then
-                        range = {
-                            start = { i + 1, 0 },
-                            ["end"] = { #lines, 99999 },
-                        }
-                        break
+        local frontmatter = {}
+        if lines[1] == "---" or lines[1] == "+++" then
+            local frontmatter_delimiter = lines[1]
+            for i = 2, #lines do
+                if lines[i] == frontmatter_delimiter then
+                    -- Put the lines of the frontmatter in `frontmatter`.
+                    for j = 1, i do
+                        table.insert(frontmatter, lines[j])
                     end
+                    -- Remove them from the buffer.
+                    vim.api.nvim_buf_set_lines(0, 0, i, false, {})
+                    -- Re-read lines after removing frontmatter.
+                    lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+                    -- Remove empty lines after frontmatter.
+                    local empty_lines = 0
+                    for _, line in ipairs(lines) do
+                        if line == "" then
+                            empty_lines = empty_lines + 1
+                        else
+                            break
+                        end
+                    end
+                    if empty_lines > 0 then
+                        vim.api.nvim_buf_set_lines(
+                            0,
+                            0,
+                            empty_lines,
+                            false,
+                            {}
+                        )
+                        -- Re-read lines after removing empty lines.
+                        lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+                    end
+                    break
                 end
             end
         end
@@ -109,43 +135,38 @@ local function do_format(conform, range)
             end
         end
 
-        cb = function(did_edit)
-            -- If didn't format anything, then just undo the replacements
-            -- instead.
-            if not did_edit then
-                local n_replacements = 0
-                for _ in pairs(replacements) do
-                    n_replacements = n_replacements + 1
-                    break
-                end
-
-                if n_replacements > 0 then
-                    vim.cmd(
-                        "let save_cursor = getpos('.')"
-                            .. "| undo "
-                            .. "| call setpos('.', save_cursor)"
-                    )
-                end
-                return
+        cb = function()
+            if #frontmatter > 0 then
+                -- Add one empty line after frontmatter.
+                table.insert(frontmatter, "")
+                vim.api.nvim_buf_set_lines(0, 0, 0, false, frontmatter)
             end
 
-            local post_format_lines =
-                vim.api.nvim_buf_get_lines(0, 0, -1, false)
-
-            for i, line in ipairs(post_format_lines) do
-                if replacements[line] then
-                    vim.api.nvim_buf_set_lines(
-                        0,
-                        i - 1,
-                        i,
-                        false,
-                        { replacements[line] }
-                    )
+            local n_replacements = 0
+            for _ in pairs(replacements) do
+                n_replacements = n_replacements + 1
+                break
+            end
+            if n_replacements > 0 then
+                local post_format_lines =
+                    vim.api.nvim_buf_get_lines(0, 0, -1, false)
+                for i, line in ipairs(post_format_lines) do
+                    if replacements[line] then
+                        vim.api.nvim_buf_set_lines(
+                            0,
+                            i - 1,
+                            i,
+                            false,
+                            { replacements[line] }
+                        )
+                    end
                 end
             end
 
             -- Save the buffer after formatting.
+            vim.g.inside_format_cb = true
             vim.cmd("write")
+            vim.g.inside_format_cb = false
         end
     end
 
@@ -154,9 +175,9 @@ local function do_format(conform, range)
         async = true,
         lsp_format = "never",
         range = range,
-    }, function(err, did_edit)
+    }, function()
         vim.api.nvim_buf_call(bufnr, function()
-            cb(did_edit)
+            cb()
         end)
     end)
 end
@@ -208,8 +229,9 @@ return {
         -- (with a bang).
         api.nvim_create_autocmd("BufWritePost", {
             callback = function()
-                -- Do not autoformat if we're saving because Neovim lost focus.
-                if not g.nvim_has_focus then
+                -- Do not autoformat if we're saving because Neovim lost focus
+                -- or if we're inside the format callback.
+                if g.inside_format_cb or not g.nvim_has_focus then
                     return
                 end
 
