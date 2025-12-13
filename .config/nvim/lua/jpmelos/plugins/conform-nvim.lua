@@ -116,6 +116,7 @@ local function do_format(conform, range)
                 local n_replacements = 0
                 for _ in pairs(replacements) do
                     n_replacements = n_replacements + 1
+                    break
                 end
 
                 if n_replacements > 0 then
