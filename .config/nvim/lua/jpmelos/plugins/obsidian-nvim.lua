@@ -70,20 +70,6 @@ return {
                 return note_id
             end,
 
-            follow_url_func = function(url)
-                if vim.fn.system("uname -s"):trim() == "Darwin" then
-                    -- MacOS
-                    vim.fn.jobstart({ "open", url })
-                else
-                    -- Linux
-                    vim.notify(
-                        "Fix this, make it specific for Linux in"
-                            .. "obsidian.nvim."
-                    )
-                    vim.fn.jobstart({ "xdg-open", url }) -- linux
-                end
-            end,
-
             picker = {
                 name = "telescope.nvim",
                 mappings = { insert_link = "<C-l>" },
