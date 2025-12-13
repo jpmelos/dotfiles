@@ -12,7 +12,7 @@ return {
     },
     init = function()
         -- Do not auto-close the preview window when closing Markdown buffer.
-        vim.g.mkdp_auto_close = true
+        vim.g.mkdp_auto_close = false
         -- Use the same window for all previews.
         vim.g.mkdp_combine_preview = true
         -- When changing the buffer, also update the preview.
