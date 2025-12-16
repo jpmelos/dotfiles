@@ -1,3 +1,5 @@
+math.randomseed()
+
 require("jpmelos.core.options")
 require("jpmelos.core.globals")
 require("jpmelos.core.globs")
