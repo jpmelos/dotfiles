@@ -470,7 +470,6 @@ function cm() {
             toml get <(echo "$CLAUDE_CODE_SECRET") . | jq -r ".profile.$profile.api_key"
         )
     fi
-    export CLAUDE_CODE_API_KEY
 
     export BASH_DEFAULT_TIMEOUT_MS=120000
     export BASH_MAX_TIMEOUT_MS="$BASH_DEFAULT_TIMEOUT_MS"
@@ -507,7 +506,7 @@ function cm() {
     if [[ "$claude_help" == "true" ]]; then
         claude --help
     else
-        claude
+        CLAUDE_CODE_API_KEY=$CLAUDE_CODE_API_KEY claude
     fi
 }
 
