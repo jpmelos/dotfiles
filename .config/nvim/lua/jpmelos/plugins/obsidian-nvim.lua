@@ -31,6 +31,10 @@ return {
 
         local default_template_name = "default"
 
+        -- Help the Markdown previewer find our images.
+        local cwd = vim.fn.getcwd()
+        vim.g.mkdp_images_path = cwd .. "/01-assets/imgs"
+
         obsidian.setup({
             legacy_commands = false,
             ui = { enable = false },
@@ -38,6 +42,7 @@ return {
             footer = { enabled = false },
 
             workspaces = workspaces,
+            preferred_link_style = "markdown",
 
             completion = {
                 nvim_cmp = true,
@@ -51,6 +56,17 @@ return {
                 -- A map for custom variables, the key should be the
                 -- variable and the value a function
                 substitutions = {},
+            },
+            attachments = {
+                img_folder = "01-assets/imgs",
+                img_name_func = function()
+                    return string.format(
+                        "%s-%s",
+                        os.date("%Y-%m-%d-%H-%M-%S"),
+                        RandomAlphaNumericString(6)
+                    )
+                end,
+                confirm_img_paste = false,
             },
             daily_notes = {
                 folder = "02-dailies",

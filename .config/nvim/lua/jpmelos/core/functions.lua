@@ -330,3 +330,16 @@ end
 function Trim(s)
     return s:gsub("^%s+", ""):gsub("%s+$", "")
 end
+
+local random_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    .. "abcdefghijklmnopqrstuvwxyz"
+    .. "0123456789"
+
+function RandomAlphaNumericString(length)
+    local result = {}
+    for i = 1, length do
+        local random_index = math.random(1, #random_chars)
+        result[i] = random_chars:sub(random_index, random_index)
+    end
+    return table.concat(result)
+end

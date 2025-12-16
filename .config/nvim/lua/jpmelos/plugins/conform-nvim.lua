@@ -66,7 +66,7 @@ local function do_format(conform, range)
 
         lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
 
-        -- First pass: Exclude frontmatter from the formatting range.
+        -- First pass: Exclude frontmatter from the file.
         local frontmatter = {}
         if lines[1] == "---" or lines[1] == "+++" then
             local frontmatter_delimiter = lines[1]
@@ -109,28 +109,10 @@ local function do_format(conform, range)
         -- formatting, and put them back in later, to stop `mdformat` from
         -- breaking them.
         local replacements = {}
-        local random_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-            .. "abcdefghijklmnopqrstuvwxyz"
-            .. "0123456789"
-
-        local start_line = 1
-        local end_line = #lines
-        if range ~= nil then
-            start_line = range.start[1]
-            end_line = range["end"][1]
-        end
-
-        for i = start_line, end_line do
+        for i = 1, #lines do
             if lines[i]:match("^{{") then
-                local random_id = ""
-                for _ = 1, 100 do
-                    local random_index = math.random(1, #random_chars)
-                    random_id = random_id
-                        .. random_chars:sub(random_index, random_index)
-                end
-
+                local random_id = RandomAlphaNumericString(100)
                 replacements[random_id] = lines[i]
-
                 vim.api.nvim_buf_set_lines(0, i - 1, i, false, { random_id })
             end
         end
