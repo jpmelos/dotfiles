@@ -207,5 +207,11 @@ return {
             "<cmd>Obsidian today<cr>",
             { desc = "Open today's daily note" }
         )
+        K(
+            "n",
+            "<leader>oi",
+            "<cmd>Obsidian paste_img<cr>",
+            { desc = "Paste image from clipboard" }
+        )
     end,
 }
