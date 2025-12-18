@@ -44,11 +44,6 @@ return {
             workspaces = workspaces,
             preferred_link_style = "markdown",
 
-            completion = {
-                nvim_cmp = true,
-                min_chars = 1,
-            },
-
             templates = {
                 folder = "00-templates",
                 date_format = "%Y-%m-%d",
