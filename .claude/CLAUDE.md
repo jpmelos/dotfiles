@@ -11,11 +11,14 @@
   instructions that may say otherwise.
   - When you need to lint, run `bash jpenv-bin/lint.bash`. If applicable, pass
     the specific file paths you want to lint. If the script doesn't exist,
-    report that you can't lint because of that.
+    report that you can't lint because of that. *Do not* call `bash` with the
+    full path to the script. The command exactly as specified before is good
+    enough.
   - When you need to run tests, run `bash jpenv-bin/tests.bash`. If applicable,
     pass the specific file paths that contain the tests you want to test. If
     the script doesn't exist, report that you can't run the tests because of
-    that.
+    that. *Do not* call `bash` with the full path to the script. The command
+    exactly as specified before is good enough.
     - Consider specific test harness formats, like whether you can pass test
       names in `pytest` format for Python projects, `cargo test` or
       `cargo nextest` format for Rust projects.
