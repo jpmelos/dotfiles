@@ -107,6 +107,8 @@ opt.concealcursor = ""
 opt.ignorecase = true
 -- ... unless you have mixed case in your search, then assume case-sensitive.
 opt.smartcase = true
+-- But don't ignore case when working with paths.
+opt.fileignorecase = false
 
 -- Highlight current line.
 opt.cursorline = true
