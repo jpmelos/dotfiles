@@ -1,3 +1,9 @@
+-- How to use this:
+-- 1. Start the Neovim instance that you want to debug.
+-- 2. Start the Neovim debugger server as below.
+-- 3. Start another Neovim instance, this will be the instance you'll use to
+--    follow along the running code.
+-- 4. Set breakpoints and watch the code run. :-)
 return {
     "jbyuki/one-small-step-for-vimkind",
     keys = {

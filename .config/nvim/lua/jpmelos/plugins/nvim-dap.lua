@@ -176,8 +176,9 @@ local function set_up_lua_debugger(dap)
             name = "Attach to running Neovim instance",
         },
     }
-    -- Make sure this host and port matches what's configured for
-    -- "jbyuki/one-small-step-for-vimkind".
+    -- Make sure this host and port matches what's configured for the DAP
+    -- adapter "jbyuki/one-small-step-for-vimkind". Instructions on how to use
+    -- this can be found in the file for the DAP adapter.
     dap.adapters.nlua = function(callback)
         callback({ type = "server", host = "127.0.0.1", port = 8086 })
     end
