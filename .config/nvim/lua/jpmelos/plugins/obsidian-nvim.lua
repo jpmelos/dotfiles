@@ -2,8 +2,8 @@ local workspaces =
     { { name = "second-brain", path = "~/devel/second-brain" } }
 
 return {
-    "obsidian-nvim/obsidian.nvim",
-    version = "*",
+    "jpmelos/obsidian.nvim",
+    branch = "jpmelos-main",
     dependencies = {
         "nvim-lua/plenary.nvim",
         "hrsh7th/nvim-cmp",
