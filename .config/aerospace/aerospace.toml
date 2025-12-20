@@ -59,7 +59,9 @@ outer.right = 5
 # All possible commands: https://nikitabobko.github.io/AeroSpace/commands
 [mode.main.binding]
 alt-slash = 'layout tiles horizontal vertical'
-alt-f = ['layout floating tiling', 'mode main']
+
+alt-f = 'layout floating tiling'
+alt-shift-f = 'fullscreen'
 
 alt-h = 'focus left'
 alt-j = 'focus down'
