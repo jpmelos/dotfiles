@@ -66,7 +66,6 @@ return {
             daily_notes = {
                 folder = "02-dailies",
                 date_format = "%Y-%m-%d",
-                alias_format = "%Y-%m-%d",
                 template = "daily-note.md",
                 default_tags = { "daily-note" },
                 workdays_only = false,
