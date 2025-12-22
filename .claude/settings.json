@@ -22,8 +22,8 @@
             "Bash(cargo clippy:*)",
             "WebFetch(domain:docs.rs)",
             "Bash(bash ~/.claude/commands/review-prompt.sh:*)",
-            "Bash(jpenv-bin/lint.bash:*)",
-            "Bash(jpenv-bin/tests.bash:*)"
+            "Bash(bash jpenv-bin/lint.bash:*)",
+            "Bash(bash jpenv-bin/tests.bash:*)"
         ]
     },
     "model": "sonnet",
