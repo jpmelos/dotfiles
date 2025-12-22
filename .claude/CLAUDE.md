@@ -19,6 +19,8 @@
     the script doesn't exist, report that you can't run the tests because of
     that. *Do not* call `bash` with the full path to the script. The command
     exactly as specified before is good enough.
-    - Consider specific test harness formats, like whether you can pass test
-      names in `pytest` format for Python projects, `cargo test` or
-      `cargo nextest` format for Rust projects.
+    - Consider specific test harness formats for command-line arguments. For
+      example, for `pytest`, consider how you should pass test names, or `-v`
+      for increased verbosity, or `-k <test_name>` for selecting specific
+      tests, .etc. Consider the same thing for other test harnesses like `cargo
+      test` and `cargo nextest` for Rust projects.
