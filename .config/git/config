@@ -169,6 +169,7 @@
     # rs = reset
     rsu = reset HEAD~1
     rso = reset --hard @{upstream}
+    rsm = ! git reset --hard origin/$(git main-branch)
 
     # sh = show
     sh = "! f() { if [[ \"$1\" =~ ^- ]]; then HEADN=\"${1#-}\"; shift; git show \"HEAD~$HEADN\" $@; else git show \"$@\"; fi; }; f"
