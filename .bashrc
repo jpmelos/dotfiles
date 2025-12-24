@@ -146,25 +146,12 @@ __git_complete g git
 
 alias gnuke='g nuke'
 
-alias gst='g st'
-__git_complete gst git_status
-
-alias gsh='g sh'
-alias gshf='g shf'
-alias gshh='g shh'
-__git_complete gsh git_show
-__git_complete gshf git_show
-__git_complete gshh git_show
-
-alias gl='g l'
-alias glf='g lf'
-alias glp='g lp'
-__git_complete gl git_log
-__git_complete glf git_log
-__git_complete glp git_log
-
-alias gls='g ls'
-__git_complete gls git_ls_tree
+alias ga='g a'
+alias gaa='g aa'
+alias gapa='g apa'
+__git_complete ga git_add
+__git_complete gaa git_add
+__git_complete gapa git_add
 
 alias gb='g b'
 alias gbr='g br'
@@ -174,31 +161,6 @@ __git_complete gb git_branch
 __git_complete gbr git_branch
 __git_complete gbn git_checkout
 __git_complete gbd git_branch
-
-alias gd='g d'
-alias gdst='g dst'
-alias gdca='g dca'
-alias gdm='g dm'
-alias gdom='g dom'
-__git_complete gd git_diff
-__git_complete gdst git_diff
-__git_complete gdca git_diff
-__git_complete gdm git_diff
-__git_complete gdom git_diff
-
-alias go='g o'
-alias gom='g om'
-alias gof='g of'
-__git_complete go git_checkout
-__git_complete gom git_checkout
-__git_complete gof git_checkout
-
-alias ga='g a'
-alias gaa='g aa'
-alias gapa='g apa'
-__git_complete ga git_add
-__git_complete gaa git_add
-__git_complete gapa git_add
 
 alias gc='g c'
 alias gca='g ca'
@@ -219,11 +181,23 @@ __git_complete gcmn git_commit
 __git_complete gcamn git_commit
 __git_complete gcw git_commit
 
-alias gu='g u'
-__git_complete gu git_reset
+alias gd='g d'
+alias gdst='g dst'
+alias gdca='g dca'
+alias gdm='g dm'
+alias gdom='g dom'
+__git_complete gd git_diff
+__git_complete gdst git_diff
+__git_complete gdca git_diff
+__git_complete gdm git_diff
+__git_complete gdom git_diff
 
-alias gcp='g cp'
-__git_complete gcp git_cherry_pick
+alias gl='g l'
+alias glf='g lf'
+alias glp='g lp'
+__git_complete gl git_log
+__git_complete glf git_log
+__git_complete glp git_log
 
 alias gm='g m'
 alias gmm='g mm'
@@ -234,29 +208,52 @@ __git_complete gmm git_merge
 __git_complete gmc git_merge
 __git_complete gma git_merge
 
-alias gr='g r'
-alias grm='g rbm'
-alias gri='g ri'
-alias grim='g rim'
-alias grc='g rc'
-alias gra='g ra'
-__git_complete gr git_rebase
-__git_complete grm git_rebase
-__git_complete gri git_rebase
-__git_complete grim git_rebase
-__git_complete grc git_rebase
-__git_complete gra git_rebase
+alias go='g o'
+alias gom='g om'
+alias gof='g of'
+__git_complete go git_checkout
+__git_complete gom git_checkout
+__git_complete gof git_checkout
 
-alias gro='g ro'
-__git_complete gro git_reset
+alias gpl='g pl'
+__git_complete gpl git_pull
 
-alias gp='g p'
-alias gpf='g pf'
-__git_complete gp git_push
-__git_complete gpf git_push
+alias gps='g ps'
+alias gpsf='g psf'
+__git_complete gps git_push
+__git_complete gpsf git_push
 
-alias gpu='g pu'
-__git_complete gpu git_pull
+alias grb='g rb'
+alias grbm='g rbm'
+alias grbi='g rbi'
+alias grbim='g rbim'
+alias grbc='g rbc'
+alias grba='g rba'
+__git_complete grb git_rebase
+__git_complete grbm git_rebase
+__git_complete grbi git_rebase
+__git_complete grbim git_rebase
+__git_complete grbc git_rebase
+__git_complete grba git_rebase
+
+alias grsu='g rsu'
+alias grso='g rso'
+__git_complete grsu git_reset
+__git_complete grro git_reset
+
+alias gsh='g sh'
+alias gshf='g shf'
+__git_complete gsh git_show
+__git_complete gshf git_show
+
+alias gst='g st'
+__git_complete gst git_status
+
+alias gt='g t'
+__git_complete gt git_ls_tree
+
+alias gy='g y'
+__git_complete gy git_cherry_pick
 
 ###################
 #                 #
