@@ -477,7 +477,7 @@ function cm() {
 
     echo "Setting up MCPs"
 
-    CLAUDE_CODE_API_KEY=$CLAUDE_CODE_API_KEY claude mcp list \
+    ANTHROPIC_API_KEY=$CLAUDE_CODE_API_KEY claude mcp list \
         | grep '^[a-z]*:' \
         | cut -d: -f1 \
         | xargs -I {} bash -c "claude mcp remove {} > /dev/null"
@@ -487,7 +487,7 @@ function cm() {
             | jq -r ".profile.$profile.github_api_token"
     )
     if [[ "$GITHUB_MCP_API_KEY" != "null" ]]; then
-        CLAUDE_CODE_API_KEY=$CLAUDE_CODE_API_KEY claude mcp add \
+        ANTHROPIC_API_KEY=$CLAUDE_CODE_API_KEY claude mcp add \
             github https://api.githubcopilot.com/mcp/ \
             --scope user \
             --transport http \
@@ -503,9 +503,9 @@ function cm() {
     echo "Running Claude Code with profile '$profile'"
 
     if [[ "$claude_help" == "true" ]]; then
-        CLAUDE_CODE_API_KEY=$CLAUDE_CODE_API_KEY claude --help
+        ANTHROPIC_API_KEY=$CLAUDE_CODE_API_KEY claude --help
     else
-        CLAUDE_CODE_API_KEY=$CLAUDE_CODE_API_KEY claude
+        ANTHROPIC_API_KEY=$CLAUDE_CODE_API_KEY claude
     fi
 }
 
