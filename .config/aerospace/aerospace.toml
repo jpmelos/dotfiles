@@ -99,6 +99,8 @@ alt-shift-9 = ['move-node-to-workspace 9', 'workspace 9']
 
 alt-shift-semicolon = 'mode service'
 
+alt-t = 'exec-and-forget wezterm cli spawn --new-window'
+
 [mode.service.binding]
 esc = ['reload-config', 'mode main']
 
