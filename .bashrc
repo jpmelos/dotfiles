@@ -83,6 +83,9 @@ fi
 #               #
 #################
 
+# List current directory with details.
+alias l='ls -FhAls'
+
 # Search history.
 alias h="history | grep"
 #
