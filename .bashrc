@@ -484,7 +484,7 @@ function cm() {
 
     export BASH_DEFAULT_TIMEOUT_MS=120000
     export BASH_MAX_TIMEOUT_MS="$BASH_DEFAULT_TIMEOUT_MS"
-    export ANTHROPIC_API_KEY=$CLAUDE_CODE_API_KEY
+    export CLAUDE_CODE_API_KEY
 
     if [[ "$env_only" == "true" ]]; then
         echo "Environment variables exported for profile '$profile'"

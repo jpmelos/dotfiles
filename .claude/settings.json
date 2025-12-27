@@ -1,4 +1,5 @@
 {
+    "apiKeyHelper": "~/.claude/api-key-helper.sh",
     "permissions": {
         "allow": [
             "Bash(true)",
