@@ -88,7 +88,7 @@ alias l='ls -FhAls'
 
 # Search history.
 alias h="history | grep"
-#
+
 # Search running processes.
 alias p="ps aux | grep"
 
