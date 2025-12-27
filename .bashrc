@@ -125,6 +125,9 @@ alias mv='mv -i'
 alias tree='\tree -alF -I .git --gitignore'
 alias treea='\tree -alF -I .git'
 
+# Include headers and automatically follows redirects.
+alias curl='\curl -iL'
+
 # Docker aliases.
 alias d='docker'
 alias dc='docker compose'
@@ -136,7 +139,8 @@ alias docker-nuke-all-the-things='
     docker builder prune -a --force;  # Build cache
     docker system prune -a --volumes --force  # All the rest'
 
-alias curl='\curl -iL'
+# Alias to export Claude Code environment variables.
+alias cme='cm --env'
 
 #####################################
 #                                   #
@@ -392,15 +396,19 @@ function cm() {
 
     project_relative_dir="${current_dir#"$devel_dir"/}"
 
-    claude_help=false
+    env_only=false
     show_help=false
     profile=""
 
     args=()
     for arg in "$@"; do
         case "$arg" in
+            --env)
+                env_only=true
+                ;;
             --claude-help)
-                claude_help=true
+                claude --help
+                return 0
                 ;;
             --help)
                 show_help=true
@@ -426,6 +434,7 @@ function cm() {
     if [[ "$show_help" == "true" ]]; then
         echo "Usage: cm [options] [profile]"
         echo "Options:"
+        echo "  --env          Only export environment variables, don't run Claude"
         echo "  --claude-help  Show Claude help"
         echo "  --help         Show this help"
         return 0
@@ -475,41 +484,15 @@ function cm() {
 
     export BASH_DEFAULT_TIMEOUT_MS=120000
     export BASH_MAX_TIMEOUT_MS="$BASH_DEFAULT_TIMEOUT_MS"
-    export MCP_TIMEOUT=10000
-    export MCP_TOOL_TIMEOUT="$MCP_TIMEOUT"
+    export ANTHROPIC_API_KEY=$CLAUDE_CODE_API_KEY
 
-    echo "Setting up MCPs"
-
-    ANTHROPIC_API_KEY=$CLAUDE_CODE_API_KEY claude mcp list \
-        | grep '^[a-z]*:' \
-        | cut -d: -f1 \
-        | xargs -I {} bash -c "claude mcp remove {} > /dev/null"
-
-    GITHUB_MCP_API_KEY=$(
-        toml get <(echo "$CLAUDE_CODE_SECRET") . \
-            | jq -r ".profile.$profile.github_api_token"
-    )
-    if [[ "$GITHUB_MCP_API_KEY" != "null" ]]; then
-        ANTHROPIC_API_KEY=$CLAUDE_CODE_API_KEY claude mcp add \
-            github https://api.githubcopilot.com/mcp/ \
-            --scope user \
-            --transport http \
-            --header "Authorization: Bearer $GITHUB_MCP_API_KEY" \
-            --header "X-MCP-Toolsets: repos,issues,pull_requests" \
-            --header "X-MCP-Readonly: true" \
-            > /dev/null
-        echo "Installed GitHub MCP"
-    else
-        echo "Skipped GitHub MCP: No API token"
+    if [[ "$env_only" == "true" ]]; then
+        echo "Environment variables exported for profile '$profile'"
+        return 0
     fi
 
     echo "Running Claude Code with profile '$profile'"
-
-    if [[ "$claude_help" == "true" ]]; then
-        ANTHROPIC_API_KEY=$CLAUDE_CODE_API_KEY claude --help
-    else
-        ANTHROPIC_API_KEY=$CLAUDE_CODE_API_KEY claude
-    fi
+    claude
 }
 
 function pending_devel() {
