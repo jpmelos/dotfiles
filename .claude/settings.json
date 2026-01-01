@@ -1,6 +1,7 @@
 {
     "apiKeyHelper": "~/.claude/api-key-helper.sh",
     "permissions": {
+        "defaultMode": "acceptEdits",
         "allow": [
             "Bash(true)",
             "Bash(ls:*)",
