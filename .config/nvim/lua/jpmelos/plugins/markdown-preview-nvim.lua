@@ -5,9 +5,9 @@ return {
     keys = {
         {
             "<leader>mp",
-            "<cmd>MarkdownPreview<cr>",
+            "<cmd>MarkdownPreviewToggle<cr>",
             mode = "n",
-            desc = "Open Markdown preview",
+            desc = "Toggle Markdown preview",
         },
     },
     init = function()

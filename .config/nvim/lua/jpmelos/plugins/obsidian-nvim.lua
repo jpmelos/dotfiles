@@ -179,9 +179,17 @@ return {
             },
         })
 
-        vim.api.nvim_create_autocmd("User", {
-            pattern = "ObsidianNoteEnter",
-            command = "MarkdownPreview",
+        vim.api.nvim_create_autocmd("BufWinEnter", {
+            pattern = "*.md",
+            callback = function(ev)
+                if
+                    obsidian.api.find_workspace(
+                        vim.api.nvim_buf_get_name(ev.buf)
+                    )
+                then
+                    vim.cmd("MarkdownPreviewToggle")
+                end
+            end,
         })
 
         K(
