@@ -1,7 +1,6 @@
 {
     "apiKeyHelper": "~/.claude/api-key-helper.sh",
     "permissions": {
-        "defaultMode": "acceptEdits",
         "allow": [
             "Bash(true)",
             "Bash(ls:*)",
@@ -14,9 +13,13 @@
             "Bash(rg:*)",
             "Bash(git status:*)",
             "Bash(git diff:*)",
+            "Bash(gh issue list:*)",
             "Bash(gh issue view:*)",
+            "Bash(gh pr list:*)",
             "Bash(gh pr view:*)",
             "Bash(gh pr diff:*)",
+            "Bash(gh release list:*)",
+            "Bash(gh release view:*)",
             "Bash(whois:*)",
             "Bash(python -m py_compile:*)",
             "Bash(python3 -m py_compile:*)",
@@ -26,7 +29,8 @@
             "Bash(bash ~/.claude/commands/review-prompt.sh:*)",
             "Bash(bash jpenv-bin/lint.bash:*)",
             "Bash(bash jpenv-bin/tests.bash:*)"
-        ]
+        ],
+        "defaultMode": "acceptEdits"
     },
     "model": "sonnet",
     "autoUpdates": false
