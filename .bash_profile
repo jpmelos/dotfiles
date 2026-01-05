@@ -1,7 +1,7 @@
 # vim: set ft=sh :
 
 # Are we on a Mac?
-if [[ "$HOME" =~ /Users/* ]]; then
+if [[ "$OSTYPE" == "darwin"* ]]; then
     JPMELOS_IS_MACOS="true"
 else
     JPMELOS_IS_MACOS="false"
