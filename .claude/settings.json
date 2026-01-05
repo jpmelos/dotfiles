@@ -33,5 +33,8 @@
         "defaultMode": "acceptEdits"
     },
     "model": "sonnet",
-    "autoUpdates": false
+    "autoUpdates": false,
+    "enabledPlugins": {
+        "rust-analyzer-lsp@claude-plugins-official": true
+    }
 }
