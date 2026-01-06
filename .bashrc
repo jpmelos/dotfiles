@@ -18,7 +18,7 @@ shopt -s histverify no_empty_cmd_completion
 
 # This is called from the `$PROMPT_COMMAND`, which is defined in
 # `.bash_profile`.
-function run_autoenv_on_init() {
+run_autoenv_on_init() {
     if [ -z "$AUTOENV_RAN_ON_INIT" ]; then
         cd /
         cd - > /dev/null
@@ -330,7 +330,7 @@ extract() {
 
 # Determine actual size of a file in disk (considers entire blocks) or total
 # size of a directory.
-function fs() {
+fs() {
     if du -b /dev/null > /dev/null 2>&1; then
         local arg=-sbh
     else
@@ -344,7 +344,7 @@ function fs() {
 }
 
 # Start an HTTP server from a directory, optionally specifying the port
-function server() {
+server() {
     local addr="${1:-0.0.0.0}"
     local port="${2:-8000}"
 
@@ -353,7 +353,7 @@ function server() {
 }
 
 # Compare original and gzipped file size.
-function gz() {
+gz() {
     local origsize=$(wc -c < "$1")
     local gzipsize=$(gzip -c "$1" | wc -c)
     local ratio=$(echo "$gzipsize * 100 / $origsize" | bc -l)
@@ -374,7 +374,7 @@ fi
 
 # `o` with no arguments opens the current directory, otherwise opens the given
 # location.
-function o() {
+o() {
     if [ $# -eq 0 ]; then
         open .
     else
@@ -382,11 +382,11 @@ function o() {
     fi
 }
 
-function is_in_path() {
+is_in_path() {
     builtin type -P "$1" &> /dev/null
 }
 
-function cm() {
+cm() {
     devel_dir="$HOME/devel"
     current_dir="$(pwd)"
     if [[ "$current_dir" != "$devel_dir"* ]]; then
@@ -495,7 +495,7 @@ function cm() {
     claude
 }
 
-function pending_devel() {
+pending_devel() {
     local devel_dir="$HOME/devel"
 
     if [ ! -d "$devel_dir" ]; then
@@ -561,7 +561,7 @@ function pending_devel() {
     cd "$current_dir"
 }
 
-function j() {
+j() {
     local local_bin_dir="./jpenv-bin"
     if [ ! -d "$local_bin_dir" ]; then
         echo "Local binaries directory not found" >&2
@@ -598,7 +598,7 @@ function j() {
     bash "$script_path" "$@"
 }
 
-function je() {
+je() {
     local local_bin_dir="./jpenv-bin"
     if [ ! -d "$local_bin_dir" ]; then
         echo "Local binaries directory not found" >&2
