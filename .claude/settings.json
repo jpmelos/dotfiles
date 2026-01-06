@@ -12,6 +12,7 @@
             "Bash(cut:*)",
             "Bash(rg:*)",
             "Bash(git log:*)",
+            "Bash(git rev-list:*)",
             "Bash(git status:*)",
             "Bash(git diff:*)",
             "Bash(gh issue list:*)",
