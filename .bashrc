@@ -628,8 +628,19 @@ function je() {
     script_path="./jpenv-bin/${script_name}.bash"
 
     if [ ! -f "$script_path" ]; then
-        echo "Error: Script '${script_name}' not found in ./jpenv-bin/" >&2
-        return 1
+        echo "Script '${script_name}' not found. Creating from template..."
+        cat > "$script_path" << 'EOF'
+#!/usr/bin/env bash
+set -e
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND"' ERR
+cd "$(dirname "${BASH_SOURCE[0]}")"
+
+#/ Documentation goes here.
+
+echo "Hello, world!"
+EOF
+        chmod +x "$script_path"
+        echo "Created $script_path"
     fi
 
     $EDITOR "$script_path" "$@"
