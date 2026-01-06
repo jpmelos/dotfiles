@@ -261,6 +261,15 @@ __git_complete gst git_status
 alias gt='g t'
 __git_complete gt git_ls_tree
 
+alias gw='g w'
+alias gwa='g wa'
+alias gwl='g wl'
+alias gwp='g wp'
+__git_complete gw git_worktree
+__git_complete gwa git_worktree
+__git_complete gwl git_worktree
+__git_complete gwp git_worktree
+
 alias gy='g y'
 __git_complete gy git_cherry_pick
 

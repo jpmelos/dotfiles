@@ -182,6 +182,12 @@
     # t = ls-tree
     t = ls-tree HEAD --
 
+    # w = worktree
+    w = worktree
+    wa = worktree add
+    wl = worktree list
+    wp = worktree prune
+
     # y = cherry-pick
     y = cherry-pick
 
