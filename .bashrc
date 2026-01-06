@@ -633,7 +633,7 @@ function je() {
 #!/usr/bin/env bash
 set -e
 trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND"' ERR
-cd "$(dirname "${BASH_SOURCE[0]}")"
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 #/ Documentation goes here.
 
