@@ -38,6 +38,7 @@
 
 [rebase]
     updateRefs = true
+    rescheduleFailedExec = true
 
 [rerere]
 	enabled = true
