@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+set -e
+
+#/ Run a command and send a Telegram notification when it finishes.
+#/
+#/ Usage:
+#/   bash tw.bash <command> [args...]
+#/
+#/ Example:
+#/   bash tw.bash sleep 10
+#/   bash tw.bash npm test
+
+# Check if command was provided.
+if [ $# -eq 0 ]; then
+    echo "Error: No command provided" >&2
+    echo "Usage: bash tw.bash <command> [args...]" >&2
+    exit 1
+fi
+
+# Fetch Telegram credentials from 1Password.
+TELEGRAM_BOT_SECRET=$(
+    op item get "Telegram Bot" \
+        --vault "Private" --format json \
+        | jq -r ".fields[0].value"
+)
+if [ -z "$TELEGRAM_BOT_SECRET" ] || [ "$TELEGRAM_BOT_SECRET" = "null" ]; then
+    echo "Error: Failed to fetch Telegram Bot secret from 1Password" >&2
+    exit 1
+fi
+
+TELEGRAM_BOT_TOKEN=$(
+    toml get <(echo "$TELEGRAM_BOT_SECRET") . | jq -r ".telegram_bot.bot_token"
+)
+if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ "$TELEGRAM_BOT_TOKEN" = "null" ]; then
+    echo "Error: Failed to parse telegram_bot.bot_id from secret" >&2
+    exit 1
+fi
+
+TELEGRAM_CHAT_ID=$(
+    toml get <(echo "$TELEGRAM_BOT_SECRET") . | jq -r ".telegram_bot.chat_id"
+)
+if [ -z "$TELEGRAM_CHAT_ID" ] || [ "$TELEGRAM_CHAT_ID" = "null" ]; then
+    echo "Error: Failed to parse telegram_bot.channel_id from secret" >&2
+    exit 1
+fi
+
+# Capture metadata.
+START_TIME=$(date +%s)
+HOSTNAME=$(hostname)
+PWD_PATH=$(pwd)
+COMMAND_STRING="$*"
+
+# Execute the command.
+set +e
+"$@"
+EXIT_CODE=$?
+set -e
+
+# Calculate duration.
+END_TIME=$(date +%s)
+DURATION=$((END_TIME - START_TIME))
+
+# Format duration as human-readable.
+if [ $DURATION -lt 60 ]; then
+    DURATION_STR="${DURATION}s"
+elif [ $DURATION -lt 3600 ]; then
+    MINUTES=$((DURATION / 60))
+    SECONDS=$((DURATION % 60))
+    DURATION_STR="${MINUTES}m ${SECONDS}s"
+else
+    HOURS=$((DURATION / 3600))
+    MINUTES=$(((DURATION % 3600) / 60))
+    SECONDS=$((DURATION % 60))
+    DURATION_STR="${HOURS}h ${MINUTES}m ${SECONDS}s"
+fi
+
+# Format notification message.
+if [ $EXIT_CODE -eq 0 ]; then
+    STATUS_EMOJI="✅"
+    STATUS_TEXT="Task finished successfully!"
+else
+    STATUS_EMOJI="❌"
+    STATUS_TEXT="Task failed with exit code $EXIT_CODE"
+fi
+
+MESSAGE="$STATUS_EMOJI $STATUS_TEXT
+Command: $COMMAND_STRING
+Duration: $DURATION_STR
+Location: $HOSTNAME:$PWD_PATH"
+
+# Send Telegram notification.
+TELEGRAM_API_URL="https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage"
+
+CURL_OUTPUT=$(curl -s -X POST "$TELEGRAM_API_URL" \
+    -d "chat_id=$TELEGRAM_CHAT_ID" \
+    --data-urlencode "text=$MESSAGE" \
+    2>&1)
+
+CURL_EXIT=$?
+
+if [ $CURL_EXIT -ne 0 ]; then
+    echo "Warning: Failed to send Telegram notification (curl exit code: $CURL_EXIT)" >&2
+    echo "Curl output: $CURL_OUTPUT" >&2
+elif ! echo "$CURL_OUTPUT" | jq -e '.ok' > /dev/null 2>&1; then
+    echo "Warning: Telegram API returned error: $CURL_OUTPUT" >&2
+fi
+
+# Exit with the same status as the original command.
+exit $EXIT_CODE
