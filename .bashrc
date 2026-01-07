@@ -604,7 +604,21 @@ j() {
         return 1
     fi
 
-    bash "$script_path" "$@"
+    local should_source=false
+    local source_content=""
+
+    while IFS= read -r line; do
+        echo "$line"
+        if [ "$line" = "/j-execute" ]; then
+            should_source=true
+        elif [ "$should_source" = true ]; then
+            source_content+="$line"$'\n'
+        fi
+    done < <(bash "$script_path" "$@")
+
+    if [ "$should_source" = true ] && [ -n "$source_content" ]; then
+        eval "$source_content"
+    fi
 }
 
 je() {
