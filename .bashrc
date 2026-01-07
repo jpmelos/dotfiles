@@ -606,24 +606,31 @@ j() {
         return 1
     fi
 
-    local should_source=false
-    local source_content=""
+    if grep -qxF "#: j-execute" "$script_path"; then
+        local should_source=false
+        local source_content=""
 
-    while IFS= read -r line; do
-        echo "$line"
-        if [ "$line" = "/j-execute" ]; then
-            should_source=true
-        elif [ "$should_source" = true ]; then
-            source_content+="$line"$'\n'
+        while IFS= read -r line; do
+            echo "$line"
+            if [ "$line" = "/j-execute" ]; then
+                should_source=true
+            elif [ "$should_source" = true ]; then
+                source_content+="$line"$'\n'
+            fi
+        done < <(bash "$script_path" "$@")
+
+        if [ "$should_source" = true ] && [ -n "$source_content" ]; then
+            echo ""
+            echo "==== j-executing ===="
+            echo ""
+            eval "$source_content"
         fi
-    done < <(bash "$script_path" "$@")
 
-    if [ "$should_source" = true ] && [ -n "$source_content" ]; then
-        echo ""
-        echo "==== j-executing ===="
-        echo ""
-        eval "$source_content"
+        return
     fi
+
+    bash "$script_path" "$@"
+
 }
 
 je() {
@@ -664,6 +671,12 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND"' ERR
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 #/ Documentation goes here.
+
+# If this script needs to eval bash script at the end, add the following marker
+# somewhere in the file in a line by itself:
+# `#: j-execute`
+# Then, output `/j-execute` in a line by itself to `stdout`, and finally outout
+# the bash commands that need to be eval'd.
 
 echo "Hello, world!"
 EOF
