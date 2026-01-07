@@ -617,6 +617,9 @@ j() {
     done < <(bash "$script_path" "$@")
 
     if [ "$should_source" = true ] && [ -n "$source_content" ]; then
+        echo ""
+        echo "==== j-executing ===="
+        echo ""
         eval "$source_content"
     fi
 }
