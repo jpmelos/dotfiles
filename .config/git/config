@@ -168,6 +168,7 @@
     rba = rebase --abort
 
     # rs = reset
+    rs = reset
     rsu = reset HEAD~1
     rso = reset --hard @{upstream}
     rsm = ! git reset --hard origin/$(git main-branch)

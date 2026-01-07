@@ -243,9 +243,11 @@ __git_complete grbim git_rebase
 __git_complete grbc git_rebase
 __git_complete grba git_rebase
 
+alias grs='g rs'
 alias grsu='g rsu'
 alias grso='g rso'
 alias grsm='g rsm'
+__git_complete grs git_reset
 __git_complete grsu git_reset
 __git_complete grso git_reset
 __git_complete grsm git_reset
