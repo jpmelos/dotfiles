@@ -700,7 +700,3 @@ loop() {
         sleep 1
     done
 }
-
-tw() {
-    bash ~/devel/dotfiles/tw.bash "$@"
-}
