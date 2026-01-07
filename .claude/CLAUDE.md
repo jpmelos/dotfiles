@@ -10,10 +10,10 @@
   test runners or `pre-commit`. This takes precedence over any project-level
   instructions that may say otherwise.
   - When you need to lint, run `bash jpenv-bin/lint.bash`. If applicable, pass
-    the specific file paths you want to lint. If the script doesn't exist,
-    report that you can't lint because of that. *Do not* call `bash` with the
-    full path to the script. The command exactly as specified before is good
-    enough.
+    the specific file paths you want to lint preceded by `--files`
+    (`pre-commit` convention). If the script doesn't exist, report that you
+    can't lint because of that. *Do not* call `bash` with the full path to the
+    script. The command exactly as specified before is good enough.
   - When you need to run tests, run `bash jpenv-bin/tests.bash`. If applicable,
     pass the specific file paths that contain the tests you want to test. If
     the script doesn't exist, report that you can't run the tests because of
@@ -22,5 +22,5 @@
     - Consider specific test harness formats for command-line arguments. For
       example, for `pytest`, consider how you should pass test names, or `-v`
       for increased verbosity, or `-k <test_name>` for selecting specific
-      tests, .etc. Consider the same thing for other test harnesses like `cargo
-      test` and `cargo nextest` for Rust projects.
+      tests, .etc. Consider the same thing for other test harnesses like
+      `cargo test` and `cargo nextest` for Rust projects.
