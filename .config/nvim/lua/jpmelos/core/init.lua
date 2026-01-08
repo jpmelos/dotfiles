@@ -45,3 +45,32 @@ local function source_nvim_lua_file()
     end
 end
 source_nvim_lua_file()
+
+-- Register custom filetypes from `.nvim.lua` if defined.
+if vim.g.custom_filetypes then
+    local project_root = vim.fn.getcwd()
+    vim.filetype.add({
+        pattern = {
+            [".*"] = function(path, bufnr)
+                -- Check if the file is within the project directory.
+                if not path:startswith(project_root) then
+                    return nil
+                end
+
+                -- Get the path relative to the project root.
+                -- +2 to skip the leading and trailing slashes.
+                local relative_path = path:sub(#project_root + 2)
+
+                -- Match against each pattern in `vim.g.custom_filetypes`.
+                for _, entry in ipairs(vim.g.custom_filetypes) do
+                    local pattern, filetype = entry[1], entry[2]
+                    if string.matchglob(relative_path, pattern) then
+                        return filetype
+                    end
+                end
+
+                return nil
+            end,
+        },
+    })
+end
