@@ -1,20 +1,31 @@
 #!/usr/bin/env bash
 set -e
 
-#/ Run a command and send a Telegram notification when it finishes.
+#/ Send a Telegram notification, optionally running a command first.
 #/
 #/ Usage:
-#/   bash tw.bash <command> [args...]
+#/   tw <message> [command] [args...]
 #/
 #/ Example:
-#/   bash tw.bash sleep 10
-#/   bash tw.bash npm test
+#/   tw "Running tests" npm test
+#/   tw "Long operation" sleep 10
+#/   tw "Just a notification"
 
-# Check if command was provided.
-if [ $# -eq 0 ]; then
-    echo "Error: No command provided" >&2
-    echo "Usage: bash tw.bash <command> [args...]" >&2
+# Check if message was provided.
+if [ $# -lt 1 ]; then
+    echo "Error: Message required" >&2
+    echo "Usage: tw <message> [command] [args...]" >&2
     exit 1
+fi
+
+# Extract the message from the first argument.
+USER_MESSAGE="$1"
+shift
+
+# Check if a command was provided.
+HAS_COMMAND=false
+if [ $# -gt 0 ]; then
+    HAS_COMMAND=true
 fi
 
 # Fetch Telegram credentials from 1Password.
@@ -45,48 +56,64 @@ if [ -z "$TELEGRAM_CHAT_ID" ] || [ "$TELEGRAM_CHAT_ID" = "null" ]; then
 fi
 
 # Capture metadata.
-START_TIME=$(date +%s)
 HOSTNAME=$(hostname)
 PWD_PATH=$(pwd)
-COMMAND_STRING="$*"
 
-# Execute the command.
-set +e
-"$@"
-EXIT_CODE=$?
-set -e
+# Execute the command if provided.
+if [ "$HAS_COMMAND" = true ]; then
+    START_TIME=$(date +%s)
+    COMMAND_STRING="$*"
 
-# Calculate duration.
-END_TIME=$(date +%s)
-DURATION=$((END_TIME - START_TIME))
+    set +e
+    "$@"
+    EXIT_CODE=$?
+    set -e
 
-# Format duration as human-readable.
-if [ $DURATION -lt 60 ]; then
-    DURATION_STR="${DURATION}s"
-elif [ $DURATION -lt 3600 ]; then
-    MINUTES=$((DURATION / 60))
-    SECONDS=$((DURATION % 60))
-    DURATION_STR="${MINUTES}m ${SECONDS}s"
+    # Calculate duration.
+    END_TIME=$(date +%s)
+    DURATION=$((END_TIME - START_TIME))
 else
-    HOURS=$((DURATION / 3600))
-    MINUTES=$(((DURATION % 3600) / 60))
-    SECONDS=$((DURATION % 60))
-    DURATION_STR="${HOURS}h ${MINUTES}m ${SECONDS}s"
+    EXIT_CODE=0
 fi
 
 # Format notification message.
-if [ $EXIT_CODE -eq 0 ]; then
-    STATUS_EMOJI="✅"
-    STATUS_TEXT="Task finished successfully!"
-else
-    STATUS_EMOJI="❌"
-    STATUS_TEXT="Task failed with exit code $EXIT_CODE"
-fi
+if [ "$HAS_COMMAND" = true ]; then
+    # Format duration as human-readable.
+    if [ $DURATION -lt 60 ]; then
+        DURATION_STR="${DURATION}s"
+    elif [ $DURATION -lt 3600 ]; then
+        MINUTES=$((DURATION / 60))
+        SECONDS=$((DURATION % 60))
+        DURATION_STR="${MINUTES}m ${SECONDS}s"
+    else
+        HOURS=$((DURATION / 3600))
+        MINUTES=$(((DURATION % 3600) / 60))
+        SECONDS=$((DURATION % 60))
+        DURATION_STR="${HOURS}h ${MINUTES}m ${SECONDS}s"
+    fi
 
-MESSAGE="$STATUS_EMOJI $STATUS_TEXT
+    # Format message with command results.
+    if [ $EXIT_CODE -eq 0 ]; then
+        STATUS_EMOJI="✅"
+        STATUS_TEXT="Task finished successfully!"
+    else
+        STATUS_EMOJI="❌"
+        STATUS_TEXT="Task failed with exit code $EXIT_CODE"
+    fi
+
+    MESSAGE="$STATUS_EMOJI $STATUS_TEXT
+
+$USER_MESSAGE
+
 Command: $COMMAND_STRING
 Duration: $DURATION_STR
 Location: $HOSTNAME:$PWD_PATH"
+else
+    # Format message without command.
+    MESSAGE="$USER_MESSAGE
+
+Location: $HOSTNAME:$PWD_PATH"
+fi
 
 # Send Telegram notification.
 TELEGRAM_API_URL="https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage"
