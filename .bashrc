@@ -663,7 +663,13 @@ je() {
     script_path="./jpenv-bin/${script_name}.bash"
 
     if [ ! -f "$script_path" ]; then
-        echo "Script '${script_name}' not found. Creating from template..."
+        echo "Script '${script_name}' not found."
+        read -p "Create new script from template? [y/N] " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            return 1
+        fi
+        echo "Creating from template..."
         cat > "$script_path" << 'EOF'
 #!/usr/bin/env bash
 set -e
