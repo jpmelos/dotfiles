@@ -410,6 +410,7 @@ cm() {
     env_only=false
     show_help=false
     profile=""
+    claude_args=()
 
     args=()
     for arg in "$@"; do
@@ -423,6 +424,9 @@ cm() {
                 ;;
             --help)
                 show_help=true
+                ;;
+            --print | -p)
+                claude_args+=("$arg")
                 ;;
             -*)
                 args+=("$arg")
@@ -446,6 +450,7 @@ cm() {
         echo "Usage: cm [options] [profile]"
         echo "Options:"
         echo "  --env          Only export environment variables, don't run Claude"
+        echo "  --print, -p    Activate Claude's print mode"
         echo "  --claude-help  Show Claude help"
         echo "  --help         Show this help"
         return 0
@@ -503,7 +508,7 @@ cm() {
     fi
 
     echo "Running Claude Code with profile '$profile'"
-    claude
+    claude "${claude_args[@]}"
 }
 
 pending_devel() {
