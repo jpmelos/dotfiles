@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+set -e
+
+# This script manages Claude Code configuration and execution.
+# When called with --env, it outputs export commands to be eval'd.
+# Otherwise, it runs claude directly.
+
+devel_dir="$HOME/devel"
+current_dir="$(pwd)"
+if [[ "$current_dir" != "$devel_dir"* ]]; then
+    echo "Error: not inside ~/devel" >&2
+    exit 1
+fi
+
+project_relative_dir="${current_dir#"$devel_dir"/}"
+
+env_only=false
+show_help=false
+profile=""
+claude_args=()
+
+unknown_args=()
+for arg in "$@"; do
+    case "$arg" in
+        --env)
+            env_only=true
+            ;;
+        --claude-help)
+            claude --help
+            exit 0
+            ;;
+        --help)
+            show_help=true
+            ;;
+        --print | -p)
+            claude_args+=("$arg")
+            ;;
+        -*)
+            unknown_args+=("$arg")
+            ;;
+        *)
+            if [[ -z "$profile" && "$arg" != "" ]]; then
+                profile="$arg"
+            else
+                unknown_args+=("$arg")
+            fi
+            ;;
+    esac
+done
+
+if [ ${#unknown_args[@]} -gt 0 ]; then
+    echo "Error: Unrecognized arguments: ${unknown_args[*]}" >&2
+    echo "Run 'cm --help' for usage information" >&2
+    exit 1
+fi
+
+if [[ "$show_help" == "true" ]]; then
+    echo "Usage: cm [options] [profile]"
+    echo "Options:"
+    echo "  --env          Only export environment variables, don't run Claude"
+    echo "  --print, -p    Activate Claude's print mode"
+    echo "  --claude-help  Show Claude help"
+    echo "  --help         Show this help"
+    exit 0
+fi
+
+last_update_file="$HOME/.claude/.last-update"
+today=$(date +%Y-%m-%d)
+
+update_claude() {
+    echo "Updating Claude Code..."
+    npm install -g @anthropic-ai/claude-code
+    echo "$today" > "$last_update_file"
+
+}
+
+mkdir -p "$(dirname "$last_update_file")"
+if [[ ! -f "$last_update_file" ]]; then
+    update_claude
+else
+    last_update_date=$(cat "$last_update_file")
+    if [[ "$last_update_date" != "$today" ]]; then
+        update_claude
+    fi
+fi
+
+if [ -z "$profile" ]; then
+    component_count=$(echo "$project_relative_dir" | tr '/' '\n' | wc -l)
+    if [ "$component_count" -gt 1 ]; then
+        profile="$(echo "$project_relative_dir" | cut -d'/' -f1)"
+    else
+        profile="jpmelos"
+    fi
+fi
+
+CLAUDE_CODE_SECRET=$(
+    op item get "Claude Code Configuration" \
+        --vault "Private" --format json \
+        | jq -r ".fields[0].value"
+)
+CLAUDE_CODE_API_KEY=$(
+    toml get <(echo "$CLAUDE_CODE_SECRET") . | jq -r ".profile.$profile.api_key"
+)
+if [[ "$CLAUDE_CODE_API_KEY" == "null" ]]; then
+    echo "Warning: no API key for profile '$profile', defaulting to 'jpmelos'" >&2
+    profile="jpmelos"
+    CLAUDE_CODE_API_KEY=$(
+        toml get <(echo "$CLAUDE_CODE_SECRET") . | jq -r ".profile.$profile.api_key"
+    )
+fi
+
+if [[ "$env_only" == "true" ]]; then
+    # Output shell commands to be eval'd for environment variable export.
+    echo "export BASH_DEFAULT_TIMEOUT_MS=120000"
+    echo "export BASH_MAX_TIMEOUT_MS=\"\$BASH_DEFAULT_TIMEOUT_MS\""
+    printf "export CLAUDE_CODE_API_KEY=%q\n" "$CLAUDE_CODE_API_KEY"
+    echo "echo \"Environment variables exported for profile '$profile'\""
+else
+    export BASH_DEFAULT_TIMEOUT_MS=120000
+    export BASH_MAX_TIMEOUT_MS="$BASH_DEFAULT_TIMEOUT_MS"
+    export CLAUDE_CODE_API_KEY
+
+    echo "Running Claude Code with profile '$profile'"
+    exec claude "${claude_args[@]}"
+fi

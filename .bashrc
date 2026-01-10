@@ -139,9 +139,6 @@ alias docker-nuke-all-the-things='
     docker builder prune -a --force;  # Build cache
     docker system prune -a --volumes --force  # All the rest'
 
-# Alias to export Claude Code environment variables.
-alias cme='cm --env'
-
 #####################################
 #                                   #
 #    git aliases and completions    #
@@ -397,118 +394,8 @@ is_in_path() {
     builtin type -P "$1" &> /dev/null
 }
 
-cm() {
-    devel_dir="$HOME/devel"
-    current_dir="$(pwd)"
-    if [[ "$current_dir" != "$devel_dir"* ]]; then
-        echo "Error: not inside ~/devel" >&2
-        return 1
-    fi
-
-    project_relative_dir="${current_dir#"$devel_dir"/}"
-
-    env_only=false
-    show_help=false
-    profile=""
-    claude_args=()
-
-    args=()
-    for arg in "$@"; do
-        case "$arg" in
-            --env)
-                env_only=true
-                ;;
-            --claude-help)
-                claude --help
-                return 0
-                ;;
-            --help)
-                show_help=true
-                ;;
-            --print | -p)
-                claude_args+=("$arg")
-                ;;
-            -*)
-                args+=("$arg")
-                ;;
-            *)
-                if [[ -z "$profile" && "$arg" != "" ]]; then
-                    profile="$arg"
-                else
-                    args+=("$arg")
-                fi
-                ;;
-        esac
-    done
-    if [ ${#args[@]} -gt 0 ]; then
-        echo "Error: Unrecognized arguments: ${args[*]}" >&2
-        echo "Run 'cm --help' for usage information" >&2
-        return 1
-    fi
-
-    if [[ "$show_help" == "true" ]]; then
-        echo "Usage: cm [options] [profile]"
-        echo "Options:"
-        echo "  --env          Only export environment variables, don't run Claude"
-        echo "  --print, -p    Activate Claude's print mode"
-        echo "  --claude-help  Show Claude help"
-        echo "  --help         Show this help"
-        return 0
-    fi
-
-    local last_update_file="$HOME/.claude/.last-update"
-    local today=$(date +%Y-%m-%d)
-
-    if [[ ! -f "$last_update_file" ]]; then
-        echo "Updating Claude Code..."
-        npm install -g @anthropic-ai/claude-code
-        mkdir -p "$(dirname "$last_update_file")"
-        echo "$today" > "$last_update_file"
-    else
-        local last_update_date=$(cat "$last_update_file")
-        if [[ "$last_update_date" != "$today" ]]; then
-            echo "Updating Claude Code..."
-            npm install -g @anthropic-ai/claude-code
-            echo "$today" > "$last_update_file"
-        fi
-    fi
-
-    if [ -z "$profile" ]; then
-        component_count=$(echo "$project_relative_dir" | tr '/' '\n' | wc -l)
-        if [ "$component_count" -gt 1 ]; then
-            profile="$(echo "$project_relative_dir" | cut -d'/' -f1)"
-        else
-            profile="jpmelos"
-        fi
-    fi
-
-    CLAUDE_CODE_SECRET=$(
-        op item get "Claude Code Configuration" \
-            --vault "Private" --format json \
-            | jq -r ".fields[0].value"
-    )
-    CLAUDE_CODE_API_KEY=$(
-        toml get <(echo "$CLAUDE_CODE_SECRET") . | jq -r ".profile.$profile.api_key"
-    )
-    if [[ "$CLAUDE_CODE_API_KEY" == "null" ]]; then
-        echo "Warning: no API key for profile '$profile', defaulting to 'jpmelos'" >&2
-        profile="jpmelos"
-        CLAUDE_CODE_API_KEY=$(
-            toml get <(echo "$CLAUDE_CODE_SECRET") . | jq -r ".profile.$profile.api_key"
-        )
-    fi
-
-    export BASH_DEFAULT_TIMEOUT_MS=120000
-    export BASH_MAX_TIMEOUT_MS="$BASH_DEFAULT_TIMEOUT_MS"
-    export CLAUDE_CODE_API_KEY
-
-    if [[ "$env_only" == "true" ]]; then
-        echo "Environment variables exported for profile '$profile'"
-        return 0
-    fi
-
-    echo "Running Claude Code with profile '$profile'"
-    claude "${claude_args[@]}"
+cme() {
+    eval "$(cm --env)"
 }
 
 pending_devel() {
