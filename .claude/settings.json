@@ -2,9 +2,11 @@
     "apiKeyHelper": "~/.claude/api-key-helper.sh",
     "permissions": {
         "allow": [
+            "Read",
+            "Edit",
             "Bash(true)",
+            "Bash(false)",
             "Bash(ls:*)",
-            "Bash(find:*)",
             "Bash(grep:*)",
             "Bash(cat:*)",
             "Bash(head:*)",
@@ -32,11 +34,11 @@
             "Bash(bash jpenv-bin/lint.bash:*)",
             "Bash(bash jpenv-bin/tests.bash:*)"
         ],
-        "defaultMode": "acceptEdits"
+        "defaultMode": "dontAsk"
     },
     "model": "sonnet",
-    "autoUpdates": false,
     "enabledPlugins": {
         "rust-analyzer-lsp@claude-plugins-official": true
-    }
+    },
+    "autoUpdates": false
 }
