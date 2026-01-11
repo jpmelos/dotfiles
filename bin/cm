@@ -16,6 +16,7 @@ project_relative_dir="${current_dir#"$devel_dir"/}"
 
 env_only=false
 show_help=false
+print_mode=false
 profile=""
 claude_args=()
 
@@ -33,7 +34,10 @@ for arg in "$@"; do
             show_help=true
             ;;
         --print | -p)
-            claude_args+=("$arg")
+            if [[ "$print_mode" == "false" ]]; then
+                print_mode=true
+                claude_args+=("--print" "--output-format" "json")
+            fi
             ;;
         -*)
             unknown_args+=("$arg")
