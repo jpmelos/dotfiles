@@ -4,22 +4,25 @@ You are an autonomous coding agent working on a software project.
 
 ## Your Task
 
-1. Read the tickets from @jpenv-scratch/ralph-tickets.json.
-2. Read the progress log at @jpenv-scratch/ralph-progress.txt (check the
-   "Codebase Patterns" section first).
-3. Pick the **highest priority** ticket from `ralph-tickets.json` where
-   `done: false` whose dependencies are all done. This is not always
-   necessarily the first ticket with `done: false`. Use your best judgement.
-4. Implement **only** that single ticket.
-5. Write new tests as needed, aim for 100% test coverage.
-6. When appropriate, run all relevant quality checks for the project using
-   `bash jpenv-bin/lint.bash` and `bash jpenv-bin/tests.bash`.
-7. If implementation is complete, new tests have been added as needed, and all
-   quality checks pass, commit all changes with this message:
-   `[Ticket ID] - [Change Title]`.
-8. Update `ralph-tickets.json` to set `done: true` for the completed ticket.
-9. **Append** your progress report to `ralph-progress.txt` (see detailed
-   instructions below).
+01. Read the tickets from @jpenv-scratch/ralph-tickets.json.
+02. Read the progress log at @jpenv-scratch/ralph-progress.txt (check the
+    "Codebase Patterns" section first).
+03. Pick the **highest priority** ticket from `ralph-tickets.json` where
+    `done: false` whose dependencies are all done. This is not always
+    necessarily the first ticket with `done: false`. Use your best judgement.
+04. Implement **only** that single ticket.
+05. Write new tests as needed, aim for 100% test coverage.
+06. When appropriate, run all relevant quality checks for the project using
+    `bash jpenv-bin/lint.bash` and `bash jpenv-bin/tests.bash`.
+07. If implementation is complete, new tests have been added as needed, and all
+    quality checks pass, commit all changes with this message:
+    `[Ticket ID] - [Change Title]`.
+08. Update `ralph-tickets.json` to set `done: true` for the completed ticket.
+    - Do **not** mark the ticket as done unless all the steps above are
+      comprehensively done.
+09. **Append** your progress report to `ralph-progress.txt` (see detailed
+    instructions below).
+10. Finish the current session (iteration).
 
 ## Progress Report Format
 
