@@ -32,7 +32,7 @@
             "Bash(cargo check:*)",
             "Bash(cargo clippy:*)",
             "WebFetch(domain:docs.rs)",
-            "Bash(bash ~/.claude/commands/review-prompt.sh:*)",
+            "Bash(bash ~/.claude/commands/review-prompt.sh)",
             "Bash(bash jpenv-bin/lint.bash:*)",
             "Bash(bash jpenv-bin/tests.bash:*)"
         ],
