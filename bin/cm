@@ -120,6 +120,13 @@ if [[ -z "$CLAUDE_CODE_API_KEY" ]]; then
     fi
 fi
 
+# Function to round cost up to the next cent for display.
+round_up_cents() {
+    local value=$1
+    local rounded=$(echo "scale=0; tmp = $value * 100; tmp = tmp / 1; if (tmp < $value * 100) tmp = tmp + 1; scale=2; tmp / 100" | bc)
+    printf "%.2f" "$rounded"
+}
+
 if [[ "$env_only" == "true" ]]; then
     # Output shell commands to be eval'd for environment variable export.
     echo "export BASH_DEFAULT_TIMEOUT_MS=120000"
@@ -142,12 +149,12 @@ else
         DURATION_MS=$(echo "$OUTPUT" | jq -r '.duration_ms // 0')
         API_DURATION_MS=$(echo "$OUTPUT" | jq -r '.duration_api_ms // 0')
 
-        DURATION=$(echo "scale=3; $DURATION_MS / 1000" | bc)
-        API_DURATION=$(echo "scale=3; $API_DURATION_MS / 1000" | bc)
+        DURATION=$(printf "%.3f" "$(echo "scale=3; $DURATION_MS / 1000" | bc)")
+        API_DURATION=$(printf "%.3f" "$(echo "scale=3; $API_DURATION_MS / 1000" | bc)")
 
         echo "$RESULT"
         echo "" >&2
-        echo "Cost: \$$COST" >&2
+        echo "Cost: \$$(round_up_cents "$COST")" >&2
         echo "Duration: ${DURATION}s (API duration: ${API_DURATION}s)" >&2
     else
         exec claude "${claude_args[@]}"

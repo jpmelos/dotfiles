@@ -7,8 +7,11 @@ set -e
 #   ralph [max_iterations]
 #
 # Environment:
-#   CLAUDE_CODE_API_KEY   Set automatically if missing. Will require 1Password
-#                         authentication.
+#   CLAUDE_CODE_API_KEY   If set, uses Claude Code. Otherwise prompts user.
+#   OPENCODE_API_KEY      If set, uses OpenCode. Otherwise prompts user.
+#
+#   If neither is set, prompts user to choose (defaults to OpenCode).
+#   If both are set, prompts user to choose (defaults to OpenCode).
 #
 # Files:
 #   jpenv-scratch/ralph-tickets.json - Engineering tickets (required)
@@ -20,15 +23,66 @@ if ! git diff-index --quiet HEAD --; then
     exit 1
 fi
 
-# Check if `cm` exists and export environment variables if needed.
-if command -v cm &> /dev/null; then
-    if [ -z "$CLAUDE_CODE_API_KEY" ]; then
-        eval "$(cm --env)"
-    fi
+# Determine which AI service to use and ensure API key is available.
+RALPH_CMD=""
+
+has_claude_key=false
+has_opencode_key=false
+
+[ -n "$CLAUDE_CODE_API_KEY" ] && has_claude_key=true
+[ -n "$OPENCODE_API_KEY" ] && has_opencode_key=true
+
+if [ "$has_claude_key" = true ] && [ "$has_opencode_key" = true ]; then
+    # Both are defined, ask user which to use.
+    echo "Both OpenCode and Claude Code API keys are defined."
+    read -p "Which service would you like to use? [(o)pencode/(c)laude] (default: opencode): " choice
+    choice=${choice:-opencode}
+    case "$choice" in
+        claude | c)
+            RALPH_CMD="cm"
+            ;;
+        opencode | o | oc | *)
+            RALPH_CMD="oc"
+            ;;
+    esac
+elif [ "$has_opencode_key" = true ]; then
+    # Only OpenCode API key is defined.
+    RALPH_CMD="oc"
+    echo "Using OpenCode (API key found in environment)" >&2
+elif [ "$has_claude_key" = true ]; then
+    # Only Claude Code API key is defined.
+    RALPH_CMD="cm"
+    echo "Using Claude Code (API key found in environment)" >&2
 else
-    echo "Error: 'cm' command not found in PATH" >&2
+    # Neither is defined, ask user which to use.
+    echo "No API keys found in environment."
+    read -p "Which service would you like to use? [(o)pencode/(c)laude] (default: opencode): " choice
+    choice=${choice:-opencode}
+    case "$choice" in
+        claude | c)
+            RALPH_CMD="cm"
+            ;;
+        opencode | o | oc | *)
+            RALPH_CMD="oc"
+            ;;
+    esac
+
+    # Export environment variables for the chosen service.
+    if command -v "$RALPH_CMD" &> /dev/null; then
+        eval "$("$RALPH_CMD" --env)"
+    else
+        echo "Error: '$RALPH_CMD' command not found in PATH" >&2
+        exit 1
+    fi
+fi
+
+# Verify the command is available.
+if ! command -v "$RALPH_CMD" &> /dev/null; then
+    echo "Error: '$RALPH_CMD' command not found in PATH" >&2
     exit 1
 fi
+
+echo "Using '$RALPH_CMD' for Ralph" >&2
 
 MAX_ITERATIONS=${1:-10}
 if ! [[ "$MAX_ITERATIONS" =~ ^[0-9]+$ ]] || [ "$MAX_ITERATIONS" -lt 1 ]; then
@@ -82,19 +136,38 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     log "═══════════════════════════════════════════════════════"
     log ""
 
-    OUTPUT=$(cat "$HOME/.claude/ralph/prompt.md" | cm -p --raw-output)
+    OUTPUT=$(cat "$HOME/ralph/prompt.md" | "$RALPH_CMD" -p --raw-output)
 
     # Extract result and metrics from JSON output.
-    RESULT=$(echo "$OUTPUT" | jq -r '.result // ""')
-    ITERATION_COST=$(echo "$OUTPUT" | jq -r '.total_cost_usd // 0')
-    ITERATION_DURATION_MS=$(echo "$OUTPUT" | jq -r '.duration_ms // 0')
-    ITERATION_API_DURATION_MS=$(echo "$OUTPUT" | jq -r '.duration_api_ms // 0')
+    # The format differs between OpenCode and Claude Code.
+    if [ "$RALPH_CMD" = "cm" ]; then
+        # Claude Code output is a single JSON object.
+        RESULT=$(echo "$OUTPUT" | jq -r '.result // ""')
+        ITERATION_COST=$(echo "$OUTPUT" | jq -r '.total_cost_usd // 0')
+        ITERATION_DURATION_MS=$(echo "$OUTPUT" | jq -r '.duration_ms // 0')
+        ITERATION_API_DURATION_MS=$(echo "$OUTPUT" | jq -r '.duration_api_ms // 0')
+    else
+        # OpenCode output is newline-delimited JSON.
+        # Extract text from the last text part.
+        RESULT=$(echo "$OUTPUT" | jq -r 'select(.type == "text") | .part.text // ""' | tail -n 1)
+
+        # Get cost from the last line.
+        ITERATION_COST=$(echo "$OUTPUT" | tail -n 1 | jq -r '.part.cost // 0')
+
+        # Get first and last timestamps to calculate duration.
+        FIRST_TS=$(echo "$OUTPUT" | head -n 1 | jq -r '.timestamp // 0')
+        LAST_TS=$(echo "$OUTPUT" | tail -n 1 | jq -r '.timestamp // 0')
+        ITERATION_DURATION_MS=$((LAST_TS - FIRST_TS))
+
+        # OpenCode doesn't provide API duration separately.
+        ITERATION_API_DURATION_MS=0
+    fi
 
     log "$RESULT"
 
     # Convert milliseconds to seconds.
-    ITERATION_DURATION=$(echo "scale=3; $ITERATION_DURATION_MS / 1000" | bc)
-    ITERATION_API_DURATION=$(echo "scale=3; $ITERATION_API_DURATION_MS / 1000" | bc)
+    ITERATION_DURATION=$(printf "%.3f" "$(echo "scale=3; $ITERATION_DURATION_MS / 1000" | bc)")
+    ITERATION_API_DURATION=$(printf "%.3f" "$(echo "scale=3; $ITERATION_API_DURATION_MS / 1000" | bc)")
 
     # Update totals.
     TOTAL_COST=$(echo "$TOTAL_COST + $ITERATION_COST" | bc)
@@ -105,7 +178,7 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     log "Iteration cost: \$$(round_up_cents "$ITERATION_COST")"
     log "Iteration duration: ${ITERATION_DURATION}s (API: ${ITERATION_API_DURATION}s)"
     log "Total cost so far: \$$(round_up_cents "$TOTAL_COST")"
-    log "Total duration so far: ${TOTAL_DURATION}s (API: ${TOTAL_API_DURATION}s)"
+    log "Total duration so far: $(printf "%.3f" "$TOTAL_DURATION")s (API: $(printf "%.3f" "$TOTAL_API_DURATION")s)"
 
     if echo "$RESULT" | grep -q "<promise>COMPLETE</promise>"; then
         log ""
@@ -116,7 +189,7 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
         log "Ralph completed all tasks!"
         log "Completed at iteration $i of $MAX_ITERATIONS"
         log "Total cost: \$$(round_up_cents "$TOTAL_COST")"
-        log "Total duration: ${TOTAL_DURATION}s (API: ${TOTAL_API_DURATION}s)"
+        log "Total duration: $(printf "%.3f" "$TOTAL_DURATION")s (API: $(printf "%.3f" "$TOTAL_API_DURATION")s)"
         exit 0
     fi
 done
@@ -128,5 +201,5 @@ log "═════════════════════════
 log ""
 log "Ralph used up all allowed iterations ($MAX_ITERATIONS) without completing all tasks."
 log "Total cost: \$$(round_up_cents "$TOTAL_COST")"
-log "Total duration: ${TOTAL_DURATION}s (API: ${TOTAL_API_DURATION}s)"
+log "Total duration: $(printf "%.3f" "$TOTAL_DURATION")s (API: $(printf "%.3f" "$TOTAL_API_DURATION")s)"
 exit 1

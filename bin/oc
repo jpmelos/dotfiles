@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+set -e
+
+# This script manages OpenCode configuration and execution.
+# When called with --env, it outputs export commands to be eval'd.
+# Otherwise, it runs opencode directly.
+
+devel_dir="$HOME/devel"
+current_dir="$(pwd)"
+if [[ "$current_dir" != "$devel_dir"* ]]; then
+    echo "Error: not inside ~/devel" >&2
+    exit 1
+fi
+
+project_relative_dir="${current_dir#"$devel_dir"/}"
+
+env_only=false
+show_help=false
+print_mode=false
+raw_output=false
+profile=""
+opencode_args=()
+
+unknown_args=()
+for arg in "$@"; do
+    case "$arg" in
+        --env)
+            env_only=true
+            ;;
+        --opencode-help)
+            opencode --help
+            exit 0
+            ;;
+        --help)
+            show_help=true
+            ;;
+        --print | -p)
+            print_mode=true
+            ;;
+        --raw-output)
+            raw_output=true
+            ;;
+        -*)
+            unknown_args+=("$arg")
+            ;;
+        *)
+            if [[ -z "$profile" && "$arg" != "" ]]; then
+                profile="$arg"
+            else
+                unknown_args+=("$arg")
+            fi
+            ;;
+    esac
+done
+
+if [ ${#unknown_args[@]} -gt 0 ]; then
+    echo "Error: Unrecognized arguments: ${unknown_args[*]}" >&2
+    echo "Run 'oc --help' for usage information" >&2
+    exit 1
+fi
+
+if [[ "$show_help" == "true" ]]; then
+    echo "Usage: oc [options] [profile]"
+    echo "Options:"
+    echo "  --env            Only export environment variables, don't run OpenCode"
+    echo "  --print, -p      Activate OpenCode's print mode"
+    echo "  --raw-output     Output raw JSON (only with --print)"
+    echo "  --opencode-help  Show OpenCode help"
+    echo "  --help           Show this help"
+    exit 0
+fi
+
+last_update_file="$HOME/.config/opencode/.last-update"
+today=$(date +%Y-%m-%d)
+
+update_opencode() {
+    echo "Updating OpenCode..." >&2
+    brew upgrade anomalyco/tap/opencode >&2
+    echo "$today" > "$last_update_file"
+}
+
+mkdir -p "$(dirname "$last_update_file")"
+if [[ ! -f "$last_update_file" ]]; then
+    update_opencode
+else
+    last_update_date=$(cat "$last_update_file")
+    if [[ "$last_update_date" != "$today" ]]; then
+        update_opencode
+    fi
+fi
+
+if [ -z "$profile" ]; then
+    component_count=$(echo "$project_relative_dir" | tr '/' '\n' | wc -l)
+    if [ "$component_count" -gt 1 ]; then
+        profile="$(echo "$project_relative_dir" | cut -d'/' -f1)"
+    else
+        profile="jpmelos"
+    fi
+fi
+
+if [[ -z "$OPENCODE_API_KEY" ]]; then
+    OPENCODE_SECRET=$(
+        op item get "OpenCode Configuration" \
+            --vault "Private" --format json \
+            | jq -r ".fields[0].value"
+    )
+    OPENCODE_API_KEY=$(
+        toml get <(echo "$OPENCODE_SECRET") . | jq -r ".profile.$profile.api_key"
+    )
+    if [[ "$OPENCODE_API_KEY" == "null" ]]; then
+        echo "Warning: no API key for profile '$profile', defaulting to 'jpmelos'" >&2
+        profile="jpmelos"
+        OPENCODE_API_KEY=$(
+            toml get <(echo "$OPENCODE_SECRET") . | jq -r ".profile.$profile.api_key"
+        )
+    fi
+fi
+
+# Function to round cost up to the next cent for display.
+round_up_cents() {
+    local value=$1
+    local rounded=$(echo "scale=0; tmp = $value * 100; tmp = tmp / 1; if (tmp < $value * 100) tmp = tmp + 1; scale=2; tmp / 100" | bc)
+    printf "%.2f" "$rounded"
+}
+
+if [[ "$env_only" == "true" ]]; then
+    # Output shell commands to be eval'd for environment variable export.
+    printf "export OPENCODE_API_KEY=%q\n" "$OPENCODE_API_KEY"
+    echo "echo \"Environment variables exported for profile '$profile'\""
+else
+    export OPENCODE_API_KEY
+
+    echo "Running OpenCode with profile '$profile'" >&2
+    echo "" >&2
+
+    if [[ "$print_mode" == "true" ]]; then
+        if [[ "$raw_output" == "true" ]]; then
+            exec opencode run --format json
+        else
+            OUTPUT=$(opencode run --format json)
+
+            # Extract text from the last text part.
+            RESULT=$(echo "$OUTPUT" | jq -r 'select(.type == "text") | .part.text // ""' | tail -n 1)
+
+            # Get first and last timestamps to calculate duration.
+            FIRST_TS=$(echo "$OUTPUT" | head -n 1 | jq -r '.timestamp // 0')
+            LAST_TS=$(echo "$OUTPUT" | tail -n 1 | jq -r '.timestamp // 0')
+            DURATION_MS=$((LAST_TS - FIRST_TS))
+            DURATION=$(printf "%.3f" "$(echo "scale=3; $DURATION_MS / 1000" | bc)")
+
+            # Get cost from the last line.
+            COST=$(echo "$OUTPUT" | tail -n 1 | jq -r '.part.cost // 0')
+
+            echo "$RESULT"
+            echo "" >&2
+            echo "Cost: \$$(round_up_cents "$COST")" >&2
+            echo "Duration: ${DURATION}s" >&2
+        fi
+    else
+        exec opencode "${opencode_args[@]}"
+    fi
+fi

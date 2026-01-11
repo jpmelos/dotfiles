@@ -1,0 +1,68 @@
+{
+    "$schema": "https://opencode.ai/config.json",
+    "enabled_providers": [
+        "opencode"
+    ],
+    "model": "opencode/gemini-3-pro",
+    "provider": {
+        "opencode": {
+            "options": {
+                "apiKey": "{env:OPENCODE_API_KEY}"
+            }
+        }
+    },
+    "default_agent": "build",
+    "tui": {
+        "diff_style": "stacked"
+    },
+    "permission": {
+        "*": "deny",
+        "read": "allow",
+        "edit": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "list": "allow",
+        "bash": {
+            "true": "allow",
+            "false": "allow",
+            "ls *": "allow",
+            "grep *": "allow",
+            "rg *": "allow",
+            "cat *": "allow",
+            "head *": "allow",
+            "tail *": "allow",
+            "cut *": "allow",
+            "git log *": "allow",
+            "git rev-list *": "allow",
+            "git status *": "allow",
+            "git diff *": "allow",
+            "git commit *": "allow",
+            "gh issue list *": "allow",
+            "gh issue view *": "allow",
+            "gh pr list *": "allow",
+            "gh pr view *": "allow",
+            "gh pr diff *": "allow",
+            "gh release list *": "allow",
+            "gh release view *": "allow",
+            "whois *": "allow",
+            "python -m py_compile *": "allow",
+            "python3 -m py_compile *": "allow",
+            "cargo check *": "allow",
+            "cargo clippy *": "allow",
+            "bash ~/.config/opencode/command/review-prompt.sh": "allow",
+            "bash jpenv-bin/lint.bash *": "allow",
+            "bash jpenv-bin/tests.bash *": "allow"
+        },
+        "task": "allow",
+        "skill": "allow",
+        "lsp": "allow",
+        "todoread": "allow",
+        "todowrite": "allow",
+        "webfetch": "allow",
+        "websearch": "allow",
+        "codesearch": "allow",
+        "external_directory": "ask",
+        "doom_loop": "ask"
+    },
+    "autoupdate": false
+}

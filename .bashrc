@@ -404,6 +404,16 @@ cme() {
     fi
 }
 
+oce() {
+    ENV_OUTPUT=$(oc --env 2>&1)
+    if [ $? -eq 0 ]; then
+        eval "$ENV_OUTPUT"
+    else
+        echo "Error: Failed to get environment from oc" >&2
+        exit 1
+    fi
+}
+
 pending_devel() {
     local devel_dir="$HOME/devel"
 
