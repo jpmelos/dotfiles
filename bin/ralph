@@ -68,7 +68,7 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     echo "═══════════════════════════════════════════════════════"
     echo ""
 
-    OUTPUT=$(cat "$HOME/.claude/ralph/prompt.md" | cm -p)
+    OUTPUT=$(cat "$HOME/.claude/ralph/prompt.md" | cm -p --raw-output)
 
     # Extract result and metrics from JSON output.
     RESULT=$(echo "$OUTPUT" | jq -r '.result // ""')

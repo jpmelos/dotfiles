@@ -41,5 +41,10 @@
     "enabledPlugins": {
         "rust-analyzer-lsp@claude-plugins-official": true
     },
-    "autoUpdates": false
+    "autoUpdates": false,
+    "statusLine": {
+        "type": "command",
+        "command": "bash ~/.claude/statusline.sh",
+        "padding": 0
+    }
 }

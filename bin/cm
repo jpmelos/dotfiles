@@ -17,6 +17,7 @@ project_relative_dir="${current_dir#"$devel_dir"/}"
 env_only=false
 show_help=false
 print_mode=false
+raw_output=false
 profile=""
 claude_args=()
 
@@ -38,6 +39,9 @@ for arg in "$@"; do
                 print_mode=true
                 claude_args+=("--print" "--output-format" "json")
             fi
+            ;;
+        --raw-output)
+            raw_output=true
             ;;
         -*)
             unknown_args+=("$arg")
@@ -63,6 +67,7 @@ if [[ "$show_help" == "true" ]]; then
     echo "Options:"
     echo "  --env          Only export environment variables, don't run Claude"
     echo "  --print, -p    Activate Claude's print mode"
+    echo "  --raw-output   Output raw JSON (only with --print)"
     echo "  --claude-help  Show Claude help"
     echo "  --help         Show this help"
     exit 0
@@ -126,6 +131,25 @@ else
     export BASH_MAX_TIMEOUT_MS="$BASH_DEFAULT_TIMEOUT_MS"
     export CLAUDE_CODE_API_KEY
 
-    echo "Running Claude Code with profile '$profile'"
-    exec claude "${claude_args[@]}"
+    echo "Running Claude Code with profile '$profile'" >&2
+    echo "" >&2
+
+    if [[ "$print_mode" == "true" && "$raw_output" == "false" ]]; then
+        OUTPUT=$(claude "${claude_args[@]}")
+
+        RESULT=$(echo "$OUTPUT" | jq -r '.result // ""')
+        COST=$(echo "$OUTPUT" | jq -r '.total_cost_usd // 0')
+        DURATION_MS=$(echo "$OUTPUT" | jq -r '.duration_ms // 0')
+        API_DURATION_MS=$(echo "$OUTPUT" | jq -r '.duration_api_ms // 0')
+
+        DURATION=$(echo "scale=3; $DURATION_MS / 1000" | bc)
+        API_DURATION=$(echo "scale=3; $API_DURATION_MS / 1000" | bc)
+
+        echo "$RESULT"
+        echo ""
+        echo "Cost: \$$COST"
+        echo "Duration: ${DURATION}s (API duration: ${API_DURATION}s)"
+    else
+        exec claude "${claude_args[@]}"
+    fi
 fi
