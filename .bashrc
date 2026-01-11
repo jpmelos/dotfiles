@@ -395,7 +395,13 @@ is_in_path() {
 }
 
 cme() {
-    eval "$(cm --env)"
+    ENV_OUTPUT=$(cm --env 2>&1)
+    if [ $? -eq 0 ]; then
+        eval "$ENV_OUTPUT"
+    else
+        echo "Error: Failed to get environment from cm" >&2
+        exit 1
+    fi
 }
 
 pending_devel() {
