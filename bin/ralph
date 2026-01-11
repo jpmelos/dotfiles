@@ -49,6 +49,13 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $message" >> "$LOG_FILE"
 }
 
+# Function to round cost up to the next cent for display.
+round_up_cents() {
+    local value=$1
+    local rounded=$(echo "scale=0; tmp = $value * 100; tmp = tmp / 1; if (tmp < $value * 100) tmp = tmp + 1; scale=2; tmp / 100" | bc)
+    printf "%.2f" "$rounded"
+}
+
 # Check if PRD file exists.
 if [ ! -f "$PRD_FILE" ]; then
     echo "Error: PRD file not found at $PRD_FILE" >&2
@@ -96,9 +103,9 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     TOTAL_API_DURATION=$(echo "$TOTAL_API_DURATION + $ITERATION_API_DURATION" | bc)
 
     log ""
-    log "Iteration cost: \$$ITERATION_COST"
+    log "Iteration cost: \$$(round_up_cents "$ITERATION_COST")"
     log "Iteration duration: ${ITERATION_DURATION}s (API: ${ITERATION_API_DURATION}s)"
-    log "Total cost so far: \$$TOTAL_COST"
+    log "Total cost so far: \$$(round_up_cents "$TOTAL_COST")"
     log "Total duration so far: ${TOTAL_DURATION}s (API: ${TOTAL_API_DURATION}s)"
 
     if echo "$RESULT" | grep -q "<promise>COMPLETE</promise>"; then
@@ -109,7 +116,7 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
         log ""
         log "Ralph completed all tasks!"
         log "Completed at iteration $i of $MAX_ITERATIONS"
-        log "Total cost: \$$TOTAL_COST"
+        log "Total cost: \$$(round_up_cents "$TOTAL_COST")"
         log "Total duration: ${TOTAL_DURATION}s (API: ${TOTAL_API_DURATION}s)"
         exit 0
     fi
@@ -121,6 +128,6 @@ log "  Giving up!"
 log "═══════════════════════════════════════════════════════"
 log ""
 log "Ralph used up all allowed iterations ($MAX_ITERATIONS) without completing all tasks."
-log "Total cost: \$$TOTAL_COST"
+log "Total cost: \$$(round_up_cents "$TOTAL_COST")"
 log "Total duration: ${TOTAL_DURATION}s (API: ${TOTAL_API_DURATION}s)"
 exit 1
