@@ -26,6 +26,7 @@ vim.g.formatters_by_ft = {
     yaml = { "prettier" },
     toml = { "taplo" },
     json = { "jq" },
+    jsonc = { "jq" },
     -- Others.
     graphql = { "prettier" },
 }
