@@ -77,7 +77,7 @@ last_update_file="$HOME/.claude/.last-update"
 today=$(date +%Y-%m-%d)
 
 update_claude() {
-    echo "Updating Claude Code..."
+    echo "Updating Claude Code..." >&2
     npm install -g @anthropic-ai/claude-code
     echo "$today" > "$last_update_file"
 
@@ -146,9 +146,9 @@ else
         API_DURATION=$(echo "scale=3; $API_DURATION_MS / 1000" | bc)
 
         echo "$RESULT"
-        echo ""
-        echo "Cost: \$$COST"
-        echo "Duration: ${DURATION}s (API duration: ${API_DURATION}s)"
+        echo "" >&2
+        echo "Cost: \$$COST" >&2
+        echo "Duration: ${DURATION}s (API duration: ${API_DURATION}s)" >&2
     else
         exec claude "${claude_args[@]}"
     fi
