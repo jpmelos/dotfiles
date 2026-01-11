@@ -83,6 +83,9 @@ export EDITOR="nvim"
 # Configure ripgrep to use a configuration file.
 export RIPGREP_CONFIG_PATH="$HOME/.ripgreprc"
 
+# 1Password configuration.
+export OP_ACCOUNT=my.1password.com
+
 ###############################
 #                             #
 #    Python-specific stuff    #
@@ -99,14 +102,6 @@ export VIRTUAL_ENV_DISABLE_PROMPT=1
 
 # Indicate where the pyenv root is.
 export PYENV_ROOT=$HOME/.pyenv
-
-#########################
-#                       #
-#    Other utilities    #
-#                       #
-#########################
-
-export OP_ACCOUNT=my.1password.com
 
 ##########################
 #                        #
