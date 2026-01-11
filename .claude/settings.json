@@ -34,7 +34,8 @@
             "WebFetch(domain:docs.rs)",
             "Bash(bash ~/.claude/commands/review-prompt.sh)",
             "Bash(bash jpenv-bin/lint.bash:*)",
-            "Bash(bash jpenv-bin/tests.bash:*)"
+            "Bash(bash jpenv-bin/tests.bash:*)",
+            "Bash(bash jpenv-bin/commit.bash:*)"
         ],
         "defaultMode": "dontAsk"
     },

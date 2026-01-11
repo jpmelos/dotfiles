@@ -26,3 +26,4 @@
       for increased verbosity, or `-k <test_name>` for selecting specific
       tests, .etc. Consider the same thing for other test harnesses like
       `cargo test` and `cargo nextest` for Rust projects.
+- If you need to create a commit, always run `bash jpenv-bin/commit.bash`.
