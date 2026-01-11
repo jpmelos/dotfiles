@@ -11,8 +11,8 @@ set -e
 #                         authentication.
 #
 # Files:
-#   jpenv-scratch/prd.json - Product requirements (required)
-#   jpenv-scratch/progress.txt - Progress log (auto-created)
+#   jpenv-scratch/ralph-tickets.json - Engineering tickets (required)
+#   jpenv-scratch/ralph-progress.txt - Progress log (auto-created)
 
 if ! git diff-index --quiet HEAD --; then
     echo "Warning: Working directory has uncommitted changes" >&2
@@ -20,7 +20,7 @@ if ! git diff-index --quiet HEAD --; then
     exit 1
 fi
 
-# Check if cm exists and export environment variables if needed.
+# Check if `cm` exists and export environment variables if needed.
 if command -v cm &> /dev/null; then
     if [ -z "$CLAUDE_CODE_API_KEY" ]; then
         eval "$(cm --env)"
@@ -31,16 +31,28 @@ else
 fi
 
 MAX_ITERATIONS=${1:-10}
-
 if ! [[ "$MAX_ITERATIONS" =~ ^[0-9]+$ ]] || [ "$MAX_ITERATIONS" -lt 1 ]; then
     echo "Error: MAX_ITERATIONS must be a positive integer" >&2
     exit 1
 fi
 
 mkdir -p jpenv-scratch
-PRD_FILE="jpenv-scratch/prd.json"
-PROGRESS_FILE="jpenv-scratch/progress.txt"
+TICKETS_FILE="jpenv-scratch/ralph-tickets.json"
+PROGRESS_FILE="jpenv-scratch/ralph-progress.txt"
 LOG_FILE="jpenv-scratch/ralph.log"
+
+# Check if tickets file exists.
+if [ ! -f "$TICKETS_FILE" ]; then
+    echo "Error: Tickets file not found at $TICKETS_FILE" >&2
+    exit 1
+fi
+
+# Initialize progress file if it doesn't exist.
+if [ ! -f "$PROGRESS_FILE" ]; then
+    echo "# Ralph Progress Log" > "$PROGRESS_FILE"
+    echo "Started: $(date "+%Y-%m-%d %H:%M")" >> "$PROGRESS_FILE"
+    echo "---" >> "$PROGRESS_FILE"
+fi
 
 # Function to log to both stdout and file.
 log() {
@@ -55,19 +67,6 @@ round_up_cents() {
     local rounded=$(echo "scale=0; tmp = $value * 100; tmp = tmp / 1; if (tmp < $value * 100) tmp = tmp + 1; scale=2; tmp / 100" | bc)
     printf "%.2f" "$rounded"
 }
-
-# Check if PRD file exists.
-if [ ! -f "$PRD_FILE" ]; then
-    echo "Error: PRD file not found at $PRD_FILE" >&2
-    exit 1
-fi
-
-# Initialize progress file if it doesn't exist.
-if [ ! -f "$PROGRESS_FILE" ]; then
-    echo "# Ralph Progress Log" > "$PROGRESS_FILE"
-    echo "Started: $(date "+%Y-%m-%d %H:%M")" >> "$PROGRESS_FILE"
-    echo "---" >> "$PROGRESS_FILE"
-fi
 
 log "Starting Ralph"
 log "Max iterations: $MAX_ITERATIONS"

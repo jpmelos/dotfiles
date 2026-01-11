@@ -1,24 +1,36 @@
 ---
-description: "Convert PRD in `jpenv-scratch/PRD.md` into `jpenv-scratch/prd.json`."
+description: "Convert the plan in `jpenv-scratch/ralph-plan.md` into tickets in `jpenv-scratch/ralph-tickets.json`."
 ---
 
 ## The Task
 
-Take a Product Requirements Document (PRD) in `jpenv-scratch/PRD.md` and
-convert it into `jpenv-scratch/prd.json` according to the following guidelines
-and rules.
+Take a plan in `jpenv-scratch/ralph-plan.md` and convert it into tickets in
+`jpenv-scratch/ralph-tickets.json` according to the following guidelines and
+rules.
+
+Study the project and the plan to understand the relevant aspects specific to
+the project.
+
+- For example, if you're going to create or change a REST API, make sure to
+  understand how REST APIs work in the project.
+- Make sure you understand all project-specific terms and jargons. If you see
+  terms whose meaning depend on the project, like "service layer", make sure
+  you understand them completely before planning.
+
+Include these details in the ticket descriptions as necessary to enable work
+and set up your colleagues for success.
 
 ## Output Format
 
 ```json
 {
   "project": "[Project Name]",
-  "description": "[Feature description from PRD title/intro]",
-  "userStories": [
+  "description": "[Detailed description of the implementation work]",
+  "tickets": [
     {
       "id": 1,
-      "title": "[Story title]",
-      "description": "As a [user], I want [feature] so that [benefit]",
+      "title": "[Ticket Title]",
+      "description": "The description.",
       "acceptanceCriteria": [
         "Criterion 1",
         "Criterion 2",
@@ -31,37 +43,39 @@ and rules.
 }
 ```
 
-## Story Size: The Number One Rule
+The title must be brief, five to ten words maximum, to keep logs scannable.
 
-**Every story must be completable in one AI coding assistant session with a
+## Ticket Size: The Number One Rule
+
+**Every ticket must be completable in one AI coding assistant session with a
 context window of 150k tokens.**
 
 An AI agent with a context window of 150k tokens will be processing one user
-story per session with no memory of previous work. If a story is too big, the
+ticket per session with no memory of previous work. If a ticket is too big, the
 AI agent will run out of context window before finishing and may produce lower
 quality results.
 
-### Examples of right-sized stories
+### Examples of right-sized tickets
 
 - Add a database column and migration.
 - Update a server action with new logic.
 - Update a return payload of an API endpoint with a new set of fields.
 
-### Stories that are too big
+### Tickets that are too big
 
-These stories need to be split out:
+These tickets need to be split out:
 
 - Add authentication.
   - Split into: schema, middleware, login UI, session handling.
 - Refactor the API.
-  - Split into one story per endpoint or pattern.
+  - Split into one ticket per endpoint, middleware, or pattern.
 
 **Rule of thumb:** If you cannot describe the change in 2-3 sentences, it is
 already too big.
 
-## Story Ordering: Dependencies First
+## Ticket Ordering: Dependencies First
 
-Stories execute in priority order. Earlier stories must not depend on later
+Tickets execute in priority order. Earlier tickets must not depend on later
 ones.
 
 **Example of correct order:**
@@ -93,14 +107,14 @@ suite and linting tools.
 
 ## Conversion Rules
 
-1. **Each user story becomes one JSON entry.**
+1. **Each user ticket becomes one JSON entry.**
 2. **IDs**: Numeric, monotonically increasing by 1, and starting from 1.
-3. **All stories**: `passes: false` and empty `notes`. The `notes` field is for
+3. **All tickets**: `passes: false` and empty `notes`. The `notes` field is for
    a human to add context for the AI agent as necessary.
 
-## Splitting Large PRDs
+## Splitting Large Tickets from the Plan into Smaller Ones
 
-If a PRD has a big feature, split it:
+If a ticket in the plan is too big, split it:
 
 **Original:** Add a user notification system.
 

@@ -1,23 +1,32 @@
 ---
-name: writing-prds
-description: "Generate a Product Requirements Document (PRD) for a new feature. Use exclusively when explicitly asked to create a PRD from a feature specification."
+name: writing-plans
+description: "Generate a plan with implementation tickets for a new feature or change. Use exclusively when explicitly asked to create a plan from a feature or change specification."
 ---
 
-Create a detailed Product Requirements Document that is clear, actionable, and
-suitable for implementation.
+Create a detailed plan that is clear, actionable, and suitable for
+implementation.
 
 ## The Task
 
-1. Receive a feature description.
+1. Receive a feature or change description.
 2. Ask as many clarifying questions as you deem necessary to be able to fully
-   flesh out the feature into small, atomic tasks.
-3. Generate a structured Product Requirements Document (PRD) based on all the
-   information you gathered.
-4. Save it to `jpenv-scratch/PRD.md`.
+   flesh out the feature or change into small, atomic tickets.
+3. Study the project to understand the relevant aspects specific to the
+   project.
+   - For example, if you're going to create or change a REST API, make sure to
+     understand how REST APIs work in the project.
+   - Make sure you understand all project-specific terms and jargons. If you
+     see terms whose meaning depend on the project, like "service layer", make
+     sure you understand them completely before planning.
+   - Include these details in the ticket descriptions as necessary to enable
+     work and set up your colleagues for success.
+4. Generate a structured plan document based on all the information you
+   gathered.
+5. Save it to `jpenv-scratch/ralph-plan.md`.
 
-**Important:** Do **not** implement anything. Just create the PRD.
+**Important:** Do **not** implement anything. Just write the plan document.
 
-### Step 1: Clarifying Questions
+### Clarifying Questions
 
 Ask clarifying questions where the initial prompt is ambiguous. Focus on:
 
@@ -29,9 +38,9 @@ Ask clarifying questions where the initial prompt is ambiguous. Focus on:
 Organize questions in a clear way using ordered lists, ordered by most relevant
 first.
 
-### Step 2: PRD Structure
+### Plan Structure
 
-Generate the PRD with these sections:
+Generate the plan with these sections:
 
 1. Introduction/Overview
 
@@ -42,21 +51,25 @@ Generate the PRD with these sections:
    Specific, measurable objectives (ordered list, ordered by most relevant
    first).
 
-3. User Stories
+3. Tickets
 
-   Each story needs:
+   Each ticket needs:
 
    - **Title:** Short descriptive name.
-   - **Description:** "As a [user], I want [feature] so that [benefit]".
+   - **Description:** A description of what needs to be done in extensive
+     detail.
    - **Acceptance Criteria:** Verifiable checklist of what "done" means.
 
-   Each story should be small enough to implement in one focused session.
+   Each ticket should be small enough to implement in one focused session.
 
    **Format:**
 
    ```markdown
    ### 1: [Title]
-   **Description:** As a [user], I want [feature] so that [benefit].
+
+   **Description:**
+
+   The description.
 
    **Acceptance Criteria:**
    - [ ] Specific verifiable criterion
@@ -96,7 +109,7 @@ Generate the PRD with these sections:
 
 ## Writing for Junior Developers
 
-The PRD reader may be a junior developer or an AI agent. Therefore:
+The plan reader may be a junior developer or an AI agent. Therefore:
 
 - Be explicit and unambiguous.
 - Avoid jargon or explain it.
@@ -108,4 +121,4 @@ The PRD reader may be a junior developer or an AI agent. Therefore:
 ## Output
 
 - **Format:** Markdown (`.md`).
-- **Location:** `jpenv-scratch/PRD.md`.
+- **Location:** `jpenv-scratch/ralph-plan.md`.
