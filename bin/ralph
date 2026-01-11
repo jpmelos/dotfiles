@@ -40,6 +40,14 @@ fi
 mkdir -p jpenv-scratch
 PRD_FILE="jpenv-scratch/prd.json"
 PROGRESS_FILE="jpenv-scratch/progress.txt"
+LOG_FILE="jpenv-scratch/ralph.log"
+
+# Function to log to both stdout and file.
+log() {
+    local message="$*"
+    echo "$message"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $message" >> "$LOG_FILE"
+}
 
 # Check if PRD file exists.
 if [ ! -f "$PRD_FILE" ]; then
@@ -54,19 +62,19 @@ if [ ! -f "$PROGRESS_FILE" ]; then
     echo "---" >> "$PROGRESS_FILE"
 fi
 
-echo "Starting Ralph"
-echo "Max iterations: $MAX_ITERATIONS"
+log "Starting Ralph"
+log "Max iterations: $MAX_ITERATIONS"
 
 TOTAL_COST=0
 TOTAL_DURATION=0
 TOTAL_API_DURATION=0
 
 for i in $(seq 1 "$MAX_ITERATIONS"); do
-    echo ""
-    echo "═══════════════════════════════════════════════════════"
-    echo "  Iteration $i of $MAX_ITERATIONS"
-    echo "═══════════════════════════════════════════════════════"
-    echo ""
+    log ""
+    log "═══════════════════════════════════════════════════════"
+    log "  Iteration $i of $MAX_ITERATIONS"
+    log "═══════════════════════════════════════════════════════"
+    log ""
 
     OUTPUT=$(cat "$HOME/.claude/ralph/prompt.md" | cm -p --raw-output)
 
@@ -76,7 +84,7 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     ITERATION_DURATION_MS=$(echo "$OUTPUT" | jq -r '.duration_ms // 0')
     ITERATION_API_DURATION_MS=$(echo "$OUTPUT" | jq -r '.duration_api_ms // 0')
 
-    echo "$RESULT"
+    log "$RESULT"
 
     # Convert milliseconds to seconds.
     ITERATION_DURATION=$(echo "scale=3; $ITERATION_DURATION_MS / 1000" | bc)
@@ -87,32 +95,32 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     TOTAL_DURATION=$(echo "$TOTAL_DURATION + $ITERATION_DURATION" | bc)
     TOTAL_API_DURATION=$(echo "$TOTAL_API_DURATION + $ITERATION_API_DURATION" | bc)
 
-    echo ""
-    echo "Iteration cost: \$$ITERATION_COST"
-    echo "Iteration duration: ${ITERATION_DURATION}s (API: ${ITERATION_API_DURATION}s)"
-    echo "Total cost so far: \$$TOTAL_COST"
-    echo "Total duration so far: ${TOTAL_DURATION}s (API: ${TOTAL_API_DURATION}s)"
+    log ""
+    log "Iteration cost: \$$ITERATION_COST"
+    log "Iteration duration: ${ITERATION_DURATION}s (API: ${ITERATION_API_DURATION}s)"
+    log "Total cost so far: \$$TOTAL_COST"
+    log "Total duration so far: ${TOTAL_DURATION}s (API: ${TOTAL_API_DURATION}s)"
 
     if echo "$RESULT" | grep -q "<promise>COMPLETE</promise>"; then
-        echo ""
-        echo "═══════════════════════════════════════════════════════"
-        echo "  Done!"
-        echo "═══════════════════════════════════════════════════════"
-        echo ""
-        echo "Ralph completed all tasks!"
-        echo "Completed at iteration $i of $MAX_ITERATIONS"
-        echo "Total cost: \$$TOTAL_COST"
-        echo "Total duration: ${TOTAL_DURATION}s (API: ${TOTAL_API_DURATION}s)"
+        log ""
+        log "═══════════════════════════════════════════════════════"
+        log "  Done!"
+        log "═══════════════════════════════════════════════════════"
+        log ""
+        log "Ralph completed all tasks!"
+        log "Completed at iteration $i of $MAX_ITERATIONS"
+        log "Total cost: \$$TOTAL_COST"
+        log "Total duration: ${TOTAL_DURATION}s (API: ${TOTAL_API_DURATION}s)"
         exit 0
     fi
 done
 
-echo ""
-echo "═══════════════════════════════════════════════════════"
-echo "  Giving up!"
-echo "═══════════════════════════════════════════════════════"
-echo ""
-echo "Ralph used up all allowed iterations ($MAX_ITERATIONS) without completing all tasks."
-echo "Total cost: \$$TOTAL_COST"
-echo "Total duration: ${TOTAL_DURATION}s (API: ${TOTAL_API_DURATION}s)"
+log ""
+log "═══════════════════════════════════════════════════════"
+log "  Giving up!"
+log "═══════════════════════════════════════════════════════"
+log ""
+log "Ralph used up all allowed iterations ($MAX_ITERATIONS) without completing all tasks."
+log "Total cost: \$$TOTAL_COST"
+log "Total duration: ${TOTAL_DURATION}s (API: ${TOTAL_API_DURATION}s)"
 exit 1
