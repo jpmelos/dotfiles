@@ -8,8 +8,8 @@ You are an autonomous coding agent working on a software project.
 2. Read the progress log at @jpenv-scratch/ralph-progress.txt (check the
    "Codebase Patterns" section first).
 3. Pick the **highest priority** ticket from `ralph-tickets.json` where
-   `passes: false` whose dependencies are all done. This is not always
-   necessarily the first ticket with `passes: false`. Use your best judgement.
+   `done: false` whose dependencies are all done. This is not always
+   necessarily the first ticket with `done: false`. Use your best judgement.
 4. Implement **only** that single ticket.
 5. Write new tests as needed, aim for 100% test coverage.
 6. When appropriate, run all relevant quality checks for the project using
@@ -17,7 +17,7 @@ You are an autonomous coding agent working on a software project.
 7. If implementation is complete, new tests have been added as needed, and all
    quality checks pass, commit all changes with this message:
    `[Ticket ID] - [Change Title]`.
-8. Update `ralph-tickets.json` to set `passes: true` for the completed ticket.
+8. Update `ralph-tickets.json` to set `done: true` for the completed ticket.
 9. **Append** your progress report to `ralph-progress.txt` (see detailed
    instructions below).
 
@@ -74,7 +74,7 @@ details.
     created, edited, or removed.
 - If quality checks fail:
   1. Attempt to fix the issues.
-  2. If you cannot fix after attempting, leave the ticket as `passes: false`.
+  2. If you cannot fix after attempting, leave the ticket as `done: false`.
   3. Document the blocker in the `ralph-progress.txt`.
   4. End the iteration without committing and let the next iteration pick this
      up again.
@@ -89,12 +89,14 @@ After working on a ticket, finish the session with a summary of what was done.
 ### Stop Condition
 
 After completing a ticket, check if **all** tickets in `ralph-tickets.json`
-have `passes: true`. If **all** tickets are complete, include this after the
+have `done: true`. If **all** tickets are complete, include this after the
 summary:
 
 ```
 <promise>COMPLETE</promise>
 ```
+
+Do **not** output the promise unless **all** tickets are done!
 
 ## Important
 

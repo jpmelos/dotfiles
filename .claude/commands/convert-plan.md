@@ -37,7 +37,7 @@ and set up your colleagues for success.
         "Criterion 3"
       ],
       "notes": "",
-      "passes": false
+      "done": false
     }
   ]
 }
@@ -109,8 +109,8 @@ suite and linting tools.
 
 1. **Each user ticket becomes one JSON entry.**
 2. **IDs**: Numeric, monotonically increasing by 1, and starting from 1.
-3. **All tickets**: `passes: false` and empty `notes`. The `notes` field is for
-   a human to add context for the AI agent as necessary.
+3. **All tickets**: `done: false` and empty `notes`. The `notes` field is for a
+   human to add context for the AI agent as necessary.
 
 ## Splitting Large Tickets from the Plan into Smaller Ones
 
