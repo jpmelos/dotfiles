@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+set -e
+
+# Ralph - Long-running AI agent loop
+#
+# Usage:
+#   ralph [max_iterations]
+#
+# Environment:
+#   CLAUDE_CODE_API_KEY   Set automatically if missing. Will require 1Password
+#                         authentication.
+#
+# Files:
+#   jpenv-scratch/prd.json - Product requirements (required)
+#   jpenv-scratch/progress.txt - Progress log (auto-created)
+
+if ! git diff-index --quiet HEAD --; then
+    echo "Warning: Working directory has uncommitted changes" >&2
+    echo "Commit or stash changes before running Ralph" >&2
+    exit 1
+fi
+
+# Check if cm exists and export environment variables if needed.
+if command -v cm &> /dev/null; then
+    if [ -z "$CLAUDE_CODE_API_KEY" ]; then
+        eval "$(cm --env)"
+    fi
+else
+    echo "Error: 'cm' command not found in PATH" >&2
+    exit 1
+fi
+
+MAX_ITERATIONS=${1:-10}
+
+if ! [[ "$MAX_ITERATIONS" =~ ^[0-9]+$ ]] || [ "$MAX_ITERATIONS" -lt 1 ]; then
+    echo "Error: MAX_ITERATIONS must be a positive integer" >&2
+    exit 1
+fi
+
+mkdir -p jpenv-scratch
+PRD_FILE="jpenv-scratch/prd.json"
+PROGRESS_FILE="jpenv-scratch/progress.txt"
+
+# Check if PRD file exists.
+if [ ! -f "$PRD_FILE" ]; then
+    echo "Error: PRD file not found at $PRD_FILE" >&2
+    exit 1
+fi
+
+# Initialize progress file if it doesn't exist.
+if [ ! -f "$PROGRESS_FILE" ]; then
+    echo "# Ralph Progress Log" > "$PROGRESS_FILE"
+    echo "Started: $(date "+%Y-%m-%d %H:%M")" >> "$PROGRESS_FILE"
+    echo "---" >> "$PROGRESS_FILE"
+fi
+
+echo "Starting Ralph"
+echo "Max iterations: $MAX_ITERATIONS"
+
+TOTAL_COST=0
+TOTAL_DURATION=0
+TOTAL_API_DURATION=0
+
+for i in $(seq 1 "$MAX_ITERATIONS"); do
+    echo ""
+    echo "═══════════════════════════════════════════════════════"
+    echo "  Iteration $i of $MAX_ITERATIONS"
+    echo "═══════════════════════════════════════════════════════"
+    echo ""
+
+    OUTPUT=$(cat "$HOME/.claude/ralph/prompt.md" | cm -p)
+
+    # Extract result and metrics from JSON output.
+    RESULT=$(echo "$OUTPUT" | jq -r '.result // ""')
+    ITERATION_COST=$(echo "$OUTPUT" | jq -r '.total_cost_usd // 0')
+    ITERATION_DURATION_MS=$(echo "$OUTPUT" | jq -r '.duration_ms // 0')
+    ITERATION_API_DURATION_MS=$(echo "$OUTPUT" | jq -r '.duration_api_ms // 0')
+
+    echo "$RESULT"
+
+    # Convert milliseconds to seconds.
+    ITERATION_DURATION=$(echo "scale=3; $ITERATION_DURATION_MS / 1000" | bc)
+    ITERATION_API_DURATION=$(echo "scale=3; $ITERATION_API_DURATION_MS / 1000" | bc)
+
+    # Update totals.
+    TOTAL_COST=$(echo "$TOTAL_COST + $ITERATION_COST" | bc)
+    TOTAL_DURATION=$(echo "$TOTAL_DURATION + $ITERATION_DURATION" | bc)
+    TOTAL_API_DURATION=$(echo "$TOTAL_API_DURATION + $ITERATION_API_DURATION" | bc)
+
+    echo ""
+    echo "Iteration cost: \$$ITERATION_COST"
+    echo "Iteration duration: ${ITERATION_DURATION}s (API: ${ITERATION_API_DURATION}s)"
+    echo "Total cost so far: \$$TOTAL_COST"
+    echo "Total duration so far: ${TOTAL_DURATION}s (API: ${TOTAL_API_DURATION}s)"
+
+    if echo "$RESULT" | grep -q "<promise>COMPLETE</promise>"; then
+        echo ""
+        echo "═══════════════════════════════════════════════════════"
+        echo "  Done!"
+        echo "═══════════════════════════════════════════════════════"
+        echo ""
+        echo "Ralph completed all tasks!"
+        echo "Completed at iteration $i of $MAX_ITERATIONS"
+        echo "Total cost: \$$TOTAL_COST"
+        echo "Total duration: ${TOTAL_DURATION}s (API: ${TOTAL_API_DURATION}s)"
+        exit 0
+    fi
+done
+
+echo ""
+echo "═══════════════════════════════════════════════════════"
+echo "  Giving up!"
+echo "═══════════════════════════════════════════════════════"
+echo ""
+echo "Ralph used up all allowed iterations ($MAX_ITERATIONS) without completing all tasks."
+echo "Total cost: \$$TOTAL_COST"
+echo "Total duration: ${TOTAL_DURATION}s (API: ${TOTAL_API_DURATION}s)"
+exit 1
