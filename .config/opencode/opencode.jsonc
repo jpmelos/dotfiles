@@ -63,6 +63,7 @@
             "cut*": "allow",
             "mkdir*": "allow",
             "git log*": "allow",
+            "git show*": "allow",
             "git rev-list*": "allow",
             "git status*": "allow",
             "git diff*": "allow",

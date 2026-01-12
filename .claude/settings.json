@@ -16,6 +16,7 @@
             "Bash(cut:*)",
             "Bash(mkdir:*)",
             "Bash(git log:*)",
+            "Bash(git show:*)",
             "Bash(git rev-list:*)",
             "Bash(git status:*)",
             "Bash(git diff:*)",
