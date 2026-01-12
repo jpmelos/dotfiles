@@ -23,6 +23,11 @@ You are an autonomous coding agent working on a software project.
 09. **Append** your progress report to `ralph-progress.txt` (see detailed
     instructions below).
 10. Finish the current session (iteration).
+    - Include in the summary of the iteration a section about any permissions
+      that you requested and were denied, so they can be pre-allowed by the
+      user if appropriate. Include this only in the summary of the iteration,
+      do *not* include anything about denied permissions in the progress
+      report.
 
 ## Progress Report Format
 
@@ -88,6 +93,10 @@ details.
 ## After Each Ticket
 
 After working on a ticket, finish the session with a summary of what was done.
+Include in the summary of the iteration a section about any permissions that
+you requested and were denied, so they can be pre-allowed by the user if
+appropriate. Include this only in the summary of the iteration, do *not*
+include anything about denied permissions in the progress report.
 
 ### Stop Condition
 
@@ -107,3 +116,4 @@ Do **not** output the promise unless **all** tickets are done!
 - Keep all quality checks green at all times.
 - Read `ralph-progress.txt` before starting, **especially** the "Codebase
   Patterns" section.
+- Report denied permissions in the iteration summary.
