@@ -180,14 +180,16 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     log "Total cost so far: \$$(round_up_cents "$TOTAL_COST")"
     log "Total duration so far: $(printf "%.3f" "$TOTAL_DURATION")s (API: $(printf "%.3f" "$TOTAL_API_DURATION")s)"
 
-    if echo "$RESULT" | grep -q "<promise>COMPLETE</promise>"; then
+    # Check if all tickets are marked as done.
+    TICKETS_REMAINING=$(jq '[.tickets[] | select(.done == false)] | length' "$TICKETS_FILE")
+    if [ "$TICKETS_REMAINING" -eq 0 ]; then
         log ""
         log "═══════════════════════════════════════════════════════"
         log "  Done!"
         log "═══════════════════════════════════════════════════════"
         log ""
         log "Ralph completed all tasks!"
-        log "Completed at iteration $i of $MAX_ITERATIONS"
+        log "Completed at iteration $i of $MAX_ITERATIONS."
         log "Total cost: \$$(round_up_cents "$TOTAL_COST")"
         log "Total duration: $(printf "%.3f" "$TOTAL_DURATION")s (API: $(printf "%.3f" "$TOTAL_API_DURATION")s)"
         exit 0

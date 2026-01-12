@@ -98,18 +98,6 @@ you requested and were denied, so they can be pre-allowed by the user if
 appropriate. Include this only in the summary of the iteration, do *not*
 include anything about denied permissions in the progress report.
 
-### Stop Condition
-
-After completing a ticket, check if **all** tickets in `ralph-tickets.json`
-have `done: true`. If **all** tickets are complete, include this after the
-summary:
-
-```
-<promise>COMPLETE</promise>
-```
-
-Do **not** output the promise unless **all** tickets are done!
-
 ## Important
 
 - Work on **one** ticket per iteration.
