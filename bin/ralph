@@ -149,7 +149,7 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     else
         # OpenCode output is newline-delimited JSON.
         # Extract text from the last text part.
-        RESULT=$(echo "$OUTPUT" | jq -r 'select(.type == "text") | .part.text // ""' | tail -n 1)
+        RESULT=$(echo "$OUTPUT" | jq -r '[select(.type == "text")] | last | .part.text // ""')
 
         # Get cost from the last line.
         ITERATION_COST=$(echo "$OUTPUT" | tail -n 1 | jq -r '.part.cost // 0')
