@@ -10,6 +10,7 @@ return {
         "williamboman/mason.nvim",
         "williamboman/mason-lspconfig.nvim",
         "hrsh7th/cmp-nvim-lsp",
+        "b0o/schemastore.nvim",
     },
     -- Keep this and the language servers in sync.
     ft = {
@@ -28,6 +29,7 @@ return {
 
         local mason_lspconfig = require("mason-lspconfig")
         local cmp_nvim_lsp = require("cmp_nvim_lsp")
+        local schema_store = require("schemastore")
 
         -- Capabilities, with the ones added by `nvim-cmp`.
         local capabilities = vim.tbl_deep_extend(
@@ -102,6 +104,30 @@ return {
                         fullFunctionSignatures = { enable = true },
                         hideDeprecated = true,
                     },
+                },
+            },
+        })
+        vim.lsp.config("jsonls", {
+            settings = {
+                json = {
+                    schemas = schema_store.json.schemas(),
+                    validate = { enable = true },
+                },
+            },
+        })
+        vim.lsp.config("yamlls", {
+            settings = {
+                yaml = {
+                    schemaStore = {
+                        -- You must disable built-in schemaStore support if you
+                        -- want to use this plugin and its advanced options
+                        -- like `ignore`.
+                        enable = false,
+                        -- Avoid TypeError: Cannot read properties of undefined
+                        -- (reading 'length').
+                        url = "",
+                    },
+                    schemas = schema_store.yaml.schemas(),
                 },
             },
         })
