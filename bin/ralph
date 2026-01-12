@@ -152,6 +152,7 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     log "═══════════════════════════════════════════════════════"
     log "  Iteration $i of $MAX_ITERATIONS"
     log "═══════════════════════════════════════════════════════"
+    log "Started: $(date "+%Y-%m-%d %H:%M:%S")"
     log ""
 
     OUTPUT=$(cat "$HOME/ralph/prompt.md" | "$RALPH_CMD" -p --raw-output)
