@@ -8,6 +8,14 @@
         "opencode": {
             "options": {
                 "apiKey": "{env:OPENCODE_API_KEY}"
+            },
+            "models": {
+                "gemini-3-pro": {
+                    "limit": {
+                        "context": 195000,
+                        "output": 65536
+                    }
+                }
             }
         }
     },
