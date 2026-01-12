@@ -60,6 +60,7 @@
             "head *": "allow",
             "tail *": "allow",
             "cut *": "allow",
+            "mkdir *": "allow",
             "git log *": "allow",
             "git rev-list *": "allow",
             "git status *": "allow",
