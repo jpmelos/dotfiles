@@ -65,7 +65,6 @@
             "git rev-list *": "allow",
             "git status *": "allow",
             "git diff *": "allow",
-            "git commit *": "allow",
             "gh issue list *": "allow",
             "gh issue view *": "allow",
             "gh pr list *": "allow",

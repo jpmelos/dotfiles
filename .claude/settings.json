@@ -19,7 +19,6 @@
             "Bash(git rev-list:*)",
             "Bash(git status:*)",
             "Bash(git diff:*)",
-            "Bash(git commit:*)",
             "Bash(gh issue list:*)",
             "Bash(gh issue view:*)",
             "Bash(gh pr list:*)",
