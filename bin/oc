@@ -98,7 +98,7 @@ if [ -z "$profile" ]; then
     fi
 fi
 
-if [[ -z "$OPENCODE_API_KEY" ]]; then
+if [ -z "${OPENCODE_API_KEY+x}" ]; then
     OPENCODE_SECRET=$(
         op item get "OpenCode Configuration" \
             --vault "Private" --format json \
@@ -115,7 +115,7 @@ if [[ -z "$OPENCODE_API_KEY" ]]; then
     fi
 fi
 
-if [[ -z "$CLAUDE_CODE_API_KEY" ]]; then
+if [ -z "${CLAUDE_CODE_API_KEY+x}" ]; then
     if [[ -z "$OPENCODE_SECRET" ]]; then
         OPENCODE_SECRET=$(
             op item get "OpenCode Configuration" \

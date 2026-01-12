@@ -102,7 +102,7 @@ if [ -z "$profile" ]; then
     fi
 fi
 
-if [[ -z "$CLAUDE_CODE_API_KEY" ]]; then
+if [ -z "${CLAUDE_CODE_API_KEY+x}" ]; then
     CLAUDE_CODE_SECRET=$(
         op item get "Claude Code Configuration" \
             --vault "Private" --format json \
