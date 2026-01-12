@@ -113,9 +113,8 @@ if [[ -z "$CLAUDE_CODE_API_KEY" ]]; then
     )
     if [[ "$CLAUDE_CODE_API_KEY" == "null" ]]; then
         echo "Warning: no API key for profile '$profile', defaulting to 'jpmelos'" >&2
-        profile="jpmelos"
         CLAUDE_CODE_API_KEY=$(
-            toml get <(echo "$CLAUDE_CODE_SECRET") . | jq -r ".profile.$profile.api_key"
+            toml get <(echo "$CLAUDE_CODE_SECRET") . | jq -r ".profile.jpmelos.api_key"
         )
     fi
 fi

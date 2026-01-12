@@ -105,13 +105,31 @@ if [[ -z "$OPENCODE_API_KEY" ]]; then
             | jq -r ".fields[0].value"
     )
     OPENCODE_API_KEY=$(
-        toml get <(echo "$OPENCODE_SECRET") . | jq -r ".profile.$profile.api_key"
+        toml get <(echo "$OPENCODE_SECRET") . | jq -r ".profile.$profile.opencode_zen_api_key"
     )
     if [[ "$OPENCODE_API_KEY" == "null" ]]; then
-        echo "Warning: no API key for profile '$profile', defaulting to 'jpmelos'" >&2
-        profile="jpmelos"
+        echo "Warning: no OpenCode API key for profile '$profile', defaulting to 'jpmelos'" >&2
         OPENCODE_API_KEY=$(
-            toml get <(echo "$OPENCODE_SECRET") . | jq -r ".profile.$profile.api_key"
+            toml get <(echo "$OPENCODE_SECRET") . | jq -r ".profile.jpmelos.opencode_zen_api_key"
+        )
+    fi
+fi
+
+if [[ -z "$CLAUDE_CODE_API_KEY" ]]; then
+    if [[ -z "$OPENCODE_SECRET" ]]; then
+        OPENCODE_SECRET=$(
+            op item get "OpenCode Configuration" \
+                --vault "Private" --format json \
+                | jq -r ".fields[0].value"
+        )
+    fi
+    CLAUDE_CODE_API_KEY=$(
+        toml get <(echo "$OPENCODE_SECRET") . | jq -r ".profile.$profile.claude_code_api_key"
+    )
+    if [[ "$CLAUDE_CODE_API_KEY" == "null" ]]; then
+        echo "Warning: no API key for profile '$profile', defaulting to 'jpmelos'" >&2
+        CLAUDE_CODE_API_KEY=$(
+            toml get <(echo "$OPENCODE_SECRET") . | jq -r ".profile.jpmelos.claude_code_api_key"
         )
     fi
 fi
@@ -126,9 +144,11 @@ round_up_cents() {
 if [[ "$env_only" == "true" ]]; then
     # Output shell commands to be eval'd for environment variable export.
     printf "export OPENCODE_API_KEY=%q\n" "$OPENCODE_API_KEY"
+    printf "export CLAUDE_CODE_API_KEY=%q\n" "$CLAUDE_CODE_API_KEY"
     echo "echo \"Environment variables exported for profile '$profile'\""
 else
     export OPENCODE_API_KEY
+    export CLAUDE_CODE_API_KEY
 
     echo "Running OpenCode with profile '$profile'" >&2
     echo "" >&2
