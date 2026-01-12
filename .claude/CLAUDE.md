@@ -27,7 +27,8 @@
       tests, .etc. Consider the same thing for other test harnesses like
       `cargo test` and `cargo nextest` for Rust projects.
 - If you need to create a commit, always run
-  `bash jpenv-bin/commit.bash Commit message goes here`.
+  `bash jpenv-bin/commit.bash Commit message goes here`. **Never** try to call
+  `git commit` directly.
   - Do not add any files to the staging area (`git add`) or anything like that.
     Once you're happy with the changes that you've made, just call
     `bash jpenv-bin/commit.bash` and that script will take care of everything
