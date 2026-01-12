@@ -73,5 +73,9 @@
         "external_directory": "ask",
         "doom_loop": "ask"
     },
+    "keybinds": {
+        "input_newline": "return",
+        "input_submit": "shift+return"
+    },
     "autoupdate": false
 }
