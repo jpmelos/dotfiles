@@ -141,6 +141,25 @@ round_up_cents() {
     printf "%.2f" "$rounded"
 }
 
+# Function to format duration as XhYmZ.WWWs.
+format_duration() {
+    local total_seconds=$1
+    local hours=$(echo "$total_seconds / 3600" | bc)
+    local remainder=$(echo "$total_seconds - ($hours * 3600)" | bc)
+    local minutes=$(echo "$remainder / 60" | bc)
+    local seconds=$(echo "$remainder - ($minutes * 60)" | bc)
+
+    local result=""
+    if [ "$hours" -gt 0 ]; then
+        result="${hours}h"
+    fi
+    if [ "$minutes" -gt 0 ] || [ "$hours" -gt 0 ]; then
+        result="${result}${minutes}m"
+    fi
+    result="${result}$(printf "%.3f" "$seconds")s"
+    echo "$result"
+}
+
 if [[ "$env_only" == "true" ]]; then
     # Output shell commands to be eval'd for environment variable export.
     printf "export OPENCODE_API_KEY=%q\n" "$OPENCODE_API_KEY"
@@ -174,7 +193,7 @@ else
             echo "$RESULT"
             echo "" >&2
             echo "Cost: \$$(round_up_cents "$COST")" >&2
-            echo "Duration: ${DURATION}s" >&2
+            echo "Duration: $(format_duration "$DURATION")" >&2
         fi
     else
         exec opencode "${opencode_args[@]}"

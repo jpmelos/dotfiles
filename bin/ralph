@@ -122,12 +122,30 @@ round_up_cents() {
     printf "%.2f" "$rounded"
 }
 
+# Function to format duration as XhYmZ.WWWs.
+format_duration() {
+    local total_seconds=$1
+    local hours=$(echo "$total_seconds / 3600" | bc)
+    local remainder=$(echo "$total_seconds - ($hours * 3600)" | bc)
+    local minutes=$(echo "$remainder / 60" | bc)
+    local seconds=$(echo "$remainder - ($minutes * 60)" | bc)
+
+    local result=""
+    if [ "$hours" -gt 0 ]; then
+        result="${hours}h"
+    fi
+    if [ "$minutes" -gt 0 ] || [ "$hours" -gt 0 ]; then
+        result="${result}${minutes}m"
+    fi
+    result="${result}$(printf "%.3f" "$seconds")s"
+    echo "$result"
+}
+
 log "Starting Ralph"
 log "Max iterations: $MAX_ITERATIONS"
 
 TOTAL_COST=0
 TOTAL_DURATION=0
-TOTAL_API_DURATION=0
 
 for i in $(seq 1 "$MAX_ITERATIONS"); do
     log ""
@@ -145,7 +163,6 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
         RESULT=$(echo "$OUTPUT" | jq -r '.result // ""')
         ITERATION_COST=$(echo "$OUTPUT" | jq -r '.total_cost_usd // 0')
         ITERATION_DURATION_MS=$(echo "$OUTPUT" | jq -r '.duration_ms // 0')
-        ITERATION_API_DURATION_MS=$(echo "$OUTPUT" | jq -r '.duration_api_ms // 0')
     else
         # OpenCode output is newline-delimited JSON.
         # Extract text from the last text part.
@@ -158,27 +175,22 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
         FIRST_TS=$(echo "$OUTPUT" | head -n 1 | jq -r '.timestamp // 0')
         LAST_TS=$(echo "$OUTPUT" | tail -n 1 | jq -r '.timestamp // 0')
         ITERATION_DURATION_MS=$((LAST_TS - FIRST_TS))
-
-        # OpenCode doesn't provide API duration separately.
-        ITERATION_API_DURATION_MS=0
     fi
 
     log "$RESULT"
 
     # Convert milliseconds to seconds.
     ITERATION_DURATION=$(printf "%.3f" "$(echo "scale=3; $ITERATION_DURATION_MS / 1000" | bc)")
-    ITERATION_API_DURATION=$(printf "%.3f" "$(echo "scale=3; $ITERATION_API_DURATION_MS / 1000" | bc)")
 
     # Update totals.
     TOTAL_COST=$(echo "$TOTAL_COST + $ITERATION_COST" | bc)
     TOTAL_DURATION=$(echo "$TOTAL_DURATION + $ITERATION_DURATION" | bc)
-    TOTAL_API_DURATION=$(echo "$TOTAL_API_DURATION + $ITERATION_API_DURATION" | bc)
 
     log ""
     log "Iteration cost: \$$(round_up_cents "$ITERATION_COST")"
-    log "Iteration duration: ${ITERATION_DURATION}s (API: ${ITERATION_API_DURATION}s)"
+    log "Iteration duration: $(format_duration "$ITERATION_DURATION")"
     log "Total cost so far: \$$(round_up_cents "$TOTAL_COST")"
-    log "Total duration so far: $(printf "%.3f" "$TOTAL_DURATION")s (API: $(printf "%.3f" "$TOTAL_API_DURATION")s)"
+    log "Total duration so far: $(format_duration "$TOTAL_DURATION")"
 
     # Check if all tickets are marked as done.
     TICKETS_REMAINING=$(jq '[.tickets[] | select(.done == false)] | length' "$TICKETS_FILE")
@@ -191,7 +203,7 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
         log "Ralph completed all tasks!"
         log "Completed at iteration $i of $MAX_ITERATIONS."
         log "Total cost: \$$(round_up_cents "$TOTAL_COST")"
-        log "Total duration: $(printf "%.3f" "$TOTAL_DURATION")s (API: $(printf "%.3f" "$TOTAL_API_DURATION")s)"
+        log "Total duration: $(format_duration "$TOTAL_DURATION")"
         exit 0
     fi
 done
@@ -203,5 +215,5 @@ log "═════════════════════════
 log ""
 log "Ralph used up all allowed iterations ($MAX_ITERATIONS) without completing all tasks."
 log "Total cost: \$$(round_up_cents "$TOTAL_COST")"
-log "Total duration: $(printf "%.3f" "$TOTAL_DURATION")s (API: $(printf "%.3f" "$TOTAL_API_DURATION")s)"
+log "Total duration: $(format_duration "$TOTAL_DURATION")"
 exit 1
