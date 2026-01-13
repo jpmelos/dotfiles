@@ -4,10 +4,10 @@ You are an autonomous coding agent working on a software project.
 
 ## Your Task
 
-01. Read the tickets from @jpenv-scratch/ralph-tickets.json.
-02. Read the progress log at @jpenv-scratch/ralph-progress.txt (check the
-    "Codebase Patterns" section first).
-03. Pick the **highest priority** ticket from `ralph-tickets.json` where
+01. Read the tickets from @jpenv-ralph/tickets.json.
+02. Read the progress log at @jpenv-ralph/progress.txt (check the "Codebase
+    Patterns" section first).
+03. Pick the **highest priority** ticket from `tickets.json` where
     `done: false` whose dependencies are all done. This is not always
     necessarily the first ticket with `done: false`. Use your best judgement.
 04. Implement **only** that single ticket.
@@ -17,10 +17,10 @@ You are an autonomous coding agent working on a software project.
 07. If implementation is complete, new tests have been added as needed, and all
     quality checks pass, commit all changes with this message:
     `[Ticket ID] - [Change Title]`. Do **not** prepend the ticket ID with `#`.
-08. Update `ralph-tickets.json` to set `done: true` for the completed ticket.
+08. Update `tickets.json` to set `done: true` for the completed ticket.
     - Do **not** mark the ticket as done unless all the steps above are
       comprehensively done.
-09. **Append** your progress report to `ralph-progress.txt` (see detailed
+09. **Append** your progress report to `progress.txt` (see detailed
     instructions below).
 10. Finish the current session (iteration).
     - Include in the summary of the iteration a section about any permissions
@@ -31,7 +31,7 @@ You are an autonomous coding agent working on a software project.
 
 ## Progress Report Format
 
-**Append** to the progress report section in `ralph-progress.txt` (never edit
+**Append** to the progress report section in `progress.txt` (never edit
 anything in the progress report section, **always append**):
 
 ```
@@ -56,9 +56,9 @@ mistakes and understand the codebase better.
 ### Consolidate Patterns
 
 If you discover a **reusable pattern** that future iterations should know, add
-it to the "Codebase Patterns" section at the **top** of `ralph-progress.txt`
-(create it if it doesn't exist). This section should consolidate the most
-important learnings. As an example:
+it to the "Codebase Patterns" section at the **top** of `progress.txt` (create
+it if it doesn't exist). This section should consolidate the most important
+learnings. As an example:
 
 ```
 ## Codebase Patterns
@@ -83,7 +83,7 @@ details.
 - If quality checks fail:
   1. Attempt to fix the issues.
   2. If you cannot fix after attempting, leave the ticket as `done: false`.
-  3. Document the blocker in the `ralph-progress.txt`.
+  3. Document the blocker in the `progress.txt`.
   4. End the iteration without committing and let the next iteration pick this
      up again.
 - Do not commit code that's not passing all quality checks.
@@ -102,6 +102,6 @@ include anything about denied permissions in the progress report.
 
 - Work on **one** ticket per iteration.
 - Keep all quality checks green at all times.
-- Read `ralph-progress.txt` before starting, **especially** the "Codebase
-  Patterns" section.
+- Read `progress.txt` before starting, **especially** the "Codebase Patterns"
+  section.
 - Report denied permissions in the iteration summary.

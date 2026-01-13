@@ -1,12 +1,11 @@
 ---
-description: "Convert the plan in `jpenv-scratch/ralph-plan.md` into tickets in `jpenv-scratch/ralph-tickets.json`."
+description: "Convert the plan in `jpenv-ralph/plan.md` into tickets in `jpenv-ralph/tickets.json`."
 ---
 
 ## The Task
 
-Take a plan in `jpenv-scratch/ralph-plan.md` and convert it into tickets in
-`jpenv-scratch/ralph-tickets.json` according to the following guidelines and
-rules.
+Take a plan in `jpenv-ralph/plan.md` and convert it into tickets in
+`jpenv-ralph/tickets.json` according to the following guidelines and rules.
 
 Study the project and the plan to understand the relevant aspects specific to
 the project.

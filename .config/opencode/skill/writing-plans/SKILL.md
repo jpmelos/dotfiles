@@ -22,7 +22,7 @@ implementation.
      work and set up your colleagues for success.
 4. Generate a structured plan document based on all the information you
    gathered.
-5. Save it to `jpenv-scratch/ralph-plan.md`.
+5. Save it to `jpenv-ralph/plan.md`.
 
 **Important:** Do **not** implement anything. Just write the plan document.
 
@@ -121,4 +121,4 @@ The plan reader may be a junior developer or an AI agent. Therefore:
 ## Output
 
 - **Format:** Markdown (`.md`).
-- **Location:** `jpenv-scratch/ralph-plan.md`.
+- **Location:** `jpenv-ralph/plan.md`.

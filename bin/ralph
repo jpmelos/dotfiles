@@ -14,8 +14,8 @@ set -e
 #   If both are set, prompts user to choose (defaults to OpenCode).
 #
 # Files:
-#   jpenv-scratch/ralph-tickets.json - Engineering tickets (required)
-#   jpenv-scratch/ralph-progress.txt - Progress log (auto-created)
+#   jpenv-ralph/tickets.json - Engineering tickets (required)
+#   jpenv-ralph/progress.txt - Progress log (auto-created)
 
 # Check for uncommitted changes (staged or unstaged).
 if ! git diff-index --quiet HEAD --; then
@@ -98,11 +98,12 @@ if ! [[ "$MAX_ITERATIONS" =~ ^[0-9]+$ ]] || [ "$MAX_ITERATIONS" -lt 1 ]; then
     exit 1
 fi
 
-mkdir -p jpenv-scratch
-TICKETS_FILE="jpenv-scratch/ralph-tickets.json"
-PROGRESS_FILE="jpenv-scratch/ralph-progress.txt"
-LOG_FILE="jpenv-scratch/ralph.log"
-STATE_FILE="jpenv-scratch/ralph-state.json"
+RALPH_DIR="jpenv-ralph"
+mkdir -p "$RALPH_DIR"
+TICKETS_FILE="$RALPH_DIR/tickets.json"
+PROGRESS_FILE="$RALPH_DIR/progress.txt"
+LOG_FILE="$RALPH_DIR/log.log"
+STATE_FILE="$RALPH_DIR/state.json"
 
 # Check if tickets file exists.
 if [ ! -f "$TICKETS_FILE" ]; then
