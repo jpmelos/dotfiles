@@ -17,9 +17,17 @@ set -e
 #   jpenv-scratch/ralph-tickets.json - Engineering tickets (required)
 #   jpenv-scratch/ralph-progress.txt - Progress log (auto-created)
 
+# Check for uncommitted changes (staged or unstaged).
 if ! git diff-index --quiet HEAD --; then
-    echo "Warning: Working directory has uncommitted changes" >&2
+    echo "Error: Working directory has uncommitted changes" >&2
     echo "Commit or stash changes before running Ralph" >&2
+    exit 1
+fi
+
+# Check for untracked files (excluding ignored files).
+if [ -n "$(git ls-files --others --exclude-standard)" ]; then
+    echo "Error: Working directory has untracked files" >&2
+    echo "Commit, ignore, or remove untracked files before running Ralph" >&2
     exit 1
 fi
 
@@ -94,6 +102,7 @@ mkdir -p jpenv-scratch
 TICKETS_FILE="jpenv-scratch/ralph-tickets.json"
 PROGRESS_FILE="jpenv-scratch/ralph-progress.txt"
 LOG_FILE="jpenv-scratch/ralph.log"
+STATE_FILE="jpenv-scratch/ralph-state.json"
 
 # Check if tickets file exists.
 if [ ! -f "$TICKETS_FILE" ]; then
@@ -146,8 +155,52 @@ log "Max iterations: $MAX_ITERATIONS"
 
 TOTAL_COST=0
 TOTAL_DURATION=0
+START_ITERATION=1
 
-for i in $(seq 1 "$MAX_ITERATIONS"); do
+# Load state if resuming from a previous run.
+if [ -f "$STATE_FILE" ]; then
+    log ""
+    log "Found existing state file - resuming from previous run"
+
+    if ! TOTAL_COST=$(jq -e -r '.total_cost // 0' "$STATE_FILE" 2> /dev/null); then
+        echo "Error: Failed to parse state file at $STATE_FILE" >&2
+        echo "The state file may be corrupt. Please remove it and start fresh." >&2
+        exit 1
+    fi
+    if ! TOTAL_DURATION=$(jq -e -r '.total_duration // 0' "$STATE_FILE" 2> /dev/null); then
+        echo "Error: Failed to parse state file at $STATE_FILE" >&2
+        echo "The state file may be corrupt. Please remove it and start fresh." >&2
+        exit 1
+    fi
+    if ! LAST_COMPLETED_ITERATION=$(jq -e -r '.last_completed_iteration // 0' "$STATE_FILE" 2> /dev/null); then
+        echo "Error: Failed to parse state file at $STATE_FILE" >&2
+        echo "The state file may be corrupt. Please remove it and start fresh." >&2
+        exit 1
+    fi
+    if ! SAVED_COMMIT=$(jq -e -r '.last_commit // ""' "$STATE_FILE" 2> /dev/null); then
+        echo "Error: Failed to parse state file at $STATE_FILE" >&2
+        echo "The state file may be corrupt. Please remove it and start fresh." >&2
+        exit 1
+    fi
+
+    # Verify that the current HEAD matches the saved commit.
+    CURRENT_COMMIT=$(git rev-parse HEAD)
+    if [ -n "$SAVED_COMMIT" ] && [ "$SAVED_COMMIT" != "$CURRENT_COMMIT" ]; then
+        echo "Error: Repository state has changed since last run" >&2
+        echo "Expected commit: $SAVED_COMMIT" >&2
+        echo "Current commit:  $CURRENT_COMMIT" >&2
+        echo "Please reset to the expected commit or remove the state file to start fresh." >&2
+        exit 1
+    fi
+
+    START_ITERATION=$((LAST_COMPLETED_ITERATION + 1))
+
+    log "Resuming from iteration $START_ITERATION"
+    log "Previous total cost: \$$(round_up_cents "$TOTAL_COST")"
+    log "Previous total duration: $(format_duration "$TOTAL_DURATION")"
+fi
+
+for i in $(seq "$START_ITERATION" "$MAX_ITERATIONS"); do
     log ""
     log "═══════════════════════════════════════════════════════"
     log "  Iteration $i of $MAX_ITERATIONS"
@@ -193,6 +246,21 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     log "Total cost so far: \$$(round_up_cents "$TOTAL_COST")"
     log "Total duration so far: $(format_duration "$TOTAL_DURATION")"
 
+    # Save state after each iteration.
+    jq -n \
+        --arg iteration "$i" \
+        --arg cost "$TOTAL_COST" \
+        --arg duration "$TOTAL_DURATION" \
+        --arg timestamp "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+        --arg commit "$(git rev-parse HEAD)" \
+        '{
+            last_completed_iteration: ($iteration | tonumber),
+            total_cost: ($cost | tonumber),
+            total_duration: ($duration | tonumber),
+            last_updated: $timestamp,
+            last_commit: $commit
+        }' > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
+
     # Check if all tickets are marked as done.
     TICKETS_REMAINING=$(jq '[.tickets[] | select(.done == false)] | length' "$TICKETS_FILE")
     if [ "$TICKETS_REMAINING" -eq 0 ]; then
@@ -205,6 +273,9 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
         log "Completed at iteration $i of $MAX_ITERATIONS."
         log "Total cost: \$$(round_up_cents "$TOTAL_COST")"
         log "Total duration: $(format_duration "$TOTAL_DURATION")"
+
+        # Clear state file on successful completion.
+        rm -f "$STATE_FILE"
         exit 0
     fi
 done
@@ -217,4 +288,7 @@ log ""
 log "Ralph used up all allowed iterations ($MAX_ITERATIONS) without completing all tasks."
 log "Total cost: \$$(round_up_cents "$TOTAL_COST")"
 log "Total duration: $(format_duration "$TOTAL_DURATION")"
+
+log ""
+log "State saved. Run 'ralph' again to automatically resume."
 exit 1
