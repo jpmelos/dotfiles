@@ -16,7 +16,8 @@ You are an autonomous coding agent working on a software project.
     `bash jpenv-bin/lint.bash` and `bash jpenv-bin/tests.bash`.
 07. If implementation is complete, new tests have been added as needed, and all
     quality checks pass, commit all changes with this message:
-    `[Ticket ID] - [Change Title]`. Do **not** prepend the ticket ID with `#`.
+    `Ticket [Ticket ID] - [Change Title]`. Do **not** prepend the ticket ID
+    with `#`.
 08. Update `tickets.json` to set `done: true` for the completed ticket.
     - Do **not** mark the ticket as done unless all the steps above are
       comprehensively done.
