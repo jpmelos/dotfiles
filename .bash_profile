@@ -81,7 +81,7 @@ export PAGER="less -S"
 export EDITOR="nvim"
 
 # Configure ripgrep to use a configuration file.
-export RIPGREP_CONFIG_PATH="$HOME/.ripgreprc"
+export RIPGREP_CONFIG_PATH="$HOME/.config/ripgrep/ripgreprc"
 
 # 1Password configuration.
 export OP_ACCOUNT=my.1password.com

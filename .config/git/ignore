@@ -1,5 +1,5 @@
 # Generic marker for personal environment files.
-jpenv*
+**/jpenv*
 
 # Pre-commit hooks.
 /.pre-commit-config-local.yaml
@@ -15,6 +15,6 @@ jpenv*
 /.venv*
 
 # Claude Code
-/CLAUDE.local.md
+**/CLAUDE.local.md
 
-**/.claude/settings.local.json
+/.claude/settings.local.json
