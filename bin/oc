@@ -179,7 +179,7 @@ else
             OUTPUT=$(opencode run --format json)
 
             # Extract text from the last text part.
-            RESULT=$(echo "$OUTPUT" | jq -r 'select(.type == "text") | .part.text // ""' | tail -n 1)
+            RESULT=$(echo "$OUTPUT" | jq -r '[select(.type == "text")] | last | .part.text // ""')
 
             # Get first and last timestamps to calculate duration.
             FIRST_TS=$(echo "$OUTPUT" | head -n 1 | jq -r '.timestamp // 0')
