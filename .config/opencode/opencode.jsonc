@@ -54,6 +54,7 @@
         "bash": {
             "true": "allow",
             "false": "allow",
+            "echo*": "allow",
             "ls*": "allow",
             "grep*": "allow",
             "rg*": "allow",

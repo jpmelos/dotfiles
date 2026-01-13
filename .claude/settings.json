@@ -7,6 +7,7 @@
             "Edit",
             "Bash(true)",
             "Bash(false)",
+            "Bash(echo:*)",
             "Bash(ls:*)",
             "Bash(grep:*)",
             "Bash(rg:*)",
