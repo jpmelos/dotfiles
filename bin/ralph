@@ -17,6 +17,25 @@ set -e
 #   jpenv-ralph/tickets.json - Engineering tickets (required)
 #   jpenv-ralph/progress.txt - Progress log (auto-created)
 
+# Check if wakepy is available.
+if ! command -v wakepy &> /dev/null; then
+    echo "Error: wakepy command not found in PATH" >&2
+    echo "Please install wakepy to prevent the computer from sleeping during execution" >&2
+    exit 1
+fi
+
+# Start wakepy and store its PID.
+wakepy &
+WAKEPY_PID=$!
+
+# Set up trap to kill wakepy on script exit (normal or abnormal).
+cleanup() {
+    if [ -n "$WAKEPY_PID" ] && kill -0 "$WAKEPY_PID" 2> /dev/null; then
+        kill "$WAKEPY_PID" 2> /dev/null || true
+    fi
+}
+trap cleanup EXIT INT TERM
+
 # Check for uncommitted changes (staged or unstaged).
 if ! git diff-index --quiet HEAD --; then
     echo "Error: Working directory has uncommitted changes" >&2
