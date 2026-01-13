@@ -343,3 +343,14 @@ function RandomAlphaNumericString(length)
     end
     return table.concat(result)
 end
+
+function BuildSearchIgnoredFilesAdditionalArgs()
+    -- These are additional arguments for grep.
+    local additional_args = {}
+    if vim.g.search_ignored_files then
+        for _, pattern in ipairs(vim.g.search_ignored_files) do
+            table.insert(additional_args, "--glob=!" .. pattern)
+        end
+    end
+    return additional_args
+end

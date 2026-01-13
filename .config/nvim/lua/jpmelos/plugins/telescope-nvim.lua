@@ -11,7 +11,6 @@ return {
         { "nvim-telescope/telescope-fzf-native.nvim", build = "make" },
     },
     config = function()
-        local api = vim.api
         local K = vim.keymap.set
         local os_sep = require("plenary.path").path.sep
 
@@ -36,22 +35,16 @@ return {
             ["<C-t>"] = actions.file_tab,
             ["<C-c>"] = actions.close,
         }
-        -- ripgrep arguments come from `$RIPGREP_CONFIG_PATH`. By default, it
-        -- is `~/.ripgreprc`, but it may be overridden for projects with
-        -- `.autoenv.enter`.
-        telescope.setup({
-            defaults = {
-                pickers = {
-                    -- The command for live_grep and grep_string is specified
-                    -- just below.
-                    find_files = {
-                        find_command = { "rg", "--files", "--color=never" },
-                    },
-                },
-                -- Used for live_grep and grep_string. The command for
-                -- find_files is specified just above.
-                vimgrep_arguments = { "rg", "--color=never" },
 
+        -- ripgrep arguments come from `$RIPGREP_CONFIG_PATH`. By default, it
+        -- is `~/.config/ripgrep/ripgreprc`, but it may be overridden for
+        -- projects with `.autoenv.enter`.
+        telescope.setup({
+            -- Used for live_grep and grep_string. The command for find_files
+            -- is specified below in the keybindings definitions.
+            vimgrep_arguments = { "rg", "--color=never" },
+
+            defaults = {
                 path_display = { "smart" },
                 preview = { timeout = 1000 },
 
@@ -78,30 +71,32 @@ return {
         --
         -- Files.
         --
-        K(
-            "n",
-            "<leader>ff",
-            builtins.find_files,
-            { desc = "Find files in current directory" }
-        )
+        K("n", "<leader>ff", function()
+            local find_command = { "rg", "--files", "--color=never" }
+            vim.list_extend(
+                find_command,
+                BuildSearchIgnoredFilesAdditionalArgs()
+            )
+            builtins.find_files({
+                find_command = find_command,
+            })
+        end, { desc = "Find files in current directory" })
         K("n", "<leader>fb", builtins.buffers, { desc = "Find buffers" })
         K("n", "<leader>fo", builtins.oldfiles, { desc = "Find old files" })
 
         --
         -- Strings.
         --
-        K(
-            "n",
-            "<leader>fa",
-            builtins.live_grep,
-            { desc = "Find in current directory" }
-        )
-        K(
-            "n",
-            "<leader>fca",
-            builtins.grep_string,
-            { desc = "Find in current directory" }
-        )
+        K("n", "<leader>fa", function()
+            builtins.live_grep({
+                additional_args = BuildSearchIgnoredFilesAdditionalArgs(),
+            })
+        end, { desc = "Find in current directory" })
+        K("n", "<leader>fca", function()
+            builtins.grep_string({
+                additional_args = BuildSearchIgnoredFilesAdditionalArgs(),
+            })
+        end, { desc = "Find in current directory" })
         K("n", "<leader>fp", function()
             if vim.bo.filetype ~= "NvimTree" then
                 vim.notify("This command only works in NvimTree.")
@@ -114,7 +109,10 @@ return {
                 return
             end
 
-            builtins.live_grep({ search_dirs = { node.absolute_path } })
+            builtins.live_grep({
+                search_dirs = { node.absolute_path },
+                additional_args = BuildSearchIgnoredFilesAdditionalArgs(),
+            })
         end, { desc = "Find string in current path" })
 
         --
