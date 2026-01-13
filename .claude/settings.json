@@ -11,6 +11,7 @@
             "Bash(grep:*)",
             "Bash(rg:*)",
             "Bash(cat:*)",
+            "Bash(wc:*)",
             "Bash(head:*)",
             "Bash(tail:*)",
             "Bash(cut:*)",

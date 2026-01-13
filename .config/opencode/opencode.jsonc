@@ -58,6 +58,7 @@
             "grep*": "allow",
             "rg*": "allow",
             "cat*": "allow",
+            "wc*": "allow",
             "head*": "allow",
             "tail*": "allow",
             "cut*": "allow",
