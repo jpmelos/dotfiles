@@ -8,8 +8,8 @@ jpenv*
 /.nvim.lua
 
 # autoenv files.
-.autoenv.enter
-.autoenv.leave
+**/.autoenv.enter
+**/.autoenv.leave
 
 # Python virtual environments.
 /.venv*

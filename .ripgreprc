@@ -10,3 +10,10 @@
 --hidden
 --glob
     !/.git
+# Whitelist git-ignored files that should be searchable.
+--glob
+    jpenv*
+--glob
+    .autoenv.enter
+--glob
+    .autoenv.leave
