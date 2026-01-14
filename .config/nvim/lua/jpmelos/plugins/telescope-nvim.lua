@@ -81,22 +81,22 @@ return {
                 find_command = find_command,
             })
         end, { desc = "Find files in current directory" })
+
         K("n", "<leader>fb", builtins.buffers, { desc = "Find buffers" })
+
         K("n", "<leader>fo", builtins.oldfiles, { desc = "Find old files" })
 
         --
         -- Strings.
         --
         K("n", "<leader>fa", function()
-            builtins.live_grep({
-                additional_args = BuildSearchIgnoredFilesAdditionalArgs(),
-            })
+            builtins.live_grep(TelescopeLiveGrepArgs())
         end, { desc = "Find in current directory" })
+
         K("n", "<leader>fca", function()
-            builtins.grep_string({
-                additional_args = BuildSearchIgnoredFilesAdditionalArgs(),
-            })
+            builtins.grep_string(TelescopeGrepStringArgs())
         end, { desc = "Find in current directory" })
+
         K("n", "<leader>fp", function()
             if vim.bo.filetype ~= "NvimTree" then
                 vim.notify("This command only works in NvimTree.")
@@ -109,10 +109,13 @@ return {
                 return
             end
 
-            builtins.live_grep({
-                search_dirs = { node.absolute_path },
-                additional_args = BuildSearchIgnoredFilesAdditionalArgs(),
-            })
+            local live_grep_args = TelescopeLiveGrepArgs()
+            vim.tbl_extend(
+                "force",
+                live_grep_args,
+                { search_dirs = { node.absolute_path } }
+            )
+            builtins.live_grep(live_grep_args)
         end, { desc = "Find string in current path" })
 
         --

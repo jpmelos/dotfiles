@@ -354,3 +354,24 @@ function BuildSearchIgnoredFilesAdditionalArgs()
     end
     return additional_args
 end
+
+function TelescopeLiveGrepArgs()
+    local additional_args = { "--pcre2" }
+    vim.list_extend(additional_args, BuildSearchIgnoredFilesAdditionalArgs())
+
+    return {
+        prompt_title = "Fuzzy Live Grep",
+        additional_args = additional_args,
+        on_input_filter_cb = function(prompt)
+            -- Turn "abc" into "a.*b.*c".
+            local fuzzy = prompt:gsub(".", "%0.*")
+            return { prompt = fuzzy }
+        end,
+    }
+end
+
+function TelescopeGrepStringArgs()
+    return {
+        additional_args = BuildSearchIgnoredFilesAdditionalArgs(),
+    }
+end
