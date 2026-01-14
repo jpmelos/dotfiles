@@ -131,10 +131,13 @@
 
     # d = diff
     d = diff
-    dst = diff --name-status
-    dca = diff --cached
+    df = diff --stat
+    dc = diff --cached
+    dcf = diff --cached --stat
     dm = ! git diff $(git main-branch)...HEAD
+    dmf = ! git diff $(git main-branch)...HEAD --stat
     dom = ! git diff origin/$(git main-branch)...HEAD
+    domf = ! git diff origin/$(git main-branch)...HEAD --stat
 
     # l = log
     l = "! f() { git log --color=always --oneline --graph --decorate $@ | awk -f ~/.git-log-prepend-number-awk | less -R; }; f"
@@ -175,7 +178,7 @@
 
     # sh = show
     sh = "! f() { if [[ \"$1\" =~ ^- ]]; then HEADN=\"${1#-}\"; shift; git show \"HEAD~$HEADN\" $@; else git show \"$@\"; fi; }; f"
-    shf = "! f() { if [[ \"$1\" =~ ^- ]]; then HEADN=\"${1#-}\"; shift; git show --name-status $@ \"HEAD~$HEADN\"; else git show --name-status \"$@\"; fi; }; f"
+    shf = "! f() { if [[ \"$1\" =~ ^- ]]; then HEADN=\"${1#-}\"; shift; git show --name-status $@ \"HEAD~$HEADN\"; else git show --stat \"$@\"; fi; }; f"
 
     # st = status
     st = status

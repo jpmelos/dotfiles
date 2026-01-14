@@ -186,15 +186,21 @@ __git_complete gcamn git_commit
 __git_complete gcw git_commit
 
 alias gd='g d'
-alias gdst='g dst'
-alias gdca='g dca'
+alias gdf='g df'
+alias gdc='g dc'
+alias gdcf='g dcf'
 alias gdm='g dm'
+alias gdmf='g dmf'
 alias gdom='g dom'
+alias gdomf='g domf'
 __git_complete gd git_diff
-__git_complete gdst git_diff
-__git_complete gdca git_diff
+__git_complete gdf git_diff
+__git_complete gdc git_diff
+__git_complete gdcf git_diff
 __git_complete gdm git_diff
+__git_complete gdmf git_diff
 __git_complete gdom git_diff
+__git_complete gdomf git_diff
 
 alias gl='g l'
 alias glf='g lf'
