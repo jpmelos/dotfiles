@@ -59,6 +59,7 @@ outer.right = 5
 # All possible commands: https://nikitabobko.github.io/AeroSpace/commands
 [mode.main.binding]
 alt-slash = 'layout tiles horizontal vertical'
+alt-shift-slash = 'layout accordion horizontal vertical'
 
 alt-f = 'layout floating tiling'
 alt-shift-f = 'fullscreen'
@@ -115,9 +116,9 @@ shift-keypad7 = ['move-node-to-workspace 7', 'workspace 7']
 shift-keypad8 = ['move-node-to-workspace 8', 'workspace 8']
 shift-keypad9 = ['move-node-to-workspace 9', 'workspace 9']
 
-alt-shift-semicolon = 'mode service'
-
 alt-t = 'exec-and-forget wezterm cli spawn --new-window'
+
+alt-shift-semicolon = 'mode service'
 
 [mode.service.binding]
 esc = ['reload-config', 'mode main']
