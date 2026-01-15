@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# Check if input file is provided
+if [ $# -eq 0 ]; then
+    echo "Usage: $0 <input_file> [output_file]"
+    echo "Example: $0 input.mkv input.mp4"
+    exit 1
+fi
+
+INPUT_FILE="$1"
+OUTPUT_FILE="${2:-${INPUT_FILE%.*}.mp4}"
+
+# Check if input file exists
+if [ ! -f "$INPUT_FILE" ]; then
+    echo "Error: Input file '$INPUT_FILE' not found"
+    exit 1
+fi
+
+echo "Analyzing subtitle streams in '$INPUT_FILE'..."
+
+# Get all subtitle stream info
+SUBTITLE_INFO=$(ffmpeg -i "$INPUT_FILE" 2>&1 | grep "Stream.*Subtitle" || true)
+
+if [ -z "$SUBTITLE_INFO" ]; then
+    echo "No subtitle streams found."
+    echo "Running ffmpeg without subtitle mapping..."
+
+    ffmpeg -i "$INPUT_FILE" \
+        -map 0:v -map 0:a \
+        -c:v libx264 -profile:v high -pix_fmt yuv420p -crf 20 \
+        -c:a aac \
+        "$OUTPUT_FILE"
+
+    exit 0
+fi
+
+echo "Found subtitle streams:"
+echo "$SUBTITLE_INFO"
+echo ""
+
+# Find text-based subtitle streams (can be converted to mov_text)
+TEXT_SUBTITLE_STREAMS=$(echo "$SUBTITLE_INFO" | grep -E "subrip|ass|ssa|webvtt|mov_text|srt|subviewer|microdvd|text" | grep -oE "Stream #[0-9]+:[0-9]+" | cut -d'#' -f2 | cut -d'(' -f1 || true)
+
+if [ -z "$TEXT_SUBTITLE_STREAMS" ]; then
+    echo "No text-based subtitle streams found (all are bitmap-based)."
+    echo "Running ffmpeg without subtitle mapping..."
+
+    ffmpeg -i "$INPUT_FILE" \
+        -map 0:v -map 0:a \
+        -c:v libx264 -profile:v high -pix_fmt yuv420p -crf 20 \
+        -c:a aac \
+        "$OUTPUT_FILE"
+
+    exit 0
+fi
+
+echo "Text-based subtitle streams that can be converted to mov_text:"
+echo "$TEXT_SUBTITLE_STREAMS"
+echo ""
+
+# Build the ffmpeg command with explicit subtitle stream mappings
+FFMPEG_CMD="ffmpeg -i \"$INPUT_FILE\" -map 0:v -map 0:a"
+
+while IFS= read -r stream; do
+    FFMPEG_CMD="$FFMPEG_CMD -map $stream"
+done <<< "$TEXT_SUBTITLE_STREAMS"
+
+FFMPEG_CMD="$FFMPEG_CMD -c:v libx264 -profile:v high -pix_fmt yuv420p -crf 20 -c:a aac -c:s mov_text \"$OUTPUT_FILE\""
+
+echo "Running ffmpeg command:"
+echo "$FFMPEG_CMD"
+echo ""
+
+# Execute the command
+eval "$FFMPEG_CMD"
+
+echo ""
+echo "Conversion complete: $OUTPUT_FILE"
