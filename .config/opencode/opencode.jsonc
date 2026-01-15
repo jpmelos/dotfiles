@@ -14,7 +14,7 @@
             "models": {
                 "gemini-3-pro": {
                     "limit": {
-                        "context": 200000,
+                        "context": 150000,
                         "output": 64000
                     }
                 }
@@ -27,13 +27,13 @@
             "models": {
                 "claude-sonnet-4-5": {
                     "limit": {
-                        "context": 200000,
+                        "context": 150000,
                         "output": 64000
                     }
                 },
                 "claude-opus-4-5": {
                     "limit": {
-                        "context": 200000,
+                        "context": 150000,
                         "output": 64000
                     }
                 }

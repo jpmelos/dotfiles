@@ -1,39 +1,58 @@
 # Autonomous Coding Agent Instructions
 
-You are an autonomous coding agent working on a software project.
+You are an autonomous coding agent working on a software project. Your goal is
+to implement a single ticket from the provided ticket list, commit the changes
+to Git, document your progress, mark the ticket as complete, and stop.
+
+## Important Context Information
+
+Arguments:
+
+```
+$ARGUMENTS
+```
+
+Parse the following information from the arguments:
+
+- **`tickets_file`**: The JSON file containing ticket information.
 
 ## Your Task
 
-01. Read the tickets from @jpenv-ralph/tickets.json.
-02. Read the progress log at @jpenv-ralph/progress.txt (check the "Codebase
+01. Read the tickets from `tickets_file`.
+02. Read the progress log (see instructions below, check the "Codebase
     Patterns" section first).
-03. Pick the **highest priority** ticket from `tickets.json` where
+03. Pick the **highest priority** ticket from the tickets file where
     `done: false` whose dependencies are all done. This is not always
     necessarily the first ticket with `done: false`. Use your best judgement.
-04. Implement **only** that single ticket.
-05. Write new tests as needed, aim for 100% test coverage.
-06. When appropriate, run all relevant quality checks for the project using
-    `bash jpenv-bin/lint.bash` and `bash jpenv-bin/tests.bash`.
-07. If implementation is complete, new tests have been added as needed, and all
-    quality checks pass, commit all changes with this message:
-    `Ticket [Ticket ID] - [Change Title]`. Do **not** prepend the ticket ID
-    with `#`.
-08. Update `tickets.json` to set `done: true` for the completed ticket.
-    - Do **not** mark the ticket as done unless all the steps above are
-      comprehensively done.
-09. **Append** your progress report to `progress.txt` (see detailed
+04. Implement **only** that single ticket. Do not implement multiple tickets.
+    Do not implement any additional features or changes beyond what is required
+    for the ticket. Keep the changes focused.
+05. Write new tests as needed. Update existing tests as needed. Delete tests
+    that became obsolete or irrelevant. Aim for 100% test coverage.
+06. Run all relevant quality checks and tests using `bash jpenv-bin/lint.bash`
+    and `bash jpenv-bin/tests.bash`.
+07. Commit your changes to Git using
+    `bash jpenv-bin/commit.bash Ticket [Ticket ID] - [Change Title]`. Do
+    **not** prepend the ticket ID with `#`. Zero-pad the ticket ID to 2 digits.
+    You **must** commit your changes before proceeding to the next step.
+08. **Append** your progress report to the progress log (see detailed
     instructions below).
-10. Finish the current session (iteration).
-    - Include in the summary of the iteration a section about any permissions
-      that you requested and were denied, so they can be pre-allowed by the
-      user if appropriate. Include this only in the summary of the iteration,
-      do *not* include anything about denied permissions in the progress
-      report.
+09. Update the tickets file to set `done: true` for the completed ticket. Do
+    **not** mark the ticket as done unless all the steps above are complete.
+10. Write a summary of what you did.
+11. You are done, stop.
 
-## Progress Report Format
+## Progress Log
 
-**Append** to the progress report section in `progress.txt` (never edit
-anything in the progress report section, **always append**):
+The progress log is a file with the same filename as `tickets_file`, but ends
+with `.progress.md` instead of `tickets.json`.
+
+At the start of each ticket, read the progress log, and pay close attention to
+the "Codebase Patterns" section at the top. This file may not exist yet if this
+is the first ticket.
+
+After committing to Git in each iteration, **append** to the progress log
+(never edit anything in the progress log, **always append**):
 
 ```
 ## [YYYY-MM-DD HH:MM] - [Ticket ID]: [Ticket Title]
@@ -48,7 +67,7 @@ anything in the progress report section, **always append**):
 Example of a header:
 
 ```
-## 2026-01-10 14:30 - New Table Column `cost` and Migration (#5)
+## 2026-01-10 14:30 - 05: New Table Column `cost` and Migration
 ```
 
 The learnings section is critical - it helps future iterations avoid repeating
@@ -57,9 +76,9 @@ mistakes and understand the codebase better.
 ### Consolidate Patterns
 
 If you discover a **reusable pattern** that future iterations should know, add
-it to the "Codebase Patterns" section at the **top** of `progress.txt` (create
-it if it doesn't exist). This section should consolidate the most important
-learnings. As an example:
+it to the "Codebase Patterns" section at the **top** of the progress log file
+(create it if it doesn't exist). This section should consolidate the most
+important learnings. As an example:
 
 ```
 ## Codebase Patterns
@@ -71,38 +90,47 @@ learnings. As an example:
 Only add patterns that are **general and reusable**, not ticket-specific
 details.
 
+### Permissions Denied
+
+If you requested permissions during the iteration and they were denied, add
+them to the "Permission Issues" section at the **top** of the progress log file
+(create it if it doesn't exist). If the permission is related to running a
+command, include the exact command. If it's related to searching or otherwise
+accessing a URL, include the exact URL you tried to use. As examples:
+
+```
+## Permissions Denied
+
+- `echo "Some message"`: Running `echo` was denied.
+- Search `docs.python.org`: Tried to search the Python documentation, but was
+  denied.
+```
+
 ## Quality Requirements
 
-- All commits must pass your project's quality checks.
-  - Run quality checks with:
+- All commits must pass your project's quality checks and tests.
+  - Run quality checks and tests with:
     - `bash jpenv-bin/lint.bash`
     - `bash jpenv-bin/tests.bash`
   - Read the source code of those files to understand how to pass arguments to
     them (for example, to lint just specific files or run just specific tests).
-  - When running tests, run only the relevant tests for the code that you
-    created, edited, or removed.
-- If quality checks fail:
+  - When running tests, run only the relevant files and tests for the code that
+    you created or edited.
+- If quality checks or tests fail:
   1. Attempt to fix the issues.
-  2. If you cannot fix after attempting, leave the ticket as `done: false`.
-  3. Document the blocker in the `progress.txt`.
-  4. End the iteration without committing and let the next iteration pick this
-     up again.
-- Do not commit code that's not passing all quality checks.
+  2. If you cannot fix after attempting, leave the ticket as `done: false` and
+     do not create a Git commit.
+  3. Document the blocker in the progress log.
+  4. End the iteration without committing and let the next iteration pick up
+     the ticket again.
 - Keep changes focused and minimal.
 - Follow existing code patterns.
 
-## After Each Ticket
-
-After working on a ticket, finish the session with a summary of what was done.
-Include in the summary of the iteration a section about any permissions that
-you requested and were denied, so they can be pre-allowed by the user if
-appropriate. Include this only in the summary of the iteration, do *not*
-include anything about denied permissions in the progress report.
-
 ## Important
 
-- Work on **one** ticket per iteration.
-- Keep all quality checks green at all times.
-- Read `progress.txt` before starting, **especially** the "Codebase Patterns"
-  section.
-- Report denied permissions in the iteration summary.
+- Read the progress log file before starting, **especially** the "Codebase
+  Patterns" section.
+- Work on **one** ticket.
+- Keep all quality checks and tests green at all times.
+- Commit to Git if the task was completed.
+- Update the progress log file and the tickets file.

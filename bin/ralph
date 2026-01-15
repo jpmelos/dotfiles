@@ -4,7 +4,15 @@ set -e
 # Ralph - Long-running AI agent loop
 #
 # Usage:
-#   ralph [max_iterations]
+#   ralph TICKETS_FILE [max_iterations]
+#
+# Examples:
+#   ralph features/auth/auth.tickets.json
+#   ralph features/auth/auth.tickets.json 20
+#
+# Arguments:
+#   TICKETS_FILE          Path to the tickets JSON file (required)
+#   max_iterations        Maximum number of iterations (default: 10)
 #
 # Environment:
 #   CLAUDE_CODE_API_KEY   If set, uses Claude Code. Otherwise prompts user.
@@ -12,10 +20,6 @@ set -e
 #
 #   If neither is set, prompts user to choose (defaults to OpenCode).
 #   If both are set, prompts user to choose (defaults to OpenCode).
-#
-# Files:
-#   jpenv-ralph/tickets.json - Engineering tickets (required)
-#   jpenv-ralph/progress.txt - Progress log (auto-created)
 
 # Check if wakepy is available.
 if ! command -v wakepy &> /dev/null; then
@@ -111,18 +115,20 @@ fi
 
 echo "Using '$RALPH_CMD' for Ralph" >&2
 
-MAX_ITERATIONS=${1:-10}
-if ! [[ "$MAX_ITERATIONS" =~ ^[0-9]+$ ]] || [ "$MAX_ITERATIONS" -lt 1 ]; then
-    echo "Error: MAX_ITERATIONS must be a positive integer" >&2
+# Get tickets file from first argument.
+TICKETS_FILE="$1"
+if [ -z "$TICKETS_FILE" ]; then
+    echo "Error: TICKETS_FILE argument is required" >&2
+    echo "Usage: ralph TICKETS_FILE [max_iterations]" >&2
     exit 1
 fi
 
-RALPH_DIR="jpenv-ralph"
-mkdir -p "$RALPH_DIR"
-TICKETS_FILE="$RALPH_DIR/tickets.json"
-PROGRESS_FILE="$RALPH_DIR/progress.txt"
-LOG_FILE="$RALPH_DIR/log.log"
-STATE_FILE="$RALPH_DIR/state.json"
+# Validate tickets file extension.
+if [[ ! "$TICKETS_FILE" =~ \.tickets\.json$ ]]; then
+    echo "Error: Tickets file must end with .tickets.json" >&2
+    echo "Got: $TICKETS_FILE" >&2
+    exit 1
+fi
 
 # Check if tickets file exists.
 if [ ! -f "$TICKETS_FILE" ]; then
@@ -130,9 +136,27 @@ if [ ! -f "$TICKETS_FILE" ]; then
     exit 1
 fi
 
+# Get max iterations from second argument (default: 10).
+MAX_ITERATIONS=${2:-10}
+if ! [[ "$MAX_ITERATIONS" =~ ^[0-9]+$ ]] || [ "$MAX_ITERATIONS" -lt 1 ]; then
+    echo "Error: MAX_ITERATIONS must be a positive integer" >&2
+    exit 1
+fi
+
+# Derive base directory and feature name from tickets file.
+RALPH_DIR=$(dirname "$TICKETS_FILE")
+TICKETS_BASENAME=$(basename "$TICKETS_FILE")
+FEATURE_NAME="${TICKETS_BASENAME%.tickets.json}"
+
+# Derive other file paths.
+PROGRESS_FILE="$RALPH_DIR/$FEATURE_NAME.progress.md"
+LOG_FILE="$RALPH_DIR/$FEATURE_NAME.log"
+STATE_FILE="$RALPH_DIR/$FEATURE_NAME.state.json"
+
 # Initialize progress file if it doesn't exist.
 if [ ! -f "$PROGRESS_FILE" ]; then
-    echo "# Ralph Progress Log" > "$PROGRESS_FILE"
+    echo "# Ralph Progress Log: $FEATURE_NAME" > "$PROGRESS_FILE"
+    echo "Tickets file: $TICKETS_FILE" >> "$PROGRESS_FILE"
     echo "Started: $(date "+%Y-%m-%d %H:%M")" >> "$PROGRESS_FILE"
     echo "---" >> "$PROGRESS_FILE"
 fi
@@ -228,7 +252,8 @@ for i in $(seq "$START_ITERATION" "$MAX_ITERATIONS"); do
     log "Started: $(date "+%Y-%m-%d %H:%M:%S")"
     log ""
 
-    OUTPUT=$(cat "$HOME/ralph/prompt.md" | "$RALPH_CMD" -p --raw-output)
+    PROMPT=$(cat "$HOME/ralph/prompt.md" | sed "s|\$ARGUMENTS|tickets_file=$TICKETS_FILE|g")
+    OUTPUT=$(echo "$PROMPT" | "$RALPH_CMD" -p --raw-output)
 
     # Extract result and metrics from JSON output.
     # The format differs between OpenCode and Claude Code.

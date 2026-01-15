@@ -1,17 +1,28 @@
 ---
-name: writing-plans
-description: "Generate a plan with implementation tickets for a new feature or change. Use exclusively when explicitly asked to create a plan from a feature or change specification."
+description: Generate a plan in Markdown with implementation tickets for a new feature or change. Use exclusively when explicitly asked to create a plan from a feature or change specification.
 ---
 
-Create a detailed plan that is clear, actionable, and suitable for
-implementation.
+## Important Context Information
+
+Arguments:
+
+```
+$ARGUMENTS
+```
+
+Parse the following information from the arguments:
+
+- `spec_file`: The Markdown file containing the feature or change
+  specification.
 
 ## The Task
 
-1. Receive a feature or change description.
-2. Ask as many clarifying questions as you deem necessary to be able to fully
+Create a detailed plan that is clear, actionable, and suitable for
+implementation of the feature or change described in `spec_file`.
+
+1. Ask as many clarifying questions as you deem necessary to be able to fully
    flesh out the feature or change into small, atomic tickets.
-3. Study the project to understand the relevant aspects specific to the
+2. Study the project to understand the relevant aspects specific to the
    project.
    - For example, if you're going to create or change a REST API, make sure to
      understand how REST APIs work in the project.
@@ -20,9 +31,10 @@ implementation.
      sure you understand them completely before planning.
    - Include these details in the ticket descriptions as necessary to enable
      work and set up your colleagues for success.
-4. Generate a structured plan document based on all the information you
+3. Generate a structured plan document based on all the information you
    gathered.
-5. Save it to `jpenv-ralph/plan.md`.
+4. Save the plan to a file in the same directory as the `spec_file` using the
+   same filename as the `spec_file` but with the file extension `.plan.md`.
 
 **Important:** Do **not** implement anything. Just write the plan document.
 
@@ -120,5 +132,5 @@ The plan reader may be a junior developer or an AI agent. Therefore:
 
 ## Output
 
-- **Format:** Markdown (`.md`).
-- **Location:** `jpenv-ralph/plan.md`.
+- **Format:** Markdown (`.plan.md`).
+- **Location:** Same directory as the `spec_file`.

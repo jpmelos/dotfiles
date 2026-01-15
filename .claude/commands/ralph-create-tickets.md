@@ -1,11 +1,26 @@
 ---
-description: "Convert the plan in `jpenv-ralph/plan.md` into tickets in `jpenv-ralph/tickets.json`."
+description: Convert a feature or change plan into tickets.
+argument-hint: plan_file=PLAN_FILE tokens_per_ticket=TOKENS_PER_TICKET
 ---
+
+## Important Context Information
+
+Arguments:
+
+```
+$ARGUMENTS
+```
+
+Parse the following information from the arguments:
+
+- `plan_file`: The Markdown file containing the plan to convert.
+- `tokens_per_ticket`: (Optional.) The maximum number of tokens per ticket.
+  Default to 150,000.
 
 ## The Task
 
-Take a plan in `jpenv-ralph/plan.md` and convert it into tickets in
-`jpenv-ralph/tickets.json` according to the following guidelines and rules.
+Take the plan in `plan_file` and convert it into tickets in a JSON file
+`tickets_file` according to the following guidelines and rules.
 
 Study the project and the plan to understand the relevant aspects specific to
 the project.
@@ -15,9 +30,12 @@ the project.
 - Make sure you understand all project-specific terms and jargons. If you see
   terms whose meaning depend on the project, like "service layer", make sure
   you understand them completely before planning.
+- Include these details in the ticket descriptions as necessary to enable work
+  and set up your colleagues for success.
 
-Include these details in the ticket descriptions as necessary to enable work
-and set up your colleagues for success.
+Output the resulting JSON file to the same directory as the `plan_file` using
+the same filename as the `plan_file` but with the file extension
+`.tickets.json`.
 
 ## Output Format
 
@@ -47,25 +65,40 @@ The title must be brief, five to ten words maximum, to keep logs scannable.
 ## Ticket Size: The Number One Rule
 
 **Every ticket must be completable in one AI coding assistant session with a
-context window of 150k tokens.**
+context window of `tokens_per_ticket` tokens.** Each ticket will correspond to
+a single Git commit and should be focused on a single, modular change that is
+easy to review and verify.
 
-An AI agent with a context window of 150k tokens will be processing one user
-ticket per session with no memory of previous work. If a ticket is too big, the
-AI agent will run out of context window before finishing and may produce lower
-quality results.
+An AI agent with a context window of `tokens_per_ticket` tokens will be
+processing one ticket per session with no memory of previous work. If a ticket
+is too big, the AI agent will run out of context window before finishing and
+may produce lower quality results. If a ticket is too small, the AI agent will
+waste tokens on overhead and setup, reducing overall efficiency. The tickets
+described in the `plan_file` can be split or merged as necessary to optimize
+for this rule.
 
 ### Examples of right-sized tickets
 
-- Add a database column and migration.
-- Update a server action with new logic.
-- Update a return payload of an API endpoint with a new set of fields.
+- Add a database column and a corresponding migration file.
+- Update a service function and write tests for it.
+- Update a return payload of an API endpoint with a new set of fields and
+  update the API endpoint tests.
+
+### Including Tests
+
+It is acceptable to implement tests for multiple tickets at once in a single
+separate ticket when the tickets are related and share similar test logic. For
+example, integration tests are better implemented in a single ticket towards
+the end of the plan rather than updated piecemeal for each ticket.
 
 ### Tickets that are too big
 
 These tickets need to be split out:
 
 - Add authentication.
-  - Split into: schema, middleware, login UI, session handling.
+  - Split into: schema updates and tests, middleware updates and tests, login
+    endpoint, session handling, tests for the login endpoint and session
+    handling, integration tests.
 - Refactor the API.
   - Split into one ticket per endpoint, middleware, or pattern.
 
@@ -106,7 +139,7 @@ suite and linting tools.
 
 ## Conversion Rules
 
-1. **Each user ticket becomes one JSON entry.**
+1. **Each ticket becomes one JSON entry.**
 2. **IDs**: Numeric, monotonically increasing by 1, and starting from 1.
 3. **All tickets**: `done: false` and empty `notes`. The `notes` field is for a
    human to add context for the AI agent as necessary.
@@ -138,3 +171,8 @@ If a ticket in the plan is too big, split it:
 
 Each is one focused, modular change that can be completed and verified
 independently.
+
+## Output
+
+- **Format:** JSON (`*.tickets.json`).
+- **Location:** Same directory as the `plan_file`.
