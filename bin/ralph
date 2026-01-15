@@ -225,8 +225,8 @@ validate_tickets_schema() {
             return 1
         fi
 
-        if ! jq -e ".tickets[$idx].notes | type == \"string\"" "$file" > /dev/null 2>&1; then
-            echo "Error: Ticket #$ticket_num field 'notes' must be a string" >&2
+        if ! jq -e ".tickets[$idx].notes | type == \"array\"" "$file" > /dev/null 2>&1; then
+            echo "Error: Ticket #$ticket_num field 'notes' must be an array" >&2
             return 1
         fi
 
@@ -240,6 +240,15 @@ validate_tickets_schema() {
         for ((cidx = 0; cidx < criteria_count; cidx++)); do
             if ! jq -e ".tickets[$idx].acceptanceCriteria[$cidx] | type == \"string\"" "$file" > /dev/null 2>&1; then
                 echo "Error: Ticket #$ticket_num acceptanceCriteria[$cidx] must be a string" >&2
+                return 1
+            fi
+        done
+
+        # Validate notes contains only strings.
+        local notes_count=$(jq ".tickets[$idx].notes | length" "$file")
+        for ((nidx = 0; nidx < notes_count; nidx++)); do
+            if ! jq -e ".tickets[$idx].notes[$nidx] | type == \"string\"" "$file" > /dev/null 2>&1; then
+                echo "Error: Ticket #$ticket_num notes[$nidx] must be a string" >&2
                 return 1
             fi
         done
