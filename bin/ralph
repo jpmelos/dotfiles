@@ -417,6 +417,9 @@ if [ -f "$STATE_FILE" ]; then
     fi
 
     START_ITERATION=$((LAST_COMPLETED_ITERATION + 1))
+    # When resuming, MAX_ITERATIONS is the number of remaining iterations.
+    # Add the current iteration to get the new maximum.
+    MAX_ITERATIONS=$((LAST_COMPLETED_ITERATION + MAX_ITERATIONS))
 
     log "Resuming from iteration $START_ITERATION"
     log "Previous total cost: \$$(round_up_cents "$TOTAL_COST")"
