@@ -82,6 +82,7 @@
             "cargo check*": "allow",
             "cargo clippy*": "allow",
             "bash ~/.config/opencode/command/review-prompt.sh": "allow",
+            "bash ~/bin/ralph --validate*": "allow",
             "bash jpenv-bin/lint.bash*": "allow",
             "bash jpenv-bin/tests.bash*": "allow",
             "bash jpenv-bin/commit.bash*": "allow"

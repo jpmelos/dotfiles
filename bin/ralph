@@ -1,25 +1,225 @@
 #!/usr/bin/env bash
 set -e
 
-# Ralph - Long-running AI agent loop
-#
-# Usage:
-#   ralph TICKETS_FILE [max_iterations]
-#
-# Examples:
-#   ralph features/auth/auth.tickets.json
-#   ralph features/auth/auth.tickets.json 20
-#
-# Arguments:
-#   TICKETS_FILE          Path to the tickets JSON file (required)
-#   max_iterations        Maximum number of iterations (default: 10)
-#
-# Environment:
-#   CLAUDE_CODE_API_KEY   If set, uses Claude Code. Otherwise prompts user.
-#   OPENCODE_API_KEY      If set, uses OpenCode. Otherwise prompts user.
-#
-#   If neither is set, prompts user to choose (defaults to OpenCode).
-#   If both are set, prompts user to choose (defaults to OpenCode).
+#/ Ralph - Long-running AI agent loop
+#/
+#/ Usage:
+#/   ralph [--validate] TICKETS_FILE [max_iterations]
+#/
+#/ Examples:
+#/   ralph features/auth/auth.tickets.json
+#/   ralph features/auth/auth.tickets.json 20
+#/   ralph --validate features/auth/auth.tickets.json
+#/
+#/ Arguments:
+#/   --help, -h            Show this help message and exit
+#/   --validate            Validate tickets file without executing Ralph
+#/                         (useful for pre-flight checks)
+#/   TICKETS_FILE          Path to the tickets JSON file (required)
+#/   max_iterations        Maximum number of iterations (default: 10)
+#/
+#/ Environment:
+#/   CLAUDE_CODE_API_KEY   If set, uses Claude Code. Otherwise prompts user.
+#/   OPENCODE_API_KEY      If set, uses OpenCode. Otherwise prompts user.
+#/
+#/   If neither is set, prompts user to choose (defaults to OpenCode).
+#/   If both are set, prompts user to choose (defaults to OpenCode).
+
+# Show help if requested.
+if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+    grep '^#/' "$0" | sed 's/^#\/ \{0,1\}//'
+    exit 0
+fi
+
+# Parse arguments.
+VALIDATE_ONLY=false
+if [ "$1" = "--validate" ]; then
+    VALIDATE_ONLY=true
+    shift
+fi
+
+# Get tickets file from first argument.
+TICKETS_FILE="$1"
+if [ -z "$TICKETS_FILE" ]; then
+    echo "Error: TICKETS_FILE argument is required" >&2
+    echo "Usage: ralph [--validate] TICKETS_FILE [max_iterations]" >&2
+    exit 1
+fi
+
+# Validate tickets file extension.
+if [[ ! "$TICKETS_FILE" =~ \.tickets\.json$ ]]; then
+    echo "Error: Tickets file must end with .tickets.json" >&2
+    echo "Got: $TICKETS_FILE" >&2
+    exit 1
+fi
+
+# Check if tickets file exists.
+if [ ! -f "$TICKETS_FILE" ]; then
+    echo "Error: Tickets file not found at $TICKETS_FILE" >&2
+    exit 1
+fi
+
+# Validate tickets file schema.
+validate_tickets_schema() {
+    local file="$1"
+
+    # Check if file is valid JSON.
+    if ! jq empty "$file" 2> /dev/null; then
+        echo "Error: Tickets file is not valid JSON" >&2
+        return 1
+    fi
+
+    # Check for required top-level fields.
+    if ! jq -e 'has("project")' "$file" > /dev/null 2>&1; then
+        echo "Error: Missing required field 'project' in tickets file" >&2
+        return 1
+    fi
+
+    if ! jq -e 'has("description")' "$file" > /dev/null 2>&1; then
+        echo "Error: Missing required field 'description' in tickets file" >&2
+        return 1
+    fi
+
+    if ! jq -e 'has("tickets")' "$file" > /dev/null 2>&1; then
+        echo "Error: Missing required field 'tickets' in tickets file" >&2
+        return 1
+    fi
+
+    # Check top-level field types and non-emptiness.
+    if ! jq -e '.project | type == "string" and length > 0' "$file" > /dev/null 2>&1; then
+        echo "Error: Field 'project' must be a non-empty string" >&2
+        return 1
+    fi
+
+    if ! jq -e '.description | type == "string" and length > 0' "$file" > /dev/null 2>&1; then
+        echo "Error: Field 'description' must be a non-empty string" >&2
+        return 1
+    fi
+
+    if ! jq -e '.tickets | type == "array"' "$file" > /dev/null 2>&1; then
+        echo "Error: Field 'tickets' must be an array" >&2
+        return 1
+    fi
+
+    # Check each ticket has required fields.
+    local ticket_count=$(jq '.tickets | length' "$file")
+    for ((idx = 0; idx < ticket_count; idx++)); do
+        local ticket_num=$((idx + 1))
+
+        # Check required fields exist (using has() to check presence, not truthiness).
+        if ! jq -e ".tickets[$idx] | has(\"id\")" "$file" > /dev/null 2>&1; then
+            echo "Error: Ticket #$ticket_num missing required field 'id'" >&2
+            return 1
+        fi
+
+        if ! jq -e ".tickets[$idx] | has(\"title\")" "$file" > /dev/null 2>&1; then
+            echo "Error: Ticket #$ticket_num missing required field 'title'" >&2
+            return 1
+        fi
+
+        if ! jq -e ".tickets[$idx] | has(\"description\")" "$file" > /dev/null 2>&1; then
+            echo "Error: Ticket #$ticket_num missing required field 'description'" >&2
+            return 1
+        fi
+
+        if ! jq -e ".tickets[$idx] | has(\"acceptanceCriteria\")" "$file" > /dev/null 2>&1; then
+            echo "Error: Ticket #$ticket_num missing required field 'acceptanceCriteria'" >&2
+            return 1
+        fi
+
+        if ! jq -e ".tickets[$idx] | has(\"notes\")" "$file" > /dev/null 2>&1; then
+            echo "Error: Ticket #$ticket_num missing required field 'notes'" >&2
+            return 1
+        fi
+
+        if ! jq -e ".tickets[$idx] | has(\"done\")" "$file" > /dev/null 2>&1; then
+            echo "Error: Ticket #$ticket_num missing required field 'done'" >&2
+            return 1
+        fi
+
+        # Validate field types and non-emptiness.
+        if ! jq -e ".tickets[$idx].id | type == \"number\"" "$file" > /dev/null 2>&1; then
+            echo "Error: Ticket #$ticket_num field 'id' must be a number" >&2
+            return 1
+        fi
+
+        if ! jq -e ".tickets[$idx].title | type == \"string\" and length > 0" "$file" > /dev/null 2>&1; then
+            echo "Error: Ticket #$ticket_num field 'title' must be a non-empty string" >&2
+            return 1
+        fi
+
+        if ! jq -e ".tickets[$idx].description | type == \"string\" and length > 0" "$file" > /dev/null 2>&1; then
+            echo "Error: Ticket #$ticket_num field 'description' must be a non-empty string" >&2
+            return 1
+        fi
+
+        if ! jq -e ".tickets[$idx].acceptanceCriteria | type == \"array\"" "$file" > /dev/null 2>&1; then
+            echo "Error: Ticket #$ticket_num field 'acceptanceCriteria' must be an array" >&2
+            return 1
+        fi
+
+        if ! jq -e ".tickets[$idx].notes | type == \"array\"" "$file" > /dev/null 2>&1; then
+            echo "Error: Ticket #$ticket_num field 'notes' must be an array" >&2
+            return 1
+        fi
+
+        if ! jq -e ".tickets[$idx].done | type == \"boolean\"" "$file" > /dev/null 2>&1; then
+            echo "Error: Ticket #$ticket_num field 'done' must be a boolean" >&2
+            return 1
+        fi
+
+        # Validate acceptanceCriteria contains only non-empty strings and is non-empty.
+        local criteria_count=$(jq ".tickets[$idx].acceptanceCriteria | length" "$file")
+        if [ "$criteria_count" -eq 0 ]; then
+            echo "Error: Ticket #$ticket_num must have at least one acceptanceCriteria" >&2
+            return 1
+        fi
+        for ((cidx = 0; cidx < criteria_count; cidx++)); do
+            if ! jq -e ".tickets[$idx].acceptanceCriteria[$cidx] | type == \"string\" and length > 0" "$file" > /dev/null 2>&1; then
+                echo "Error: Ticket #$ticket_num acceptanceCriteria[$cidx] must be a non-empty string" >&2
+                return 1
+            fi
+        done
+
+        # Validate notes contains only non-empty strings.
+        local notes_count=$(jq ".tickets[$idx].notes | length" "$file")
+        for ((nidx = 0; nidx < notes_count; nidx++)); do
+            if ! jq -e ".tickets[$idx].notes[$nidx] | type == \"string\" and length > 0" "$file" > /dev/null 2>&1; then
+                echo "Error: Ticket #$ticket_num notes[$nidx] must be a non-empty string" >&2
+                return 1
+            fi
+        done
+    done
+
+    # Validate ticket IDs are sequential starting from 1.
+    local expected_id=1
+    for ((idx = 0; idx < ticket_count; idx++)); do
+        local actual_id=$(jq ".tickets[$idx].id" "$file")
+        if [ "$actual_id" != "$expected_id" ]; then
+            echo "Error: Ticket IDs must be sequential starting from 1. Expected ID $expected_id but got $actual_id" >&2
+            return 1
+        fi
+        expected_id=$((expected_id + 1))
+    done
+
+    return 0
+}
+
+echo "Validating tickets file..."
+if ! validate_tickets_schema "$TICKETS_FILE"; then
+    echo "Tickets file schema validation failed" >&2
+    exit 1
+fi
+echo "Tickets file is valid!"
+
+# Exit early if only validating (exit 0 on success, 1 on failure).
+if [ "$VALIDATE_ONLY" = true ]; then
+    # Warn if max_iterations was provided but ignored.
+    if [ -n "$2" ]; then
+        echo "Warning: max_iterations argument ignored in validate mode" >&2
+    fi
+    exit 0
+fi
 
 # Check if wakepy is available.
 if ! command -v wakepy &> /dev/null; then
@@ -114,165 +314,6 @@ if ! command -v "$RALPH_CMD" &> /dev/null; then
 fi
 
 echo "Using '$RALPH_CMD' for Ralph" >&2
-
-# Get tickets file from first argument.
-TICKETS_FILE="$1"
-if [ -z "$TICKETS_FILE" ]; then
-    echo "Error: TICKETS_FILE argument is required" >&2
-    echo "Usage: ralph TICKETS_FILE [max_iterations]" >&2
-    exit 1
-fi
-
-# Validate tickets file extension.
-if [[ ! "$TICKETS_FILE" =~ \.tickets\.json$ ]]; then
-    echo "Error: Tickets file must end with .tickets.json" >&2
-    echo "Got: $TICKETS_FILE" >&2
-    exit 1
-fi
-
-# Check if tickets file exists.
-if [ ! -f "$TICKETS_FILE" ]; then
-    echo "Error: Tickets file not found at $TICKETS_FILE" >&2
-    exit 1
-fi
-
-# Validate tickets file schema.
-validate_tickets_schema() {
-    local file="$1"
-
-    # Check if file is valid JSON.
-    if ! jq empty "$file" 2> /dev/null; then
-        echo "Error: Tickets file is not valid JSON" >&2
-        return 1
-    fi
-
-    # Check for required top-level fields.
-    if ! jq -e '.project' "$file" > /dev/null 2>&1; then
-        echo "Error: Missing required field 'project' in tickets file" >&2
-        return 1
-    fi
-
-    if ! jq -e '.description' "$file" > /dev/null 2>&1; then
-        echo "Error: Missing required field 'description' in tickets file" >&2
-        return 1
-    fi
-
-    if ! jq -e '.tickets' "$file" > /dev/null 2>&1; then
-        echo "Error: Missing required field 'tickets' in tickets file" >&2
-        return 1
-    fi
-
-    # Check that tickets is an array.
-    if ! jq -e '.tickets | type == "array"' "$file" > /dev/null 2>&1; then
-        echo "Error: Field 'tickets' must be an array" >&2
-        return 1
-    fi
-
-    # Check each ticket has required fields.
-    local ticket_count=$(jq '.tickets | length' "$file")
-    for ((idx = 0; idx < ticket_count; idx++)); do
-        local ticket_num=$((idx + 1))
-
-        # Check required fields exist.
-        if ! jq -e ".tickets[$idx].id" "$file" > /dev/null 2>&1; then
-            echo "Error: Ticket #$ticket_num missing required field 'id'" >&2
-            return 1
-        fi
-
-        if ! jq -e ".tickets[$idx].title" "$file" > /dev/null 2>&1; then
-            echo "Error: Ticket #$ticket_num missing required field 'title'" >&2
-            return 1
-        fi
-
-        if ! jq -e ".tickets[$idx].description" "$file" > /dev/null 2>&1; then
-            echo "Error: Ticket #$ticket_num missing required field 'description'" >&2
-            return 1
-        fi
-
-        if ! jq -e ".tickets[$idx].acceptanceCriteria" "$file" > /dev/null 2>&1; then
-            echo "Error: Ticket #$ticket_num missing required field 'acceptanceCriteria'" >&2
-            return 1
-        fi
-
-        if ! jq -e ".tickets[$idx].notes" "$file" > /dev/null 2>&1; then
-            echo "Error: Ticket #$ticket_num missing required field 'notes'" >&2
-            return 1
-        fi
-
-        if ! jq -e ".tickets[$idx].done" "$file" > /dev/null 2>&1; then
-            echo "Error: Ticket #$ticket_num missing required field 'done'" >&2
-            return 1
-        fi
-
-        # Validate field types.
-        if ! jq -e ".tickets[$idx].id | type == \"number\"" "$file" > /dev/null 2>&1; then
-            echo "Error: Ticket #$ticket_num field 'id' must be a number" >&2
-            return 1
-        fi
-
-        if ! jq -e ".tickets[$idx].title | type == \"string\"" "$file" > /dev/null 2>&1; then
-            echo "Error: Ticket #$ticket_num field 'title' must be a string" >&2
-            return 1
-        fi
-
-        if ! jq -e ".tickets[$idx].description | type == \"string\"" "$file" > /dev/null 2>&1; then
-            echo "Error: Ticket #$ticket_num field 'description' must be a string" >&2
-            return 1
-        fi
-
-        if ! jq -e ".tickets[$idx].acceptanceCriteria | type == \"array\"" "$file" > /dev/null 2>&1; then
-            echo "Error: Ticket #$ticket_num field 'acceptanceCriteria' must be an array" >&2
-            return 1
-        fi
-
-        if ! jq -e ".tickets[$idx].notes | type == \"array\"" "$file" > /dev/null 2>&1; then
-            echo "Error: Ticket #$ticket_num field 'notes' must be an array" >&2
-            return 1
-        fi
-
-        if ! jq -e ".tickets[$idx].done | type == \"boolean\"" "$file" > /dev/null 2>&1; then
-            echo "Error: Ticket #$ticket_num field 'done' must be a boolean" >&2
-            return 1
-        fi
-
-        # Validate acceptanceCriteria contains only strings.
-        local criteria_count=$(jq ".tickets[$idx].acceptanceCriteria | length" "$file")
-        for ((cidx = 0; cidx < criteria_count; cidx++)); do
-            if ! jq -e ".tickets[$idx].acceptanceCriteria[$cidx] | type == \"string\"" "$file" > /dev/null 2>&1; then
-                echo "Error: Ticket #$ticket_num acceptanceCriteria[$cidx] must be a string" >&2
-                return 1
-            fi
-        done
-
-        # Validate notes contains only strings.
-        local notes_count=$(jq ".tickets[$idx].notes | length" "$file")
-        for ((nidx = 0; nidx < notes_count; nidx++)); do
-            if ! jq -e ".tickets[$idx].notes[$nidx] | type == \"string\"" "$file" > /dev/null 2>&1; then
-                echo "Error: Ticket #$ticket_num notes[$nidx] must be a string" >&2
-                return 1
-            fi
-        done
-    done
-
-    # Validate ticket IDs are sequential starting from 1.
-    local expected_id=1
-    for ((idx = 0; idx < ticket_count; idx++)); do
-        local actual_id=$(jq ".tickets[$idx].id" "$file")
-        if [ "$actual_id" != "$expected_id" ]; then
-            echo "Error: Ticket IDs must be sequential starting from 1. Expected ID $expected_id but got $actual_id" >&2
-            return 1
-        fi
-        expected_id=$((expected_id + 1))
-    done
-
-    return 0
-}
-
-echo "Validating tickets file..."
-if ! validate_tickets_schema "$TICKETS_FILE"; then
-    echo "Tickets file schema validation failed" >&2
-    exit 1
-fi
 
 # Get max iterations from second argument (default: 10).
 MAX_ITERATIONS=${2:-10}

@@ -36,6 +36,9 @@ Output the resulting JSON file to the same directory as the `plan_file` using
 the same filename as the `plan_file` but with the file extension
 `.tickets.json`.
 
+Once you create the file, run `bash ~/bin/ralph --validate plan_file` and fix
+any validation errors.
+
 ## Output Format
 
 ```json
