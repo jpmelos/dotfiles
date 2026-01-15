@@ -29,7 +29,7 @@ if ! command -v wakepy &> /dev/null; then
 fi
 
 # Start wakepy and store its PID.
-wakepy &
+wakepy &> /dev/null &
 WAKEPY_PID=$!
 
 # Set up trap to kill wakepy on script exit (normal or abnormal).
