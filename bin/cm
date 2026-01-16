@@ -109,7 +109,7 @@ if [ -z "${CLAUDE_CODE_API_KEY+x}" ]; then
             | jq -r ".fields[0].value"
     )
     CLAUDE_CODE_API_KEY=$(
-        toml get <(echo "$CLAUDE_CODE_SECRET") . | jq -r ".profile.$profile.api_key"
+        toml get <(echo "$CLAUDE_CODE_SECRET") . | jq -r ".profile.\"$profile\".api_key"
     )
     if [[ "$CLAUDE_CODE_API_KEY" == "null" ]]; then
         echo "Warning: no API key for profile '$profile', defaulting to 'jpmelos'" >&2

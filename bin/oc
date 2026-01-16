@@ -105,7 +105,7 @@ if [ -z "${OPENCODE_API_KEY+x}" ]; then
             | jq -r ".fields[0].value"
     )
     OPENCODE_API_KEY=$(
-        toml get <(echo "$OPENCODE_SECRET") . | jq -r ".profile.$profile.opencode_zen_api_key"
+        toml get <(echo "$OPENCODE_SECRET") . | jq -r ".profile.\"$profile\".opencode_zen_api_key"
     )
     if [[ "$OPENCODE_API_KEY" == "null" ]]; then
         echo "Warning: no OpenCode API key for profile '$profile', defaulting to 'jpmelos'" >&2
@@ -124,7 +124,7 @@ if [ -z "${CLAUDE_CODE_API_KEY+x}" ]; then
         )
     fi
     CLAUDE_CODE_API_KEY=$(
-        toml get <(echo "$OPENCODE_SECRET") . | jq -r ".profile.$profile.claude_code_api_key"
+        toml get <(echo "$OPENCODE_SECRET") . | jq -r ".profile.\"$profile\".claude_code_api_key"
     )
     if [[ "$CLAUDE_CODE_API_KEY" == "null" ]]; then
         echo "Warning: no API key for profile '$profile', defaulting to 'jpmelos'" >&2
