@@ -357,7 +357,7 @@ end
 
 function TelescopeLiveGrepArgs(additional_args)
     local additional_rg_args = { "--pcre2" }
-    vim.list_extend(
+    additional_rg_args = vim.list_extend(
         additional_rg_args,
         BuildSearchIgnoredFilesAdditionalArgs()
     )
@@ -371,7 +371,10 @@ function TelescopeLiveGrepArgs(additional_args)
             return { prompt = fuzzy }
         end,
     }
-    vim.tbl_extend("force", live_grep_args, additional_args)
+    if additional_args then
+        live_grep_args =
+            vim.tbl_extend("force", live_grep_args, additional_args)
+    end
 
     return live_grep_args
 end
@@ -380,6 +383,9 @@ function TelescopeGrepStringArgs(additional_args)
     local live_grep_args = {
         additional_args = BuildSearchIgnoredFilesAdditionalArgs(),
     }
-    vim.tbl_extend("force", live_grep_args, additional_args)
+    if additional_args then
+        live_grep_args =
+            vim.tbl_extend("force", live_grep_args, additional_args)
+    end
     return live_grep_args
 end

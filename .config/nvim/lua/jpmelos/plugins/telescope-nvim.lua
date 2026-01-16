@@ -110,7 +110,7 @@ return {
             end
 
             local live_grep_args = TelescopeLiveGrepArgs()
-            vim.tbl_extend(
+            live_grep_args = vim.tbl_extend(
                 "force",
                 live_grep_args,
                 { search_dirs = { node.absolute_path } }
