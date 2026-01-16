@@ -52,7 +52,7 @@ return {
                 substitutions = {},
             },
             attachments = {
-                img_folder = "01-assets/imgs",
+                folder = "01-assets/imgs",
                 img_name_func = function()
                     return string.format(
                         "%s-%s",
