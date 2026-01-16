@@ -73,7 +73,7 @@ return {
         --
         K("n", "<leader>ff", function()
             local find_command = { "rg", "--files", "--color=never" }
-            vim.list_extend(
+            find_command = vim.list_extend(
                 find_command,
                 BuildSearchIgnoredFilesAdditionalArgs()
             )
@@ -93,9 +93,13 @@ return {
             builtins.live_grep(TelescopeLiveGrepArgs())
         end, { desc = "Find in current directory" })
 
+        K("n", "<leader>fza", function()
+            builtins.live_grep(TelescopeLiveGrepArgs({ fuzzy = true }))
+        end, { desc = "Fuzzy find in current directory" })
+
         K("n", "<leader>fca", function()
             builtins.grep_string(TelescopeGrepStringArgs())
-        end, { desc = "Find in current directory" })
+        end, { desc = "Find string in current directory" })
 
         K("n", "<leader>fp", function()
             if vim.bo.filetype ~= "NvimTree" then
@@ -109,14 +113,28 @@ return {
                 return
             end
 
-            local live_grep_args = TelescopeLiveGrepArgs()
-            live_grep_args = vim.tbl_extend(
-                "force",
-                live_grep_args,
-                { search_dirs = { node.absolute_path } }
-            )
-            builtins.live_grep(live_grep_args)
-        end, { desc = "Find string in current path" })
+            builtins.live_grep(TelescopeLiveGrepArgs({
+                live_grep_args = { search_dirs = { node.absolute_path } },
+            }))
+        end, { desc = "Find in current path" })
+
+        K("n", "<leader>fzp", function()
+            if vim.bo.filetype ~= "NvimTree" then
+                vim.notify("This command only works in NvimTree.")
+                return
+            end
+
+            local node = tree_api.tree.get_node_under_cursor()
+            if node.type ~= "directory" then
+                vim.notify("This command only works on directories.")
+                return
+            end
+
+            builtins.live_grep(TelescopeLiveGrepArgs({
+                fuzzy = true,
+                live_grep_args = { search_dirs = { node.absolute_path } },
+            }))
+        end, { desc = "Fuzzy find in current path" })
 
         --
         -- Vim.

@@ -355,37 +355,46 @@ function BuildSearchIgnoredFilesAdditionalArgs()
     return additional_args
 end
 
-function TelescopeLiveGrepArgs(additional_args)
-    local additional_rg_args = { "--pcre2" }
-    additional_rg_args = vim.list_extend(
-        additional_rg_args,
+function TelescopeLiveGrepArgs(args)
+    args = args or {}
+    local live_grep_args =
+        vim.tbl_extend("force", {}, args.live_grep_args or {})
+
+    live_grep_args.additional_args =
+        vim.list_extend(live_grep_args.additional_args or {}, { "--pcre2" })
+    live_grep_args.additional_args = vim.list_extend(
+        live_grep_args.additional_args,
         BuildSearchIgnoredFilesAdditionalArgs()
     )
 
-    local live_grep_args = {
-        prompt_title = "Fuzzy Live Grep",
-        additional_args = additional_rg_args,
-        on_input_filter_cb = function(prompt)
-            -- Turn "abc" into "a.*b.*c".
-            local fuzzy = prompt:gsub(".", "%0.*")
-            return { prompt = fuzzy }
-        end,
-    }
-    if additional_args then
-        live_grep_args =
-            vim.tbl_extend("force", live_grep_args, additional_args)
+    if args.fuzzy then
+        live_grep_args.prompt_title = live_grep_args.prompt_title
+            or "Fuzzy Live Grep"
+        live_grep_args.on_input_filter_cb = function(prompt)
+            -- Escape special regex characters and insert .* between each
+            -- character.
+            local chars = {}
+            for char in prompt:gmatch(".") do
+                local escaped =
+                    char:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%1")
+                table.insert(chars, escaped)
+            end
+            return { prompt = table.concat(chars, ".*") }
+        end
     end
 
     return live_grep_args
 end
 
-function TelescopeGrepStringArgs(additional_args)
-    local live_grep_args = {
-        additional_args = BuildSearchIgnoredFilesAdditionalArgs(),
-    }
-    if additional_args then
-        live_grep_args =
-            vim.tbl_extend("force", live_grep_args, additional_args)
-    end
-    return live_grep_args
+function TelescopeGrepStringArgs(args)
+    args = args or {}
+    local grep_string_args =
+        vim.tbl_extend("force", {}, args.grep_string_args or {})
+
+    grep_string_args.additional_args = vim.list_extend(
+        grep_string_args.additional_args or {},
+        BuildSearchIgnoredFilesAdditionalArgs()
+    )
+
+    return grep_string_args
 end
