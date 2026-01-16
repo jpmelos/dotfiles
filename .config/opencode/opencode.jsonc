@@ -64,6 +64,7 @@
             "tail*": "allow",
             "cut*": "allow",
             "mkdir*": "allow",
+            "git branch --show-current": "allow",
             "git log*": "allow",
             "git show*": "allow",
             "git rev-list*": "allow",
