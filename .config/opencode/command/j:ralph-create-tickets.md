@@ -34,7 +34,8 @@ the project.
 
 Output the resulting JSON file to the same directory as the `plan_file` using
 the same filename as the `plan_file` but with the file extension
-`.tickets.json`.
+`.tickets.json`. For example, if the plan file is `feature-x.plan.md`, name the
+tickets file as `feature-x.tickets.json`.
 
 Once you create the file, run `bash ~/bin/ralph --validate plan_file` and fix
 any validation errors.

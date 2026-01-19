@@ -35,7 +35,9 @@ implementation of the feature or change described in `spec_file`.
 3. Generate a structured plan document based on all the information you
    gathered.
 4. Save the plan to a file in the same directory as the `spec_file` using the
-   same filename as the `spec_file` but with the file extension `.plan.md`.
+   same filename as the `spec_file` but with the file extension `.plan.md`. For
+   example, if the `spec_file` is named `feature-x.spec.md`, name the plan file
+   as `feature-x.plan.md`.
 
 **Important:** Do **not** implement anything. Just write the plan document.
 
