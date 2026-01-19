@@ -89,10 +89,12 @@ for this rule.
 
 ### Including Tests
 
-It is acceptable to implement tests for multiple tickets at once in a single
-separate ticket when the tickets are related and share similar test logic. For
-example, integration tests are better implemented in a single ticket towards
-the end of the plan rather than updated piecemeal for each ticket.
+When it is possible to write tests that completely test a commit that is small
+and self-contained, prefer it. However, it is acceptable to implement tests for
+multiple tickets at once in a single separate ticket as long as the tickets are
+related and share similar test logic. For example, integration tests are better
+implemented in a single ticket towards the end of the plan rather than updated
+piecemeal for each ticket.
 
 ### Tickets that are too big
 
