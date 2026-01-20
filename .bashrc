@@ -652,3 +652,63 @@ loop() {
         sleep 1
     done
 }
+
+# Print full (absolute) path of a file.
+pf() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: pf <file>"
+        return 1
+    fi
+
+    if [ ! -e "$1" ]; then
+        echo "Error: '$1' does not exist" >&2
+        return 1
+    fi
+
+    # Get the absolute path.
+    if [ -d "$1" ]; then
+        (cd "$1" && pwd)
+    else
+        echo "$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
+    fi
+}
+
+# Print relative path of a file from the current directory.
+pr() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: pr <file>"
+        return 1
+    fi
+
+    if [ ! -e "$1" ]; then
+        echo "Error: '$1' does not exist" >&2
+        return 1
+    fi
+
+    # Get the absolute path first.
+    local abs_path
+    if [ -d "$1" ]; then
+        abs_path=$(cd "$1" && pwd)
+    else
+        abs_path="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
+    fi
+
+    # Get the current directory.
+    local current_dir=$(pwd)
+
+    # Check if the file is a descendent of the current directory.
+    case "$abs_path" in
+        "$current_dir"/*)
+            # Remove the current directory prefix and leading slash.
+            echo "${abs_path#$current_dir/}"
+            ;;
+        "$current_dir")
+            # The file is the current directory itself.
+            echo "."
+            ;;
+        *)
+            echo "Error: '$1' is not a descendent of the current directory" >&2
+            return 1
+            ;;
+    esac
+}
