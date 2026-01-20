@@ -88,7 +88,8 @@ important learnings. As an example:
 ```
 
 Only add patterns that are **general and reusable**, not ticket-specific
-details.
+details. This section must be placed **at the top of the progress log file**,
+right after the header section.
 
 ### Permissions Denied
 
@@ -129,7 +130,7 @@ accessing a URL, include the exact URL you tried to use. As examples:
 ## Important
 
 - Read the progress log file before starting, **especially** the "Codebase
-  Patterns" section.
+  Patterns" section at the top.
 - Work on **one** ticket.
 - Keep all quality checks and tests green at all times.
 - Commit to Git if the task was completed.
