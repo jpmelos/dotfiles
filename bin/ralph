@@ -373,6 +373,45 @@ format_duration() {
     echo "$result"
 }
 
+# Function to handle state file commit mismatch.
+# Modifies: TOTAL_COST, TOTAL_DURATION, START_ITERATION, SAVED_COMMIT.
+# Exits with code 1 if user chooses to abort.
+handle_state_commit_mismatch() {
+    local saved_commit=$1
+    local current_commit=$2
+
+    echo "Error: Repository state has changed since last run" >&2
+    echo "Expected commit: $saved_commit" >&2
+    echo "Current commit: $current_commit" >&2
+    echo "" >&2
+    echo "What would you like to do?" >&2
+    echo "  1. Delete the state file and start from scratch" >&2
+    echo "  2. Override the commit SHA to the current value and continue" >&2
+    echo "  3. Abort" >&2
+    read -p "Enter your choice [1-3]: " choice
+    case "$choice" in
+        1)
+            echo "Deleting state file and starting from scratch..." >&2
+            rm -f "$STATE_FILE"
+            TOTAL_COST=0
+            TOTAL_DURATION=0
+            START_ITERATION=1
+            ;;
+        2)
+            echo "Overriding commit SHA to current value and continuing..." >&2
+            SAVED_COMMIT="$current_commit"
+            ;;
+        3)
+            echo "Aborting." >&2
+            exit 1
+            ;;
+        *)
+            echo "Invalid choice. Aborting." >&2
+            exit 1
+            ;;
+    esac
+}
+
 log "Starting Ralph"
 log "Max iterations: $MAX_ITERATIONS"
 
@@ -409,11 +448,7 @@ if [ -f "$STATE_FILE" ]; then
     # Verify that the current HEAD matches the saved commit.
     CURRENT_COMMIT=$(git rev-parse HEAD)
     if [ -n "$SAVED_COMMIT" ] && [ "$SAVED_COMMIT" != "$CURRENT_COMMIT" ]; then
-        echo "Error: Repository state has changed since last run" >&2
-        echo "Expected commit: $SAVED_COMMIT" >&2
-        echo "Current commit:  $CURRENT_COMMIT" >&2
-        echo "Please reset to the expected commit or remove the state file to start fresh." >&2
-        exit 1
+        handle_state_commit_mismatch "$SAVED_COMMIT" "$CURRENT_COMMIT"
     fi
 
     START_ITERATION=$((LAST_COMPLETED_ITERATION + 1))
@@ -501,8 +536,6 @@ for i in $(seq "$START_ITERATION" "$MAX_ITERATIONS"); do
         log "Total cost: \$$(round_up_cents "$TOTAL_COST")"
         log "Total duration: $(format_duration "$TOTAL_DURATION")"
 
-        # Clear state file on successful completion.
-        rm -f "$STATE_FILE"
         exit 0
     fi
 done
