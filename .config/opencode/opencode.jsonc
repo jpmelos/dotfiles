@@ -4,8 +4,7 @@
         "opencode",
         "anthropic"
     ],
-    // "model": "opencode/gemini-3-pro",
-    "model": "anthropic/claude-sonnet-4-5",
+    "model": "opencode/gemini-3-pro",
     "provider": {
         "opencode": {
             "options": {
