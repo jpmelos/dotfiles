@@ -89,8 +89,9 @@ alias l='ls -FhAls'
 # Search history.
 alias h="history | grep"
 
-# Search running processes.
-alias p="ps aux | grep"
+# Copy and paste shortcuts.
+alias c="pbcopy"
+alias p="pbpaste"
 
 # Find out what is taking so much space on your drives!
 alias diskspace="du -S | sort -n -r | more"
