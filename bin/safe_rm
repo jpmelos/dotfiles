@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+#/ safe_rm - Restricted rm that only operates within current directory
+#/
+#/ Usage:
+#/   safe_rm [OPTIONS] -- FILES...
+#/
+#/ Examples:
+#/   safe_rm -rf -- file1.txt file2.txt     # OK: inside cwd
+#/   safe_rm -rf -- subdir/                 # OK: inside cwd
+#/   safe_rm -rf -- subdir/file.txt         # OK: inside cwd
+#/   safe_rm -rf -- ../outside              # ERROR: outside cwd
+#/   safe_rm -rf -- /tmp/file               # ERROR: absolute path
+#/   safe_rm -rf -- ~/file                  # ERROR: ~ expands to absolute
+#/   ln -s /etc bad; safe_rm -- bad/passwd  # ERROR: target outside cwd
+#/
+#/ All rm options must come before --, all file paths after it. Only files
+#/ within the current directory can be deleted.
+#/
+#/ Security Note:
+#/   There is a small time window between validation and deletion where files
+#/   could be modified. Use in trusted environments only.
+
+if [ "$#" -gt 0 ] && { [ "$1" = "--help" ] || [ "$1" = "-h" ]; }; then
+    grep '^#/' "${BASH_SOURCE[0]}" | sed 's/^#\/ \{0,1\}//'
+    exit 0
+fi
+
+if [ "$#" -eq 0 ]; then
+    echo "safe_rm: arguments required" >&2
+    exit 1
+fi
+
+# Find position of --
+sep_index=-1
+i=0
+for arg in "$@"; do
+    if [ "$arg" = "--" ]; then
+        sep_index=$i
+        break
+    fi
+    i=$((i + 1))
+done
+
+if [ "$sep_index" -lt 0 ]; then
+    echo "safe_rm: missing -- separator" >&2
+    exit 1
+fi
+
+# Check that there are files after --
+if [ "$sep_index" -eq $(("$#" - 1)) ]; then
+    echo "safe_rm: no files specified after --" >&2
+    exit 1
+fi
+
+# Everything before -- must start with -
+i=0
+for arg in "$@"; do
+    if [ "$i" -eq "$sep_index" ]; then
+        break
+    fi
+
+    case "$arg" in
+        -*) ;;
+        *)
+            echo "safe_rm: non-flag before --: $arg" >&2
+            exit 1
+            ;;
+    esac
+    i=$((i + 1))
+done
+
+cwd="$(pwd -P)"
+
+is_inside_cwd() {
+    case "$1" in
+        "$cwd"/*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+validate_path() {
+    local arg="$1"
+
+    # Check for trailing slash before normalization
+    local has_trailing_slash=0
+    case "$arg" in
+        */) has_trailing_slash=1 ;;
+    esac
+
+    # Remove trailing slashes but preserve "/" and ".".
+    local arg_normalized="$arg"
+    while [ "${arg_normalized%/}" != "$arg_normalized" ] && [ "$arg_normalized" != "/" ]; do
+        arg_normalized="${arg_normalized%/}"
+    done
+    [ -z "$arg_normalized" ] && arg_normalized="."
+
+    # Use bash native string operations instead of dirname/basename.
+    local base="${arg_normalized##*/}"
+    local dir="${arg_normalized%/*}"
+    [ "$dir" = "$arg_normalized" ] && dir="."
+    [ -z "$dir" ] && dir="/"
+
+    # Resolve the physical directory path.
+    local phys_dir
+    if ! phys_dir=$(cd -P -- "$dir" 2>&1 && pwd -P); then
+        echo "safe_rm: cannot resolve directory: $dir (from $arg)" >&2
+        return 1
+    fi
+
+    local phys_path
+    if [ "$phys_dir" = "/" ]; then
+        phys_path="/$base"
+    else
+        phys_path="$phys_dir/$base"
+    fi
+
+    # Handle symlinks specially.
+    if [ -L "$arg_normalized" ]; then
+        if [ "$has_trailing_slash" -eq 1 ]; then
+            local target_dir
+            if target_dir=$(cd -P -- "$arg_normalized" 2>/dev/null && pwd -P); then
+                if ! is_inside_cwd "$target_dir"; then
+                    echo "safe_rm: trailing slash on symlink is unsafe (target outside cwd): $arg" >&2
+                    return 1
+                fi
+            else
+                echo "safe_rm: trailing slash on symlink is unsafe (target may be outside cwd): $arg" >&2
+                return 1
+            fi
+        fi
+        # Symlinks without trailing slash are safe to delete (only the link is removed).
+    fi
+
+    # Check if the resolved path is inside cwd.
+    if ! is_inside_cwd "$phys_path"; then
+        echo "safe_rm: refusing outside cwd: $arg" >&2
+        return 1
+    fi
+
+    return 0
+}
+
+# Validate everything after --.
+i=0
+for arg in "$@"; do
+    if [ "$i" -le "$sep_index" ]; then
+        i=$((i + 1))
+        continue
+    fi
+
+    if ! validate_path "$arg"; then
+        exit 1
+    fi
+
+    i=$((i + 1))
+done
+
+# Ensure we're calling the real rm command, not an alias or function.
+if ! rm_cmd=$(command -v rm); then
+    echo "safe_rm: cannot find rm command" >&2
+    exit 1
+fi
+
+# All checks passed — delegate exactly as given.
+exec "$rm_cmd" "$@"

@@ -17,6 +17,7 @@
             "Bash(tail:*)",
             "Bash(cut:*)",
             "Bash(mkdir:*)",
+            "Bash(safe_rm:*)",
             "Bash(git branch --show-current)",
             "Bash(git log:*)",
             "Bash(git show:*)",
