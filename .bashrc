@@ -162,10 +162,13 @@ alias gb='g b'
 alias gbr='g br'
 alias gbn='g bn'
 alias gbd='g bd'
+alias gbD='g bD'
 __git_complete gb git_branch
 __git_complete gbr git_branch
 __git_complete gbn git_checkout
 __git_complete gbd git_branch
+# gbD doesn't use additional arguments.
+# __git_complete gbD git_branch
 
 alias gc='g c'
 alias gca='g ca'
