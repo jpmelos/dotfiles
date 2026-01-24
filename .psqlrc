@@ -1,4 +1,4 @@
 \echo 'Expanded view with \\x.'
 \echo 'Edit queries in an editor with \\e.'
-\pset null '<j[NULL]>'
+\pset null '¤'
 \echo ''
