@@ -46,9 +46,6 @@
         }
     },
     "default_agent": "build",
-    "tui": {
-        "diff_style": "stacked"
-    },
     "permission": {
         "*": "deny",
         "read": "allow",
