@@ -40,6 +40,7 @@
             "Bash(gh release list:*)",
             "Bash(gh release view:*)",
             "Bash(whois:*)",
+            "Bash(which:*)",
             "Bash(python -m py_compile:*)",
             "Bash(python3 -m py_compile:*)",
             "Bash(cargo check:*)",
