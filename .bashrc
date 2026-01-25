@@ -90,7 +90,11 @@ alias l='ls -FhAls'
 alias h="history | grep"
 
 # Copy and paste shortcuts.
-alias c="pbcopy"
+# Strictly, c is not an alias, but it's just a very thin wrapper around
+# `pbcopy` to make it trim leading and trailing whitespaces from the input.
+c() {
+    perl -0777 -pe 's/^\s+|\s+$//g' | pbcopy
+}
 alias p="pbpaste"
 
 # Find out what is taking so much space on your drives!
