@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
 # This script manages OpenCode configuration and execution.
 # When called with --env, it outputs export commands to be eval'd.
@@ -116,7 +116,7 @@ if [ -z "${OPENCODE_API_KEY+x}" ]; then
 fi
 
 if [ -z "${CLAUDE_CODE_API_KEY+x}" ]; then
-    if [[ -z "$OPENCODE_SECRET" ]]; then
+    if [[ -z "${OPENCODE_SECRET:-}" ]]; then
         OPENCODE_SECRET=$(
             op item get "OpenCode Configuration" \
                 --vault "Private" --format json \

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
 # This script manages Claude Code configuration and execution.
 # When called with --env, it outputs export commands to be eval'd.

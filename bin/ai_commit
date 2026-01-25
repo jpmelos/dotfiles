@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# This is a commit command that AI agents can run safely.
+# Run it like `ai_commit This is the commit message.`
+
+if [ $# -eq 0 ]; then
+    echo "Error: Commit message is required" >&2
+    exit 1
+fi
+
+git add -A :/
+git commit --no-gpg-sign -m "$*"

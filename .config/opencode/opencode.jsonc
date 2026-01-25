@@ -46,13 +46,17 @@
     "permission": {
         "*": "deny",
         "read": "allow",
-        "edit": "allow",
+        "edit": {
+            "*": "allow",
+            "jpenv-bin/*": "deny"
+        },
         "glob": "allow",
         "grep": "allow",
         "list": "allow",
         "bash": {
             "true": "allow",
             "false": "allow",
+            "date*": "allow",
             "echo*": "allow",
             "ls*": "allow",
             "grep*": "allow",
@@ -85,10 +89,10 @@
             "cargo check*": "allow",
             "cargo clippy*": "allow",
             "bash ~/.config/opencode/command/review-prompt.sh": "allow",
-            "bash ~/bin/ralph --validate*": "allow",
+            "ralph --validate*": "allow",
+            "ai_commit*": "allow",
             "bash jpenv-bin/lint.bash*": "allow",
-            "bash jpenv-bin/tests.bash*": "allow",
-            "bash jpenv-bin/commit.bash*": "allow"
+            "bash jpenv-bin/tests.bash*": "allow"
         },
         "task": "allow",
         "skill": "allow",

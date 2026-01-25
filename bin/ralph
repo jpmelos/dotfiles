@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
 #/ Ralph - Long-running AI agent loop
 #/
@@ -260,8 +260,8 @@ RALPH_CMD=""
 has_claude_key=false
 has_opencode_key=false
 
-[ -n "$CLAUDE_CODE_API_KEY" ] && has_claude_key=true
-[ -n "$OPENCODE_API_KEY" ] && has_opencode_key=true
+[ -n "${CLAUDE_CODE_API_KEY:-}" ] && has_claude_key=true
+[ -n "${OPENCODE_API_KEY:-}" ] && has_opencode_key=true
 
 if [ "$has_claude_key" = true ] && [ "$has_opencode_key" = true ]; then
     # Both are defined, ask user which to use.

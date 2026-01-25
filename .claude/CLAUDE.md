@@ -34,12 +34,12 @@
       of that. *Do not* call `bash` with the full path to the script. The
       command exactly as specified before is what is allowed.
 - If you need to create a commit, always run
-  `bash jpenv-bin/commit.bash Commit message goes here`. Do not try to call
-  `git commit` directly.
+  `ai_commit Commit message goes here`. Do not try to call `git commit`
+  directly.
   - Do not add any files to the staging area (`git add`) or anything like that.
-    Once you're happy with the changes that you've made, just call
-    `bash jpenv-bin/commit.bash` and that script will take care of everything
-    to include all your changes in the commit.
+    Once you're happy with the changes that you've made, just call `ai_commit`
+    and that will take care of everything to include all your changes in the
+    commit.
   - If the script doesn't exist, just assume that you are not allowed to create
     commits for the project.
 - When you need to delete files, use `safe_rm`.

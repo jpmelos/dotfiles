@@ -44,10 +44,10 @@ $WORKTREE_STATUS
 06. Run all relevant quality checks and tests using `bash jpenv-bin/lint.bash`
     and `bash jpenv-bin/tests.bash`.
 07. If the ticket is complete, commit your changes to Git using
-    `bash jpenv-bin/commit.bash Ticket [Ticket ID] - [Change Title]`. Do
-    **not** prepend the ticket ID with `#`. Zero-pad the ticket ID to 2 digits.
-    You **must** commit your changes before proceeding to the next step, unless
-    you have not been able to complete the current ticket.
+    `ai_commit Ticket [Ticket ID] - [Change Title]`. Do **not** prepend the
+    ticket ID with `#`. Zero-pad the ticket ID to 2 digits. You **must** commit
+    your changes before proceeding to the next step, unless you have not been
+    able to complete the current ticket.
 08. **Append** your progress report to the progress log (see detailed
     instructions below).
 09. **If, and only if, you have completely implemented the changes required by

@@ -1,12 +1,16 @@
 {
     "apiKeyHelper": "~/.claude/api-key-helper.sh",
     "permissions": {
+        "deny": [
+            "Edit(jpenv-bin/**)"
+        ],
         "allow": [
             "Read",
             "Write",
             "Edit",
             "Bash(true)",
             "Bash(false)",
+            "Bash(date)",
             "Bash(echo:*)",
             "Bash(ls:*)",
             "Bash(grep:*)",
@@ -40,10 +44,10 @@
             "Bash(cargo clippy:*)",
             "WebFetch(domain:docs.rs)",
             "Bash(bash ~/.claude/commands/review-prompt.sh)",
-            "Bash(bash ~/bin/ralph --validate:*)",
+            "Bash(ralph --validate:*)",
+            "Bash(ai_commit:*)",
             "Bash(bash jpenv-bin/lint.bash:*)",
-            "Bash(bash jpenv-bin/tests.bash:*)",
-            "Bash(bash jpenv-bin/commit.bash:*)"
+            "Bash(bash jpenv-bin/tests.bash:*)"
         ],
         "defaultMode": "dontAsk"
     },

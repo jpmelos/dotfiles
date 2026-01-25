@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
 #/ Send a Telegram notification, optionally running a command first.
 #/
