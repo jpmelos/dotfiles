@@ -1,0 +1,9 @@
+{
+  "sidebar": "hide",
+  "thinking_visibility": false,
+  "timestamps": "hide",
+  "tool_details_visibility": true,
+  "assistant_metadata_visibility": true,
+  "scrollbar_visible": false,
+  "animations_enabled": true
+}
