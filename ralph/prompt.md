@@ -14,38 +14,53 @@ $ARGUMENTS
 
 Parse the following information from the arguments:
 
-- **`tickets_file`**: The JSON file containing ticket information.
+- **`tickets_file`:** The JSON file containing ticket information.
+
+Status of the worktree:
+
+```
+$WORKTREE_STATUS
+```
 
 ## Your Task
 
 01. Read the tickets from `tickets_file`.
 02. Read the progress log (see instructions below, check the "Codebase
     Patterns" section first).
-03. Pick the **highest priority** ticket from the tickets file where
-    `done: false` whose dependencies are all done. This is not always
-    necessarily the first ticket with `done: false`. Use your best judgement.
-04. Implement **only** that single ticket. Do not implement multiple tickets.
-    Do not implement any additional features or changes beyond what is required
-    for the ticket. Keep the changes focused.
+03. Pick the **highest priority** ticket from the tickets file which is not
+    done whose dependencies are all done. This is not always necessarily the
+    first pending ticket in the list. Use your best judgement.
+    1. Consider the current status of the worktree. There may already be work
+       related to a specific ticket in progress. In that case, you should
+       prefer to pick that ticket. If you decide you can't take that ticket yet
+       because of pending dependencies, then you must clean the worktree before
+       choosing another ticket.
+04. Implement **only** the one ticket that you picked. Do not implement
+    multiple tickets. Do not implement any additional changes beyond what is
+    required for the ticket. Keep the changes focused.
 05. Write new tests as needed. Update existing tests as needed. Delete tests
-    that became obsolete or irrelevant. Aim for 100% test coverage.
+    that became obsolete or irrelevant. Aim for 100% test coverage for the
+    change being implemented.
 06. Run all relevant quality checks and tests using `bash jpenv-bin/lint.bash`
     and `bash jpenv-bin/tests.bash`.
-07. Commit your changes to Git using
+07. If the ticket is complete, commit your changes to Git using
     `bash jpenv-bin/commit.bash Ticket [Ticket ID] - [Change Title]`. Do
     **not** prepend the ticket ID with `#`. Zero-pad the ticket ID to 2 digits.
-    You **must** commit your changes before proceeding to the next step.
+    You **must** commit your changes before proceeding to the next step, unless
+    you have not been able to complete the current ticket.
 08. **Append** your progress report to the progress log (see detailed
     instructions below).
-09. Update the tickets file to set `done: true` for the completed ticket. Do
-    **not** mark the ticket as done unless all the steps above are complete.
+09. **If, and only if, you have completely implemented the changes required by
+    the ticket and all the steps above,** update the tickets file to set
+    `done: true` for the completed ticket.
 10. Write a summary of what you did.
 11. You are done, stop.
 
 ## Progress Log
 
 The progress log is a file with the same filename as `tickets_file`, but ends
-with `.progress.md` instead of `tickets.json`.
+with `.progress.md` instead of `tickets.json`. For example, the progress log
+for `feature-x.tickets.json` is named `feature-x.progress.md`.
 
 At the start of each ticket, read the progress log, and pay close attention to
 the "Codebase Patterns" section at the top. This file may not exist yet if this
@@ -94,22 +109,23 @@ right after the header section.
 ### Permissions Denied
 
 If you requested permissions during the iteration and they were denied, add
-them to the "Permission Issues" section at the **top** of the progress log file
-(create it if it doesn't exist). If the permission is related to running a
-command, include the exact command. If it's related to searching or otherwise
-accessing a URL, include the exact URL you tried to use. As examples:
+them to the "Permission Denied" section at the **top** of the progress log file
+(immediately below the "Codebase Patterns" section, create it if it doesn't
+exist yet). Include an explanation about why you needed the permission. If the
+permission is related to running a command, include the exact command. If it's
+related to searching or otherwise accessing a URL, include the exact URL you
+tried to use. As examples:
 
 ```
 ## Permissions Denied
-
-- `echo "Some message"`: Running `echo` was denied.
-- Search `docs.python.org`: Tried to search the Python documentation, but was
-  denied.
+- `echo "Some message"`: Tried to print a report about X.
+- Search `docs.python.org`: Tried to search the Python documentation to
+  understand how `sorted` works.
 ```
 
 ## Quality Requirements
 
-- All commits must pass your project's quality checks and tests.
+- All commits must pass the project's quality checks and tests.
   - Run quality checks and tests with:
     - `bash jpenv-bin/lint.bash`
     - `bash jpenv-bin/tests.bash`
@@ -131,7 +147,7 @@ accessing a URL, include the exact URL you tried to use. As examples:
 
 - Read the progress log file before starting, **especially** the "Codebase
   Patterns" section at the top.
-- Work on **one** ticket.
+- Work on **only one** ticket.
 - Keep all quality checks and tests green at all times.
-- Commit to Git if the task was completed.
+- Commit to Git if, and only if, the ticket was completed.
 - Update the progress log file and the tickets file.

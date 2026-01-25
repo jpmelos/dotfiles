@@ -1,6 +1,6 @@
 ---
-description: Convert a feature or change plan into tickets.
-argument-hint: plan_file=PLAN_FILE tokens_per_ticket=TOKENS_PER_TICKET
+description: Convert a code change plan into tickets.
+argument-hint: plan_file=PLAN_FILE tokens_per_ticket?=TOKENS_PER_TICKET
 ---
 
 ## Important Context Information
@@ -13,9 +13,9 @@ $ARGUMENTS
 
 Parse the following information from the arguments:
 
-- `plan_file`: The Markdown file containing the plan to convert.
-- `tokens_per_ticket`: (Optional.) The maximum number of tokens per ticket.
-  Default to 150,000.
+- **`plan_file`:** The Markdown file containing the plan to convert.
+- **`tokens_per_ticket`:** (Optional.) The estimated maximum number of tokens
+  each ticket can take to be implemented by an AI agent. Default to 150,000.
 
 ## The Task
 
@@ -25,8 +25,8 @@ Take the plan in `plan_file` and convert it into tickets in a JSON file
 Study the project and the plan to understand the relevant aspects specific to
 the project.
 
-- For example, if you're going to create or change a REST API, make sure to
-  understand how REST APIs work in the project.
+- For example, if you're going to work on a REST API, make sure to understand
+  how REST APIs work in the project.
 - Make sure you understand all project-specific terms and jargons. If you see
   terms whose meaning depend on the project, like "service layer", make sure
   you understand them completely before planning.
@@ -77,9 +77,9 @@ An AI agent with a context window of `tokens_per_ticket` tokens will be
 processing one ticket per session with no memory of previous work. If a ticket
 is too big, the AI agent will run out of context window before finishing and
 may produce lower quality results. If a ticket is too small, the AI agent will
-waste tokens on overhead and setup, reducing overall efficiency. The tickets
-described in the `plan_file` can be split or merged as necessary to optimize
-for this rule.
+waste tokens on overhead and setup, reducing overall efficiency. Size tickets
+to optimize for a balance of quality and cost. The tickets described in the
+`plan_file` can be split or merged as necessary to optimize for this rule.
 
 ### Examples of right-sized tickets
 
@@ -91,15 +91,17 @@ for this rule.
 ### Including Tests
 
 When it is possible to write tests that completely test a commit that is small
-and self-contained, prefer it. However, it is acceptable to implement tests for
-multiple tickets at once in a single separate ticket as long as the tickets are
-related and share similar test logic. For example, integration tests are better
-implemented in a single ticket towards the end of the plan rather than updated
-piecemeal for each ticket.
+and self-contained, prefer to do this.
+
+However, it is acceptable to implement tests for multiple tickets at once in a
+single separate ticket as long as many tickets are related and share similar
+test logic. For example, integration tests are better implemented in a single
+ticket towards the end of the plan rather than updated piecemeal for each
+ticket.
 
 ### Tickets that are too big
 
-These tickets need to be split out:
+Big tickets need to be split out. For example:
 
 - Add authentication.
   - Split into: schema updates and tests, middleware updates and tests, login
@@ -145,7 +147,7 @@ suite and linting tools.
 
 ## Conversion Rules
 
-1. **Each ticket becomes one JSON entry.**
+1. **Each ticket becomes exactly one JSON entry.**
 2. **IDs**: Numeric, monotonically increasing by 1, and starting from 1.
 3. **All tickets**: `done: false` and `notes: []` (empty array). The `notes`
    field is for a human to add context for the AI agent as necessary.

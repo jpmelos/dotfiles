@@ -469,7 +469,11 @@ for i in $(seq "$START_ITERATION" "$MAX_ITERATIONS"); do
     log "Started: $(date "+%Y-%m-%d %H:%M:%S")"
     log ""
 
-    PROMPT=$(cat "$HOME/ralph/prompt.md" | sed "s|\$ARGUMENTS|tickets_file=$TICKETS_FILE|g")
+    WORKTREE_STATUS=$(git status)
+    PROMPT=$(<"$HOME/ralph/prompt.md")
+    PROMPT=${PROMPT//\$ARGUMENTS/tickets_file=$TICKETS_FILE}
+    PROMPT=${PROMPT//\$WORKTREE_STATUS/$WORKTREE_STATUS}
+
     OUTPUT=$(echo "$PROMPT" | "$RALPH_CMD" -p --raw-output)
 
     # Extract result and metrics from JSON output.
