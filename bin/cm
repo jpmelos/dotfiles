@@ -2,35 +2,82 @@
 set -euo pipefail
 trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND"' ERR
 
-# This script manages Claude Code configuration and execution.
-# When called with --env, it outputs export commands to be eval'd.
-# Otherwise, it runs claude directly.
+#/ Run Claude Code inside a Docker container.
+#/
+#/ Usage: cm [options] [profile]
+#/ Options:
+#/   --print, -p       Activate Claude's print mode
+#/   --raw-output      Output raw JSON (only with --print)
+#/   --force-rebuild   Force rebuild of Docker image
+#/   --claude-help     Show Claude help
+#/   --help            Show this help
 
-devel_dir="$HOME/devel"
-current_dir="$(pwd)"
+# Check for bash.
+if [ -z "${BASH_VERSION:-}" ]; then
+    echo "Error: This script requires bash" >&2
+    exit 1
+fi
+
+if ! command -v docker &> /dev/null; then
+    echo "Error: Docker is not installed" >&2
+    exit 1
+fi
+
+if ! docker info &> /dev/null; then
+    echo "Error: Docker daemon is not running" >&2
+    exit 1
+fi
+
+if ! command -v bc &> /dev/null; then
+    echo "Error: bc is not installed" >&2
+    exit 1
+fi
+
+if ! command -v toml &> /dev/null; then
+    echo "Error: toml-cli is not installed" >&2
+    exit 1
+fi
+
+if ! command -v jq &> /dev/null; then
+    echo "Error: jq is not installed" >&2
+    exit 1
+fi
+
+if ! command -v realpath &> /dev/null; then
+    echo "Error: realpath is not installed" >&2
+    exit 1
+fi
+
+devel_dir="$(realpath "$HOME/devel")"
+if [[ ! -d "$devel_dir" ]]; then
+    echo "Error: $HOME/devel does not exist" >&2
+    exit 1
+fi
+
+current_dir="$(realpath "$(pwd)")"
 if [[ "$current_dir" != "$devel_dir"* ]]; then
     echo "Error: not inside ~/devel" >&2
     exit 1
 fi
 
 project_relative_dir="${current_dir#"$devel_dir"/}"
+if [[ -z "$project_relative_dir" ]]; then
+    echo "Error: Cannot run from ~/devel root, must be in a subdirectory" >&2
+    exit 1
+fi
 
-env_only=false
 show_help=false
+show_claude_help=false
 print_mode=false
 raw_output=false
+force_rebuild=false
 profile=""
 claude_args=()
 
-unknown_args=()
 for arg in "$@"; do
     case "$arg" in
-        --env)
-            env_only=true
-            ;;
         --claude-help)
-            claude --help
-            exit 0
+            show_claude_help=true
             ;;
         --help)
             show_help=true
@@ -38,60 +85,180 @@ for arg in "$@"; do
         --print | -p)
             if [[ "$print_mode" == "false" ]]; then
                 print_mode=true
-                claude_args+=("--print" "--output-format" "json")
             fi
             ;;
         --raw-output)
             raw_output=true
             ;;
+        --force-rebuild)
+            force_rebuild=true
+            ;;
         -*)
-            unknown_args+=("$arg")
+            claude_args+=("$arg")
             ;;
         *)
             if [[ -z "$profile" && "$arg" != "" ]]; then
                 profile="$arg"
             else
-                unknown_args+=("$arg")
+                claude_args+=("$arg")
             fi
             ;;
     esac
 done
 
-if [ ${#unknown_args[@]} -gt 0 ]; then
-    echo "Error: Unrecognized arguments: ${unknown_args[*]}" >&2
-    echo "Run 'cm --help' for usage information" >&2
-    exit 1
+if [[ "$raw_output" == "true" && "$print_mode" == "false" ]]; then
+    echo "Warning: --raw-output has no effect without --print" >&2
 fi
 
 if [[ "$show_help" == "true" ]]; then
-    echo "Usage: cm [options] [profile]"
-    echo "Options:"
-    echo "  --env          Only export environment variables, don't run Claude"
-    echo "  --print, -p    Activate Claude's print mode"
-    echo "  --raw-output   Output raw JSON (only with --print)"
-    echo "  --claude-help  Show Claude help"
-    echo "  --help         Show this help"
+    grep '^#/' "${BASH_SOURCE[0]}" | cut -c4-
     exit 0
 fi
 
-last_update_file="$HOME/.claude/.last-update"
-today=$(date +%Y-%m-%d)
+username="$(whoami)"
 
-update_claude() {
-    echo "Updating Claude Code..." >&2
-    npm install -g @anthropic-ai/claude-code
-    echo "$today" > "$last_update_file"
+build_image() {
+    local today="$1"
+    local last_build_file="$2"
 
+    echo "Building Docker image..." >&2
+    if docker build \
+        -f "$devel_dir/dotfiles/references/Dockerfile.claude" \
+        --build-arg USERNAME="$username" \
+        --build-arg BUILD_DATE="$today" \
+        -t "$username-claude:latest" \
+        "$devel_dir/dotfiles" >&2; then
+        echo "$today" > "$last_build_file"
+        # Clean up dangling images.
+        if ! docker image prune -f >&2 2> /dev/null; then
+            echo "Warning: Could not clean up dangling Docker images" >&2
+        fi
+        return 0
+    else
+        echo "Warning: Docker build failed" >&2
+        return 1
+    fi
 }
 
-mkdir -p "$(dirname "$last_update_file")"
-if [[ ! -f "$last_update_file" ]]; then
-    update_claude
-else
-    last_update_date=$(cat "$last_update_file")
-    if [[ "$last_update_date" != "$today" ]]; then
-        update_claude
+# Run Claude Code in Docker container.
+# Usage: run_claude [--exec] [--minimal] [args...]
+# --exec: Use exec to replace current process
+# --minimal: Skip mounts and environment, just run with --rm
+run_claude() {
+    local use_exec=false
+    local minimal=false
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --exec)
+                use_exec=true
+                shift
+                ;;
+            --minimal)
+                minimal=true
+                shift
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+
+    local cmd=(docker run)
+
+    # Only use -it if stdin is a TTY
+    if [ -t 0 ] && [ -t 1 ]; then
+        cmd+=(-it)
     fi
+
+    container_home="/home/$(whoami)"
+
+    if [[ "$minimal" == "true" ]]; then
+        cmd+=(--rm "$username-claude:latest" "$@")
+    else
+        cmd+=(--rm --user "$(id -u):$(id -g)")
+
+        cmd+=(-v "$current_dir:$container_home/devel/$project_relative_dir")
+
+        # If this is not the main Git worktree, also mount the main worktree.
+        if [ -f "$current_dir/.git" ]; then
+            # .git is a file, not a directory - this is not the main worktree.
+            main_worktree=$(
+                git worktree list --porcelain \
+                    | grep -m1 "^worktree " | cut -d' ' -f2
+            )
+            main_worktree_realpath=$(realpath "$main_worktree")
+
+            if [[ "$main_worktree_realpath" != "$devel_dir"* ]]; then
+                echo "Error: Main worktree must be in ~/devel" >&2
+                exit 1
+            fi
+
+            # Calculate relative path from `$devel_dir`.
+            main_worktree_relative="${main_worktree_realpath#"$devel_dir"/}"
+            cmd+=(
+                -v "$main_worktree_realpath:$container_home/devel/$main_worktree_relative:ro"
+            )
+        fi
+
+        # Mount my dotfiles so symlinks work.
+        if [ "$current_dir" != "$devel_dir/dotfiles" ]; then
+            cmd+=(-v "$devel_dir/dotfiles:$container_home/devel/dotfiles:ro")
+        fi
+
+        cmd+=(
+            -v "$devel_dir/dotfiles/bin/ai_commit:/usr/local/bin/ai_commit:ro"
+            -v "$devel_dir/dotfiles/bin/safe_rm:/usr/local/bin/safe_rm:ro"
+            -v "$devel_dir/dotfiles/bin/ralph:/usr/local/bin/ralph:ro"
+            -v "$devel_dir/dotfiles/bin/review_diff:/usr/local/bin/review_diff:ro"
+            -v "$HOME/.config/git:$container_home/.config/git:ro"
+        )
+
+        cmd+=(
+            -v "$HOME/.claude:$container_home/.claude"
+            -v "$HOME/.claude.json:$container_home/.claude.json"
+        )
+
+        cmd+=(
+            -e CLAUDE_CODE_API_KEY
+            -e GH_TOKEN
+        )
+
+        cmd+=(
+            -w "$container_home/devel/$project_relative_dir"
+            "$username-claude:latest"
+            "$@"
+        )
+    fi
+
+    if [[ "$use_exec" == "true" ]]; then
+        exec "${cmd[@]}"
+    else
+        "${cmd[@]}"
+    fi
+}
+
+last_build_file="$HOME/.claude/.last-docker-build"
+today=$(date +%Y-%m-%d)
+
+mkdir -p "$(dirname "$last_build_file")"
+if [[ ! -f "$last_build_file" ]]; then
+    echo "never" > "$last_build_file"
+fi
+
+last_build_date=$(cat "$last_build_file")
+if [[ "$force_rebuild" == "true" ]] || [[ "$last_build_date" != "$today" ]]; then
+    if ! build_image "$today" "$last_build_file"; then
+        if ! docker image inspect "$username-claude:latest" > /dev/null 2>&1; then
+            echo "Error: Docker image does not exist and build failed" >&2
+            exit 1
+        fi
+        echo "Warning: Using existing Docker image despite build failure" >&2
+    fi
+fi
+
+if [[ "$show_claude_help" == "true" ]]; then
+    run_claude --exec --minimal --help
 fi
 
 if [ -z "$profile" ]; then
@@ -99,24 +266,50 @@ if [ -z "$profile" ]; then
     if [ "$component_count" -gt 1 ]; then
         profile="$(echo "$project_relative_dir" | cut -d'/' -f1)"
     else
-        profile="jpmelos"
+        profile="$username"
     fi
 fi
 
+# Validate profile name to prevent command injection.
+if [[ ! "$profile" =~ ^[a-zA-Z0-9_]([a-zA-Z0-9._-]*[a-zA-Z0-9_])?$ ]]; then
+    echo "Error: Invalid profile name '$profile'" >&2
+    exit 1
+fi
+
 if [ -z "${CLAUDE_CODE_API_KEY+x}" ]; then
-    CLAUDE_CODE_SECRET=$(
-        op item get "Claude Code Configuration" \
-            --vault "Private" --format json \
-            | jq -r ".fields[0].value"
-    )
-    CLAUDE_CODE_API_KEY=$(
-        toml get <(echo "$CLAUDE_CODE_SECRET") . | jq -r ".profile.\"$profile\".api_key"
-    )
-    if [[ "$CLAUDE_CODE_API_KEY" == "null" ]]; then
-        echo "Warning: no API key for profile '$profile', defaulting to 'jpmelos'" >&2
-        CLAUDE_CODE_API_KEY=$(
-            toml get <(echo "$CLAUDE_CODE_SECRET") . | jq -r ".profile.jpmelos.api_key"
-        )
+    if ! CLAUDE_CODE_SECRET=$(op read "op://Private/Claude Code Configuration/notesPlain" 2>&1); then
+        echo "Error: Failed to retrieve Claude Code configuration from 1Password" >&2
+        echo "Make sure you are logged in to 1Password CLI (run: op signin)" >&2
+        exit 1
+    fi
+
+    if ! CLAUDE_CODE_API_KEY=$(toml get <(echo "$CLAUDE_CODE_SECRET") . | jq -r ".profile.\"$profile\".api_key"); then
+        echo "Error: Failed to parse Claude Code configuration" >&2
+        exit 1
+    fi
+
+    if [[ "$CLAUDE_CODE_API_KEY" == "null" || -z "$CLAUDE_CODE_API_KEY" ]]; then
+        echo "Warning: no API key for profile '$profile', defaulting to '$username'" >&2
+        if ! CLAUDE_CODE_API_KEY=$(toml get <(echo "$CLAUDE_CODE_SECRET") . | jq -r ".profile.$username.api_key"); then
+            echo "Error: Failed to retrieve default API key" >&2
+            exit 1
+        fi
+        if [[ "$CLAUDE_CODE_API_KEY" == "null" || -z "$CLAUDE_CODE_API_KEY" ]]; then
+            echo "Error: No valid API key found" >&2
+            exit 1
+        fi
+    fi
+fi
+
+if [ -z "${GH_TOKEN+x}" ]; then
+    if ! GH_TOKEN=$(op read "op://Private/GH Token/notesPlain" 2>&1); then
+        echo "Error: Failed to retrieve GH_TOKEN from 1Password" >&2
+        echo "Make sure you are logged in to 1Password CLI (run: op signin)" >&2
+        exit 1
+    fi
+    if [[ -z "$GH_TOKEN" ]]; then
+        echo "Error: GH_TOKEN is empty" >&2
+        exit 1
     fi
 fi
 
@@ -146,22 +339,31 @@ format_duration() {
     echo "$result"
 }
 
-if [[ "$env_only" == "true" ]]; then
-    # Output shell commands to be eval'd for environment variable export.
-    echo "export BASH_DEFAULT_TIMEOUT_MS=120000"
-    echo "export BASH_MAX_TIMEOUT_MS=\"\$BASH_DEFAULT_TIMEOUT_MS\""
-    printf "export CLAUDE_CODE_API_KEY=%q\n" "$CLAUDE_CODE_API_KEY"
-    echo "echo \"Environment variables exported for profile '$profile'\""
-else
-    export BASH_DEFAULT_TIMEOUT_MS=120000
-    export BASH_MAX_TIMEOUT_MS="$BASH_DEFAULT_TIMEOUT_MS"
-    export CLAUDE_CODE_API_KEY
+export CLAUDE_CODE_API_KEY
+export GH_TOKEN
 
-    echo "Running Claude Code with profile '$profile'" >&2
-    echo "" >&2
+mkdir -p "$HOME/.claude"
 
-    if [[ "$print_mode" == "true" && "$raw_output" == "false" ]]; then
-        OUTPUT=$(claude "${claude_args[@]}")
+echo "Running Claude Code with profile '$profile'" >&2
+echo "" >&2
+
+# Read from stdin if available (for piped input).
+message=""
+if [ ! -t 0 ]; then
+    message=$(cat)
+fi
+
+if [[ "$print_mode" == "true" ]]; then
+    # In print mode, a message is REQUIRED.
+    if [ -z "$message" ]; then
+        echo "Error: Print mode requires a message via stdin" >&2
+        exit 1
+    fi
+
+    if [[ "$raw_output" == "true" ]]; then
+        run_claude --exec --print --output-format json "$message"
+    else
+        OUTPUT=$(run_claude --print --output-format json "$message")
 
         RESULT=$(echo "$OUTPUT" | jq -r '.result // ""')
         COST=$(echo "$OUTPUT" | jq -r '.total_cost_usd // 0')
@@ -173,7 +375,13 @@ else
         echo "" >&2
         echo "Cost: \$$(round_up_cents "$COST")" >&2
         echo "Duration: $(format_duration "$DURATION")" >&2
-    else
-        exec claude "${claude_args[@]}"
     fi
+else
+    # In non-print mode, a message is NOT ALLOWED.
+    if [ -n "$message" ]; then
+        echo "Error: Non-print mode does not accept stdin. Use --print or -p for message input" >&2
+        exit 1
+    fi
+
+    run_claude --exec "${claude_args[@]}"
 fi

@@ -86,9 +86,6 @@ export RIPGREP_CONFIG_PATH="$HOME/.config/ripgrep/ripgreprc"
 # 1Password configuration.
 export OP_ACCOUNT=my.1password.com
 
-# Disable OpenCode integration with Claude Code conventions.
-export OPENCODE_DISABLE_CLAUDE_CODE=true
-
 ###############################
 #                             #
 #    Python-specific stuff    #

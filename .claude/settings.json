@@ -1,9 +1,6 @@
 {
     "apiKeyHelper": "~/.claude/api-key-helper.sh",
     "permissions": {
-        "deny": [
-            "Edit(jpenv-bin/**)"
-        ],
         "allow": [
             "Read",
             "Write",
@@ -52,16 +49,15 @@
             "Bash(bash jpenv-bin/lint.bash:*)",
             "Bash(bash jpenv-bin/tests.bash:*)"
         ],
+        "deny": [
+            "Edit(jpenv-bin/**)"
+        ],
         "defaultMode": "dontAsk"
     },
-    "model": "sonnet",
-    "enabledPlugins": {
-        "rust-analyzer-lsp@claude-plugins-official": true
-    },
-    "autoUpdates": false,
     "statusLine": {
         "type": "command",
         "command": "bash ~/.claude/statusline.sh",
         "padding": 0
-    }
+    },
+    "autoUpdates": false
 }
