@@ -27,20 +27,20 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND"' ERR
 #/   If both are set, prompts user to choose (defaults to OpenCode).
 
 # Show help if requested.
-if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     grep '^#/' "$0" | sed 's/^#\/ \{0,1\}//'
     exit 0
 fi
 
 # Parse arguments.
 VALIDATE_ONLY=false
-if [ "$1" = "--validate" ]; then
+if [ "${1:-}" = "--validate" ]; then
     VALIDATE_ONLY=true
     shift
 fi
 
 # Get tickets file from first argument.
-TICKETS_FILE="$1"
+TICKETS_FILE="${1:-}"
 if [ -z "$TICKETS_FILE" ]; then
     echo "Error: TICKETS_FILE argument is required" >&2
     echo "Usage: ralph [--validate] TICKETS_FILE [max_iterations]" >&2
@@ -216,7 +216,7 @@ echo "Tickets file is valid!"
 # Exit early if only validating (exit 0 on success, 1 on failure).
 if [ "$VALIDATE_ONLY" = true ]; then
     # Warn if max_iterations was provided but ignored.
-    if [ -n "$2" ]; then
+    if [ -n "${2:-}" ]; then
         echo "Warning: max_iterations argument ignored in validate mode" >&2
     fi
     exit 0
