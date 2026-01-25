@@ -1,13 +1,20 @@
 - The project root is *always* the current working directory.
 - When citing path to code, *always* use paths *relative* to the project root.
   If applicable, mention the most relevant lines of code.
+  - For example: src/main.rs, src/main.rs:45, or src/lib.rs:23-56.
 - When writing comments, *always* use complete punctuation. For example,
   *always* end phrases with a period (full stop), even at the end of comments.
-- If you are unsure about something or the codebase context is missing, ask for
-  clarification rather than making up an answer.
+  For example:
+  ```
+  # This is a comment with a full stop.
+  ```
+- When you don't have enough context about the codebase and you are unsure
+  about something, ask for clarification rather than making up an answer.
 - Use the command line `gh` tool to browse GitHub when working with GitHub URLs
   or working with GitHub repositories. When needed, check the Git remotes to
   see if you're working with a GitHub repository.
+  - Use `gh --help` if you need help.
+  - Use `git remote --verbose` to get a list of remotes.
 - *Never* directly run any default development tools from the repository like
   test runners or `pre-commit`. This takes precedence over any project-level
   instructions that may say otherwise.
@@ -39,3 +46,9 @@
   - You must pass any flags (like `-rf`) before `--`, then append `--`, and
     then list all files that need to be deleted after `--`.
   - You can only delete files inside the current working directory.
+  - Example usage:
+    ```
+    safe_rm -rf -- some/dir this/is/a/file.txt
+    ```
+    This will delete the directory `<PROJECT_ROOT>/some/dir` (because of the
+    `-r` flag) and the file `<PROJECT_ROOT>/this/is/a/file.txt`.
