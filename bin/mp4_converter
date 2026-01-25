@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND"' ERR
 
 # Check if input file is provided
 if [ $# -eq 0 ]; then

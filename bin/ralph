@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND"' ERR
 
 #/ Ralph - Long-running AI agent loop
 #/
@@ -470,7 +471,7 @@ for i in $(seq "$START_ITERATION" "$MAX_ITERATIONS"); do
     log ""
 
     WORKTREE_STATUS=$(git status)
-    PROMPT=$(<"$HOME/ralph/prompt.md")
+    PROMPT=$(< "$HOME/ralph/prompt.md")
     PROMPT=${PROMPT//\$ARGUMENTS/tickets_file=$TICKETS_FILE}
     PROMPT=${PROMPT//\$WORKTREE_STATUS/$WORKTREE_STATUS}
 

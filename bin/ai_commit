@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND"' ERR
 
 # This is a commit command that AI agents can run safely.
 # Run it like `ai_commit This is the commit message.`

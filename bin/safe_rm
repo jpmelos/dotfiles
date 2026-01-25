@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND"' ERR
 
 #/ safe_rm - Restricted rm that only operates within current directory
 #/
@@ -120,7 +121,7 @@ validate_path() {
     if [ -L "$arg_normalized" ]; then
         if [ "$has_trailing_slash" -eq 1 ]; then
             local target_dir
-            if target_dir=$(cd -P -- "$arg_normalized" 2>/dev/null && pwd -P); then
+            if target_dir=$(cd -P -- "$arg_normalized" 2> /dev/null && pwd -P); then
                 if ! is_inside_cwd "$target_dir"; then
                     echo "safe_rm: trailing slash on symlink is unsafe (target outside cwd): $arg" >&2
                     return 1

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND"' ERR
 
 #/ Send a Telegram notification, optionally running a command first.
 #/

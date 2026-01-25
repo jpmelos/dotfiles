@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND"' ERR
 
 diff=$(git diff)
