@@ -4,7 +4,7 @@ description: Review the current diff.
 
 Review these changes:
 
-!`bash ~/.claude/commands/review-prompt.sh`
+!`review_diff`
 
 Provide a detailed explanation about what the changes are about, and if you can
 figure it out, also explain why the changes would be desirable. Feel free to

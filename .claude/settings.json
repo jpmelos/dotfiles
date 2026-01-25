@@ -43,7 +43,7 @@
             "Bash(cargo check:*)",
             "Bash(cargo clippy:*)",
             "WebFetch(domain:docs.rs)",
-            "Bash(bash ~/.claude/commands/review-prompt.sh)",
+            "Bash(review_diff)",
             "Bash(ralph --validate:*)",
             "Bash(ai_commit:*)",
             "Bash(bash jpenv-bin/lint.bash:*)",

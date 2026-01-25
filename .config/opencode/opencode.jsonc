@@ -105,7 +105,7 @@
             "cargo check *": "allow",
             "cargo clippy": "allow",
             "cargo clippy *": "allow",
-            "bash ~/.config/opencode/command/review-prompt.sh": "allow",
+            "review_diff": "allow",
             "ralph --validate *": "allow",
             "ai_commit": "allow",
             "ai_commit *": "allow",
