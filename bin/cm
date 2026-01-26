@@ -283,7 +283,20 @@ if [[ "$force_rebuild" == "true" ]] \
             echo "Error: Docker image does not exist and build failed" >&2
             exit 1
         fi
-        echo "Warning: Using existing Docker image despite build failure" >&2
+        echo "" >&2
+        echo "========================================" >&2
+        echo "WARNING: BUILD FAILED - OLD IMAGE EXISTS" >&2
+        echo "========================================" >&2
+        echo "The Docker build failed, but an older image is available." >&2
+        echo "This image may have outdated dependencies or be missing recent fixes." >&2
+        echo "" >&2
+        read -p "Do you want to continue with the old image? [y/N] " -n 1 -r >&2
+        echo "" >&2
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "Aborted by user" >&2
+            exit 1
+        fi
+        echo "Continuing with existing Docker image..." >&2
     else
         echo "$today" > "$last_build_file"
         echo "$dockerfile_mtime" > "$last_build_mtime_file"
@@ -318,19 +331,19 @@ if [ -z "${CLAUDE_CODE_API_KEY+x}" ]; then
     fi
 
     # Validate secret is valid TOML before using it.
-    if ! echo "$CLAUDE_CODE_SECRET" | toml get - . > /dev/null 2>&1; then
-        echo "Error: Retrieved secret is not valid TOML" >&2
+    if ! toml get <(echo "$CLAUDE_CODE_SECRET") profile > /dev/null 2>&1; then
+        echo "Error: Retrieved secret is not valid TOML or missing 'profile' section" >&2
         exit 1
     fi
 
-    if ! CLAUDE_CODE_API_KEY=$(toml get <(echo "$CLAUDE_CODE_SECRET") . | jq -r ".profile.\"$profile\".api_key"); then
+    if ! CLAUDE_CODE_API_KEY=$(toml get <(echo "$CLAUDE_CODE_SECRET") . | jq -r --arg p "$profile" '.profile[$p].api_key'); then
         echo "Error: Failed to parse Claude Code configuration" >&2
         exit 1
     fi
 
     if [[ "$CLAUDE_CODE_API_KEY" == "null" || -z "$CLAUDE_CODE_API_KEY" ]]; then
         echo "Warning: no API key for profile '$profile', defaulting to '$username'" >&2
-        if ! CLAUDE_CODE_API_KEY=$(toml get <(echo "$CLAUDE_CODE_SECRET") . | jq -r ".profile.$username.api_key"); then
+        if ! CLAUDE_CODE_API_KEY=$(toml get <(echo "$CLAUDE_CODE_SECRET") . | jq -r --arg u "$username" '.profile[$u].api_key'); then
             echo "Error: Failed to retrieve default API key" >&2
             exit 1
         fi
@@ -363,6 +376,13 @@ round_up_cents() {
 # Function to format duration as XhYmZ.WWWs.
 format_duration() {
     local total_seconds=$1
+
+    # Handle zero or empty input.
+    if [[ -z "$total_seconds" ]] || [[ $(echo "$total_seconds == 0" | bc) -eq 1 ]]; then
+        echo "0.000s"
+        return
+    fi
+
     local hours=$(echo "$total_seconds / 3600" | bc)
     local remainder=$(echo "$total_seconds - ($hours * 3600)" | bc)
     local minutes=$(echo "$remainder / 60" | bc)
