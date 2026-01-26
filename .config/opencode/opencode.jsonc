@@ -130,7 +130,7 @@
         "webfetch": "allow",
         "websearch": "allow",
         "codesearch": "allow",
-        "external_directory": "ask",
+        "external_directory": "allow",
         "doom_loop": "ask"
     },
     "keybinds": {
