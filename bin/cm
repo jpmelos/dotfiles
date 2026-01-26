@@ -206,6 +206,23 @@ run_claude() {
             cmd+=(-v "$devel_dir/dotfiles:$container_home/devel/dotfiles:ro")
         fi
 
+        # Mount additional projects from `AGENTS_ADDITIONAL_PROJECTS`.
+        if [ -n "${AGENTS_ADDITIONAL_PROJECTS:-}" ]; then
+            IFS=',' read -ra ADDITIONAL_PROJECTS <<< "$AGENTS_ADDITIONAL_PROJECTS"
+            for project in "${ADDITIONAL_PROJECTS[@]}"; do
+                # Trim whitespace.
+                project=$(echo "$project" | xargs)
+                if [ -n "$project" ]; then
+                    project_path="$devel_dir/$project"
+                    if [ -d "$project_path" ]; then
+                        cmd+=(-v "$project_path:$container_home/devel/$project:ro")
+                    else
+                        echo "Warning: Additional project '$project' does not exist at $project_path" >&2
+                    fi
+                fi
+            done
+        fi
+
         cmd+=(
             -v "$devel_dir/dotfiles/bin/ai_commit:/usr/local/bin/ai_commit:ro"
             -v "$devel_dir/dotfiles/bin/safe_rm:/usr/local/bin/safe_rm:ro"
