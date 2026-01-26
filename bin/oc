@@ -128,7 +128,6 @@ build_image() {
         --build-arg BUILD_DATE="$today" \
         -t "$username-opencode:latest" \
         "$devel_dir/dotfiles" >&2; then
-        echo "$today" > "$last_build_file"
         # Clean up dangling images.
         if ! docker image prune -f >&2 2> /dev/null; then
             echo "Warning: Could not clean up dangling Docker images" >&2
@@ -136,6 +135,10 @@ build_image() {
         return 0
     else
         echo "Warning: Docker build failed" >&2
+        # Clean up dangling images.
+        if ! docker image prune -f >&2 2> /dev/null; then
+            echo "Warning: Could not clean up dangling Docker images" >&2
+        fi
         return 1
     fi
 }
@@ -265,21 +268,34 @@ run_opencode() {
 }
 
 last_build_file="$HOME/.config/opencode/.last-docker-build"
+last_build_mtime_file="$HOME/.config/opencode/.last-docker-build.mtime"
 today=$(date +%Y-%m-%d)
 
 mkdir -p "$(dirname "$last_build_file")"
 if [[ ! -f "$last_build_file" ]]; then
     echo "never" > "$last_build_file"
 fi
+if [[ ! -f "$last_build_mtime_file" ]]; then
+    echo "0" > "$last_build_mtime_file"
+fi
 
+dockerfile_path="$devel_dir/dotfiles/references/Dockerfile.opencode"
+dockerfile_mtime=$(stat -c %Y "$dockerfile_path" 2> /dev/null || stat -f %m "$dockerfile_path" 2> /dev/null || echo "0")
 last_build_date=$(cat "$last_build_file")
-if [[ "$force_rebuild" == "true" ]] || [[ "$last_build_date" != "$today" ]]; then
+last_build_mtime=$(cat "$last_build_mtime_file")
+
+if [[ "$force_rebuild" == "true" ]] \
+    || [[ "$last_build_date" != "$today" ]] \
+    || [[ "$dockerfile_mtime" -gt "$last_build_mtime" ]]; then
     if ! build_image "$today" "$last_build_file"; then
         if ! docker image inspect "$username-opencode:latest" > /dev/null 2>&1; then
             echo "Error: Docker image does not exist and build failed" >&2
             exit 1
         fi
         echo "Warning: Using existing Docker image despite build failure" >&2
+    else
+        echo "$today" > "$last_build_file"
+        echo "$dockerfile_mtime" > "$last_build_mtime_file"
     fi
 fi
 
@@ -297,7 +313,8 @@ if [ -z "$profile" ]; then
 fi
 
 # Validate profile name to prevent command injection.
-if [[ ! "$profile" =~ ^[a-zA-Z0-9_]([a-zA-Z0-9._-]*[a-zA-Z0-9_])?$ ]]; then
+# Max length: 64 characters, alphanumeric with dots, dashes, underscores.
+if [[ ! "$profile" =~ ^[a-zA-Z0-9_]([a-zA-Z0-9._-]{0,62}[a-zA-Z0-9_])?$ ]]; then
     echo "Error: Invalid profile name '$profile'" >&2
     exit 1
 fi
@@ -306,6 +323,12 @@ if [ -z "${OPENCODE_API_KEY+x}" ]; then
     if ! OPENCODE_SECRET=$(op read "op://Private/OpenCode Configuration/notesPlain" 2>&1); then
         echo "Error: Failed to retrieve OpenCode configuration from 1Password" >&2
         echo "Make sure you are logged in to 1Password CLI (run: op signin)" >&2
+        exit 1
+    fi
+
+    # Validate secret is valid TOML before using it.
+    if ! echo "$OPENCODE_SECRET" | toml get - . > /dev/null 2>&1; then
+        echo "Error: Retrieved secret is not valid TOML" >&2
         exit 1
     fi
 
@@ -332,6 +355,12 @@ if [ -z "${CLAUDE_CODE_API_KEY+x}" ]; then
         if ! OPENCODE_SECRET=$(op read "op://Private/OpenCode Configuration/notesPlain" 2>&1); then
             echo "Error: Failed to retrieve OpenCode configuration from 1Password" >&2
             echo "Make sure you are logged in to 1Password CLI (run: op signin)" >&2
+            exit 1
+        fi
+
+        # Validate secret is valid TOML before using it.
+        if ! echo "$OPENCODE_SECRET" | toml get - . > /dev/null 2>&1; then
+            echo "Error: Retrieved secret is not valid TOML" >&2
             exit 1
         fi
     fi
