@@ -1,5 +1,9 @@
 {
     "apiKeyHelper": "~/.claude/api-key-helper.sh",
+    "env": {
+        "BASH_DEFAULT_TIMEOUT_MS": "120000",
+        "BASH_MAX_TIMEOUT_MS": "120000"
+    },
     "permissions": {
         "allow": [
             "Read",
