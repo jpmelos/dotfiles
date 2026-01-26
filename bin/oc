@@ -221,6 +221,7 @@ run_opencode() {
         )
 
         cmd+=(
+            -e OPENCODE_DISABLE_MODELS_FETCH=1
             -e OPENCODE_DISABLE_CLAUDE_CODE=true
             -e OPENCODE_API_KEY
             -e CLAUDE_CODE_API_KEY
