@@ -250,6 +250,9 @@ run_claude() {
         )
     fi
 
+    echo "Running container with:" >&2
+    echo "${cmd[@]}" >&2
+
     if [[ "$use_exec" == "true" ]]; then
         exec "${cmd[@]}"
     else
@@ -315,6 +318,8 @@ if [ -z "$profile" ]; then
     fi
 fi
 
+echo "Running Claude Code with profile '$profile'..." >&2
+
 # Validate profile name to prevent command injection.
 # Max length: 64 characters, alphanumeric with dots, dashes, underscores.
 if [[ ! "$profile" =~ ^[a-zA-Z0-9_]([a-zA-Z0-9._-]{0,62}[a-zA-Z0-9_])?$ ]]; then
@@ -323,11 +328,13 @@ if [[ ! "$profile" =~ ^[a-zA-Z0-9_]([a-zA-Z0-9._-]{0,62}[a-zA-Z0-9_])?$ ]]; then
 fi
 
 if [ -z "${CLAUDE_CODE_API_KEY+x}" ]; then
+    echo -n "Fetching Claude Code configuration from 1Password..." >&2
     if ! CLAUDE_CODE_SECRET=$(op read "op://Private/Claude Code Configuration/notesPlain" 2>&1); then
         echo "Error: Failed to retrieve Claude Code configuration from 1Password" >&2
         echo "Make sure you are logged in to 1Password CLI (run: op signin)" >&2
         exit 1
     fi
+    echo " done!" >&2
 
     # Validate secret is valid TOML before using it.
     if ! toml get <(echo "$CLAUDE_CODE_SECRET") profile > /dev/null 2>&1; then
@@ -354,11 +361,14 @@ if [ -z "${CLAUDE_CODE_API_KEY+x}" ]; then
 fi
 
 if [ -z "${GH_TOKEN+x}" ]; then
+    echo -n "Fetching GitHub token from 1Password..." >&2
     if ! GH_TOKEN=$(op read "op://Private/GH Token/notesPlain" 2>&1); then
         echo "Error: Failed to retrieve GH_TOKEN from 1Password" >&2
         echo "Make sure you are logged in to 1Password CLI (run: op signin)" >&2
         exit 1
     fi
+    echo " done!" >&2
+
     if [[ -z "$GH_TOKEN" ]]; then
         echo "Error: GH_TOKEN is empty" >&2
         exit 1
@@ -402,9 +412,6 @@ export CLAUDE_CODE_API_KEY
 export GH_TOKEN
 
 mkdir -p "$HOME/.claude"
-
-echo "Running Claude Code with profile '$profile'" >&2
-echo "" >&2
 
 # Read from stdin if available (for piped input).
 message=""
