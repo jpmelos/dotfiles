@@ -1,24 +1,23 @@
 ---
 description: Review a file.
-argument-hint: [file_path]
 ---
 
-Review file $1.
+Review files $ARGUMENTS.
 
-Provide a detailed explanation about what the contents are about, and if you
-can figure it out, also explain why this file's existence is desirable. Feel
-free to read any files you feel is necessary to assist you in a more
-comprehensive review. Think very hard.
+Provide a detailed explanation about what the contents of the files are about,
+and if you can figure it out, also explain why these files' existences is
+desirable. Feel free to read any files you feel is necessary to assist you in a
+more comprehensive review. Think very hard.
 
 Review checklist:
 
-- File is good and bug-free.
+- Files are good and bug-free.
 - Code is simple and readable.
 - Functions and variables are well-named.
 - Proper error handling.
 - No exposed secrets or API keys.
 - Input is validated and sanitized.
-- Good test coverage. (Tests may be in another file.)
+- Good test coverage. (Tests may be other files.)
 - Code should have good performance characteristics.
 
 Provide feedback organized by priority:

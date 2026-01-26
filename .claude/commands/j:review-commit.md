@@ -1,6 +1,6 @@
 ---
 description: Review a commit.
-argument-hint: [commit_sha]
+argument-hint: commit_sha_or_ref
 ---
 
 Review commit $1.
