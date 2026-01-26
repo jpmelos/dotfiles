@@ -119,7 +119,6 @@ username="$(whoami)"
 
 build_image() {
     local today="$1"
-    local last_build_file="$2"
 
     echo "Building Docker image..." >&2
     if docker build \
@@ -258,13 +257,13 @@ run_claude() {
     fi
 }
 
-last_build_file="$HOME/.claude/.last-docker-build"
+last_build_date_file="$HOME/.claude/.last-docker-build.date"
 last_build_mtime_file="$HOME/.claude/.last-docker-build.mtime"
 today=$(date +%Y-%m-%d)
 
-mkdir -p "$(dirname "$last_build_file")"
-if [[ ! -f "$last_build_file" ]]; then
-    echo "never" > "$last_build_file"
+mkdir -p "$(dirname "$last_build_date_file")"
+if [[ ! -f "$last_build_date_file" ]]; then
+    echo "never" > "$last_build_date_file"
 fi
 if [[ ! -f "$last_build_mtime_file" ]]; then
     echo "0" > "$last_build_mtime_file"
@@ -272,13 +271,13 @@ fi
 
 dockerfile_path="$devel_dir/dotfiles/references/Dockerfile.claude"
 dockerfile_mtime=$(stat -c %Y "$dockerfile_path" 2> /dev/null || stat -f %m "$dockerfile_path" 2> /dev/null || echo "0")
-last_build_date=$(cat "$last_build_file")
+last_build_date=$(cat "$last_build_date_file")
 last_build_mtime=$(cat "$last_build_mtime_file")
 
 if [[ "$force_rebuild" == "true" ]] \
     || [[ "$last_build_date" != "$today" ]] \
     || [[ "$dockerfile_mtime" -gt "$last_build_mtime" ]]; then
-    if ! build_image "$today" "$last_build_file"; then
+    if ! build_image "$today"; then
         if ! docker image inspect "$username-claude:latest" > /dev/null 2>&1; then
             echo "Error: Docker image does not exist and build failed" >&2
             exit 1
@@ -298,7 +297,7 @@ if [[ "$force_rebuild" == "true" ]] \
         fi
         echo "Continuing with existing Docker image..." >&2
     else
-        echo "$today" > "$last_build_file"
+        echo "$today" > "$last_build_date_file"
         echo "$dockerfile_mtime" > "$last_build_mtime_file"
     fi
 fi
