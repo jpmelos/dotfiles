@@ -9,6 +9,7 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND"' ERR
 #/   --print, -p       Activate Claude's print mode
 #/   --raw-output      Output raw JSON (only with --print)
 #/   --force-rebuild   Force rebuild of Docker image
+#/   --no-build-cache  Build from scratch without using cache
 #/   --claude-help     Show Claude help
 #/   --help            Show this help
 
@@ -71,6 +72,7 @@ show_claude_help=false
 print_mode=false
 raw_output=false
 force_rebuild=false
+no_build_cache=false
 profile=""
 claude_args=()
 
@@ -92,6 +94,9 @@ for arg in "$@"; do
             ;;
         --force-rebuild)
             force_rebuild=true
+            ;;
+        --no-build-cache)
+            no_build_cache=true
             ;;
         -*)
             claude_args+=("$arg")
@@ -119,14 +124,26 @@ username="$(whoami)"
 
 build_image() {
     local today="$1"
+    local use_cache="$2"
 
     echo "Building Docker image..." >&2
-    if docker build \
-        -f "$devel_dir/dotfiles/references/Dockerfile.claude" \
-        --build-arg USERNAME="$username" \
-        --build-arg BUILD_DATE="$today" \
-        -t "$username-claude:latest" \
-        "$devel_dir/dotfiles" >&2; then
+    local build_args=(
+        -f "$devel_dir/dotfiles/references/Dockerfile.claude"
+        --build-arg USERNAME="$username"
+        --build-arg BUILD_DATE="$today"
+    )
+
+    if [[ "$use_cache" == "false" ]]; then
+        echo "Building from scratch without cache..." >&2
+        build_args+=(--no-cache)
+    fi
+
+    build_args+=(
+        -t "$username-claude:latest"
+        "$devel_dir/dotfiles"
+    )
+
+    if docker build "${build_args[@]}" >&2; then
         # Clean up dangling images.
         if ! docker image prune -f >&2 2> /dev/null; then
             echo "Warning: Could not clean up dangling Docker images" >&2
@@ -280,7 +297,11 @@ last_build_mtime=$(cat "$last_build_mtime_file")
 if [[ "$force_rebuild" == "true" ]] \
     || [[ "$last_build_date" != "$today" ]] \
     || [[ "$dockerfile_mtime" -gt "$last_build_mtime" ]]; then
-    if ! build_image "$today"; then
+    use_cache="true"
+    if [[ "$no_build_cache" == "true" ]]; then
+        use_cache="false"
+    fi
+    if ! build_image "$today" "$use_cache"; then
         if ! docker image inspect "$username-claude:latest" > /dev/null 2>&1; then
             echo "Error: Docker image does not exist and build failed" >&2
             exit 1
