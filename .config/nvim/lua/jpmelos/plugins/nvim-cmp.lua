@@ -51,8 +51,12 @@ return {
                         local item = entry:get_completion_item()
                         if item.insertTextFormat == 2 then
                             item.insertTextFormat = 1
-                            item.textEdit.newText =
-                                entry:get_completion_item().filterText
+                            local plainText = item.filterText or item.label
+                            if item.textEdit then
+                                item.textEdit.newText = plainText
+                            else
+                                item.insertText = plainText
+                            end
                         end
                         return vim_item
                     end,
