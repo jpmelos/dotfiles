@@ -317,7 +317,9 @@ fi
 # Updates the system.
 if [ "$JPMELOS_IS_MACOS" = "true" ]; then
     update() {
-        brew update && brew upgrade
+        brew update
+        brew upgrade
+        brew cleanup
     }
 else
     update() {
