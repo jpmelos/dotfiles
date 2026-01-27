@@ -2,6 +2,10 @@
 - When citing path to code, *always* use paths *relative* to the project root.
   If applicable, mention the most relevant lines of code.
   - For example: src/main.rs, src/main.rs:45, or src/lib.rs:23-56.
+- Prefer descriptive variable names instead of shorter names.
+  - For example, prefer `thread_id` instead of `tid`.
+  - The only exceptions to this rule are very very short for-loops, Python
+    comprehensions, or similar structures.
 - When writing comments, *always* use complete punctuation. For example,
   *always* end phrases with a period (full stop), even at the end of comments.
   For example:
