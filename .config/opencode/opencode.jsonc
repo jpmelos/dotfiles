@@ -86,6 +86,8 @@
             "git status *": "allow",
             "git diff": "allow",
             "git diff *": "allow",
+            "git reset": "allow",
+            "git reset *": "allow",
             "gh search *": "allow",
             "gh issue list": "allow",
             "gh issue list *": "allow",

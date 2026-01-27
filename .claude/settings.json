@@ -30,6 +30,7 @@
             "Bash(git rev-list:*)",
             "Bash(git status:*)",
             "Bash(git diff:*)",
+            "Bash(git reset:*)",
             "Bash(gh search:*)",
             "Bash(gh issue list:*)",
             "Bash(gh issue status:*)",
