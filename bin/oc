@@ -203,9 +203,9 @@ run_opencode() {
     container_home="/home/$username"
 
     if [[ "$minimal" == "true" ]]; then
-        cmd+=(--rm "$username-opencode:latest" "$@")
+        cmd+=(--init --rm "$username-opencode:latest" "$@")
     else
-        cmd+=(--rm --user "$(id -u):$(id -g)")
+        cmd+=(--init --rm --user "$(id -u):$(id -g)")
 
         cmd+=(-v "$current_dir:$container_home/devel/$project_relative_dir")
 
