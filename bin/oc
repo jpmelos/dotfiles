@@ -281,8 +281,7 @@ run_opencode() {
         )
     fi
 
-    echo "Running container with:" >&2
-    echo "${cmd[@]}" >&2
+    echo "Running container..." >&2
 
     if [[ "$use_exec" == "true" ]]; then
         exec "${cmd[@]}"
