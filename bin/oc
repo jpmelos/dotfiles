@@ -515,8 +515,9 @@ if [[ "$print_mode" == "true" ]]; then
     else
         OUTPUT=$(run_opencode run --format json "$message")
 
-        # Extract text from the last text part.
-        RESULT=$(jq -r '[select(.type == "text")] | last | .part.text // ""' <<< "$OUTPUT")
+        # OpenCode output is newline-delimited JSON.
+        # Extract text from the last line whose type is "text".
+        RESULT=$(jq -s '[.[] | select(.type == "text")] | last | .part.text' <<< "$OUTPUT")
 
         # Get first and last timestamps to calculate duration.
         FIRST_TS=$(head -n 1 <<< "$OUTPUT" | jq -r '.timestamp // 0')
