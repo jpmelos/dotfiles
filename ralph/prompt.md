@@ -48,6 +48,9 @@ $WORKTREE_STATUS
     ticket ID with `#`. Zero-pad the ticket ID to 2 digits. You **must** commit
     your changes before proceeding to the next step, unless you have not been
     able to complete the current ticket.
+    - If you believe the ticket doesn't need any work because it is already
+      done, still create an empty commit: simply call
+      `ai_commit Ticket [Ticket ID] - [Change Title]` with a clean worktree.
 08. **Append** your progress report to the progress log (see detailed
     instructions below).
 09. **If, and only if, you have completely implemented the changes required by

@@ -11,4 +11,4 @@ if [ $# -eq 0 ]; then
 fi
 
 git add -A :/
-git commit --no-gpg-sign -m "$*"
+git commit --no-gpg-sign --allow-empty -m "$*"
