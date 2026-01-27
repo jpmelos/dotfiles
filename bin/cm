@@ -190,9 +190,14 @@ run_claude() {
 
     local cmd=(docker run)
 
-    # Only use -it if stdin is a TTY
+    # Only use -it if stdin is a TTY.
     if [ -t 0 ] && [ -t 1 ]; then
         cmd+=(-it)
+    # In print mode, we still want to allocate a TTY so that we get the output
+    # from the Claude Code process in a format that's easier to process (one
+    # JSON object per line).
+    elif [[ "$print_mode" == "true" ]]; then
+        cmd+=(-t)
     fi
 
     container_home="/home/$username"
