@@ -51,7 +51,7 @@ echo "$SUBTITLE_INFO"
 echo ""
 
 # Find text-based subtitle streams (can be converted to mov_text)
-TEXT_SUBTITLE_STREAMS=$(echo "$SUBTITLE_INFO" | grep -E "subrip|ass|ssa|webvtt|mov_text|srt|subviewer|microdvd|text" | grep -oE "Stream #[0-9]+:[0-9]+" | cut -d'#' -f2 | cut -d'(' -f1 || true)
+TEXT_SUBTITLE_STREAMS=$(grep -E "subrip|ass|ssa|webvtt|mov_text|srt|subviewer|microdvd|text" <<< "$SUBTITLE_INFO" | grep -oE "Stream #[0-9]+:[0-9]+" | cut -d'#' -f2 | cut -d'(' -f1 || true)
 
 if [ -z "$TEXT_SUBTITLE_STREAMS" ]; then
     echo "No text-based subtitle streams found (all are bitmap-based)."

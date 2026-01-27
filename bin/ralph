@@ -351,17 +351,17 @@ log() {
 # Function to round cost up to the next cent for display.
 round_up_cents() {
     local value=$1
-    local rounded=$(echo "scale=0; tmp = $value * 100; tmp = tmp / 1; if (tmp < $value * 100) tmp = tmp + 1; scale=2; tmp / 100" | bc)
+    local rounded=$(bc <<< "scale=0; tmp = $value * 100; tmp = tmp / 1; if (tmp < $value * 100) tmp = tmp + 1; scale=2; tmp / 100")
     printf "%.2f" "$rounded"
 }
 
 # Function to format duration as XhYmZ.WWWs.
 format_duration() {
     local total_seconds=$1
-    local hours=$(echo "$total_seconds / 3600" | bc)
-    local remainder=$(echo "$total_seconds - ($hours * 3600)" | bc)
-    local minutes=$(echo "$remainder / 60" | bc)
-    local seconds=$(echo "$remainder - ($minutes * 60)" | bc)
+    local hours=$(bc <<< "$total_seconds / 3600")
+    local remainder=$(bc <<< "$total_seconds - ($hours * 3600)")
+    local minutes=$(bc <<< "$remainder / 60")
+    local seconds=$(bc <<< "$remainder - ($minutes * 60)")
 
     local result=""
     if [ "$hours" -gt 0 ]; then
@@ -475,37 +475,37 @@ for i in $(seq "$START_ITERATION" "$MAX_ITERATIONS"); do
     PROMPT=${PROMPT//\$ARGUMENTS/tickets_file=$TICKETS_FILE}
     PROMPT=${PROMPT//\$WORKTREE_STATUS/$WORKTREE_STATUS}
 
-    OUTPUT=$(echo "$PROMPT" | "$RALPH_CMD" -p --raw-output)
+    OUTPUT=$("$RALPH_CMD" -p --raw-output <<< "$PROMPT")
 
     # Extract result and metrics from JSON output.
     # The format differs between OpenCode and Claude Code.
     if [ "$RALPH_CMD" = "cm" ]; then
         # Claude Code output is a single JSON object.
-        RESULT=$(echo "$OUTPUT" | jq -r '.result // ""')
-        ITERATION_COST=$(echo "$OUTPUT" | jq -r '.total_cost_usd // 0')
-        ITERATION_DURATION_MS=$(echo "$OUTPUT" | jq -r '.duration_ms // 0')
+        RESULT=$(jq -r '.result // ""' <<< "$OUTPUT")
+        ITERATION_COST=$(jq -r '.total_cost_usd // 0' <<< "$OUTPUT")
+        ITERATION_DURATION_MS=$(jq -r '.duration_ms // 0' <<< "$OUTPUT")
     else
         # OpenCode output is newline-delimited JSON.
         # Extract text from the last text part.
-        RESULT=$(echo "$OUTPUT" | jq -r '[select(.type == "text")] | last | .part.text // ""')
+        RESULT=$(jq -r '[select(.type == "text")] | last | .part.text // ""' <<< "$OUTPUT")
 
         # Sum up costs from all steps.
-        ITERATION_COST=$(echo "$OUTPUT" | jq -s 'map(.part.cost // 0) | add')
+        ITERATION_COST=$(jq -s 'map(.part.cost // 0) | add' <<< "$OUTPUT")
 
         # Get first and last timestamps to calculate duration.
-        FIRST_TS=$(echo "$OUTPUT" | head -n 1 | jq -r '.timestamp // 0')
-        LAST_TS=$(echo "$OUTPUT" | tail -n 1 | jq -r '.timestamp // 0')
+        FIRST_TS=$(head -n 1 <<< "$OUTPUT" | jq -r '.timestamp // 0')
+        LAST_TS=$(tail -n 1 <<< "$OUTPUT" | jq -r '.timestamp // 0')
         ITERATION_DURATION_MS=$((LAST_TS - FIRST_TS))
     fi
 
     log "$RESULT"
 
     # Convert milliseconds to seconds.
-    ITERATION_DURATION=$(printf "%.3f" "$(echo "scale=3; $ITERATION_DURATION_MS / 1000" | bc)")
+    ITERATION_DURATION=$(printf "%.3f" "$(bc <<< "scale=3; $ITERATION_DURATION_MS / 1000")")
 
     # Update totals.
-    TOTAL_COST=$(echo "$TOTAL_COST + $ITERATION_COST" | bc)
-    TOTAL_DURATION=$(echo "$TOTAL_DURATION + $ITERATION_DURATION" | bc)
+    TOTAL_COST=$(bc <<< "$TOTAL_COST + $ITERATION_COST")
+    TOTAL_DURATION=$(bc <<< "$TOTAL_DURATION + $ITERATION_DURATION")
 
     log ""
     log "Iteration cost: \$$(round_up_cents "$ITERATION_COST")"

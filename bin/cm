@@ -240,7 +240,7 @@ run_claude() {
             IFS=',' read -ra ADDITIONAL_PROJECTS <<< "$AGENTS_ADDITIONAL_PROJECTS"
             for project in "${ADDITIONAL_PROJECTS[@]}"; do
                 # Trim whitespace.
-                project=$(echo "$project" | xargs)
+                project=$(xargs <<< "$project")
                 if [ -n "$project" ]; then
                     project_path="$devel_dir/$project"
                     if [ -d "$project_path" ]; then
@@ -340,9 +340,9 @@ if [[ "$show_claude_help" == "true" ]]; then
 fi
 
 if [ -z "$profile" ]; then
-    component_count=$(echo "$project_relative_dir" | tr '/' '\n' | wc -l)
+    component_count=$(tr '/' '\n' <<< "$project_relative_dir" | wc -l)
     if [ "$component_count" -gt 1 ]; then
-        profile="$(echo "$project_relative_dir" | cut -d'/' -f1)"
+        profile="$(cut -d'/' -f1 <<< "$project_relative_dir")"
     else
         profile="$username"
     fi
@@ -419,7 +419,7 @@ export GH_TOKEN
 # Function to round cost up to the next cent for display.
 round_up_cents() {
     local value=$1
-    local rounded=$(echo "scale=0; tmp = $value * 100; tmp = tmp / 1; if (tmp < $value * 100) tmp = tmp + 1; scale=2; tmp / 100" | bc)
+    local rounded=$(bc <<< "scale=0; tmp = $value * 100; tmp = tmp / 1; if (tmp < $value * 100) tmp = tmp + 1; scale=2; tmp / 100")
     printf "%.2f" "$rounded"
 }
 
@@ -428,15 +428,15 @@ format_duration() {
     local total_seconds=$1
 
     # Handle zero or empty input.
-    if [[ -z "$total_seconds" ]] || [[ $(echo "$total_seconds == 0" | bc) -eq 1 ]]; then
+    if [[ -z "$total_seconds" ]] || [[ $(bc <<< "$total_seconds == 0") -eq 1 ]]; then
         echo "0.000s"
         return
     fi
 
-    local hours=$(echo "$total_seconds / 3600" | bc)
-    local remainder=$(echo "$total_seconds - ($hours * 3600)" | bc)
-    local minutes=$(echo "$remainder / 60" | bc)
-    local seconds=$(echo "$remainder - ($minutes * 60)" | bc)
+    local hours=$(bc <<< "$total_seconds / 3600")
+    local remainder=$(bc <<< "$total_seconds - ($hours * 3600)")
+    local minutes=$(bc <<< "$remainder / 60")
+    local seconds=$(bc <<< "$remainder - ($minutes * 60)")
 
     local result=""
     if [ "$hours" -gt 0 ]; then
@@ -469,11 +469,11 @@ if [[ "$print_mode" == "true" ]]; then
     else
         OUTPUT=$(run_claude --print --output-format json "$message")
 
-        RESULT=$(echo "$OUTPUT" | jq -r '.result // ""')
-        COST=$(echo "$OUTPUT" | jq -r '.total_cost_usd // 0')
-        DURATION_MS=$(echo "$OUTPUT" | jq -r '.duration_ms // 0')
+        RESULT=$(jq -r '.result // ""' <<< "$OUTPUT")
+        COST=$(jq -r '.total_cost_usd // 0' <<< "$OUTPUT")
+        DURATION_MS=$(jq -r '.duration_ms // 0' <<< "$OUTPUT")
 
-        DURATION=$(printf "%.3f" "$(echo "scale=3; $DURATION_MS / 1000" | bc)")
+        DURATION=$(printf "%.3f" "$(bc <<< "scale=3; $DURATION_MS / 1000")")
 
         echo "$RESULT"
         echo "" >&2

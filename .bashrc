@@ -110,7 +110,7 @@ alias erc='nvim -O ~/.bash_profile ~/.bashrc'
 alias src='source ~/.bash_profile'
 
 # Show path in readable format.
-alias path='echo $PATH | tr : "\n"'
+alias path='tr : "\n" <<< "$PATH"'
 
 # Allows alias checking in watch commands.
 alias watch='\watch '
@@ -378,7 +378,7 @@ server() {
 gz() {
     local origsize=$(wc -c < "$1")
     local gzipsize=$(gzip -c "$1" | wc -c)
-    local ratio=$(echo "$gzipsize * 100 / $origsize" | bc -l)
+    local ratio=$(bc -l <<< "$gzipsize * 100 / $origsize")
     printf "orig: %d bytes\n" "$origsize"
     printf "gzip: %d bytes (%2.2f%%)\n" "$gzipsize" "$ratio"
 }
