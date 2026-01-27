@@ -454,7 +454,7 @@ if [[ "$env_only" == "true" ]]; then
     printf "export OPENCODE_API_KEY=%q\n" "$OPENCODE_API_KEY"
     printf "export CLAUDE_CODE_API_KEY=%q\n" "$CLAUDE_CODE_API_KEY"
     printf "export GH_TOKEN=%q\n" "$GH_TOKEN"
-    echo "echo \"Environment variables exported for profile '$profile'\" >&2"
+    echo "Environment variables exported for profile '$profile'" >&2
     exit 0
 fi
 
