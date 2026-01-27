@@ -6,6 +6,7 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND"' ERR
 #/
 #/ Usage: cm [options] [profile]
 #/ Options:
+#/   --env             Only export environment variables, don't run Claude
 #/   --print, -p       Activate Claude's print mode
 #/   --raw-output      Output raw JSON (only with --print)
 #/   --force-rebuild   Force rebuild of Docker image
@@ -67,6 +68,7 @@ if [[ -z "$project_relative_dir" ]]; then
     exit 1
 fi
 
+env_only=false
 show_help=false
 show_claude_help=false
 print_mode=false
@@ -78,6 +80,9 @@ claude_args=()
 
 for arg in "$@"; do
     case "$arg" in
+        --env)
+            env_only=true
+            ;;
         --claude-help)
             show_claude_help=true
             ;;
@@ -396,6 +401,17 @@ if [ -z "${GH_TOKEN+x}" ]; then
     fi
 fi
 
+if [[ "$env_only" == "true" ]]; then
+    # Output shell commands to be eval'd for environment variable export.
+    printf "export CLAUDE_CODE_API_KEY=%q\n" "$CLAUDE_CODE_API_KEY"
+    printf "export GH_TOKEN=%q\n" "$GH_TOKEN"
+    echo "echo \"Environment variables exported for profile '$profile'\" >&2"
+    exit 0
+fi
+
+export CLAUDE_CODE_API_KEY
+export GH_TOKEN
+
 # Function to round cost up to the next cent for display.
 round_up_cents() {
     local value=$1
@@ -428,9 +444,6 @@ format_duration() {
     result="${result}$(printf "%.3f" "$seconds")s"
     echo "$result"
 }
-
-export CLAUDE_CODE_API_KEY
-export GH_TOKEN
 
 mkdir -p "$HOME/.claude"
 

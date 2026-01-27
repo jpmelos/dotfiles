@@ -6,6 +6,7 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND"' ERR
 #/
 #/ Usage: oc [options] [profile]
 #/ Options:
+#/   --env             Only export environment variables, don't run OpenCode
 #/   --print, -p       Activate OpenCode's print mode
 #/   --raw-output      Output raw JSON (only with --print)
 #/   --force-rebuild   Force rebuild of Docker image
@@ -67,6 +68,7 @@ if [[ -z "$project_relative_dir" ]]; then
     exit 1
 fi
 
+env_only=false
 show_help=false
 show_opencode_help=false
 print_mode=false
@@ -78,6 +80,9 @@ opencode_args=()
 
 for arg in "$@"; do
     case "$arg" in
+        --env)
+            env_only=true
+            ;;
         --opencode-help)
             show_opencode_help=true
             ;;
@@ -440,6 +445,19 @@ if [ -z "${GH_TOKEN+x}" ]; then
     fi
 fi
 
+if [[ "$env_only" == "true" ]]; then
+    # Output shell commands to be eval'd for environment variable export.
+    printf "export OPENCODE_API_KEY=%q\n" "$OPENCODE_API_KEY"
+    printf "export CLAUDE_CODE_API_KEY=%q\n" "$CLAUDE_CODE_API_KEY"
+    printf "export GH_TOKEN=%q\n" "$GH_TOKEN"
+    echo "echo \"Environment variables exported for profile '$profile'\" >&2"
+    exit 0
+fi
+
+export OPENCODE_API_KEY
+export CLAUDE_CODE_API_KEY
+export GH_TOKEN
+
 # Function to round cost up to the next cent for display.
 round_up_cents() {
     local value=$1
@@ -472,10 +490,6 @@ format_duration() {
     result="${result}$(printf "%.3f" "$seconds")s"
     echo "$result"
 }
-
-export OPENCODE_API_KEY
-export CLAUDE_CODE_API_KEY
-export GH_TOKEN
 
 mkdir -p "$HOME/.config/opencode" "$HOME/.local/state/opencode"
 
