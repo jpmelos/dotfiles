@@ -206,6 +206,221 @@ validate_tickets_schema() {
     return 0
 }
 
+# Function to check if the ticket-commit invariant holds.
+# Returns 0 if, and only if, each ticket marked with `done: true` has exactly
+# one matching commit, and vice versa. Returns 1 if the invariant is violated.
+check_ticket_commit_invariant() {
+    # Check if there are any commits to analyze.
+    local commit_count
+    if ! commit_count=$(git rev-list --count "$SESSION_START_COMMIT.." 2> /dev/null); then
+        log "ERROR: Invalid commit range: $SESSION_START_COMMIT.."
+        exit 1
+    fi
+
+    # If no commits yet, invariant holds only if there are no done tickets.
+    if [ "$commit_count" -eq 0 ]; then
+        local done_count=$(jq -r '.tickets[] | select(.done == true) | .id' "$TICKETS_FILE" 2> /dev/null | wc -l)
+        if [ "$done_count" -eq 0 ]; then
+            return 0
+        else
+            return 1
+        fi
+    fi
+
+    # Extract ticket IDs from commits matching pattern "Ticket ## - ".
+    local commit_ticket_ids=$(
+        git log --format='%s' "$SESSION_START_COMMIT.." 2> /dev/null \
+            | grep -E '^Ticket [0-9]{2} - ' \
+            | sed 's/^Ticket \([0-9][0-9]\) - .*/\1/' \
+            | sed 's/^0//' \
+            | sort -n
+    )
+
+    # Extract ticket IDs from tickets file where `done: true`.
+    local done_ticket_ids=$(
+        jq -r '.tickets[] | select(.done == true) | .id' "$TICKETS_FILE" 2> /dev/null \
+            | sort -n
+    )
+
+    # Compare the two sets.
+    if [ "$commit_ticket_ids" = "$done_ticket_ids" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Recovers from ticket-commit invariant violations.
+# Returns 0 on success, 1 on failure.
+recover_ticket_commit_invariant() {
+    # Strategy: Find the earliest commit that needs to be removed, then reset
+    # everything from HEAD back to (and including) that commit. This ensures we
+    # remove all problematic commits and everything after them, maintaining a
+    # clean linear history.
+
+    # Get all commits since session start in reverse chronological order
+    # (newest first).
+    local all_commits_reverse=()
+    while IFS= read -r line; do
+        all_commits_reverse+=("$line")
+    done < <(
+        git log --format='%H|||%s' "$SESSION_START_COMMIT.." 2> /dev/null
+    )
+
+    # Get list of done ticket IDs.
+    local done_ticket_ids=$(
+        jq -r '.tickets[] | select(.done == true) | .id' "$TICKETS_FILE" 2> /dev/null \
+            | sort -n
+    )
+
+    local done_ticket_ids_array=()
+    while IFS= read -r ticket_id; do
+        [ -n "$ticket_id" ] && done_ticket_ids_array+=("$ticket_id")
+    done <<< "$done_ticket_ids"
+
+    # Build a list of all ticket IDs we've seen so far (to detect duplicates).
+    local seen_ticket_ids=()
+    local earliest_commit_to_remove=""
+
+    # Process commits from newest to oldest.
+    # As we go back in time, keep updating earliest_commit_to_remove
+    # whenever we find a problematic commit.
+    for commit_line in "${all_commits_reverse[@]}"; do
+        local commit_hash="${commit_line%%|||*}"
+        local commit_subject="${commit_line#*|||}"
+
+        # Extract ticket ID if this matches the ticket pattern.
+        local ticket_id=$(
+            echo "$commit_subject" \
+                | grep -E '^Ticket [0-9]{2} - ' \
+                | sed 's/^Ticket \([0-9][0-9]\) - .*/\1/' \
+                | sed 's/^0//'
+        )
+
+        # Skip commits that don't match the ticket pattern.
+        if [ -z "$ticket_id" ]; then
+            continue
+        fi
+
+        # Check if this ticket has a duplicate (already seen).
+        local is_duplicate=false
+        for seen_id in "${seen_ticket_ids[@]}"; do
+            if [ "$ticket_id" = "$seen_id" ]; then
+                is_duplicate=true
+                break
+            fi
+        done
+
+        # Check if this ticket is marked as done.
+        local is_done=false
+        for done_id in "${done_ticket_ids_array[@]}"; do
+            if [ "$ticket_id" = "$done_id" ]; then
+                is_done=true
+                break
+            fi
+        done
+
+        # If this commit is problematic, update earliest_commit_to_remove.
+        # Since we're going backwards in time, this keeps getting updated
+        # to earlier and earlier commits.
+        if [ "$is_duplicate" = true ] || [ "$is_done" = false ]; then
+            earliest_commit_to_remove="$commit_hash"
+            if [ "$is_duplicate" = true ]; then
+                log "Found duplicate commits for ticket $ticket_id"
+            else
+                log "Found commit for ticket $ticket_id which is not marked done"
+            fi
+        fi
+
+        # Add this ticket to the seen list.
+        seen_ticket_ids+=("$ticket_id")
+    done
+
+    # If we found a commit to remove, reset to its parent.
+    if [ -n "$earliest_commit_to_remove" ]; then
+        log "Earliest problematic commit: $(git log -1 --format='%s' "$earliest_commit_to_remove" 2> /dev/null)"
+        log "Resetting to parent of $earliest_commit_to_remove"
+
+        # Reset to the parent of the earliest problematic commit.
+        git reset --hard "$earliest_commit_to_remove~1" > /dev/null 2>&1
+        if [ $? -ne 0 ]; then
+            log "ERROR: Failed to reset to parent of $earliest_commit_to_remove"
+            return 1
+        fi
+
+        log "Successfully removed all commits from $earliest_commit_to_remove onwards"
+    fi
+
+    # Case B: Mark excess done tickets as not done.
+    # After Case A, re-scan commits.
+
+    # Get ticket IDs from commits.
+    commit_ticket_ids=$(
+        git log --format='%s' "$SESSION_START_COMMIT.." 2> /dev/null \
+            | grep -E '^Ticket [0-9]{2} - ' \
+            | sed 's/^Ticket \([0-9][0-9]\) - .*/\1/' \
+            | sed 's/^0//' \
+            | sort -n
+    )
+
+    # Find ticket IDs that are done but have no matching commit.
+    local commit_ticket_ids_array=()
+    while IFS= read -r ticket_id; do
+        [ -n "$ticket_id" ] && commit_ticket_ids_array+=("$ticket_id")
+    done <<< "$commit_ticket_ids"
+
+    while IFS= read -r ticket_id; do
+        local found=false
+        for commit_ticket_id in "${commit_ticket_ids_array[@]}"; do
+            if [ "$ticket_id" = "$commit_ticket_id" ]; then
+                found=true
+                break
+            fi
+        done
+        if [ "$found" = false ]; then
+            log "Marking ticket $ticket_id as not done"
+            if ! jq --argjson id "$ticket_id" \
+                '(.tickets[] | select(.id == $id)).done = false' \
+                "$TICKETS_FILE" > "$TICKETS_FILE.tmp"; then
+                log "ERROR: Failed to mark ticket $ticket_id as not done"
+                return 1
+            fi
+            mv "$TICKETS_FILE.tmp" "$TICKETS_FILE"
+        fi
+    done <<< "$done_ticket_ids"
+
+    return 0
+}
+
+# Check and recover invariants.
+# Returns 0 if all invariants are satisfied (after recovery if needed), 1 on
+# failure.
+check_invariants() {
+    log "Checking invariants..."
+
+    # Check if ticket-commit invariant holds.
+    if ! check_ticket_commit_invariant; then
+        log "Ticket-commit invariant violated. Attempting recovery..."
+
+        # Attempt recovery.
+        if ! recover_ticket_commit_invariant; then
+            log "ERROR: Failed to recover ticket-commit invariant"
+            return 1
+        fi
+
+        # Verify recovery worked.
+        if ! check_ticket_commit_invariant; then
+            log "ERROR: Ticket-commit invariant still violated after recovery"
+            return 1
+        fi
+
+        log "Ticket-commit invariant recovered"
+    fi
+
+    log "All invariants satisfied"
+    return 0
+}
+
 echo "Validating tickets file..."
 if ! validate_tickets_schema "$TICKETS_FILE"; then
     echo "Tickets file schema validation failed" >&2
@@ -394,9 +609,10 @@ handle_state_commit_mismatch() {
         1)
             echo "Deleting state file and starting from scratch..." >&2
             rm -f "$STATE_FILE"
+            SESSION_START_COMMIT=$(git rev-parse HEAD)
+            START_ITERATION=1
             TOTAL_COST=0
             TOTAL_DURATION=0
-            START_ITERATION=1
             ;;
         2)
             echo "Overriding commit SHA to current value and continuing..." >&2
@@ -416,15 +632,21 @@ handle_state_commit_mismatch() {
 log "Starting Ralph"
 log "Max iterations: $MAX_ITERATIONS"
 
+SESSION_START_COMMIT=$(git rev-parse HEAD)
+START_ITERATION=1
 TOTAL_COST=0
 TOTAL_DURATION=0
-START_ITERATION=1
 
 # Load state if resuming from a previous run.
 if [ -f "$STATE_FILE" ]; then
     log ""
     log "Found existing state file - resuming from previous run"
 
+    if ! SESSION_START_COMMIT=$(jq -e -r '.session_start_commit // ""' "$STATE_FILE" 2> /dev/null); then
+        echo "Error: Failed to parse state file at $STATE_FILE" >&2
+        echo "The state file may be corrupt. Please remove it and start fresh." >&2
+        exit 1
+    fi
     if ! TOTAL_COST=$(jq -e -r '.total_cost // 0' "$STATE_FILE" 2> /dev/null); then
         echo "Error: Failed to parse state file at $STATE_FILE" >&2
         echo "The state file may be corrupt. Please remove it and start fresh." >&2
@@ -452,6 +674,19 @@ if [ -f "$STATE_FILE" ]; then
         handle_state_commit_mismatch "$SAVED_COMMIT" "$CURRENT_COMMIT"
     fi
 
+    # Validate that SESSION_START_COMMIT is set and valid.
+    if [ -z "$SESSION_START_COMMIT" ]; then
+        echo "Error: session_start_commit is missing from state file" >&2
+        echo "The state file may be corrupt. Please remove it and start fresh." >&2
+        exit 1
+    fi
+    if ! git rev-parse --verify "$SESSION_START_COMMIT" &> /dev/null; then
+        echo "Error: session_start_commit ($SESSION_START_COMMIT) is not a valid commit" >&2
+        echo "This may happen if commits were deleted or the repository was rebased." >&2
+        echo "Please remove the state file and start fresh." >&2
+        exit 1
+    fi
+
     START_ITERATION=$((LAST_COMPLETED_ITERATION + 1))
     # When resuming, MAX_ITERATIONS is the number of remaining iterations.
     # Add the current iteration to get the new maximum.
@@ -460,6 +695,12 @@ if [ -f "$STATE_FILE" ]; then
     log "Resuming from iteration $START_ITERATION"
     log "Previous total cost: \$$(round_up_cents "$TOTAL_COST")"
     log "Previous total duration: $(format_duration "$TOTAL_DURATION")"
+fi
+
+# Check and recover invariants before starting.
+if ! check_invariants; then
+    log "ERROR: Failed to satisfy invariants. Aborting."
+    exit 1
 fi
 
 for i in $(seq "$START_ITERATION" "$MAX_ITERATIONS"); do
@@ -513,17 +754,25 @@ for i in $(seq "$START_ITERATION" "$MAX_ITERATIONS"); do
     log "Total cost so far: \$$(round_up_cents "$TOTAL_COST")"
     log "Total duration so far: $(format_duration "$TOTAL_DURATION")"
 
+    # Check invariants after each iteration.
+    if ! check_invariants; then
+        log "ERROR: Invariants violated after iteration $i. Aborting."
+        exit 1
+    fi
+
     # Save state after each iteration.
     jq -n \
-        --arg iteration "$i" \
+        --arg session_start "$SESSION_START_COMMIT" \
         --arg cost "$TOTAL_COST" \
         --arg duration "$TOTAL_DURATION" \
+        --arg iteration "$i" \
         --arg timestamp "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
         --arg commit "$(git rev-parse HEAD)" \
         '{
-            last_completed_iteration: ($iteration | tonumber),
+            session_start_commit: $session_start,
             total_cost: ($cost | tonumber),
             total_duration: ($duration | tonumber),
+            last_completed_iteration: ($iteration | tonumber),
             last_updated: $timestamp,
             last_commit: $commit
         }' > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
