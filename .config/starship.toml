@@ -1,5 +1,8 @@
-scan_timeout = 1000
-command_timeout = 1000
+scan_timeout = 100
+command_timeout = 100
 
 [time]
 disabled = false
+
+[python]
+disabled = true
