@@ -10,3 +10,11 @@
 --no-ignore
 --glob
     !**/.git
+--glob
+    !/.cache
+--glob
+    !/.venv
+--glob
+    !/.pytest-cache
+--glob
+    !/.ruff_cache
