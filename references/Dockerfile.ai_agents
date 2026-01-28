@@ -30,7 +30,9 @@ RUN mkdir -p /home/${USERNAME}/devel \
              /home/${USERNAME}/.local/bin \
              /home/${USERNAME}/.local/share \
              /home/${USERNAME}/.local/state \
-             /home/${USERNAME}/.config && \
+             /home/${USERNAME}/.config \
+             /home/${USERNAME}/.npm \
+             /home/${USERNAME}/.cache/pre-commit && \
     chmod -R 777 /home/${USERNAME}
 
 ENV HOME=/home/${USERNAME}
