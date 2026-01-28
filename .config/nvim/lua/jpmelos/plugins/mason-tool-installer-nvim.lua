@@ -31,17 +31,16 @@ return {
                 "taplo",
                 -- Markdown.
                 -- Install mdformat manually like below:
-                -- pipx install mdformat
-                -- pipx inject mdformat \
-                --     mdformat-config \
-                --     mdformat-ruff \
-                --     mdformat-rustfmt \
-                --     mdformat-shfmt \
-                --     mdformat-web \
-                --     mdformat-frontmatter \
-                --     mdformat-gfm \
-                --     mdformat-gfm-alerts \
-                --     mdformat-tables
+                -- uv tool install \
+                --     --with mdformat-config \
+                --     --with mdformat-ruff \
+                --     --with mdformat-rustfmt \
+                --     --with mdformat-shfmt \
+                --     --with mdformat-web \
+                --     --with mdformat-frontmatter \
+                --     --with mdformat-gfm \
+                --     --with mdformat-gfm-alerts \
+                --     mdformat
             },
         })
     end,
