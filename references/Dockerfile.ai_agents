@@ -1,4 +1,7 @@
-FROM debian:trixie-slim
+FROM debian:trixie-slim AS base
+
+ARG USERNAME
+ARG BUILD_DATE
 
 # Install system dependencies.
 RUN apt-get update && \
@@ -13,6 +16,7 @@ RUN apt-get update && \
         ripgrep \
         gh \
         pre-commit \
+        vim \
         python3 \
         rustup \
         nodejs \
@@ -22,15 +26,12 @@ RUN apt-get update && \
 # Create directory structure and set HOME.
 # Make /home/user writable by any user since container runs with --user flag.
 # Pre-create common directories that applications expect to write to.
-ARG USERNAME
 RUN mkdir -p /home/${USERNAME}/devel \
              /home/${USERNAME}/.local/bin \
              /home/${USERNAME}/.local/share \
              /home/${USERNAME}/.local/state \
              /home/${USERNAME}/.config && \
     chmod -R 777 /home/${USERNAME}
-ENV HOME=/home/${USERNAME}
-ENV PATH="${HOME}/.local/bin:${PATH}"
 
 # Enable interoperability between Linux and MacOS for absolute symlinks
 # pointing into the home folder.
@@ -41,19 +42,31 @@ RUN rustup install stable && rustup default stable
 
 # Install uv.
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV UV_PROJECT_ENVIRONMENT=jpenv-venv-container
 
-# Accept build date argument to bust cache.
-ARG BUILD_DATE
-RUN echo "Build date: ${BUILD_DATE}"
-
-# Install Claude Code globally.
-RUN curl -fsSL https://claude.ai/install.sh -o /root/claude-install.sh && \
-    bash /root/claude-install.sh && \
-    rm /root/claude-install.sh
+ENV HOME=/home/${USERNAME}
+ENV PATH="${HOME}/.local/bin:${PATH}"
+ENV EDITOR="vim"
+ENV UV_PROJECT_ENVIRONMENT="jpenv-venv-container"
 
 # Set working directory.
 WORKDIR /home/${USERNAME}/devel
 
-# Set entrypoint.
+# Accept build date argument to bust cache.
+RUN echo "Build date: ${BUILD_DATE}"
+
+FROM base AS claude
+
+# Install Claude Code.
+RUN curl -fsSL https://claude.ai/install.sh -o /root/claude-install.sh && \
+    bash /root/claude-install.sh && \
+    rm /root/claude-install.sh
+
 ENTRYPOINT ["claude"]
+
+FROM base AS opencode
+
+# Install OpenCode.
+RUN npm install -g opencode-ai && \
+    npm cache clean --force
+
+ENTRYPOINT ["opencode"]
