@@ -3,23 +3,20 @@ FROM debian:trixie-slim
 # Install system dependencies.
 RUN apt-get update && \
     apt-get install -y \
+        build-essential \
+        git \
+        git-delta \
+        curl \
+        ca-certificates \
         jq \
         bc \
         ripgrep \
         gh \
         python3 \
         rustup \
-        build-essential \
-        git \
-        git-delta \
-        curl \
-        ca-certificates \
         nodejs \
         npm && \
     rm -rf /var/lib/apt/lists/*
-
-# Install Rust stable toolchain.
-RUN rustup install stable && rustup default stable
 
 # Create directory structure and set HOME.
 # Make /home/user writable by any user since container runs with --user flag.
@@ -37,6 +34,13 @@ ENV PATH="${HOME}/.local/bin:${PATH}"
 # Enable interoperability between Linux and MacOS for absolute symlinks
 # pointing into the home folder.
 RUN ln -s /home /Users && chmod 555 /Users
+
+# Install Rust stable toolchain.
+RUN rustup install stable && rustup default stable
+
+# Install uv.
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV UV_PROJECT_ENVIRONMENT=jpenv-venv-container
 
 # Accept build date argument to bust cache.
 ARG BUILD_DATE
