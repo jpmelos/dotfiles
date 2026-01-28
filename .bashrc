@@ -596,7 +596,7 @@ je() {
         echo "Creating from template..."
         cat > "$script_path" << 'EOF'
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND"' ERR
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
