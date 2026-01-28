@@ -68,69 +68,92 @@ return {
 
         -- Keep the `ft` lazy-loading configuration for this plugin up-to-date,
         -- and the `ensure_installed` list for `mason-lspconfig`.
-        vim.lsp.config("pyright", {
-            settings = {
-                pyright = { disableOrganizeImports = true },
-                python = {
-                    analysis = {
-                        autoImportCompletions = true,
-                        diagnosticMode = "openFilesOnly",
-                        typeCheckingMode = "off",
-                        useLibraryCodeForTypes = false,
-                        autoSearchPaths = false,
+
+        -- Helper function to merge custom LSP configuration.
+        local function get_lsp_config(lsp_name, default_config)
+            local custom_configs = vim.g.lsp_configuration or {}
+            local custom_config = custom_configs[lsp_name] or {}
+            return vim.tbl_deep_extend("force", default_config, custom_config)
+        end
+
+        vim.lsp.config(
+            "pyright",
+            get_lsp_config("pyright", {
+                settings = {
+                    pyright = { disableOrganizeImports = true },
+                    python = {
+                        analysis = {
+                            autoImportCompletions = true,
+                            diagnosticMode = "openFilesOnly",
+                            typeCheckingMode = "off",
+                            useLibraryCodeForTypes = false,
+                            autoSearchPaths = false,
+                        },
                     },
                 },
-            },
-        })
-        vim.lsp.config("lua_ls", {
-            settings = {
-                Lua = {
-                    diagnostics = {
-                        disable = { "type-check" },
-                        -- Make the language server recognize the "vim"
-                        -- global. Useful when working with Neovim
-                        -- configuration.
-                        globals = { "vim", "Obsidian" },
+            })
+        )
+        vim.lsp.config(
+            "lua_ls",
+            get_lsp_config("lua_ls", {
+                settings = {
+                    Lua = {
+                        diagnostics = {
+                            disable = { "type-check" },
+                            -- Make the language server recognize the "vim"
+                            -- global. Useful when working with Neovim
+                            -- configuration.
+                            globals = { "vim", "Obsidian" },
+                        },
                     },
                 },
-            },
-        })
-        vim.lsp.config("rust_analyzer", {
-            settings = {
-                ["rust-analyzer"] = {
-                    checkOnSave = false,
-                    diagnostics = { enable = false },
-                    completion = {
-                        fullFunctionSignatures = { enable = true },
-                        hideDeprecated = true,
+            })
+        )
+        vim.lsp.config(
+            "rust_analyzer",
+            get_lsp_config("rust_analyzer", {
+                settings = {
+                    ["rust-analyzer"] = {
+                        checkOnSave = false,
+                        diagnostics = { enable = false },
+                        completion = {
+                            fullFunctionSignatures = { enable = true },
+                            hideDeprecated = true,
+                        },
                     },
                 },
-            },
-        })
-        vim.lsp.config("jsonls", {
-            settings = {
-                json = {
-                    schemas = schema_store.json.schemas(),
-                    validate = { enable = true },
-                },
-            },
-        })
-        vim.lsp.config("yamlls", {
-            settings = {
-                yaml = {
-                    schemaStore = {
-                        -- You must disable built-in schemaStore support if you
-                        -- want to use this plugin and its advanced options
-                        -- like `ignore`.
-                        enable = false,
-                        -- Avoid TypeError: Cannot read properties of undefined
-                        -- (reading 'length').
-                        url = "",
+            })
+        )
+        vim.lsp.config(
+            "jsonls",
+            get_lsp_config("jsonls", {
+                settings = {
+                    json = {
+                        schemas = schema_store.json.schemas(),
+                        validate = { enable = true },
                     },
-                    schemas = schema_store.yaml.schemas(),
                 },
-            },
-        })
+            })
+        )
+        vim.lsp.config(
+            "yamlls",
+            get_lsp_config("yamlls", {
+                settings = {
+                    yaml = {
+                        schemaStore = {
+                            -- You must disable built-in schemaStore support if
+                            -- you want to use this plugin and its advanced
+                            -- options like `ignore`.
+                            enable = false,
+                            -- Avoid TypeError: Cannot read properties of
+                            -- undefined (reading 'length').
+                            url = "",
+                        },
+                        schemas = schema_store.yaml.schemas(),
+                    },
+                },
+            })
+        )
         vim.lsp.config("*", {
             on_attach = lsp_on_attach,
             capabilities = capabilities,
