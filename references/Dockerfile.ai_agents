@@ -33,6 +33,14 @@ RUN mkdir -p /home/${USERNAME}/devel \
              /home/${USERNAME}/.config && \
     chmod -R 777 /home/${USERNAME}
 
+ENV HOME=/home/${USERNAME}
+ENV PATH="${HOME}/.local/bin:${PATH}"
+ENV EDITOR="vim"
+ENV UV_PROJECT_ENVIRONMENT="jpenv-venv-container"
+
+# Set working directory.
+WORKDIR /home/${USERNAME}/devel
+
 # Enable interoperability between Linux and MacOS for absolute symlinks
 # pointing into the home folder.
 RUN ln -s /home /Users && chmod 555 /Users
@@ -42,14 +50,6 @@ RUN rustup install stable && rustup default stable
 
 # Install uv.
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-
-ENV HOME=/home/${USERNAME}
-ENV PATH="${HOME}/.local/bin:${PATH}"
-ENV EDITOR="vim"
-ENV UV_PROJECT_ENVIRONMENT="jpenv-venv-container"
-
-# Set working directory.
-WORKDIR /home/${USERNAME}/devel
 
 # Accept build date argument to bust cache.
 RUN echo "Build date: ${BUILD_DATE}"
