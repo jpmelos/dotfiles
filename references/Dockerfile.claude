@@ -12,6 +12,7 @@ RUN apt-get update && \
         bc \
         ripgrep \
         gh \
+        pre-commit \
         python3 \
         rustup \
         nodejs \
