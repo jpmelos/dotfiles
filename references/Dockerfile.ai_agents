@@ -38,7 +38,9 @@ RUN mkdir -p /home/${USERNAME}/devel \
 ENV HOME=/home/${USERNAME}
 ENV PATH="${HOME}/.local/bin:${PATH}"
 ENV EDITOR="vim"
+
 ENV UV_PROJECT_ENVIRONMENT="jpenv-venv-container"
+ENV UV_LINK_MODE="copy"
 
 # Set working directory.
 WORKDIR /home/${USERNAME}/devel
