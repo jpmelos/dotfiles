@@ -140,5 +140,7 @@
         "input_submit": "shift+return",
         "model_cycle_favorite": "shift+tab"
     },
+    "lsp": false,
+    "formatter": false,
     "autoupdate": false
 }
