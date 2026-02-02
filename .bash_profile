@@ -31,8 +31,6 @@ fi
 field_prepend PATH "$HOME/.local/bin"
 # Rust tooling's own binaries.
 field_prepend PATH "$HOME/.cargo/bin"
-# pyenv's own binaries.
-field_prepend PATH "$HOME/.pyenv/bin"
 # My own executables.
 field_prepend PATH "$HOME/bin"
 export PATH
@@ -99,9 +97,6 @@ export PIP_REQUIRE_VIRTUALENV=true
 # No need to show the current virtual environment in the prompt, since we'll
 # use Starship for that.
 export VIRTUAL_ENV_DISABLE_PROMPT=1
-
-# Indicate where the pyenv root is.
-export PYENV_ROOT=$HOME/.pyenv
 
 ##########################
 #                        #

@@ -54,15 +54,6 @@ source ~/.autoenv/activate.sh
 
 eval "$(starship init bash)"
 
-###############################
-#                             #
-#    Python-specific stuff    #
-#                             #
-###############################
-
-# Set up pyenv for each interactive shell.
-eval "$(pyenv init -)"
-
 ################################
 #                              #
 #    Homebrew's completions    #
