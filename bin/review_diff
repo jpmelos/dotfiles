@@ -19,7 +19,11 @@ if [ -z "$diff" ]; then
 fi
 
 cat << EOF
-The changes were obtained using: $git_command.
+The changes were obtained using
+
+\`\`\`
+$git_command
+\`\`\`
 
 =================
 
