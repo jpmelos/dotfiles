@@ -233,7 +233,7 @@ run_opencode() {
             # Calculate relative path from `$devel_dir`.
             main_worktree_relative="${main_worktree_realpath#"$devel_dir"/}"
             cmd+=(
-                -v "$main_worktree_realpath:$container_home/devel/$main_worktree_relative:ro"
+                -v "$main_worktree_realpath:$container_home/devel/$main_worktree_relative"
             )
         fi
 
