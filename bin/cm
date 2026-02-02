@@ -166,6 +166,11 @@ build_image() {
     fi
 }
 
+generate_container_name() {
+    local dir_basename=$(basename "$current_dir")
+    echo "oc_${dir_basename:0:53}_$(shuf -i 1-999999 -n 1)"
+}
+
 # Run Claude Code in Docker container.
 # Usage: run_claude [--exec] [--minimal] [args...]
 # --exec: Use exec to replace current process
@@ -205,9 +210,9 @@ run_claude() {
     container_home="/home/$username"
 
     if [[ "$minimal" == "true" ]]; then
-        cmd+=(--init --rm "$username-claude:latest" "$@")
+        cmd+=(--init --rm --name "$(generate_container_name)" "$username-claude:latest" "$@")
     else
-        cmd+=(--init --rm --user "$(id -u):$(id -g)")
+        cmd+=(--init --rm --name "$(generate_container_name)" --user "$(id -u):$(id -g)")
 
         cmd+=(-v "$current_dir:$container_home/devel/$project_relative_dir")
 
