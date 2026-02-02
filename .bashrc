@@ -126,7 +126,11 @@ alias curl='\curl -iL'
 
 # Docker aliases.
 alias d='docker'
+alias dps="docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
+
+# Docker Compose aliases.
 alias dc='docker compose'
+alias dcps="dc ps --format 'table {{.Name}}\t{{.Service}}\t{{.Status}}\t{{.Ports}}'"
 alias docker-nuke-all-the-things='
     docker rm -f $(docker ps -aq);  # Containers
     docker rmi -f $(docker images -aq);  # Images
