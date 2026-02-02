@@ -117,7 +117,7 @@
     br = "! f() { git branch -vv --color=always | head -n 20; }; f"
     bn = checkout -b  # n = new
     bd = branch -D  # d = delete
-    bD = "! f() { git branch | grep -v '^*' | xargs git branch -D; }; f"
+    bdd = "! f() { git branch | grep -v '^*' | xargs git branch -D; }; f"
 
     # c = commit
     c = commit
