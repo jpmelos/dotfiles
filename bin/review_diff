@@ -2,21 +2,33 @@
 set -euo pipefail
 trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND"' ERR
 
-diff=$(git diff)
-git_command="git diff"
-if [ -z "$diff" ]; then
+get_diff() {
+    diff=$(git diff)
+    git_command="git diff"
+    if [ -n "$diff" ]; then
+        return 0
+    fi
+
     diff=$(git diff --cached)
     git_command="git diff --cached"
-    if [ -z "$diff" ]; then
-        main_branch=$(git main-branch)
-        diff=$(git diff "$main_branch...")
-        git_command="git diff $main_branch..."
-        if [ -z "$diff" ]; then
-            echo "There is nothing to review."
-            exit 1
-        fi
+    if [ -n "$diff" ]; then
+        return 0
     fi
-fi
+
+    local main_branch
+    main_branch=$(git main-branch)
+
+    diff=$(git diff "$main_branch...")
+    git_command="git diff $main_branch..."
+    if [ -n "$diff" ]; then
+        return 0
+    fi
+
+    echo "There is nothing to review."
+    return 1
+}
+
+get_diff || exit 1
 
 cat << EOF
 The changes were obtained using
