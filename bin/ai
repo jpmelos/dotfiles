@@ -1,0 +1,709 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND"' ERR
+
+#/ Run OpenCode or Claude Code inside a Docker container.
+#/
+#/ Usage: ai [options]
+#/ Options:
+#/   --harness <name>  Specify harness: 'opencode' or 'claude' (overrides auto-detection)
+#/   --profile <name>  Specify profile for API key lookup (default: auto-detect from path)
+#/   --env             Only export environment variables, don't run
+#/   --raw-output      Output raw JSON (only in print mode)
+#/   --force-rebuild   Force rebuild of Docker image
+#/   --no-build-cache  Build from scratch without using cache
+#/   --help-harness    Show harness help
+#/   --help            Show this help
+#/
+#/ Configuration:
+#/   Expects a 1Password item at: op://Private/AI Agents Configuration/notesPlain
+#/   Format (JSON):
+#/   {
+#/     "profiles": {
+#/       "username": {
+#/         "opencode_api_key": "sk-...",
+#/         "claude_code_api_key": "sk-..."
+#/       },
+#/       "orgname": {
+#/         "opencode_api_key": "sk-...",
+#/         "claude_code_api_key": "sk-..."
+#/       }
+#/     }
+#/   }
+#/   If a profile is not found, falls back to the username profile.
+
+if [ -z "${BASH_VERSION:-}" ]; then
+    echo "Error: This script requires bash" >&2
+    exit 1
+fi
+
+if ! command -v docker &> /dev/null; then
+    echo "Error: Docker is not installed" >&2
+    exit 1
+fi
+
+if ! docker info &> /dev/null; then
+    echo "Error: Docker daemon is not running" >&2
+    exit 1
+fi
+
+if ! command -v bc &> /dev/null; then
+    echo "Error: bc is not installed" >&2
+    exit 1
+fi
+
+if ! command -v jq &> /dev/null; then
+    echo "Error: jq is not installed" >&2
+    exit 1
+fi
+
+if ! command -v realpath &> /dev/null; then
+    echo "Error: realpath is not installed" >&2
+    exit 1
+fi
+
+devel_dir="$(realpath "$HOME/devel")"
+if [[ ! -d "$devel_dir" ]]; then
+    echo "Error: $HOME/devel does not exist" >&2
+    exit 1
+fi
+
+current_dir="$(realpath "$(pwd)")"
+if [[ "$current_dir" != "$devel_dir"* ]]; then
+    echo "Error: not inside ~/devel" >&2
+    exit 1
+fi
+
+project_relative_dir="${current_dir#"$devel_dir"/}"
+if [[ -z "$project_relative_dir" ]]; then
+    echo "Error: Cannot run from ~/devel root, must be in a subdirectory" >&2
+    exit 1
+fi
+
+harness=""
+profile=""
+env_only=false
+raw_output=false
+force_rebuild=false
+no_build_cache=false
+show_harness_help=false
+show_help=false
+harness_args=()
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --harness)
+            shift
+            if [[ $# -eq 0 ]]; then
+                echo "Error: --harness requires an argument" >&2
+                exit 1
+            fi
+            harness="$1"
+            shift
+            ;;
+        --profile)
+            shift
+            if [[ $# -eq 0 ]]; then
+                echo "Error: --profile requires an argument" >&2
+                exit 1
+            fi
+            profile="$1"
+            shift
+            ;;
+        --env)
+            env_only=true
+            shift
+            ;;
+        --raw-output)
+            raw_output=true
+            shift
+            ;;
+        --force-rebuild)
+            force_rebuild=true
+            shift
+            ;;
+        --no-build-cache)
+            no_build_cache=true
+            shift
+            ;;
+        --help-harness)
+            show_harness_help=true
+            shift
+            ;;
+        --help)
+            show_help=true
+            shift
+            ;;
+        *)
+            harness_args+=("$1")
+            shift
+            ;;
+    esac
+done
+
+if [[ "$show_help" == "true" ]]; then
+    grep '^#/' "${BASH_SOURCE[0]}" | cut -c4-
+    exit 0
+fi
+
+username="$(whoami)"
+dockerfile_path="$devel_dir/dotfiles/references/Dockerfile.ai_agents"
+
+# ============================================================================
+# Harness Configuration
+# ============================================================================
+# This section defines harness-specific behavior to avoid if statements
+# scattered throughout the code.
+
+declare -A HARNESS_CONFIG
+
+# OpenCode configuration
+HARNESS_CONFIG[opencode.name]="OpenCode"
+HARNESS_CONFIG[opencode.docker_target]="opencode"
+HARNESS_CONFIG[opencode.docker_image]="$username-opencode:latest"
+HARNESS_CONFIG[opencode.container_prefix]="oc"
+HARNESS_CONFIG[opencode.state_dir]="$HOME/.config/opencode"
+HARNESS_CONFIG[opencode.build_date_file]="$HOME/.config/opencode/.last-docker-build.date"
+HARNESS_CONFIG[opencode.build_mtime_file]="$HOME/.config/opencode/.last-docker-build.mtime"
+
+# Claude Code configuration
+HARNESS_CONFIG[claude.name]="Claude Code"
+HARNESS_CONFIG[claude.docker_target]="claude"
+HARNESS_CONFIG[claude.docker_image]="$username-claude:latest"
+HARNESS_CONFIG[claude.container_prefix]="cc"
+HARNESS_CONFIG[claude.state_dir]="$HOME/.claude"
+HARNESS_CONFIG[claude.build_date_file]="$HOME/.claude/.last-docker-build.date"
+HARNESS_CONFIG[claude.build_mtime_file]="$HOME/.claude/.last-docker-build.mtime"
+
+# Determine harness if not explicitly set.
+if [[ -z "$harness" ]]; then
+    # Check AI_AGENT_HARNESS environment variable first.
+    if [[ -n "${AI_AGENT_HARNESS:-}" ]]; then
+        harness="$AI_AGENT_HARNESS"
+    else
+        has_opencode_key=false
+        has_claude_key=false
+
+        [ -n "${OPENCODE_API_KEY:-}" ] && has_opencode_key=true
+        [ -n "${CLAUDE_CODE_API_KEY:-}" ] && has_claude_key=true
+
+        if [[ "$has_opencode_key" == "true" && "$has_claude_key" == "true" ]]; then
+            echo "Both OpenCode and Claude Code API keys are defined." >&2
+            read -p "Which would you like to use? [(o)pencode/(c)laude] (default: opencode): " choice
+            choice=${choice:-opencode}
+            case "$choice" in
+                claude | c)
+                    harness="claude"
+                    ;;
+                opencode | o | *)
+                    harness="opencode"
+                    ;;
+            esac
+        elif [[ "$has_opencode_key" == "true" ]]; then
+            harness="opencode"
+        elif [[ "$has_claude_key" == "true" ]]; then
+            harness="claude"
+        else
+            echo "No API keys found in environment." >&2
+            read -p "Which would you like to use? [(o)pencode/(c)laude] (default: opencode): " choice
+            choice=${choice:-opencode}
+            case "$choice" in
+                claude | c)
+                    harness="claude"
+                    ;;
+                opencode | o | *)
+                    harness="opencode"
+                    ;;
+            esac
+        fi
+    fi
+fi
+
+# Validate harness.
+if [[ "$harness" != "opencode" && "$harness" != "claude" ]]; then
+    echo "Error: Invalid harness '$harness'. Must be 'opencode' or 'claude'" >&2
+    exit 1
+fi
+
+# Extract configuration for selected harness.
+HARNESS_NAME="${HARNESS_CONFIG[$harness.name]}"
+DOCKER_TARGET="${HARNESS_CONFIG[$harness.docker_target]}"
+DOCKER_IMAGE="${HARNESS_CONFIG[$harness.docker_image]}"
+CONTAINER_PREFIX="${HARNESS_CONFIG[$harness.container_prefix]}"
+STATE_DIR="${HARNESS_CONFIG[$harness.state_dir]}"
+BUILD_DATE_FILE="${HARNESS_CONFIG[$harness.build_date_file]}"
+BUILD_MTIME_FILE="${HARNESS_CONFIG[$harness.build_mtime_file]}"
+
+# ============================================================================
+# Harness-Specific Functions
+# ============================================================================
+
+# Setup Docker volume mounts - harness specific.
+setup_docker_mounts() {
+    local -n cmd_ref=$1
+
+    if [[ "$harness" == "opencode" ]]; then
+        cmd_ref+=(
+            -v "$HOME/.config/opencode:$container_home/.config/opencode:ro"
+            -v "$HOME/.local/state/opencode:$container_home/.local/state/opencode"
+            -v "$HOME/.local/share/opencode:$container_home/.local/share/opencode"
+        )
+    else
+        cmd_ref+=(
+            -v "$HOME/.claude:$container_home/.claude"
+            -v "$HOME/.claude.json:$container_home/.claude.json"
+        )
+    fi
+}
+
+# Setup Docker environment variables - harness specific.
+setup_docker_env() {
+    local -n cmd_ref=$1
+
+    if [[ "$harness" == "opencode" ]]; then
+        cmd_ref+=(
+            -e OPENCODE_DISABLE_AUTOUPDATE=1
+            -e OPENCODE_DISABLE_DEFAULT_PLUGINS=1
+            -e OPENCODE_DISABLE_LSP_DOWNLOAD=1
+            -e OPENCODE_DISABLE_CLAUDE_CODE=1
+            -e OPENCODE_DISABLE_MODELS_FETCH=1
+            -e OPENCODE_API_KEY
+            -e CLAUDE_CODE_API_KEY
+            -e GH_TOKEN
+        )
+
+        # Pass OPENCODE_CONFIG_CONTENT if defined in environment.
+        if [ -n "${OPENCODE_CONFIG_CONTENT:-}" ]; then
+            cmd_ref+=(-e OPENCODE_CONFIG_CONTENT)
+        fi
+    else
+        cmd_ref+=(
+            -e CLAUDE_CODE_API_KEY
+            -e GH_TOKEN
+        )
+    fi
+}
+
+# Detect if we're in print mode based on harness arguments.
+# Returns 0 if in print mode, 1 otherwise.
+is_print_mode() {
+    if [[ "$harness" == "opencode" ]]; then
+        # OpenCode print mode: "run --format json <message>"
+        if [[ "${#harness_args[@]}" -ge 3 ]] \
+            && [[ "${harness_args[0]}" == "run" ]] \
+            && [[ "${harness_args[1]}" == "--format" ]] \
+            && [[ "${harness_args[2]}" == "json" ]]; then
+            return 0
+        fi
+    else
+        # Claude print mode: "--print --output-format json <message>"
+        local has_print_flag=false
+        local has_json_format=false
+
+        local i=0
+        while [[ $i -lt ${#harness_args[@]} ]]; do
+            local arg="${harness_args[$i]}"
+            if [[ "$arg" == "--print" ]]; then
+                has_print_flag=true
+            elif [[ "$arg" == "--output-format" ]]; then
+                local next_i=$((i + 1))
+                if [[ $next_i -lt ${#harness_args[@]} ]] && [[ "${harness_args[$next_i]}" == "json" ]]; then
+                    has_json_format=true
+                fi
+            fi
+            i=$((i + 1))
+        done
+
+        if [[ "$has_print_flag" == "true" ]] && [[ "$has_json_format" == "true" ]]; then
+            return 0
+        fi
+    fi
+    return 1
+}
+
+# Process harness output for print mode.
+process_print_output() {
+    local output="$1"
+
+    if [[ "$harness" == "opencode" ]]; then
+        # OpenCode output is newline-delimited JSON.
+        local result=$(jq -s '[.[] | select(.type == "text")] | last | .part.text' <<< "$output")
+
+        # Get first and last timestamps to calculate duration.
+        local first_ts=$(head -n 1 <<< "$output" | jq -r '.timestamp // 0')
+        local last_ts=$(tail -n 1 <<< "$output" | jq -r '.timestamp // 0')
+        local duration_ms=$((last_ts - first_ts))
+        local duration=$(printf "%.3f" "$(bc <<< "scale=3; $duration_ms / 1000")")
+
+        # Sum up costs from all steps.
+        local cost=$(jq -s 'map(.part.cost // 0) | add' <<< "$output")
+    else
+        local result=$(jq -r '.result // ""' <<< "$output")
+        local cost=$(jq -r '.total_cost_usd // 0' <<< "$output")
+        local duration_ms=$(jq -r '.duration_ms // 0' <<< "$output")
+        local duration=$(printf "%.3f" "$(bc <<< "scale=3; $duration_ms / 1000")")
+    fi
+
+    echo "$result"
+    echo "" >&2
+    echo "Cost: \$$(round_up_cents "$cost")" >&2
+    echo "Duration: $(format_duration "$duration")" >&2
+}
+
+# ============================================================================
+# Common Functions
+# ============================================================================
+
+build_image() {
+    local today="$1"
+    local use_cache="$2"
+
+    echo "Building Docker image..." >&2
+    local build_args=(
+        -f "$dockerfile_path"
+        --target "$DOCKER_TARGET"
+        --build-arg USERNAME="$username"
+        --build-arg BUILD_DATE="$today"
+    )
+
+    if [[ "$use_cache" == "false" ]]; then
+        echo "Building from scratch without cache..." >&2
+        build_args+=(--no-cache)
+    fi
+
+    build_args+=(
+        -t "$DOCKER_IMAGE"
+        "$devel_dir/dotfiles"
+    )
+
+    if docker build "${build_args[@]}" >&2; then
+        # Clean up dangling images.
+        if ! docker image prune -f >&2 2> /dev/null; then
+            echo "Warning: Could not clean up dangling Docker images" >&2
+        fi
+        return 0
+    else
+        echo "Warning: Docker build failed" >&2
+        # Clean up dangling images.
+        if ! docker image prune -f >&2 2> /dev/null; then
+            echo "Warning: Could not clean up dangling Docker images" >&2
+        fi
+        return 1
+    fi
+}
+
+generate_container_name() {
+    local dir_basename=$(basename "$current_dir")
+    echo "${CONTAINER_PREFIX}_${dir_basename:0:53}_$(shuf -i 1-999999 -n 1)"
+}
+
+# Run harness in Docker container.
+# Usage: run_harness [--exec] [--minimal] [args...]
+# --exec: Use exec to replace current process
+# --minimal: Skip mounts and environment, just run with --rm
+run_harness() {
+    local use_exec=false
+    local minimal=false
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --exec)
+                use_exec=true
+                shift
+                ;;
+            --minimal)
+                minimal=true
+                shift
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+
+    local cmd=(docker run)
+
+    # Only use -i if stdin is a TTY.
+    if [ -t 0 ]; then
+        cmd+=(-i)
+    fi
+
+    container_home="/home/$username"
+
+    if [[ "$minimal" == "true" ]]; then
+        cmd+=(-t --init --rm --name "$(generate_container_name)" "$DOCKER_IMAGE" "$@")
+    else
+        cmd+=(-t --init --rm --name "$(generate_container_name)" --user "$(id -u):$(id -g)")
+
+        cmd+=(-v "$current_dir:$container_home/devel/$project_relative_dir")
+
+        # If this is not the main Git worktree, also mount the main worktree.
+        if [ -f "$current_dir/.git" ]; then
+            # .git is a file, not a directory - this is not the main worktree.
+            main_worktree=$(
+                git worktree list --porcelain \
+                    | grep -m1 "^worktree " | cut -d' ' -f2
+            )
+            main_worktree_realpath=$(realpath "$main_worktree")
+
+            if [[ "$main_worktree_realpath" != "$devel_dir"* ]]; then
+                echo "Error: Main worktree must be in ~/devel" >&2
+                exit 1
+            fi
+
+            # Calculate relative path from `$devel_dir`.
+            main_worktree_relative="${main_worktree_realpath#"$devel_dir"/}"
+            cmd+=(
+                -v "$main_worktree_realpath:$container_home/devel/$main_worktree_relative"
+            )
+        fi
+
+        # Mount my dotfiles so symlinks work.
+        if [ "$current_dir" != "$devel_dir/dotfiles" ]; then
+            cmd+=(-v "$devel_dir/dotfiles:$container_home/devel/dotfiles:ro")
+        fi
+
+        # Mount additional projects from `AGENTS_ADDITIONAL_PROJECTS`.
+        if [ -n "${AGENTS_ADDITIONAL_PROJECTS:-}" ]; then
+            IFS=',' read -ra ADDITIONAL_PROJECTS <<< "$AGENTS_ADDITIONAL_PROJECTS"
+            for project in "${ADDITIONAL_PROJECTS[@]}"; do
+                # Trim whitespace.
+                project=$(xargs <<< "$project")
+                if [ -n "$project" ]; then
+                    project_path="$devel_dir/$project"
+                    if [ -d "$project_path" ]; then
+                        cmd+=(-v "$project_path:$container_home/devel/$project:ro")
+                    else
+                        echo "Warning: Additional project '$project' does not exist at $project_path" >&2
+                    fi
+                fi
+            done
+        fi
+
+        cmd+=(
+            -v "$devel_dir/dotfiles/bin/ai_commit:/usr/local/bin/ai_commit:ro"
+            -v "$devel_dir/dotfiles/bin/safe_rm:/usr/local/bin/safe_rm:ro"
+            -v "$devel_dir/dotfiles/bin/ralph:/usr/local/bin/ralph:ro"
+            -v "$devel_dir/dotfiles/bin/review_diff:/usr/local/bin/review_diff:ro"
+            -v "$HOME/.config/git:$container_home/.config/git:ro"
+        )
+
+        # Setup harness-specific mounts.
+        setup_docker_mounts cmd
+
+        # Setup harness-specific environment variables.
+        setup_docker_env cmd
+
+        cmd+=(
+            -w "$container_home/devel/$project_relative_dir"
+            "$DOCKER_IMAGE"
+            "$@"
+        )
+    fi
+
+    echo "Running container..." >&2
+
+    if [[ "$use_exec" == "true" ]]; then
+        exec "${cmd[@]}"
+    else
+        "${cmd[@]}"
+    fi
+}
+
+# Function to round cost up to the next cent for display.
+round_up_cents() {
+    local value=$1
+    local rounded=$(bc <<< "scale=0; tmp = $value * 100; tmp = tmp / 1; if (tmp < $value * 100) tmp = tmp + 1; scale=2; tmp / 100")
+    printf "%.2f" "$rounded"
+}
+
+# Function to format duration as XhYmZ.WWWs.
+format_duration() {
+    local total_seconds=$1
+
+    # Handle zero or empty input.
+    if [[ -z "$total_seconds" ]] || [[ $(bc <<< "$total_seconds == 0") -eq 1 ]]; then
+        echo "0.000s"
+        return
+    fi
+
+    local hours=$(bc <<< "$total_seconds / 3600")
+    local remainder=$(bc <<< "$total_seconds - ($hours * 3600)")
+    local minutes=$(bc <<< "$remainder / 60")
+    local seconds=$(bc <<< "$remainder - ($minutes * 60)")
+
+    local result=""
+    if [ "$hours" -gt 0 ]; then
+        result="${hours}h"
+    fi
+    if [ "$minutes" -gt 0 ] || [ "$hours" -gt 0 ]; then
+        result="${result}${minutes}m"
+    fi
+    result="${result}$(printf "%.3f" "$seconds")s"
+    echo "$result"
+}
+
+# ============================================================================
+# Main Execution
+# ============================================================================
+
+mkdir -p "$(dirname "$BUILD_DATE_FILE")"
+if [[ ! -f "$BUILD_DATE_FILE" ]]; then
+    echo "never" > "$BUILD_DATE_FILE"
+fi
+if [[ ! -f "$BUILD_MTIME_FILE" ]]; then
+    echo "0" > "$BUILD_MTIME_FILE"
+fi
+
+dockerfile_mtime=$(stat -c %Y "$dockerfile_path" 2> /dev/null || stat -f %m "$dockerfile_path" 2> /dev/null || echo "0")
+last_build_date=$(cat "$BUILD_DATE_FILE")
+last_build_mtime=$(cat "$BUILD_MTIME_FILE")
+today=$(date +%Y-%m-%d)
+
+if [[ "$force_rebuild" == "true" ]] \
+    || [[ "$last_build_date" != "$today" ]] \
+    || [[ "$dockerfile_mtime" -gt "$last_build_mtime" ]]; then
+    use_cache="true"
+    if [[ "$no_build_cache" == "true" ]]; then
+        use_cache="false"
+    fi
+    if ! build_image "$today" "$use_cache"; then
+        if ! docker image inspect "$DOCKER_IMAGE" > /dev/null 2>&1; then
+            echo "Error: Docker image does not exist and build failed" >&2
+            exit 1
+        fi
+        echo "" >&2
+        echo "========================================" >&2
+        echo "WARNING: BUILD FAILED - OLD IMAGE EXISTS" >&2
+        echo "========================================" >&2
+        echo "The Docker build failed, but an older image is available." >&2
+        echo "This image may have outdated dependencies or be missing recent fixes." >&2
+        echo "" >&2
+        read -p "Do you want to continue with the old image? [y/N] " -n 1 -r >&2
+        echo "" >&2
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "Aborted by user" >&2
+            exit 1
+        fi
+        echo "Continuing with existing Docker image..." >&2
+    else
+        echo "$today" > "$BUILD_DATE_FILE"
+        echo "$dockerfile_mtime" > "$BUILD_MTIME_FILE"
+    fi
+fi
+
+if [[ "$show_harness_help" == "true" ]]; then
+    run_harness --exec --minimal --help
+fi
+
+if [ -z "$profile" ]; then
+    component_count=$(tr '/' '\n' <<< "$project_relative_dir" | wc -l)
+    if [ "$component_count" -gt 1 ]; then
+        profile="$(cut -d'/' -f1 <<< "$project_relative_dir")"
+    else
+        profile="$username"
+    fi
+fi
+
+echo "Running $HARNESS_NAME with profile '$profile'..." >&2
+
+# Validate profile name to prevent command injection.
+# Max length: 64 characters, alphanumeric with dots, dashes, underscores.
+if [[ ! "$profile" =~ ^[a-zA-Z0-9_]([a-zA-Z0-9._-]{0,62}[a-zA-Z0-9_])?$ ]]; then
+    echo "Error: Invalid profile name '$profile'" >&2
+    exit 1
+fi
+
+# Fetch API keys from 1Password if not already set.
+if [ -z "${OPENCODE_API_KEY:-}${CLAUDE_CODE_API_KEY:-}${GH_TOKEN:-}" ]; then
+    echo -n "Fetching AI Agents configuration from 1Password..." >&2
+    if ! SECRETS=$(op read "op://Private/AI Agents Configuration/notesPlain" 2>&1); then
+        echo "Error: Failed to retrieve configuration from 1Password" >&2
+        echo "Make sure you are logged in to 1Password CLI (run: op signin)" >&2
+        exit 1
+    fi
+    echo " done!" >&2
+
+    # Validate that we got valid JSON.
+    if ! jq empty <<< "$SECRETS" 2> /dev/null; then
+        echo "Error: Retrieved secret is not valid JSON" >&2
+        exit 1
+    fi
+
+    # Extract API keys with fallback to 'jpmelos' profile if requested profile doesn't exist.
+    if [ -z "${OPENCODE_API_KEY:-}" ]; then
+        OPENCODE_API_KEY=$(jq -r --arg p "$profile" --arg u "$username" \
+            'if .profiles[$p].opencode_api_key then .profiles[$p].opencode_api_key
+             else .profiles[$u].opencode_api_key // empty end' \
+            <<< "$SECRETS")
+
+        if [[ -z "$OPENCODE_API_KEY" || "$OPENCODE_API_KEY" == "null" ]]; then
+            echo "Warning: No OpenCode API key found for profile '$profile' or '$username'" >&2
+        else
+            export OPENCODE_API_KEY
+        fi
+    fi
+
+    if [ -z "${CLAUDE_CODE_API_KEY:-}" ]; then
+        CLAUDE_CODE_API_KEY=$(jq -r --arg p "$profile" --arg u "$username" \
+            'if .profiles[$p].claude_code_api_key then .profiles[$p].claude_code_api_key
+             else .profiles[$u].claude_code_api_key // empty end' \
+            <<< "$SECRETS")
+
+        if [[ -z "$CLAUDE_CODE_API_KEY" || "$CLAUDE_CODE_API_KEY" == "null" ]]; then
+            echo "Warning: No Claude Code API key found for profile '$profile' or '$username'" >&2
+        else
+            export CLAUDE_CODE_API_KEY
+        fi
+    fi
+
+    # Fetch GitHub token if not set.
+    if [ -z "${GH_TOKEN:-}" ]; then
+        echo -n "Fetching GitHub token from 1Password..." >&2
+        if ! GH_TOKEN=$(op read "op://Private/GH Token/notesPlain" 2>&1); then
+            echo "Error: Failed to retrieve GH_TOKEN from 1Password" >&2
+            echo "Make sure you are logged in to 1Password CLI (run: op signin)" >&2
+            exit 1
+        fi
+        echo " done!" >&2
+
+        if [[ -z "$GH_TOKEN" ]]; then
+            echo "Error: GH_TOKEN is empty" >&2
+            exit 1
+        fi
+
+        export GH_TOKEN
+    fi
+fi
+
+if [[ "$env_only" == "true" ]]; then
+    # Output shell commands to be eval'd for environment variable export.
+    [ -n "${OPENCODE_API_KEY:-}" ] && printf "export OPENCODE_API_KEY=%q\n" "$OPENCODE_API_KEY"
+    [ -n "${CLAUDE_CODE_API_KEY:-}" ] && printf "export CLAUDE_CODE_API_KEY=%q\n" "$CLAUDE_CODE_API_KEY"
+    printf "export AI_AGENT_HARNESS=%q\n" "$harness"
+    echo "Environment variables exported for profile '$profile'" >&2
+    exit 0
+fi
+
+mkdir -p "$STATE_DIR"
+
+# Detect if we're in print mode and handle `--raw-output` accordingly.
+if is_print_mode; then
+    # We're in print mode.
+    if [[ "$raw_output" == "true" ]]; then
+        # Just pass through raw JSON output.
+        run_harness --exec "${harness_args[@]}"
+    else
+        # Format the output with cost and duration.
+        output=$(run_harness "${harness_args[@]}")
+        process_print_output "$output"
+    fi
+else
+    # Not in print mode - warn if `--raw-output` is present.
+    if [[ "$raw_output" == "true" ]]; then
+        echo "Warning: --raw-output has no effect outside print mode" >&2
+    fi
+
+    # Pass all arguments directly to the harness.
+    run_harness --exec "${harness_args[@]}"
+fi
