@@ -269,8 +269,11 @@ run_opencode() {
         )
 
         cmd+=(
+            -e OPENCODE_DISABLE_AUTOUPDATE=1
+            -e OPENCODE_DISABLE_DEFAULT_PLUGINS=1
+            -e OPENCODE_DISABLE_LSP_DOWNLOAD=1
+            -e OPENCODE_DISABLE_CLAUDE_CODE=1
             -e OPENCODE_DISABLE_MODELS_FETCH=1
-            -e OPENCODE_DISABLE_CLAUDE_CODE=true
             -e OPENCODE_API_KEY
             -e CLAUDE_CODE_API_KEY
             -e GH_TOKEN
