@@ -636,11 +636,11 @@ if [ -z "${OPENCODE_API_KEY:-}${CLAUDE_CODE_API_KEY:-}${GH_TOKEN:-}" ]; then
         exit 1
     fi
 
-    # Extract API keys with fallback to 'jpmelos' profile if requested profile doesn't exist.
+    # Extract API keys with fallback to '$username' profile if requested
+    # profile doesn't exist or has no key.
     if [ -z "${OPENCODE_API_KEY:-}" ]; then
         OPENCODE_API_KEY=$(jq -r --arg p "$profile" --arg u "$username" \
-            'if .profiles[$p].opencode_api_key then .profiles[$p].opencode_api_key
-             else .profiles[$u].opencode_api_key // empty end' \
+            '(.profiles[$p].opencode_api_key // .profiles[$u].opencode_api_key) // empty' \
             <<< "$SECRETS")
 
         if [[ -z "$OPENCODE_API_KEY" || "$OPENCODE_API_KEY" == "null" ]]; then
@@ -652,8 +652,7 @@ if [ -z "${OPENCODE_API_KEY:-}${CLAUDE_CODE_API_KEY:-}${GH_TOKEN:-}" ]; then
 
     if [ -z "${CLAUDE_CODE_API_KEY:-}" ]; then
         CLAUDE_CODE_API_KEY=$(jq -r --arg p "$profile" --arg u "$username" \
-            'if .profiles[$p].claude_code_api_key then .profiles[$p].claude_code_api_key
-             else .profiles[$u].claude_code_api_key // empty end' \
+            '(.profiles[$p].claude_code_api_key // .profiles[$u].claude_code_api_key) // empty' \
             <<< "$SECRETS")
 
         if [[ -z "$CLAUDE_CODE_API_KEY" || "$CLAUDE_CODE_API_KEY" == "null" ]]; then
