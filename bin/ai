@@ -147,7 +147,7 @@ if [[ "$show_help" == "true" ]]; then
 fi
 
 username="$(whoami)"
-dockerfile_path="$devel_dir/dotfiles/references/Dockerfile.ai_agents"
+dockerfile_path="$devel_dir/dotfiles/references/ai_containers/Dockerfile.ai_agents"
 
 # ============================================================================
 # Harness Configuration

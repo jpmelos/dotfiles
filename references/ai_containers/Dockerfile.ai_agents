@@ -7,7 +7,6 @@ ARG BUILD_DATE
 RUN apt-get update && \
     apt-get install -y \
         build-essential \
-        docker.io \
         git \
         git-delta \
         curl \
