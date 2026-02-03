@@ -58,8 +58,21 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o install_rust.sh
 # Install uv.
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
+# Install Docker.
+RUN curl -sL https://download.docker.com/linux/ubuntu/dists/questing/pool/stable/arm64/docker-ce-cli_29.2.1-1~ubuntu.25.10~questing_arm64.deb -o docker-ce-cli.deb && \
+    dpkg -i docker-ce-cli.deb && \
+    rm docker-ce-cli.deb
+RUN curl -sL https://download.docker.com/linux/ubuntu/dists/questing/pool/stable/arm64/docker-buildx-plugin_0.31.1-1~ubuntu.25.10~questing_arm64.deb -o docker-buildx-plugin.deb && \
+    dpkg -i docker-buildx-plugin.deb && \
+    rm docker-buildx-plugin.deb
+RUN curl -sL https://download.docker.com/linux/ubuntu/dists/questing/pool/stable/arm64/docker-compose-plugin_5.0.2-1~ubuntu.25.10~questing_arm64.deb -o docker-compose-plugin.deb && \
+    dpkg -i docker-compose-plugin.deb && \
+    rm docker-compose-plugin.deb
+
 # Accept build date argument to bust cache.
 RUN echo "Build date: ${BUILD_DATE}"
+
+# ============================================================================
 
 FROM base AS claude
 
@@ -69,6 +82,8 @@ RUN curl -fsSL https://claude.ai/install.sh -o /root/claude-install.sh && \
     rm /root/claude-install.sh
 
 ENTRYPOINT ["claude"]
+
+# ============================================================================
 
 FROM base AS opencode
 
