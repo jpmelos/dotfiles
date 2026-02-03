@@ -7,16 +7,16 @@ ARG BUILD_DATE
 RUN apt-get update && \
     apt-get install -y \
         build-essential \
-        git \
-        git-delta \
         curl \
         ca-certificates \
+        git \
+        git-delta \
         jq \
         bc \
         ripgrep \
         gh \
         pre-commit \
-        vim \
+        neovim \
         python3 \
         rustup \
         nodejs \
