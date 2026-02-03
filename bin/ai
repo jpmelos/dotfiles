@@ -433,7 +433,7 @@ run_harness() {
     if [[ "$minimal" == "true" ]]; then
         cmd+=(-t --init --rm --name "$(generate_container_name)" "$DOCKER_IMAGE" "$@")
     else
-        cmd+=(-t --init --rm --name "$(generate_container_name)" --user "$(id -u):$(id -g)")
+        cmd+=(-t --init --rm --name "$(generate_container_name)" --user "$(id -u):$(id -g)" --group-add 0)
 
         cmd+=(-v "$current_dir:$container_home/devel/$project_relative_dir")
 
@@ -488,11 +488,17 @@ run_harness() {
             -v "$HOME/.config/git:$container_home/.config/git:ro"
         )
 
-        # Setup harness-specific mounts.
+        # Set up harness-specific mounts.
         setup_docker_mounts cmd
 
-        # Setup harness-specific environment variables.
+        # Set up harness-specific environment variables.
         setup_docker_env cmd
+
+        # Set up Docker access from inside the container.
+        cmd+=(
+            -v "$HOME/.docker/run/docker.sock:/var/run/docker.sock"
+            -e "DOCKER_HOST=unix:///var/run/docker.sock"
+        )
 
         cmd+=(
             -w "$container_home/devel/$project_relative_dir"
