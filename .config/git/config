@@ -74,10 +74,10 @@
     whitespace = black red dim bold
 
 [alias]
-    main-branch = ! ~/.check-for-git-remote-head.sh && git symbolic-ref refs/remotes/origin/HEAD | cut -d'/' -f4
+    main-branch = ! ~/devel/dotfiles/references/scripts/.check-for-git-remote-head.sh && git symbolic-ref refs/remotes/origin/HEAD | cut -d'/' -f4
     root = rev-parse --show-toplevel
-    nuke = "! f() { source "$HOME/.gitfunctions"; __git_nuke; }; f"
-    big-revert = "! f() { source "$HOME/.gitfunctions"; __git_big_revert; }; f"
+    nuke = "! f() { source "$HOME/devel/dotfiles/references/scripts/.gitfunctions"; __git_nuke; }; f"
+    big-revert = "! f() { source "$HOME/devel/dotfiles/references/scripts/.gitfunctions"; __git_big_revert; }; f"
 
     # List of shorthands:
     # a = add
@@ -141,7 +141,7 @@
     domf = ! git diff origin/$(git main-branch)...HEAD --stat
 
     # l = log
-    l = "! f() { git log --color=always --oneline --graph --decorate $@ | awk -f ~/.git-log-prepend-number-awk | less -R; }; f"
+    l = "! f() { git log --color=always --oneline --graph --decorate $@ | awk -f ~/devel/dotfiles/references/scripts/.git-log-prepend-number-awk | less -R; }; f"
     lf = log -p --follow --stat --
     lp = log -p --pretty=fuller --stat
 
