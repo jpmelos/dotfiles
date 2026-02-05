@@ -478,16 +478,22 @@ run_harness() {
         # Mount additional projects from `AGENTS_ADDITIONAL_PROJECTS`.
         if [ -n "${AGENTS_ADDITIONAL_PROJECTS:-}" ]; then
             IFS=',' read -ra ADDITIONAL_PROJECTS <<< "$AGENTS_ADDITIONAL_PROJECTS"
-            for project in "${ADDITIONAL_PROJECTS[@]}"; do
+            for additional_project in "${ADDITIONAL_PROJECTS[@]}"; do
                 # Trim whitespace.
-                project=$(xargs <<< "$project")
-                if [ -n "$project" ]; then
-                    project_path="$devel_dir/$project"
+                additional_project=$(xargs <<< "$additional_project")
+                if [ -n "$additional_project" ]; then
+                    # Skip if this is the current project to avoid duplicate
+                    # mounts.
+                    if [ "$additional_project" == "$project_relative_dir" ]; then
+                        echo "Skipping additional mount for current project: $additional_project" >&2
+                        continue
+                    fi
+                    project_path="$devel_dir/$additional_project"
                     if [ -d "$project_path" ]; then
-                        echo "Additional mount point: $project" >&2
-                        cmd+=(-v "$project_path:$container_home/devel/$project:ro")
+                        echo "Additional mount point: $additional_project" >&2
+                        cmd+=(-v "$project_path:$container_home/devel/$additional_project:ro")
                     else
-                        echo "Warning: Additional project '$project' does not exist at $project_path" >&2
+                        echo "Warning: Additional project '$additional_project' does not exist at $project_path" >&2
                     fi
                 fi
             done
@@ -511,12 +517,12 @@ run_harness() {
         # `AGENTS_ADDITIONAL_ENV_VARS`.
         if [ -n "${AGENTS_ADDITIONAL_ENV_VARS:-}" ]; then
             IFS=',' read -ra ADDITIONAL_ENV_VARS <<< "$AGENTS_ADDITIONAL_ENV_VARS"
-            for env_var in "${ADDITIONAL_ENV_VARS[@]}"; do
+            for additional_env_var in "${ADDITIONAL_ENV_VARS[@]}"; do
                 # Trim whitespace.
-                env_var=$(xargs <<< "$env_var")
-                if [ -n "$env_var" ]; then
-                    echo "Additional environment variable: $env_var" >&2
-                    cmd+=(-e "$env_var")
+                additional_env_var=$(xargs <<< "$additional_env_var")
+                if [ -n "$additional_env_var" ]; then
+                    echo "Additional environment variable: $additional_env_var" >&2
+                    cmd+=(-e "$additional_env_var")
                 fi
             done
         fi
