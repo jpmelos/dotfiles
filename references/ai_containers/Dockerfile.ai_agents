@@ -1,8 +1,5 @@
 FROM debian:trixie-slim AS base
 
-ARG USERNAME
-ARG BUILD_DATE
-
 # Install system dependencies.
 RUN apt-get update && \
     apt-get install -y \
@@ -21,6 +18,8 @@ RUN apt-get update && \
         nodejs \
         npm && \
     rm -rf /var/lib/apt/lists/*
+
+ARG USERNAME
 
 # Create directory structure and set HOME.
 # Make /home/user writable by any user since container runs with --user flag.
@@ -70,6 +69,7 @@ RUN curl -sL https://download.docker.com/linux/ubuntu/dists/questing/pool/stable
     rm docker-compose-plugin.deb
 
 # Accept build date argument to bust cache.
+ARG BUILD_DATE
 RUN echo "Build date: ${BUILD_DATE}"
 
 # ============================================================================
