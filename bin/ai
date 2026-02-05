@@ -12,6 +12,7 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND"' ERR
 #/   --raw-output      Output raw JSON (only in print mode)
 #/   --force-rebuild   Force rebuild of Docker image
 #/   --no-build-cache  Build from scratch without using cache
+#/   --no-rebuild      Skip rebuilding image even if outdated
 #/   --help-harness    Show harness help
 #/   --help            Show this help
 #/
@@ -86,6 +87,7 @@ env_only=false
 raw_output=false
 force_rebuild=false
 no_build_cache=false
+no_rebuild=false
 show_harness_help=false
 show_help=false
 harness_args=()
@@ -124,6 +126,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --no-build-cache)
             no_build_cache=true
+            shift
+            ;;
+        --no-rebuild)
+            no_rebuild=true
             shift
             ;;
         --help-harness)
@@ -587,7 +593,14 @@ last_build_date=$(cat "$BUILD_DATE_FILE")
 last_build_mtime=$(cat "$BUILD_MTIME_FILE")
 today=$(date +%Y-%m-%d)
 
-if [[ "$force_rebuild" == "true" ]] \
+if [[ "$no_rebuild" == "true" ]]; then
+    # Skip rebuild entirely - verify image exists.
+    if ! docker image inspect "$DOCKER_IMAGE" > /dev/null 2>&1; then
+        echo "Error: Docker image does not exist and --no-rebuild was specified" >&2
+        exit 1
+    fi
+    echo "Skipping rebuild (--no-rebuild specified)" >&2
+elif [[ "$force_rebuild" == "true" ]] \
     || [[ "$last_build_date" != "$today" ]] \
     || [[ "$dockerfile_mtime" -gt "$last_build_mtime" ]]; then
     use_cache="true"
