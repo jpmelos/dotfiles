@@ -1,5 +1,6 @@
 return {
     "nvim-treesitter/nvim-treesitter",
+    branch = "master",
     -- Make sure we always update all parsers when we update tree-sitter.
     build = ":TSUpdate",
     config = function()
@@ -52,7 +53,6 @@ return {
                 "http",
                 "javascript",
                 "json",
-                "latex",
                 "liquid",
                 "make",
                 "markdown",
