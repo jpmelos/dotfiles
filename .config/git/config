@@ -128,7 +128,7 @@
     can = commit -a -n
     cmn = commit --amend -n
     camn = commit -a --amend -n
-    cw = --no-gpg-sign commit -a -n -m "WIP"
+    cw = commit --no-gpg-sign -a -n -m "WIP"
 
     # d = diff
     d = diff
