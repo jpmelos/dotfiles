@@ -123,7 +123,7 @@ alt-shift-semicolon = 'mode service'
 [mode.service.binding]
 esc = ['reload-config', 'mode main']
 
-alt-shift-h = ['join-with left', 'mode main']
-alt-shift-j = ['join-with down', 'mode main']
-alt-shift-k = ['join-with up', 'mode main']
-alt-shift-l = ['join-with right', 'mode main']
+shift-h = ['join-with left', 'mode main']
+shift-j = ['join-with down', 'mode main']
+shift-k = ['join-with up', 'mode main']
+shift-l = ['join-with right', 'mode main']
