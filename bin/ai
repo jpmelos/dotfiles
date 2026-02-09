@@ -443,9 +443,23 @@ run_harness() {
     container_home="/home/$username"
 
     if [[ "$minimal" == "true" ]]; then
-        cmd+=(-t --init --rm --name "$(generate_container_name)" "$DOCKER_IMAGE" "$@")
+        cmd+=(
+            -t
+            --init
+            --rm
+            --name "$(generate_container_name)"
+            "$DOCKER_IMAGE"
+            "$@"
+        )
     else
-        cmd+=(-t --init --rm --name "$(generate_container_name)" --user "$(id -u):$(id -g)" --group-add 0)
+        cmd+=(
+            -t
+            --init
+            --rm
+            --name "$(generate_container_name)"
+            --user "$(id -u):$(id -g)"
+            --group-add 0
+        )
 
         cmd+=(-v "$current_dir:$container_home/devel/$project_relative_dir")
 
@@ -512,6 +526,8 @@ run_harness() {
 
         # Set up harness-specific environment variables.
         setup_docker_env cmd
+
+        cmd+=(-e "TZ=$(date "+%Z")")
 
         # Relay additional environment variables from
         # `AGENTS_ADDITIONAL_ENV_VARS`.
