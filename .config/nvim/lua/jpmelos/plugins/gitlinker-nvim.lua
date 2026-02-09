@@ -8,8 +8,13 @@ return {
         vim.api.nvim_create_user_command("GetGitLink", function()
             require("gitlinker").get_buf_range_url(vim.fn.mode():lower(), {
                 action_callback = function(url)
-                    -- Fix single-line ranges: #LX-LX should become #LX.
-                    url = url:gsub("#L(%d+)%-L%1", "#L%1")
+                    -- In normal mode, remove line numbers from the URL.
+                    if vim.fn.mode():lower() == "n" then
+                        url = url:gsub("#L%d+", "")
+                    else
+                        -- Fix single-line ranges: #LX-LX should become #LX.
+                        url = url:gsub("#L(%d+)%-L%1", "#L%1")
+                    end
                     vim.cmd('let @+ = "' .. url .. '"')
                     require("gitlinker.actions").open_in_browser(url)
                     NormalMode()
