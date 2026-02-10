@@ -100,6 +100,34 @@ function GetVisualSelectionLines()
     return { start_line, end_line }
 end
 
+function GetVisuallySelectedText()
+    local start_pos = vim.fn.getpos("v")
+    local end_pos = vim.fn.getpos(".")
+
+    local start_line = start_pos[2]
+    local start_col = start_pos[3]
+    local end_line = end_pos[2]
+    local end_col = end_pos[3]
+
+    -- Ensure start is before end.
+    if
+        start_line > end_line
+        or (start_line == end_line and start_col > end_col)
+    then
+        start_line, end_line = end_line, start_line
+        start_col, end_col = end_col, start_col
+    end
+
+    return vim.api.nvim_buf_get_text(
+        0,
+        start_line - 1,
+        start_col - 1,
+        end_line - 1,
+        end_col,
+        {}
+    )
+end
+
 function GetGitHubLineFormatForSelection()
     local visual_selection_lines = GetVisualSelectionLines()
     if visual_selection_lines == nil then
