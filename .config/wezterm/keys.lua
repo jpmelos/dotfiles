@@ -76,16 +76,22 @@ function module.apply_to_config(config)
             action = action.Search("CurrentSelectionOrEmptyString"),
         },
         -- Clipboard.
-        {
-            key = "c",
-            mods = "SUPER",
-            action = action.CopyTo("Clipboard"),
-        },
-        {
-            key = "v",
-            mods = "SUPER",
-            action = action.PasteFrom("Clipboard"),
-        },
+        -- Disable `cmd+c` in Neovim to train muscle memory to use `y` instead.
+        bind_if_else(
+            process_integration.is_outside_vim,
+            "c",
+            "SUPER",
+            action.CopyTo("Clipboard"),
+            action.Nop
+        ),
+        -- Disable `cmd+v` in Neovim to train muscle memory to use `p` instead.
+        bind_if_else(
+            process_integration.is_outside_vim,
+            "v",
+            "SUPER",
+            action.PasteFrom("Clipboard"),
+            action.Nop
+        ),
         -- Tabs.
         {
             key = "c",
