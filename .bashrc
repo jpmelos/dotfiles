@@ -16,8 +16,12 @@ export GPG_TTY=$(tty)
 #   possible commands.
 shopt -s histverify no_empty_cmd_completion
 
-# This is called from the `$PROMPT_COMMAND`, which is defined in
-# `.bash_profile`.
+################
+#              #
+#    Prompt    #
+#              #
+################
+
 run_autoenv_on_init() {
     if [ -z "$AUTOENV_RAN_ON_INIT" ]; then
         cd /
@@ -25,6 +29,17 @@ run_autoenv_on_init() {
         AUTOENV_RAN_ON_INIT=1
     fi
 }
+
+BASH_TERMINAL_TITLE="bash"
+reset_terminal_title() {
+    echo -ne "\033]0;$BASH_TERMINAL_TITLE\007"
+}
+
+if [[ "$PROMPT_COMMAND" != *"reset_terminal_title"* ]]; then
+    export PROMPT_COMMAND="history -a; history -n; run_autoenv_on_init; reset_terminal_title; ${PROMPT_COMMAND}"
+fi
+
+eval "$(starship init bash)"
 
 #################
 #               #
@@ -45,14 +60,6 @@ AUTOENV_ENV_FILENAME=.autoenv.enter
 AUTOENV_ENV_LEAVE_FILENAME=.autoenv.leave
 
 source ~/.autoenv/activate.sh
-
-################
-#              #
-#    Prompt    #
-#              #
-################
-
-eval "$(starship init bash)"
 
 ################################
 #                              #
@@ -127,10 +134,6 @@ alias curl='\curl -iL'
 # Docker aliases.
 alias d='docker'
 alias dps="docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
-
-# Docker Compose aliases.
-alias dc='docker compose'
-alias dcps="dc ps -a --format 'table {{.Name}}\t{{.Service}}\t{{.Status}}\t{{.Ports}}'"
 alias docker-nuke-all-the-things='
     docker rm -f $(docker ps -aq);  # Containers
     docker rmi -f $(docker images -aq);  # Images
@@ -138,6 +141,10 @@ alias docker-nuke-all-the-things='
     docker network rm $(docker network ls -q);  # Networks
     docker builder prune -a --force;  # Build cache
     docker system prune -a --volumes --force  # All the rest'
+
+# Docker Compose aliases.
+alias dc='docker compose'
+alias dcps="dc ps -a --format 'table {{.Name}}\t{{.Service}}\t{{.Status}}\t{{.Ports}}'"
 
 #####################################
 #                                   #
@@ -656,64 +663,4 @@ loop() {
         echo "Command completed ($run_count runs). Restarting..."
         sleep 1
     done
-}
-
-# Print full (absolute) path of a file.
-pf() {
-    if [ $# -eq 0 ]; then
-        echo "Usage: pf <file>"
-        return 1
-    fi
-
-    if [ ! -e "$1" ]; then
-        echo "Error: '$1' does not exist" >&2
-        return 1
-    fi
-
-    # Get the absolute path.
-    if [ -d "$1" ]; then
-        (cd "$1" && pwd)
-    else
-        echo "$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
-    fi
-}
-
-# Print relative path of a file from the current directory.
-pr() {
-    if [ $# -eq 0 ]; then
-        echo "Usage: pr <file>"
-        return 1
-    fi
-
-    if [ ! -e "$1" ]; then
-        echo "Error: '$1' does not exist" >&2
-        return 1
-    fi
-
-    # Get the absolute path first.
-    local abs_path
-    if [ -d "$1" ]; then
-        abs_path=$(cd "$1" && pwd)
-    else
-        abs_path="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
-    fi
-
-    # Get the current directory.
-    local current_dir=$(pwd)
-
-    # Check if the file is a descendent of the current directory.
-    case "$abs_path" in
-        "$current_dir"/*)
-            # Remove the current directory prefix and leading slash.
-            echo "${abs_path#$current_dir/}"
-            ;;
-        "$current_dir")
-            # The file is the current directory itself.
-            echo "."
-            ;;
-        *)
-            echo "Error: '$1' is not a descendent of the current directory" >&2
-            return 1
-            ;;
-    esac
 }
