@@ -1,8 +1,27 @@
-scan_timeout = 100
+"$schema" = 'https://starship.rs/config-schema.json'
+
 command_timeout = 100
 
-[time]
-disabled = false
+sudo.disabled = false
+time.disabled = false
 
-[python]
-disabled = true
+format = """
+$directory\
+$git_branch\
+$git_commit\
+$git_state\
+$git_status\
+$sudo\
+$cmd_duration\
+$line_break\
+$jobs\
+$battery\
+$time\
+$status\
+$character
+"""
+
+[status]
+disabled = false
+format = '[$symbol\[$status(/$signal_name)\]]($style) '
+symbol = "✘"
