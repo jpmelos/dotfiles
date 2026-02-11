@@ -5,6 +5,14 @@
         "anthropic"
     ],
     "model": "opencode/claude-sonnet-4-5",
+    "agent": {
+        "build": {
+            "model": "opencode/claude-sonnet-4-5"
+        },
+        "plan": {
+            "model": "opencode/claude-opus-4-6"
+        }
+    },
     "provider": {
         "opencode": {
             "options": {
