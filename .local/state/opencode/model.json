@@ -7,7 +7,7 @@
         },
         {
             "providerID": "opencode",
-            "modelID": "claude-opus-4-5"
+            "modelID": "claude-opus-4-6"
         },
         {
             "providerID": "anthropic",
@@ -15,7 +15,7 @@
         },
         {
             "providerID": "anthropic",
-            "modelID": "claude-opus-4-5"
+            "modelID": "claude-opus-4-6"
         }
     ],
     "variant": {}
