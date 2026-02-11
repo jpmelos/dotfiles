@@ -491,7 +491,7 @@ run_harness() {
 
         # Mount additional projects from `AGENTS_ADDITIONAL_PROJECTS`.
         if [ -n "${AGENTS_ADDITIONAL_PROJECTS:-}" ]; then
-            IFS=',' read -ra ADDITIONAL_PROJECTS <<< "$AGENTS_ADDITIONAL_PROJECTS"
+            IFS=':' read -ra ADDITIONAL_PROJECTS <<< "$AGENTS_ADDITIONAL_PROJECTS"
             for additional_project in "${ADDITIONAL_PROJECTS[@]}"; do
                 # Trim whitespace.
                 additional_project=$(xargs <<< "$additional_project")
@@ -532,7 +532,7 @@ run_harness() {
         # Relay additional environment variables from
         # `AGENTS_ADDITIONAL_ENV_VARS`.
         if [ -n "${AGENTS_ADDITIONAL_ENV_VARS:-}" ]; then
-            IFS=',' read -ra ADDITIONAL_ENV_VARS <<< "$AGENTS_ADDITIONAL_ENV_VARS"
+            IFS=':' read -ra ADDITIONAL_ENV_VARS <<< "$AGENTS_ADDITIONAL_ENV_VARS"
             for additional_env_var in "${ADDITIONAL_ENV_VARS[@]}"; do
                 # Trim whitespace.
                 additional_env_var=$(xargs <<< "$additional_env_var")
