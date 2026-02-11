@@ -13,8 +13,8 @@ fi
 #               #
 #################
 
-[[ -f ~/devel/dotfiles/references/scripts/.bash_fields.sh ]] \
-    && source ~/devel/dotfiles/references/scripts/.bash_fields.sh
+[[ -f ~/devel/dotfiles/references/scripts/bash_fields.sh ]] \
+    && source ~/devel/dotfiles/references/scripts/bash_fields.sh
 
 ##############################
 #                            #
