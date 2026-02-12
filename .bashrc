@@ -662,3 +662,39 @@ loop() {
 change_commit_date() {
     GIT_COMMITTER_DATE="$1" git commit --amend --no-edit --date="$1"
 }
+
+# Docker exec into a container with TUI selection.
+dx() {
+    local container_name=$(
+        docker ps --format '{{.CreatedAt}}\t{{.Names}}' \
+            | sort -r \
+            | cut -f2 \
+            | fzf --prompt="Select container to exec into: " --height=40% --reverse
+    )
+
+    if [ -z "$container_name" ]; then
+        echo "No container selected."
+        return 1
+    fi
+
+    echo "Executing bash in container: $container_name"
+    docker exec -it "$container_name" bash
+}
+
+# Docker kill a container with TUI selection.
+dk() {
+    local container_name=$(
+        docker ps --format '{{.CreatedAt}}\t{{.Names}}' \
+            | sort -r \
+            | cut -f2 \
+            | fzf --prompt="Select container to kill: " --height=40% --reverse
+    )
+
+    if [ -z "$container_name" ]; then
+        echo "No container selected."
+        return 1
+    fi
+
+    echo "Killing container: $container_name"
+    docker kill "$container_name"
+}
