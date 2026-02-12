@@ -213,10 +213,10 @@ __git_complete gdom git_diff
 __git_complete gdomf git_diff
 
 alias gl='g l'
-alias glf='g lf'
+alias gll='g ll'
 alias glp='g lp'
 __git_complete gl git_log
-__git_complete glf git_log
+__git_complete gll git_log
 __git_complete glp git_log
 
 alias gm='g m'
@@ -663,4 +663,9 @@ loop() {
         echo "Command completed ($run_count runs). Restarting..."
         sleep 1
     done
+}
+
+# Pass the date as the first argument, for example: 2026-01-15T14:00:00.
+change_commit_date() {
+    GIT_COMMITTER_DATE="$1" git commit --amend --no-edit --date="$1"
 }

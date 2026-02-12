@@ -142,7 +142,7 @@
 
     # l = log
     l = "! f() { git log --color=always --oneline --graph --decorate $@ | awk -f ~/devel/dotfiles/references/scripts/git-log-prepend-number-awk.sh | less -R; }; f"
-    lf = log -p --follow --stat --
+    ll = "! f() { git log --date=format:'%a %Y-%m-%d %H:%M:%S' --pretty=tformat:'%h|%an|%ad|%<(60,trunc)%s' | column -t -s '|'; }; f"
     lp = log -p --pretty=fuller --stat
 
     # m = merge
