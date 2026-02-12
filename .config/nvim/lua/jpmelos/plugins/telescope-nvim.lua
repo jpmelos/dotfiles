@@ -17,11 +17,19 @@ return {
         local telescope = require("telescope")
         local builtins = require("telescope.builtin")
         local actions = require("telescope.actions")
+        local action_state = require("telescope.actions.state")
         local themes = require("telescope.themes")
 
         local tree_api = require("nvim-tree.api")
 
-        local mappings = {
+        local function telescope_paste(prompt_bufnr)
+            local picker = action_state.get_current_picker(prompt_bufnr)
+            local line = vim.fn.getreg("+"):match("([^\n]*)")
+            picker:set_prompt(line)
+        end
+
+        local i_mappings = {
+            ["<C-S-v>"] = telescope_paste,
             ["<C-k>"] = actions.move_selection_previous,
             ["<C-j>"] = actions.move_selection_next,
             ["<C-q>"] = actions.smart_send_to_qflist + actions.open_qflist,
@@ -35,6 +43,10 @@ return {
             ["<C-t>"] = actions.file_tab,
             ["<C-c>"] = actions.close,
         }
+
+        local n_mappings = vim.tbl_extend("force", vim.deepcopy(i_mappings), {
+            p = telescope_paste,
+        })
 
         -- ripgrep arguments come from `$RIPGREP_CONFIG_PATH`. By default, it
         -- is `~/.config/ripgrep/ripgreprc`, but it may be overridden for
@@ -62,7 +74,7 @@ return {
 
                 extensions = { ["ui-select"] = { themes.get_dropdown({}) } },
 
-                mappings = { n = mappings, i = mappings },
+                mappings = { n = n_mappings, i = i_mappings },
             },
         })
         telescope.load_extension("fzf")
