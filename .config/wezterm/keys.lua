@@ -61,7 +61,7 @@ function module.apply_to_config(config)
             process_integration.is_outside_vim,
             "n",
             "CTRL",
-            action.SendKey({ key = "L", mods = "CTRL" })
+            action.SendKey({ key = "l", mods = "CTRL" })
         ),
         -- Copy mode.
         {
@@ -84,13 +84,12 @@ function module.apply_to_config(config)
             action.CopyTo("Clipboard"),
             action.Nop
         ),
-        -- Disable `cmd+v` in Neovim to train muscle memory to use `p` instead.
         bind_if_else(
             process_integration.is_outside_vim,
             "v",
             "SUPER",
             action.PasteFrom("Clipboard"),
-            action.Nop
+            action.SendKey({ key = "v", mods = "CTRL|SHIFT" })
         ),
         -- Tabs.
         {

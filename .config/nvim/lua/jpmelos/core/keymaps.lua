@@ -17,6 +17,11 @@ K({ "i", "v", "c" }, "<ESC>", "<NOP>")
 -- Disable leaving insert mode via <C-c>
 K("i", "<C-c>", "<NOP>")
 
+-- Paste with `p` when Cmd+v is detected.
+-- WezTerm sends Ctrl+Shift+V for Cmd+v to make it detectable in terminal.
+K({ "n", "v" }, "<C-S-v>", "p", { desc = "Paste" })
+K("i", "<C-S-v>", "<ESC>pa", { desc = "Paste" })
+
 -- Disable toggling case with `u` in Visual mode.
 K("v", "u", "<NOP>")
 
