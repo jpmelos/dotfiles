@@ -134,13 +134,6 @@ alias curl='\curl -iL'
 # Docker aliases.
 alias d='docker'
 alias dps="docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
-alias docker-nuke-all-the-things='
-    docker rm -f $(docker ps -aq);  # Containers
-    docker rmi -f $(docker images -aq);  # Images
-    docker volume rm $(docker volume ls -q);  # Volumes
-    docker network rm $(docker network ls -q);  # Networks
-    docker builder prune -a --force;  # Build cache
-    docker system prune -a --volumes --force  # All the rest'
 
 # Docker Compose aliases.
 alias dc='docker compose'
