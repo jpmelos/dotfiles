@@ -16,6 +16,12 @@ figure it out, also explain why the changes would be desirable. Feel free to
 read any files you feel is necessary to assist you in a more comprehensive
 review. Think very hard.
 
+Finally, provide your own version of:
+
+- A PR title, at most 50 characters.
+- A PR description that is concise and to the point, without excluding any
+  important topics that need to be covered.
+
 Review checklist:
 
 - Change is good and bug-free.
