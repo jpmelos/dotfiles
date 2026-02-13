@@ -741,6 +741,7 @@ if [[ "$env_only" == "true" ]]; then
     # Output shell commands to be eval'd for environment variable export.
     [ -n "${OPENCODE_API_KEY:-}" ] && printf "export OPENCODE_API_KEY=%q\n" "$OPENCODE_API_KEY"
     [ -n "${CLAUDE_CODE_API_KEY:-}" ] && printf "export CLAUDE_CODE_API_KEY=%q\n" "$CLAUDE_CODE_API_KEY"
+    [ -n "${GH_TOKEN:-}" ] && printf "export GH_TOKEN=%q\n" "$GH_TOKEN"
     printf "export AI_AGENT_HARNESS=%q\n" "$harness"
     echo "Environment variables exported for profile '$profile'" >&2
     exit 0
