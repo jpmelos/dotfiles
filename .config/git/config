@@ -179,7 +179,7 @@
 
     # sh = show
     sh = "! f() { if [[ \"$1\" =~ ^- ]]; then HEADN=\"${1#-}\"; shift; git show \"HEAD~$HEADN\" $@; else git show \"$@\"; fi; }; f"
-    shf = "! f() { if [[ \"$1\" =~ ^- ]]; then HEADN=\"${1#-}\"; shift; git show --name-status $@ \"HEAD~$HEADN\"; else git show --stat \"$@\"; fi; }; f"
+    shf = "! f() { if [[ \"$1\" =~ ^- ]]; then HEADN=\"${1#-}\"; shift; git show --stat $@ \"HEAD~$HEADN\"; else git show --stat \"$@\"; fi; }; f"
 
     # st = status
     st = status
