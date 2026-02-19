@@ -109,6 +109,7 @@
 
     # a = add
     a = add
+    an = add -N
     aa = add -A :/
     apa = add --patch
 

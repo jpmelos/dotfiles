@@ -151,9 +151,11 @@ __git_complete g git
 alias gnuke='g nuke'
 
 alias ga='g a'
+alias gan='g an'
 alias gaa='g aa'
 alias gapa='g apa'
 __git_complete ga git_add
+__git_complete gan git_add
 __git_complete gaa git_add
 __git_complete gapa git_add
 
