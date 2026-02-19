@@ -22,14 +22,7 @@ return {
 
         local tree_api = require("nvim-tree.api")
 
-        local function telescope_paste(prompt_bufnr)
-            local picker = action_state.get_current_picker(prompt_bufnr)
-            local line = vim.fn.getreg("+"):match("([^\n]*)")
-            picker:set_prompt(line)
-        end
-
-        local i_mappings = {
-            ["<C-S-v>"] = telescope_paste,
+        local default_mappings = {
             ["<C-k>"] = actions.move_selection_previous,
             ["<C-j>"] = actions.move_selection_next,
             ["<C-q>"] = actions.smart_send_to_qflist + actions.open_qflist,
@@ -44,9 +37,27 @@ return {
             ["<C-c>"] = actions.close,
         }
 
-        local n_mappings = vim.tbl_extend("force", vim.deepcopy(i_mappings), {
-            p = telescope_paste,
-        })
+        local i_mappings =
+            vim.tbl_extend("force", vim.deepcopy(default_mappings), {
+                ["<C-S-v>"] = function()
+                    vim.api.nvim_feedkeys(
+                        vim.api.nvim_replace_termcodes(
+                            "<C-r>+",
+                            true,
+                            false,
+                            true
+                        ),
+                        "n",
+                        true
+                    )
+                end,
+            })
+        local n_mappings =
+            vim.tbl_extend("force", vim.deepcopy(default_mappings), {
+                ["<C-S-v>"] = function()
+                    vim.cmd("normal! p")
+                end,
+            })
 
         -- ripgrep arguments come from `$RIPGREP_CONFIG_PATH`. By default, it
         -- is `~/.config/ripgrep/ripgreprc`, but it may be overridden for
