@@ -69,6 +69,10 @@ RUN curl -sL https://download.docker.com/linux/ubuntu/dists/questing/pool/stable
     dpkg -i docker-compose-plugin.deb && \
     rm docker-compose-plugin.deb
 
+# Install agent-browser.
+RUN npm install -g agent-browser && \
+    agent-browser install
+
 # Accept build date argument to bust cache.
 ARG BUILD_DATE
 RUN echo "Build date: ${BUILD_DATE}"

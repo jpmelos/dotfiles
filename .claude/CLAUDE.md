@@ -66,3 +66,17 @@
     commit.
   - If the script doesn't exist, just assume that you are not allowed to create
     commits for the project.
+
+# Interacting with the browser
+
+Use `agent-browser` for web automation. Run `agent-browser --help` for all
+commands.
+
+Core workflow:
+
+1. `agent-browser open <url>` - Navigate to a URL.
+2. `agent-browser snapshot -i` - Get interactive elements with references
+   (`@e1`, `@e2`).
+3. `agent-browser click @e1` / `agent-browser fill @e2 "text"` - Interact using
+   references.
+4. Re-snapshot after page changes.

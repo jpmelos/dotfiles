@@ -52,7 +52,8 @@
             "Bash(ralph --validate:*)",
             "Bash(ai_commit:*)",
             "Bash(bash jpenv-bin/lint.bash:*)",
-            "Bash(bash jpenv-bin/tests.bash:*)"
+            "Bash(bash jpenv-bin/tests.bash:*)",
+            "Bash(agent-browser:*)"
         ],
         "deny": [
             "Edit(jpenv-bin/**)"

@@ -130,7 +130,9 @@
             "bash jpenv-bin/lint.bash": "allow",
             "bash jpenv-bin/lint.bash *": "allow",
             "bash jpenv-bin/tests.bash": "allow",
-            "bash jpenv-bin/tests.bash *": "allow"
+            "bash jpenv-bin/tests.bash *": "allow",
+            "agent-browser": "allow",
+            "agent-browser *": "allow"
         },
         "task": "allow",
         "skill": "allow",
