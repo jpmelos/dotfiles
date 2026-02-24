@@ -17,7 +17,15 @@ RUN apt-get update && \
         neovim \
         python3 \
         nodejs \
-        npm && \
+        npm \
+        # agent-browser dependencies.
+        libnspr4 \
+        libnss3 \
+        libatk1.0-0t64 \
+        libatspi2.0-0t64 \
+        libxdamage1 \
+        libxkbcommon0 \
+        libasound2t64 && \
     rm -rf /var/lib/apt/lists/*
 
 ARG USERNAME
