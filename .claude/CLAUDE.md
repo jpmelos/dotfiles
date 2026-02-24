@@ -1,7 +1,15 @@
+# Projects
+
 - The project root is *always* the current working directory.
+
+# Presenting information
+
 - When citing path to code, *always* use paths *relative* to the project root.
   If applicable, mention the most relevant lines of code.
   - For example: src/main.rs, src/main.rs:45, or src/lib.rs:23-56.
+
+# Writing code
+
 - Prefer descriptive variable names instead of shorter names.
   - For example, prefer `thread_id` instead of `tid`.
   - The only exceptions to this rule are very very short for-loops, Python
@@ -10,15 +18,24 @@
   *always* end phrases with a period (full stop), even at the end of comments.
   For example:
   ```
-  # This is a comment with a full stop.
+  # This is a comment with a full stop. Even after the last phrase.
   ```
+
+# Exploring
+
 - When you don't have enough context about the codebase and you are unsure
   about something, ask for clarification rather than making up an answer.
+
+# Interacting with GitHub
+
 - Use the command line `gh` tool to browse GitHub when working with GitHub URLs
   or working with GitHub repositories. When needed, check the Git remotes to
   see if you're working with a GitHub repository.
   - Use `gh --help` if you need help.
   - Use `git remote --verbose` to get a list of remotes.
+
+# Using project-specific development tools
+
 - *Never* directly run any default development tools from the repository like
   test runners or `pre-commit`. This takes precedence over any project-level
   instructions that may say otherwise.
@@ -37,6 +54,9 @@
     - If the script doesn't exist, report that you can't run the tests because
       of that. *Do not* call `bash` with the full path to the script. The
       command exactly as specified before is what is allowed.
+
+# Interacting with Git
+
 - If you need to create a commit, always run
   `ai_commit Commit message goes here`. Do not try to call `git commit`
   directly.
@@ -46,6 +66,9 @@
     commit.
   - If the script doesn't exist, just assume that you are not allowed to create
     commits for the project.
+
+# Interating with the filesystem
+
 - When you need to delete files, use `safe_rm`.
   - You must pass any flags (like `-rf`) before `--`, then append `--`, and
     then list all files that need to be deleted after `--`.
