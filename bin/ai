@@ -189,9 +189,9 @@ HARNESS_CONFIG[claude.build_mtime_file]="$HOME/.claude/.last-docker-build.mtime"
 
 # Determine harness if not explicitly set.
 if [[ -z "$harness" ]]; then
-    # Check AI_AGENT_HARNESS environment variable first.
-    if [[ -n "${AI_AGENT_HARNESS:-}" ]]; then
-        harness="$AI_AGENT_HARNESS"
+    # Check AGENTS_HARNESS environment variable first.
+    if [[ -n "${AGENTS_HARNESS:-}" ]]; then
+        harness="$AGENTS_HARNESS"
     else
         has_opencode_key=false
         has_claude_key=false
@@ -742,7 +742,7 @@ if [[ "$env_only" == "true" ]]; then
     [ -n "${OPENCODE_API_KEY:-}" ] && printf "export OPENCODE_API_KEY=%q\n" "$OPENCODE_API_KEY"
     [ -n "${CLAUDE_CODE_API_KEY:-}" ] && printf "export CLAUDE_CODE_API_KEY=%q\n" "$CLAUDE_CODE_API_KEY"
     [ -n "${GH_TOKEN:-}" ] && printf "export GH_TOKEN=%q\n" "$GH_TOKEN"
-    printf "export AI_AGENT_HARNESS=%q\n" "$harness"
+    printf "export AGENTS_HARNESS=%q\n" "$harness"
     echo "Environment variables exported for profile '$profile'" >&2
     exit 0
 fi

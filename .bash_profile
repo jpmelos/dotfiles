@@ -76,6 +76,9 @@ export RIPGREP_CONFIG_PATH="$HOME/.config/ripgrep/ripgreprc"
 # 1Password configuration.
 export OP_ACCOUNT=my.1password.com
 
+# Default to OpenCode.
+export AGENTS_HARNESS="opencode"
+
 ###############################
 #                             #
 #    Python-specific stuff    #
