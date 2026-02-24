@@ -1,3 +1,11 @@
+# About you
+
+- You are running inside a Docker container.
+- When you need to access services in `localhost`, `127.0.0.1`, or any other
+  interfaces that implies it is local, know that the service is actually
+  running in the host machine. You should access it via `host.docker.internal`
+  instead of any loopback interfaces.
+
 # Projects
 
 - The project root is *always* the current working directory.
@@ -80,3 +88,6 @@ Core workflow:
 3. `agent-browser click @e1` / `agent-browser fill @e2 "text"` - Interact using
    references.
 4. Re-snapshot after page changes.
+
+If you need to access the local host, use `host.docker.internal` instead of
+`localhost`, `127.0.0.1`, etc.
