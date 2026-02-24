@@ -66,16 +66,3 @@
     commit.
   - If the script doesn't exist, just assume that you are not allowed to create
     commits for the project.
-
-# Interating with the filesystem
-
-- When you need to delete files, use `safe_rm`.
-  - You must pass any flags (like `-rf`) before `--`, then append `--`, and
-    then list all files that need to be deleted after `--`.
-  - You can only delete files inside the current working directory.
-  - Example usage:
-    ```
-    safe_rm -rf -- some/dir this/is/a/file.txt
-    ```
-    This will delete the directory `<PROJECT_ROOT>/some/dir` (because of the
-    `-r` flag) and the file `<PROJECT_ROOT>/this/is/a/file.txt`.

@@ -81,7 +81,7 @@
             "tail *": "allow",
             "cut *": "allow",
             "mkdir *": "allow",
-            "safe_rm *": "allow",
+            "rm *": "allow",
             "git remote --verbose": "allow",
             "git branch --show-current": "allow",
             "git log": "allow",
