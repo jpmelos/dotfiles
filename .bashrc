@@ -662,7 +662,13 @@ loop() {
 
 # Pass the date as the first argument, for example: 2026-01-15T14:00:00.
 change_commit_date() {
-    GIT_COMMITTER_DATE="$1" git commit --amend --no-edit --date="$1"
+    # Check if there are any staged or unstaged changes (excluding untracked files).
+    if ! git diff-index --quiet HEAD --; then
+        echo "Error: Working directory has staged or unstaged changes. Please commit or stash them first." >&2
+        return 1
+    fi
+
+    GIT_COMMITTER_DATE="$1" git commit --amend --no-verify --no-edit --date="$1"
 }
 
 # Docker exec into a container with TUI selection.
