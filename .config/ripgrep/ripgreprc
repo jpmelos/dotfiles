@@ -1,22 +1,14 @@
 #
 # ATTENTION: This will affect nvim's telescope too!
 #
+# Run `rg -l .` to see which files `rg` will consider when searching.
+#
 --no-heading
 --with-filename
 --line-number
 --column
 --smart-case
---hidden
 --no-ignore
---glob
-    !**/.git
---glob
-    !/.cache
---glob
-    !/.venv
---glob
-    !/jpenv-venv-*
---glob
-    !/.pytest-cache
---glob
-    !/.ruff_cache
+--hidden
+--follow
+--glob=!.git
