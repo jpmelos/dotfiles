@@ -62,6 +62,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o install_rust.sh
     rustup install stable && \
     rustup default stable && \
     rm install_rust.sh && \
+    cargo install --locked cargo-nextest && \
     chmod -R 777 /home/${USERNAME}/.rustup /home/${USERNAME}/.cargo
 
 # Install uv.
