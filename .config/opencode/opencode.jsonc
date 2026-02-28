@@ -4,10 +4,10 @@
         "opencode",
         "anthropic"
     ],
-    "model": "opencode/claude-sonnet-4-5",
+    "model": "opencode/claude-sonnet-4-6",
     "agent": {
         "build": {
-            "model": "opencode/claude-sonnet-4-5"
+            "model": "opencode/claude-sonnet-4-6"
         },
         "plan": {
             "model": "opencode/claude-opus-4-6"
@@ -19,7 +19,7 @@
                 "apiKey": "{env:OPENCODE_API_KEY}"
             },
             "models": {
-                "claude-sonnet-4-5": {
+                "claude-sonnet-4-6": {
                     "limit": {
                         "context": 150000,
                         "output": 64000
@@ -38,7 +38,7 @@
                 "apiKey": "{env:CLAUDE_CODE_API_KEY}"
             },
             "models": {
-                "claude-sonnet-4-5": {
+                "claude-sonnet-4-6": {
                     "limit": {
                         "context": 150000,
                         "output": 64000
