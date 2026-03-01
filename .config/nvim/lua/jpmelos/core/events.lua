@@ -23,12 +23,24 @@ au({ "VimEnter", "FocusGained" }, {
     callback = UpdateGitBranch,
 })
 
+-- When a file changes on disk (even if the buffer has unsaved changes), always
+-- reload from disk, discarding the in-memory edits.
+au("FileChangedShell", {
+    callback = function()
+        vim.v.fcs_choice = "reload"
+    end,
+})
 -- Reload files when coming back to Neovim.
 au("FocusGained", { command = "checktime" })
--- Save files automatically when leaving Neovim.
+-- Save files automatically when leaving Neovim. Run `checktime` first so that
+-- `FileChangedShell` fires for any files changed on disk during this session,
+-- reloading them before we write, ensuring disk always wins on conflict.
 au("FocusLost", {
-    command = "silent! wa",
     nested = true,
+    callback = function()
+        vim.cmd("checktime")
+        vim.cmd("silent! wa")
+    end,
 })
 
 au("QuitPre", {
