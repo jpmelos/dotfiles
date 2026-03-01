@@ -124,6 +124,9 @@ alias nvim='\nvim -O'
 alias cp='cp -i'
 alias mv='mv -i'
 
+# Current datetime in a machine-readable format.
+alias dt="date '+%Y-%m-%dT%H:%M:%S'"
+
 # Always ignore the .git directory.
 alias tree='\tree -alF -I .git --gitignore'
 alias treea='\tree -alF -I .git'
