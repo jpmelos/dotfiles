@@ -134,14 +134,6 @@ alias treea='\tree -alF -I .git'
 # Include headers and automatically follows redirects.
 alias curl='\curl -iL'
 
-# Docker aliases.
-alias d='docker'
-alias dps="docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
-
-# Docker Compose aliases.
-alias dc='docker compose'
-alias dcps="dc ps -a --format 'table {{.Name}}\t{{.Service}}\t{{.Status}}\t{{.Ports}}'"
-
 #####################################
 #                                   #
 #    git aliases and completions    #
@@ -674,6 +666,20 @@ change_commit_date() {
     GIT_COMMITTER_DATE="$1" git commit --amend --no-verify --no-edit --date="$1"
 }
 
+################
+#              #
+#    Docker    #
+#              #
+################
+
+# Docker aliases.
+alias d='docker'
+alias dps="docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
+
+# Docker Compose aliases.
+alias dc='docker compose'
+alias dcps="dc ps -a --format 'table {{.Name}}\t{{.Service}}\t{{.Status}}\t{{.Ports}}'"
+
 # Docker exec into a container with TUI selection.
 dx() {
     local container_name=$(
@@ -708,4 +714,14 @@ dk() {
 
     echo "Killing container: $container_name"
     docker kill "$container_name"
+}
+
+# List all active Docker Compose environments.
+dcls() {
+    docker compose ls
+}
+
+# Drop an active Docker Compose environment.
+dcrm() {
+    docker compose -p "$1" down
 }
