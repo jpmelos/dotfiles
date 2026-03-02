@@ -656,6 +656,7 @@ loop() {
 }
 
 # Pass the date as the first argument, for example: 2026-01-15T14:00:00.
+# Defaults to current date if not provided.
 change_commit_date() {
     # Check if there are any staged or unstaged changes (excluding untracked files).
     if ! git diff-index --quiet HEAD --; then
@@ -663,7 +664,8 @@ change_commit_date() {
         return 1
     fi
 
-    GIT_COMMITTER_DATE="$1" git commit --amend --no-verify --no-edit --date="$1"
+    local date="${1:-$(date '+%Y-%m-%dT%H:%M:%S')}"
+    GIT_COMMITTER_DATE="$date" git commit --amend --no-verify --no-edit --date="$date"
 }
 
 ################
