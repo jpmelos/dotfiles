@@ -3,7 +3,7 @@
     "favorite": [
         {
             "providerID": "opencode",
-            "modelID": "claude-sonnet-4-5"
+            "modelID": "claude-sonnet-4-6"
         },
         {
             "providerID": "opencode",
@@ -11,7 +11,7 @@
         },
         {
             "providerID": "anthropic",
-            "modelID": "claude-sonnet-4-5"
+            "modelID": "claude-sonnet-4-6"
         },
         {
             "providerID": "anthropic",
