@@ -1,6 +1,6 @@
 ---
 description: Review a PR.
-argument-hint: pf_reference
+argument-hint: pr_reference
 ---
 
 Review PR $1.
