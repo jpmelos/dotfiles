@@ -745,14 +745,45 @@ if [[ "$env_only" == "true" ]]; then
 fi
 
 if [[ "$harness" == "claude" ]]; then
-    [ -d "$HOME/.claude-$profile" ] \
-        || cp -R "$HOME/.claude" "$HOME/.claude-$profile"
+    cp -R "$HOME/.claude/"* "$HOME/.claude-$profile"
     [ -f "$HOME/.claude-$profile.json" ] \
         || echo "{}" > "$HOME/.claude-$profile.json"
-    cp "$HOME/.claude/settings.json" "$HOME/.claude-$profile/settings.json"
     if [ -n "${CLAUDE_CODE_API_KEY:-}" ]; then
         tmp=$(mktemp)
         jq '. + {"apiKeyHelper": "~/.claude/api-key-helper.sh"}' \
+            "$HOME/.claude-$profile/settings.json" > "$tmp"
+        mv "$tmp" "$HOME/.claude-$profile/settings.json"
+    fi
+
+    # Add additional projects to `additionalDirectories` in Claude Code
+    # settings.
+    additional_dirs="[]"
+
+    # Always include dotfiles unless it's the current project.
+    if [ "$project_relative_dir" != "dotfiles" ]; then
+        additional_dirs=$(jq \
+            --arg p "/home/$username/devel/dotfiles" \
+            '. + [$p]' <<< "$additional_dirs")
+    fi
+
+    if [ -n "${AGENTS_ADDITIONAL_PROJECTS:-}" ]; then
+        IFS=':' read -ra ADDITIONAL_PROJECTS <<< "$AGENTS_ADDITIONAL_PROJECTS"
+        for additional_project in "${ADDITIONAL_PROJECTS[@]}"; do
+            additional_project=$(xargs <<< "$additional_project")
+            if [ -n "$additional_project" ] \
+                && [ "$additional_project" != "$project_relative_dir" ] \
+                && [ -d "$devel_dir/$additional_project" ]; then
+                additional_dirs=$(jq \
+                    --arg p "/home/$username/devel/$additional_project" \
+                    '. + [$p]' <<< "$additional_dirs")
+            fi
+        done
+    fi
+
+    if [ "$additional_dirs" != "[]" ]; then
+        tmp=$(mktemp)
+        jq --argjson dirs "$additional_dirs" \
+            '.permissions.additionalDirectories = $dirs' \
             "$HOME/.claude-$profile/settings.json" > "$tmp"
         mv "$tmp" "$HOME/.claude-$profile/settings.json"
     fi

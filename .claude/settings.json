@@ -1,8 +1,5 @@
 {
-    "env": {
-        "BASH_DEFAULT_TIMEOUT_MS": "120000",
-        "BASH_MAX_TIMEOUT_MS": "120000"
-    },
+    "$schema": "https://json.schemastore.org/claude-code-settings.json",
     "permissions": {
         "allow": [
             "Read",
@@ -55,12 +52,42 @@
         "deny": [
             "Edit(jpenv-bin/**)"
         ],
+        "additionalDirectories": [],
         "defaultMode": "dontAsk"
+    },
+    "env": {
+        "DISABLE_AUTOUPDATER": "1",
+        "BASH_DEFAULT_TIMEOUT_MS": "120000",
+        "BASH_MAX_TIMEOUT_MS": "120000",
+        "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "80",
+        "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD": "1",
+        "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR": "1",
+        "CLAUDE_CODE_DISABLE_FAST_MODE": "1",
+        "CLAUDE_CODE_DISABLE_1M_CONTEXT": "1",
+        "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY": "1",
+        "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+        "CLAUDE_CODE_EFFORT_LEVEL": "high",
+        "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "false",
+        "CLAUDE_CODE_HIDE_ACCOUNT_INFO": "1",
+        "USE_BUILTIN_RIPGREP": "0"
+    },
+    "fileSuggestion": {
+        "type": "command",
+        "command": "~/.claude/file-suggestions.sh"
     },
     "statusLine": {
         "type": "command",
         "command": "bash ~/.claude/statusline.sh",
         "padding": 0
     },
-    "autoUpdates": false
+    "spinnerVerbs": {
+        "mode": "replace",
+        "verbs": [
+            "Thinking"
+        ]
+    },
+    "alwaysThinkingEnabled": true,
+    "spinnerTipsEnabled": false,
+    "terminalProgressBarEnabled": false,
+    "disableBypassPermissionsMode": true
 }

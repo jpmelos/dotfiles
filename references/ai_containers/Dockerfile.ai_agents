@@ -9,6 +9,7 @@ RUN apt-get update && \
         ca-certificates \
         git \
         git-delta \
+        fzf \
         jq \
         bc \
         ripgrep \
