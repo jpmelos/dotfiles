@@ -174,7 +174,6 @@ HARNESS_CONFIG[opencode.name]="OpenCode"
 HARNESS_CONFIG[opencode.docker_target]="opencode"
 HARNESS_CONFIG[opencode.docker_image]="$username-opencode:latest"
 HARNESS_CONFIG[opencode.container_prefix]="oc"
-HARNESS_CONFIG[opencode.state_dir]="$HOME/.config/opencode"
 HARNESS_CONFIG[opencode.build_date_file]="$HOME/.config/opencode/.last-docker-build.date"
 HARNESS_CONFIG[opencode.build_mtime_file]="$HOME/.config/opencode/.last-docker-build.mtime"
 
@@ -183,7 +182,6 @@ HARNESS_CONFIG[claude.name]="Claude Code"
 HARNESS_CONFIG[claude.docker_target]="claude"
 HARNESS_CONFIG[claude.docker_image]="$username-claude:latest"
 HARNESS_CONFIG[claude.container_prefix]="cc"
-HARNESS_CONFIG[claude.state_dir]="$HOME/.claude"
 HARNESS_CONFIG[claude.build_date_file]="$HOME/.claude/.last-docker-build.date"
 HARNESS_CONFIG[claude.build_mtime_file]="$HOME/.claude/.last-docker-build.mtime"
 
@@ -242,7 +240,6 @@ HARNESS_NAME="${HARNESS_CONFIG[$harness.name]}"
 DOCKER_TARGET="${HARNESS_CONFIG[$harness.docker_target]}"
 DOCKER_IMAGE="${HARNESS_CONFIG[$harness.docker_image]}"
 CONTAINER_PREFIX="${HARNESS_CONFIG[$harness.container_prefix]}"
-STATE_DIR="${HARNESS_CONFIG[$harness.state_dir]}"
 BUILD_DATE_FILE="${HARNESS_CONFIG[$harness.build_date_file]}"
 BUILD_MTIME_FILE="${HARNESS_CONFIG[$harness.build_mtime_file]}"
 
@@ -262,8 +259,8 @@ setup_docker_mounts() {
         )
     else
         cmd_ref+=(
-            -v "$HOME/.claude:$container_home/.claude"
-            -v "$HOME/.claude.json:$container_home/.claude.json"
+            -v "$HOME/.claude-$profile:$container_home/.claude"
+            -v "$HOME/.claude-$profile.json:$container_home/.claude.json"
         )
     fi
 }
@@ -747,7 +744,8 @@ if [[ "$env_only" == "true" ]]; then
     exit 0
 fi
 
-mkdir -p "$STATE_DIR"
+[ -d "$HOME/.claude-$profile" ] || cp -R "$HOME/.claude" "$HOME/.claude-$profile"
+[ -f "$HOME/.claude-$profile.json" ] || echo "{}" > "$HOME/.claude-$profile.json"
 
 # Detect if we're in print mode and handle `--raw-output` accordingly.
 if is_print_mode; then
