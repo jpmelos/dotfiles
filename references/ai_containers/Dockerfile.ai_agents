@@ -94,7 +94,7 @@ FROM base AS claude
 
 # Install Claude Code.
 RUN curl -fsSL https://claude.ai/install.sh -o /root/claude-install.sh && \
-    bash /root/claude-install.sh && \
+    bash /root/claude-install.sh stable && \
     rm /root/claude-install.sh
 
 ENTRYPOINT ["claude"]
