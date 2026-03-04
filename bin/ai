@@ -674,7 +674,7 @@ if [[ ! "$profile" =~ ^[a-zA-Z0-9_]([a-zA-Z0-9._-]{0,62}[a-zA-Z0-9_])?$ ]]; then
 fi
 
 # Fetch API keys from 1Password if not already set.
-if [ -z "${OPENCODE_API_KEY:-}${CLAUDE_CODE_API_KEY:-}${GH_TOKEN:-}" ]; then
+if [ -z "${OPENCODE_API_KEY:-}${CLAUDE_CODE_API_KEY:-}${CLAUDE_CODE_SETTINGS_OVERRIDES:-}${GH_TOKEN:-}" ]; then
     echo -n "Fetching AI Agents configuration from 1Password..." >&2
     if ! SECRETS=$(op read "op://Private/AI Agents Configuration/notesPlain" 2>&1); then
         echo "Error: Failed to retrieve configuration from 1Password" >&2
@@ -715,6 +715,12 @@ if [ -z "${OPENCODE_API_KEY:-}${CLAUDE_CODE_API_KEY:-}${GH_TOKEN:-}" ]; then
         fi
     fi
 
+    if [ -z "${CLAUDE_CODE_SETTINGS_OVERRIDES:-}" ]; then
+        CLAUDE_CODE_SETTINGS_OVERRIDES=$(jq -n --arg p "$profile" --arg u "$username" \
+            --argjson secrets "$SECRETS" \
+            '$secrets.profiles[$p].claude_code_settings_overrides // $secrets.profiles[$u].claude_code_settings_overrides // {}')
+    fi
+
     # Fetch GitHub token if not set.
     if [ -z "${GH_TOKEN:-}" ]; then
         echo -n "Fetching GitHub token from 1Password..." >&2
@@ -738,14 +744,23 @@ if [[ "$env_only" == "true" ]]; then
     # Output shell commands to be eval'd for environment variable export.
     [ -n "${OPENCODE_API_KEY:-}" ] && printf "export OPENCODE_API_KEY=%q\n" "$OPENCODE_API_KEY"
     [ -n "${CLAUDE_CODE_API_KEY:-}" ] && printf "export CLAUDE_CODE_API_KEY=%q\n" "$CLAUDE_CODE_API_KEY"
+    [ -n "${CLAUDE_CODE_SETTINGS_OVERRIDES:-}" ] && printf "export CLAUDE_CODE_SETTINGS_OVERRIDES=%q\n" "$CLAUDE_CODE_SETTINGS_OVERRIDES"
     [ -n "${GH_TOKEN:-}" ] && printf "export GH_TOKEN=%q\n" "$GH_TOKEN"
     printf "export AGENTS_HARNESS=%q\n" "$harness"
     echo "Environment variables exported for profile '$profile'" >&2
     exit 0
 fi
 
-[ -d "$HOME/.claude-$profile" ] || cp -R "$HOME/.claude" "$HOME/.claude-$profile"
-[ -f "$HOME/.claude-$profile.json" ] || echo "{}" > "$HOME/.claude-$profile.json"
+if [[ "$harness" == "claude" ]]; then
+    [ -d "$HOME/.claude-$profile" ] \
+        || cp -R "$HOME/.claude" "$HOME/.claude-$profile"
+    [ -f "$HOME/.claude-$profile.json" ] \
+        || echo "{}" > "$HOME/.claude-$profile.json"
+    tmp=$(mktemp)
+    jq -s '.[0] * (.[1] // {})' "$HOME/.claude/settings.json" <(echo "$CLAUDE_CODE_SETTINGS_OVERRIDES") \
+        > "$tmp"
+    mv "$tmp" "$HOME/.claude-$profile/settings.json"
+fi
 
 # Detect if we're in print mode and handle `--raw-output` accordingly.
 if is_print_mode; then
