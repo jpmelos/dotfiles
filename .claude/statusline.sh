@@ -14,4 +14,6 @@ MODEL=$(jq -r '.model.display_name' <<< "$input")
 COST=$(jq -r '.cost.total_cost_usd' <<< "$input")
 USED_PERCENTAGE=$(jq -r '.context_window.used_percentage // 0' <<< "$input")
 
-echo "👤 $MODEL 💰 \$$(round_up_cents "$COST") 🪟 $(printf "%.0f" "$USED_PERCENTAGE")% used"
+PROFILE="${AGENT_PROFILE:-unknown}"
+
+echo "👤 $PROFILE 🤖 $MODEL 💰 \$$(round_up_cents "$COST") 🪟 $(printf "%.0f" "$USED_PERCENTAGE")% used"

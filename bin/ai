@@ -527,6 +527,7 @@ run_harness() {
         setup_docker_env cmd
 
         cmd+=(-e "TZ=$(date "+%Z")")
+        cmd+=(-e "AGENT_PROFILE=$profile")
 
         # Relay additional environment variables from
         # `AGENTS_ADDITIONAL_ENV_VARS`.
