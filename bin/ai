@@ -26,12 +26,14 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND"' ERR
 #/         "claude_code_api_key": "sk-..."
 #/       },
 #/       "orgname": {
+#/         "fallback_to_username": true,
 #/         "opencode_api_key": "sk-...",
 #/         "claude_code_api_key": "sk-..."
 #/       }
 #/     }
 #/   }
-#/   If a profile is not found, falls back to the username profile.
+#/   If a profile has "fallback_to_username": true, missing API keys fall back
+#/   to the username profile. Otherwise, no fallback is attempted.
 
 if [ -z "${BASH_VERSION:-}" ]; then
     echo "Error: This script requires bash" >&2
@@ -689,27 +691,44 @@ if [ -z "${OPENCODE_API_KEY:-}${CLAUDE_CODE_API_KEY:-}${GH_TOKEN:-}" ]; then
         exit 1
     fi
 
-    # Extract API keys with fallback to '$username' profile if requested
-    # profile doesn't exist or has no key.
+    # Check if fallback to username profile is allowed.
+    fallback_to_username=$(jq -r --arg p "$profile" \
+        '.profiles[$p].fallback_to_username // false' \
+        <<< "$SECRETS")
+
+    # Extract API keys, falling back to the username profile only if the
+    # profile allows it via `fallback_to_username`.
     if [ -z "${OPENCODE_API_KEY:-}" ]; then
-        OPENCODE_API_KEY=$(jq -r --arg p "$profile" --arg u "$username" \
-            '(.profiles[$p].opencode_api_key // .profiles[$u].opencode_api_key) // empty' \
-            <<< "$SECRETS")
+        if [[ "$fallback_to_username" == "true" ]]; then
+            OPENCODE_API_KEY=$(jq -r --arg p "$profile" --arg u "$username" \
+                '(.profiles[$p].opencode_api_key // .profiles[$u].opencode_api_key) // empty' \
+                <<< "$SECRETS")
+        else
+            OPENCODE_API_KEY=$(jq -r --arg p "$profile" \
+                '.profiles[$p].opencode_api_key // empty' \
+                <<< "$SECRETS")
+        fi
 
         if [[ -z "$OPENCODE_API_KEY" || "$OPENCODE_API_KEY" == "null" ]]; then
-            echo "Warning: No OpenCode API key found for profile '$profile' or '$username'" >&2
+            echo "Warning: No OpenCode API key found for profile '$profile'" >&2
         else
             export OPENCODE_API_KEY
         fi
     fi
 
     if [ -z "${CLAUDE_CODE_API_KEY:-}" ]; then
-        CLAUDE_CODE_API_KEY=$(jq -r --arg p "$profile" --arg u "$username" \
-            '(.profiles[$p].claude_code_api_key // .profiles[$u].claude_code_api_key) // empty' \
-            <<< "$SECRETS")
+        if [[ "$fallback_to_username" == "true" ]]; then
+            CLAUDE_CODE_API_KEY=$(jq -r --arg p "$profile" --arg u "$username" \
+                '(.profiles[$p].claude_code_api_key // .profiles[$u].claude_code_api_key) // empty' \
+                <<< "$SECRETS")
+        else
+            CLAUDE_CODE_API_KEY=$(jq -r --arg p "$profile" \
+                '.profiles[$p].claude_code_api_key // empty' \
+                <<< "$SECRETS")
+        fi
 
         if [[ -z "$CLAUDE_CODE_API_KEY" || "$CLAUDE_CODE_API_KEY" == "null" ]]; then
-            echo "Warning: No Claude Code API key found for profile '$profile' or '$username'" >&2
+            echo "Warning: No Claude Code API key found for profile '$profile'" >&2
         else
             export CLAUDE_CODE_API_KEY
         fi
