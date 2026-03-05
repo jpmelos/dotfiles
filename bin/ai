@@ -264,6 +264,12 @@ setup_docker_mounts() {
             -v "$HOME/.claude-$profile:$container_home/.claude"
             -v "$HOME/.claude-$profile.json:$container_home/.claude.json"
         )
+        # Mount the per-container settings.json on top of the directory mount.
+        if [ -n "${settings_tmp_file:-}" ]; then
+            cmd_ref+=(
+                -v "$settings_tmp_file:$container_home/.claude/settings.json"
+            )
+        fi
     fi
 }
 
@@ -808,10 +814,11 @@ if [[ "$harness" == "claude" ]]; then
             <<< "$settings")
     fi
 
-    # Write the final settings.json atomically.
-    tmp=$(mktemp)
-    printf '%s\n' "$settings" > "$tmp"
-    mv "$tmp" "$HOME/.claude-$profile/settings.json"
+    # Write the final `settings.json` to a temporary file. This file will be
+    # bind-mounted into the container on top of the directory mount, so each
+    # container gets its own isolated copy.
+    settings_tmp_file=$(mktemp)
+    printf '%s\n' "$settings" > "$settings_tmp_file"
 fi
 
 # Detect if we're in print mode and handle `--raw-output` accordingly.
