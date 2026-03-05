@@ -768,11 +768,13 @@ if [[ "$harness" == "claude" ]]; then
     cp -R "$HOME/.claude/"* "$HOME/.claude-$profile"
     [ -f "$HOME/.claude-$profile.json" ] \
         || echo "{}" > "$HOME/.claude-$profile.json"
+
+    # Build the final settings.json in memory before writing it.
+    settings=$(cat "$HOME/.claude-$profile/settings.json")
+
     if [ -n "${CLAUDE_CODE_API_KEY:-}" ]; then
-        tmp=$(mktemp)
-        jq '. + {"apiKeyHelper": "~/.claude/api-key-helper.sh"}' \
-            "$HOME/.claude-$profile/settings.json" > "$tmp"
-        mv "$tmp" "$HOME/.claude-$profile/settings.json"
+        settings=$(jq '. + {"apiKeyHelper": "~/.claude/api-key-helper.sh"}' \
+            <<< "$settings")
     fi
 
     # Add additional projects to `additionalDirectories` in Claude Code
@@ -801,12 +803,15 @@ if [[ "$harness" == "claude" ]]; then
     fi
 
     if [ "$additional_dirs" != "[]" ]; then
-        tmp=$(mktemp)
-        jq --argjson dirs "$additional_dirs" \
+        settings=$(jq --argjson dirs "$additional_dirs" \
             '.permissions.additionalDirectories = $dirs' \
-            "$HOME/.claude-$profile/settings.json" > "$tmp"
-        mv "$tmp" "$HOME/.claude-$profile/settings.json"
+            <<< "$settings")
     fi
+
+    # Write the final settings.json atomically.
+    tmp=$(mktemp)
+    printf '%s\n' "$settings" > "$tmp"
+    mv "$tmp" "$HOME/.claude-$profile/settings.json"
 fi
 
 # Detect if we're in print mode and handle `--raw-output` accordingly.
