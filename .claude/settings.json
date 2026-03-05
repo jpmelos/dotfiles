@@ -9,6 +9,7 @@
             "Write",
             "Edit",
             "WebFetch",
+            "WebSearch",
             "Bash(true)",
             "Bash(false)",
             "Bash(date)",
