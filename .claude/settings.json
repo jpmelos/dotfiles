@@ -86,6 +86,7 @@
             "Thinking"
         ]
     },
+    "includeGitInstructions": false,
     "alwaysThinkingEnabled": true,
     "spinnerTipsEnabled": false,
     "terminalProgressBarEnabled": false,
