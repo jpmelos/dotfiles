@@ -81,17 +81,16 @@ K("n", "<leader>sc", "<CMD>q<CR>", { desc = "Close split" })
 
 -- C-u and C-d only jump half screen.
 K({ "n", "v" }, "<C-u>", function()
-    local half_window = math.ceil(
-        vim.api.nvim_win_get_height(vim.api.nvim_get_current_win()) / 2
-    ) - 1
-    return half_window .. "k"
+    return HalfScreenLineCount() .. "k"
 end, { expr = true, desc = "Jump half screen up" })
 K({ "n", "v" }, "<C-d>", function()
-    local half_window = math.ceil(
-        vim.api.nvim_win_get_height(vim.api.nvim_get_current_win()) / 2
-    ) - 1
-    return half_window .. "j"
+    return HalfScreenLineCount() .. "j"
 end, { expr = true, desc = "Jump half screen down" })
+
+-- Double-tap space to scroll down half a screen.
+K({ "n", "v" }, "<Space><Space>", function()
+    return HalfScreenLineCount() .. "j"
+end, { expr = true, desc = "Scroll half screen down" })
 
 -- Always search with "very magic" (the \v thing).
 K("n", "/", "/\\v", { noremap = true })

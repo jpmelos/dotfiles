@@ -164,6 +164,12 @@ function GetBufferContents(bufnr, lines)
     )
 end
 
+function HalfScreenLineCount()
+    return math.ceil(
+        vim.api.nvim_win_get_height(vim.api.nvim_get_current_win()) / 2
+    ) - 1
+end
+
 function NormalMode()
     if vim.fn.mode() == "i" then
         vim.cmd("stopinsert")
