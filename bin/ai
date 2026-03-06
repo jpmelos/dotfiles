@@ -521,8 +521,6 @@ run_harness() {
 
         cmd+=(
             -v "$devel_dir/dotfiles/bin/ai_commit:/usr/local/bin/ai_commit:ro"
-            -v "$devel_dir/dotfiles/bin/safe_rm:/usr/local/bin/safe_rm:ro"
-            -v "$devel_dir/dotfiles/bin/ralph:/usr/local/bin/ralph:ro"
             -v "$devel_dir/dotfiles/bin/review_diff:/usr/local/bin/review_diff:ro"
             -v "$HOME/.config/git:$container_home/.config/git:ro"
         )
