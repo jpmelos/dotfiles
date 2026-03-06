@@ -492,6 +492,7 @@ run_harness() {
         # Mount my dotfiles so symlinks work.
         if [ "$current_dir" != "$devel_dir/dotfiles" ]; then
             cmd+=(-v "$devel_dir/dotfiles:$container_home/devel/dotfiles:ro")
+            cmd+=(-v "$devel_dir/dotfiles-secret:$container_home/devel/dotfiles-secret:ro")
         fi
 
         # Mount additional projects from `AGENTS_ADDITIONAL_PROJECTS`.
