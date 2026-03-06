@@ -26,6 +26,7 @@
             "Bash(tail:*)",
             "Bash(cut:*)",
             "Bash(mkdir:*)",
+            "Bash(mv:*)",
             "Bash(rm:*)",
             "Bash(git remote --verbose)",
             "Bash(git branch --show-current)",
