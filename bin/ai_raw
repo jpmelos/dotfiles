@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND"' ERR
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 
 if [[ -z "${AGENTS_HARNESS:-}" ]]; then
     echo "Error: run 'eval \$(ai --env --harness HARNESS)' to select the harness" >&2
