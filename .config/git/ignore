@@ -1,15 +1,12 @@
-# Generic marker for personal environment files.
 **/jpenv*
 
-# Pre-commit hooks.
 /.pre-commit-config-local.yaml
 
-# IDE configuration.
 /.nvim.lua
 
-# autoenv files.
 **/.autoenv.enter
 **/.autoenv.leave
 
-# Python virtual environments.
 /.venv*
+
+/.agentcontainer/config.local.toml
