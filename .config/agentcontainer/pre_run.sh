@@ -26,9 +26,6 @@ cp -R "$HOME/.claude/"* "$HOME/.claude-$profile/"
 [ -f "$HOME/.claude-$profile.json" ] \
     || echo "{}" > "$HOME/.claude-$profile.json"
 
-# Build the per-container settings.json.
-settings=$(cat "$HOME/.claude-$profile/settings.json")
-
 # Fetch secrets from 1Password if not already in environment.
 if [ -z "${CLAUDE_CODE_API_KEY:-}" ]; then
     echo "Pre-run: fetching agents configuration from 1Password..." >&2
@@ -60,24 +57,10 @@ if [ -z "${GH_TOKEN:-}" ]; then
     fi
 fi
 
-# Add apiKeyHelper to settings if we have an API key.
-if [ -n "${CLAUDE_CODE_API_KEY:-}" ] && [ "$CLAUDE_CODE_API_KEY" != "null" ]; then
-    settings=$(jq '. + {"apiKeyHelper": "~/.claude/api-key-helper.sh"}' \
-        <<< "$settings")
-fi
-
-# Write the final `settings.json` to a temporary file. This file will be
-# mounted on top of the directory mount, so each container gets its own
-# isolated copy. This is to avoid a problem with Claude Code's status line that
-# manifests when you have a `claude` open, and its `settings.json` file is
-# overwritten: the status line stops working.
-settings_tmp_file=$(mktemp)
-printf '%s\n' "$settings" > "$settings_tmp_file"
-
 # Write secrets to a temporary env file to avoid exposing them in the process
 # list.
 env_file=$(mktemp)
-if [ -n "${CLAUDE_CODE_API_KEY:-}" ] && [ "$CLAUDE_CODE_API_KEY" != "null" ]; then
+if [ -n "${CLAUDE_CODE_API_KEY:-}" ]; then
     printf 'CLAUDE_CODE_API_KEY=%s\n' "$CLAUDE_CODE_API_KEY" >> "$env_file"
 fi
 if [ -n "${GH_TOKEN:-}" ]; then
@@ -97,12 +80,27 @@ input_file="$1"
 existing=$(toml get "$input_file" args)
 
 # Build the extra entries as a JSON array, properly quoting all values.
+if [ -n "${CLAUDE_CODE_API_KEY:-}" ]; then
+    extra=$(
+        jq -n \
+            --arg key "--env" \
+            --arg value "ANTHROPIC_API_KEY=$CLAUDE_CODE_API_KEY" \
+            '[$key, $value]'
+    )
+fi
+if [ -n "${GH_TOKEN:-}" ]; then
+    extra=$(
+        jq -n \
+            --arg key "--env" \
+            --arg value "GH_TOKEN=$GH_TOKEN" \
+            '[$key, $value]'
+    )
+fi
 extra=$(
     jq -n \
-        --arg a1 "--volume" --arg v1 "$settings_tmp_file:$HOME/.claude/settings.json" \
-        --arg a2 "--env-file" --arg v2 "$env_file" \
-        --arg a3 "--env" --arg v3 "AGENT_PROFILE=$profile" \
-        '[$a1, $v1, $a2, $v2, $a3, $v3]'
+        --arg key "--env" \
+        --arg value "AGENT_PROFILE=$profile" \
+        '[$key, $value]'
 )
 
 # Merge the existing and extra arrays into a TOML document.

@@ -286,19 +286,24 @@ setup_docker_env() {
             -e OPENCODE_DISABLE_MODELS_FETCH=1
             -e OPENCODE_API_KEY
             -e CLAUDE_CODE_API_KEY
-            -e GH_TOKEN
         )
-
         # Pass OPENCODE_CONFIG_CONTENT if defined in environment.
         if [ -n "${OPENCODE_CONFIG_CONTENT:-}" ]; then
-            cmd_ref+=(-e OPENCODE_CONFIG_CONTENT)
+            cmd_ref+=(
+                -e OPENCODE_CONFIG_CONTENT
+            )
         fi
     else
-        cmd_ref+=(
-            -e CLAUDE_CODE_API_KEY
-            -e GH_TOKEN
-        )
+        if [ -n "${CLAUDE_CODE_API_KEY:-}" ]; then
+            cmd_ref+=(
+                -e "ANTHROPIC_API_KEY=$CLAUDE_CODE_API_KEY"
+            )
+        fi
     fi
+
+    cmd_ref+=(
+        -e GH_TOKEN
+    )
 }
 
 # Detect if we're in print mode based on harness arguments.
@@ -776,51 +781,6 @@ if [[ "$harness" == "claude" ]]; then
     cp -R "$HOME/.claude/"* "$HOME/.claude-$profile"
     [ -f "$HOME/.claude-$profile.json" ] \
         || echo "{}" > "$HOME/.claude-$profile.json"
-
-    # Build the final settings.json in memory before writing it.
-    settings=$(cat "$HOME/.claude-$profile/settings.json")
-
-    if [ -n "${CLAUDE_CODE_API_KEY:-}" ]; then
-        settings=$(jq '. + {"apiKeyHelper": "~/.claude/api-key-helper.sh"}' \
-            <<< "$settings")
-    fi
-
-    # Add additional projects to `additionalDirectories` in Claude Code
-    # settings.
-    additional_dirs="[]"
-
-    # Always include dotfiles unless it's the current project.
-    if [ "$project_relative_dir" != "dotfiles" ]; then
-        additional_dirs=$(jq \
-            --arg p "/home/$username/devel/dotfiles" \
-            '. + [$p]' <<< "$additional_dirs")
-    fi
-
-    if [ -n "${AGENTS_ADDITIONAL_PROJECTS:-}" ]; then
-        IFS=':' read -ra ADDITIONAL_PROJECTS <<< "$AGENTS_ADDITIONAL_PROJECTS"
-        for additional_project in "${ADDITIONAL_PROJECTS[@]}"; do
-            additional_project=$(xargs <<< "$additional_project")
-            if [ -n "$additional_project" ] \
-                && [ "$additional_project" != "$project_relative_dir" ] \
-                && [ -d "$devel_dir/$additional_project" ]; then
-                additional_dirs=$(jq \
-                    --arg p "/home/$username/devel/$additional_project" \
-                    '. + [$p]' <<< "$additional_dirs")
-            fi
-        done
-    fi
-
-    if [ "$additional_dirs" != "[]" ]; then
-        settings=$(jq --argjson dirs "$additional_dirs" \
-            '.permissions.additionalDirectories = $dirs' \
-            <<< "$settings")
-    fi
-
-    # Write the final `settings.json` to a temporary file. This file will be
-    # bind-mounted into the container on top of the directory mount, so each
-    # container gets its own isolated copy.
-    settings_tmp_file=$(mktemp)
-    printf '%s\n' "$settings" > "$settings_tmp_file"
 fi
 
 # Detect if we're in print mode and handle `--raw-output` accordingly.

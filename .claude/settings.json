@@ -13,8 +13,7 @@
             "WebFetch",
             "WebSearch",
             "Write"
-        ],
-        "additionalDirectories": []
+        ]
     },
     "env": {
         "BASH_DEFAULT_TIMEOUT_MS": "300000",
