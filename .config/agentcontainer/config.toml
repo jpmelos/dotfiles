@@ -1,0 +1,14 @@
+pre_run = ["/Users/jpmelos/devel/dotfiles/.config/agentcontainer/pre_run.sh"]
+
+[volumes]
+"/usr/local/bin/ai_commit" = "~/devel/dotfiles/bin/ai_commit"
+"/usr/local/bin/review_diff" = "~/devel/dotfiles/bin/review_diff"
+"/var/run/docker.sock" = "~/.docker/run/docker.sock"
+"~/.claude" = "~/.claude-jpmelos"
+"~/.claude.json" = "~/.claude-jpmelos.json"
+"~/devel/dotfiles" = true
+"~/devel/dotfiles-secret" = true
+
+[environment_variables]
+DOCKER_HOST = "unix:///var/run/docker.sock"
+TZ = true
