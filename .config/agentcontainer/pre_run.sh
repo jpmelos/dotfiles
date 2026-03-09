@@ -7,8 +7,8 @@ devel_dir="$(realpath "$HOME/devel")"
 current_dir="$(realpath "$(pwd)")"
 project_relative_dir="${current_dir#"$devel_dir"/}"
 
-# Determine profile from directory structure. If the project is nested under
-# a directory (e.g., `~/devel/orgname/project`), use the first component as the
+# Determine profile from directory structure. If the project is nested under a
+# directory (e.g., `~/devel/orgname/project`), use the first component as the
 # profile. Otherwise, fall back to the current username.
 component_count=$(tr '/' '\n' <<< "$project_relative_dir" | wc -l)
 if [ "$component_count" -gt 1 ]; then
@@ -84,8 +84,8 @@ if [ -n "${GH_TOKEN:-}" ]; then
     printf 'GH_TOKEN=%s\n' "$GH_TOKEN" >> "$env_file"
 fi
 
-# Read the current hookable arguments from the file passed as `$1`, append extra
-# entries, and output the result as a TOML document with an `args` key.
+# Read the current hookable arguments from the file passed as `$1`, append
+# extra entries, and output the result as a TOML document with an `args` key.
 #
 # Uses `toml` (`toml-cli`) to parse the input, so any valid TOML document with
 # an `args` key is accepted (single-line, multi-line, etc.). Uses `jq` to merge
