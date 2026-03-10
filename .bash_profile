@@ -36,8 +36,6 @@ field_prepend PATH "$HOME/.cargo/bin"
 field_prepend PATH "$HOME/bin"
 export PATH
 
-export TZ="$(date "+%Z")"
-
 ################################
 #                              #
 #    Terminal configuration    #
