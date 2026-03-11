@@ -4,7 +4,7 @@ local m = {}
 
 -- Check if a Docker container name belongs to Claude Code.
 local function is_claude_code_container(container_name)
-    return container_name:match("^cc_")
+    return container_name:match("^claude_code_")
         or container_name:match("^agentcontainer_")
 end
 
