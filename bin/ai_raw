@@ -2,9 +2,9 @@
 set -euo pipefail
 trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 
-if [[ -z "${AGENTS_HARNESS:-}" ]]; then
-    echo "Error: run 'eval \$(ai --env --harness HARNESS)' to select the harness" >&2
+if [[ "${AGENT_ENV_SET:-}" != "true" ]]; then
+    echo "Error: run 'eval \$(ai --env)' to prepare the environment" >&2
     exit 1
 fi
 
-ai --no-rebuild --process-output -- "$@"
+ai --no-rebuild -- "$@"
