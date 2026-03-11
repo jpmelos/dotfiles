@@ -3,4 +3,4 @@ set -euo pipefail
 trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 
 query=$(cat | jq -r '.query')
-rg --files | fzf --filter "$query" | head -15
+rg --files | fzf --filter "$query" | head -15 || true
