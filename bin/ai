@@ -9,8 +9,8 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 #/   --profile <name>  Specify profile for API key lookup (default: auto-detect
 #/                     from path, first component after `~/devel`)
 #/   --env             Only export environment variables, don't run
-#/   --process-output  Capture and process output (use with print mode and JSON
-#/                     output)
+#/   --process-output  Capture and process output (requires `--print` and
+#/                     `--output-format json` in harness args)
 #/   --force-rebuild   Force rebuild of Docker image
 #/   --no-build-cache  Build from scratch without using cache
 #/   --no-rebuild      Skip rebuilding image even if outdated
@@ -116,6 +116,8 @@ no_build_cache=false
 no_rebuild=false
 allow_stale=false
 show_help=false
+harness_print_mode=false
+harness_json_output=false
 harness_args=()
 
 while [[ $# -gt 0 ]]; do
@@ -168,6 +170,30 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# Detect print mode and JSON output format in harness args.
+prev_arg=""
+for arg in "${harness_args[@]}"; do
+    if [[ "$arg" == "--print" ]]; then
+        harness_print_mode=true
+    fi
+    if [[ "$arg" == "--output-format=json" ]]; then
+        harness_json_output=true
+    elif [[ "$prev_arg" == "--output-format" && "$arg" == "json" ]]; then
+        harness_json_output=true
+    fi
+    prev_arg="$arg"
+done
+
+# Validate that `--process-output` is only used with `--print --output-format
+# json`.
+if [[ "$process_output" == "true" ]]; then
+    if [[ "$harness_print_mode" != "true" ]] \
+        || [[ "$harness_json_output" != "true" ]]; then
+        echo "Error: \`--process-output\` requires \`--print\` and \`--output-format json\` in harness args" >&2
+        exit 1
+    fi
+fi
 
 if [[ "$show_help" == "true" ]]; then
     grep '^#/' "${BASH_SOURCE[0]}" | cut -c4-
@@ -257,10 +283,12 @@ run_container() {
         --add-host "host.docker.internal:host-gateway"
     )
 
-    # When processing output, don't allocate a TTY or attach stdin
-    # interactively so we can capture the output. When stdin is not a TTY, also
-    # skip both flags.
-    if [[ "$process_output" != "true" ]] && [ -t 0 ]; then
+    # When processing output or in print mode, don't allocate a TTY or attach
+    # stdin interactively so we can capture the output cleanly. When stdin is
+    # not a TTY, also skip both flags.
+    if [[ "$process_output" != "true" ]] \
+        && [[ "$harness_print_mode" != "true" ]] \
+        && [ -t 0 ]; then
         cmd+=(--interactive --tty)
     fi
 
