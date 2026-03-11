@@ -2,4 +2,4 @@
 set -euo pipefail
 trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 
-ai --no-rebuild -- "$@"
+exec ai --no-rebuild -- "$@"

@@ -7,4 +7,4 @@ if [[ "${AGENT_ENV_SET:-}" != "true" ]]; then
     exit 1
 fi
 
-ai --no-rebuild -- "$@"
+exec ai --no-rebuild -- "$@"
