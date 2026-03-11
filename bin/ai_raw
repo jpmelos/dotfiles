@@ -7,4 +7,4 @@ if [[ -z "${AGENTS_HARNESS:-}" ]]; then
     exit 1
 fi
 
-ai --no-rebuild --raw-output "$@"
+ai --no-rebuild --process-output -- "$@"

@@ -1,1 +1,0 @@
-echo "$CLAUDE_CODE_API_KEY"

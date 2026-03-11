@@ -2,38 +2,50 @@
 set -euo pipefail
 trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 
-#/ Run OpenCode or Claude Code inside a Docker container.
+#/ Run Claude Code inside a Docker container.
 #/
-#/ Usage: ai [options]
+#/ Usage: ai [options] [-- harness-args...]
 #/ Options:
-#/   --harness <name>  Specify harness: 'opencode' or 'claude' (overrides auto-detection)
-#/   --profile <name>  Specify profile for API key lookup (default: auto-detect from path)
+#/   --profile <name>  Specify profile for API key lookup (default: auto-detect
+#/                     from path, first component after `~/devel`)
 #/   --env             Only export environment variables, don't run
-#/   --raw-output      Output raw JSON (only in print mode)
+#/   --process-output  Capture and process output (use with print mode and JSON
+#/                     output)
 #/   --force-rebuild   Force rebuild of Docker image
 #/   --no-build-cache  Build from scratch without using cache
 #/   --no-rebuild      Skip rebuilding image even if outdated
-#/   --help-harness    Show harness help
+#/   --allow-stale     If build fails, use existing image (fatal if none
+#/                     exists)
 #/   --help            Show this help
 #/
+#/ Arguments after `--` are passed directly to Claude Code.
+#/
 #/ Configuration:
-#/   Expects a 1Password item at: op://Private/AI Agents Configuration/notesPlain
-#/   Format (JSON):
+#/   Expects 1Password items at:
+#/   - `op://Private/AI Agents Configuration/notesPlain` (API keys)
+#/   - `op://Private/GH Token/notesPlain` (GitHub token)
+#/
+#/   API keys format (JSON):
+#/   ```
 #/   {
 #/     "profiles": {
 #/       "username": {
-#/         "opencode_api_key": "sk-...",
-#/         "claude_code_api_key": "sk-..."
+#/         "api_key": "sk-..."
 #/       },
 #/       "orgname": {
-#/         "fallback_to_username": true,
-#/         "opencode_api_key": "sk-...",
-#/         "claude_code_api_key": "sk-..."
+#/         "api_key": "sk-...",
+#/         "fallback_to_username": bool
 #/       }
 #/     }
 #/   }
-#/   If a profile has "fallback_to_username": true, missing API keys fall back
-#/   to the username profile. Otherwise, no fallback is attempted.
+#/   ```
+#/
+#/   If a profile has `"fallback_to_username": true`, missing API keys fall
+#/   back to the username profile. Otherwise, no fallback is attempted.
+
+# ============================================================================
+# Initial checks and configuration
+# ============================================================================
 
 if [ -z "${BASH_VERSION:-}" ]; then
     echo "Error: This script requires bash" >&2
@@ -65,6 +77,18 @@ if ! command -v realpath &> /dev/null; then
     exit 1
 fi
 
+if ! command -v shuf &> /dev/null; then
+    echo "Error: shuf is not installed" >&2
+    exit 1
+fi
+
+if [[ "${AGENT_ENV_SET:-}" != "true" ]]; then
+    if ! command -v op &> /dev/null; then
+        echo "Error: 1Password CLI (op) is not installed" >&2
+        exit 1
+    fi
+fi
+
 devel_dir="$(realpath "$HOME/devel")"
 if [[ ! -d "$devel_dir" ]]; then
     echo "Error: $HOME/devel does not exist" >&2
@@ -72,39 +96,30 @@ if [[ ! -d "$devel_dir" ]]; then
 fi
 
 current_dir="$(realpath "$(pwd)")"
-if [[ "$current_dir" != "$devel_dir"* ]]; then
+if [[ "$current_dir/" != "$devel_dir/"* ]]; then
     echo "Error: not inside ~/devel" >&2
     exit 1
 fi
 
-project_relative_dir="${current_dir#"$devel_dir"/}"
-if [[ -z "$project_relative_dir" ]]; then
+if [[ "$current_dir" == "$devel_dir" ]]; then
     echo "Error: Cannot run from ~/devel root, must be in a subdirectory" >&2
     exit 1
 fi
 
-harness=""
+project_relative_dir="${current_dir#"$devel_dir"/}"
+
 profile=""
 env_only=false
-raw_output=false
+process_output=false
 force_rebuild=false
 no_build_cache=false
 no_rebuild=false
-show_harness_help=false
+allow_stale=false
 show_help=false
 harness_args=()
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --harness)
-            shift
-            if [[ $# -eq 0 ]]; then
-                echo "Error: --harness requires an argument" >&2
-                exit 1
-            fi
-            harness="$1"
-            shift
-            ;;
         --profile)
             shift
             if [[ $# -eq 0 ]]; then
@@ -118,8 +133,8 @@ while [[ $# -gt 0 ]]; do
             env_only=true
             shift
             ;;
-        --raw-output)
-            raw_output=true
+        --process-output)
+            process_output=true
             shift
             ;;
         --force-rebuild)
@@ -134,17 +149,22 @@ while [[ $# -gt 0 ]]; do
             no_rebuild=true
             shift
             ;;
-        --help-harness)
-            show_harness_help=true
+        --allow-stale)
+            allow_stale=true
             shift
             ;;
         --help)
             show_help=true
             shift
             ;;
-        *)
-            harness_args+=("$1")
+        --)
             shift
+            harness_args=("$@")
+            break
+            ;;
+        *)
+            echo "Error: Unknown option '$1'" >&2
+            exit 1
             ;;
     esac
 done
@@ -154,238 +174,47 @@ if [[ "$show_help" == "true" ]]; then
     exit 0
 fi
 
-# Validate that `--harness` is required when using `--env` mode.
-if [[ "$env_only" == "true" ]] && [[ -z "$harness" ]]; then
-    echo "Error: \`-harness\` is required when using \`--env\` mode" >&2
-    exit 1
-fi
-
 username="$(whoami)"
-dockerfile_path="$devel_dir/dotfiles/references/ai_containers/Dockerfile.ai_agents"
+
+dockerfile_path="$devel_dir/dotfiles/references/ai_containers/Dockerfile"
+docker_image_name="$username-claude:latest"
+container_prefix="claude_code"
 
 # ============================================================================
-# Harness Configuration
-# ============================================================================
-# This section defines harness-specific behavior to avoid if statements
-# scattered throughout the code.
-
-declare -A HARNESS_CONFIG
-
-# OpenCode configuration
-HARNESS_CONFIG[opencode.name]="OpenCode"
-HARNESS_CONFIG[opencode.docker_target]="opencode"
-HARNESS_CONFIG[opencode.docker_image]="$username-opencode:latest"
-HARNESS_CONFIG[opencode.container_prefix]="oc"
-HARNESS_CONFIG[opencode.build_date_file]="$HOME/.config/opencode/.last-docker-build.date"
-HARNESS_CONFIG[opencode.build_mtime_file]="$HOME/.config/opencode/.last-docker-build.mtime"
-
-# Claude Code configuration
-HARNESS_CONFIG[claude.name]="Claude Code"
-HARNESS_CONFIG[claude.docker_target]="claude"
-HARNESS_CONFIG[claude.docker_image]="$username-claude:latest"
-HARNESS_CONFIG[claude.container_prefix]="cc"
-HARNESS_CONFIG[claude.build_date_file]="$HOME/.claude/.last-docker-build.date"
-HARNESS_CONFIG[claude.build_mtime_file]="$HOME/.claude/.last-docker-build.mtime"
-
-# Determine harness if not explicitly set.
-if [[ -z "$harness" ]]; then
-    # Check AGENTS_HARNESS environment variable first.
-    if [[ -n "${AGENTS_HARNESS:-}" ]]; then
-        harness="$AGENTS_HARNESS"
-    else
-        has_opencode_key=false
-        has_claude_key=false
-
-        [ -n "${OPENCODE_API_KEY:-}" ] && has_opencode_key=true
-        [ -n "${CLAUDE_CODE_API_KEY:-}" ] && has_claude_key=true
-
-        if [[ "$has_opencode_key" == "true" && "$has_claude_key" == "true" ]]; then
-            echo "Both OpenCode and Claude Code API keys are defined." >&2
-            read -p "Which would you like to use? [(o)pencode/(c)laude] (default: opencode): " choice
-            choice=${choice:-opencode}
-            case "$choice" in
-                claude | c)
-                    harness="claude"
-                    ;;
-                opencode | o | *)
-                    harness="opencode"
-                    ;;
-            esac
-        elif [[ "$has_opencode_key" == "true" ]]; then
-            harness="opencode"
-        elif [[ "$has_claude_key" == "true" ]]; then
-            harness="claude"
-        else
-            echo "No API keys found in environment." >&2
-            read -p "Which would you like to use? [(o)pencode/(c)laude] (default: opencode): " choice
-            choice=${choice:-opencode}
-            case "$choice" in
-                claude | c)
-                    harness="claude"
-                    ;;
-                opencode | o | *)
-                    harness="opencode"
-                    ;;
-            esac
-        fi
-    fi
-fi
-
-# Validate harness.
-if [[ "$harness" != "opencode" && "$harness" != "claude" ]]; then
-    echo "Error: Invalid harness '$harness'. Must be 'opencode' or 'claude'" >&2
-    exit 1
-fi
-
-# Extract configuration for selected harness.
-HARNESS_NAME="${HARNESS_CONFIG[$harness.name]}"
-DOCKER_TARGET="${HARNESS_CONFIG[$harness.docker_target]}"
-DOCKER_IMAGE="${HARNESS_CONFIG[$harness.docker_image]}"
-CONTAINER_PREFIX="${HARNESS_CONFIG[$harness.container_prefix]}"
-BUILD_DATE_FILE="${HARNESS_CONFIG[$harness.build_date_file]}"
-BUILD_MTIME_FILE="${HARNESS_CONFIG[$harness.build_mtime_file]}"
-
-# ============================================================================
-# Harness-Specific Functions
+# Helper functions
 # ============================================================================
 
-# Setup Docker volume mounts - harness specific.
-setup_docker_mounts() {
-    local -n cmd_ref=$1
-
-    if [[ "$harness" == "opencode" ]]; then
-        cmd_ref+=(
-            -v "$HOME/.config/opencode:$container_home/.config/opencode:ro"
-            -v "$HOME/.local/state/opencode:$container_home/.local/state/opencode"
-            -v "$HOME/.local/share/opencode:$container_home/.local/share/opencode"
-        )
-    else
-        cmd_ref+=(
-            -v "$HOME/.claude-$profile:$container_home/.claude"
-            -v "$HOME/.claude-$profile.json:$container_home/.claude.json"
-        )
-        # Mount the per-container settings.json on top of the directory mount.
-        if [ -n "${settings_tmp_file:-}" ]; then
-            cmd_ref+=(
-                -v "$settings_tmp_file:$container_home/.claude/settings.json"
-            )
-        fi
-    fi
-}
-
-# Setup Docker environment variables - harness specific.
-setup_docker_env() {
-    local -n cmd_ref=$1
-
-    if [[ "$harness" == "opencode" ]]; then
-        cmd_ref+=(
-            -e OPENCODE_DISABLE_AUTOUPDATE=1
-            -e OPENCODE_DISABLE_DEFAULT_PLUGINS=1
-            -e OPENCODE_DISABLE_LSP_DOWNLOAD=1
-            -e OPENCODE_DISABLE_CLAUDE_CODE=1
-            -e OPENCODE_DISABLE_MODELS_FETCH=1
-            -e OPENCODE_API_KEY
-            -e CLAUDE_CODE_API_KEY
-        )
-        # Pass OPENCODE_CONFIG_CONTENT if defined in environment.
-        if [ -n "${OPENCODE_CONFIG_CONTENT:-}" ]; then
-            cmd_ref+=(
-                -e OPENCODE_CONFIG_CONTENT
-            )
-        fi
-    else
-        if [ -n "${CLAUDE_CODE_API_KEY:-}" ]; then
-            cmd_ref+=(
-                -e "ANTHROPIC_API_KEY=$CLAUDE_CODE_API_KEY"
-            )
-        fi
-    fi
-
-    cmd_ref+=(
-        -e GH_TOKEN
-    )
-}
-
-# Detect if we're in print mode based on harness arguments.
-# Returns 0 if in print mode, 1 otherwise.
-is_print_mode() {
-    if [[ "$harness" == "opencode" ]]; then
-        # OpenCode print mode: "run --format json <message>"
-        if [[ "${#harness_args[@]}" -ge 3 ]] \
-            && [[ "${harness_args[0]}" == "run" ]] \
-            && [[ "${harness_args[1]}" == "--format" ]] \
-            && [[ "${harness_args[2]}" == "json" ]]; then
-            return 0
-        fi
-    else
-        # Claude print mode: "--print --output-format json <message>"
-        local has_print_flag=false
-        local has_json_format=false
-
-        local i=0
-        while [[ $i -lt ${#harness_args[@]} ]]; do
-            local arg="${harness_args[$i]}"
-            if [[ "$arg" == "--print" ]]; then
-                has_print_flag=true
-            elif [[ "$arg" == "--output-format" ]]; then
-                local next_i=$((i + 1))
-                if [[ $next_i -lt ${#harness_args[@]} ]] && [[ "${harness_args[$next_i]}" == "json" ]]; then
-                    has_json_format=true
-                fi
-            fi
-            i=$((i + 1))
-        done
-
-        if [[ "$has_print_flag" == "true" ]] && [[ "$has_json_format" == "true" ]]; then
-            return 0
-        fi
-    fi
-    return 1
-}
-
-# Process harness output for print mode.
+# Process Claude Code output from print mode.
 process_print_output() {
     local output="$1"
 
-    if [[ "$harness" == "opencode" ]]; then
-        # OpenCode output is newline-delimited JSON.
-        local result=$(jq -s '[.[] | select(.type == "text")] | last | .part.text' <<< "$output")
+    local result
+    local cost
+    local duration_ms
+    local duration
 
-        # Get first and last timestamps to calculate duration.
-        local first_ts=$(head -n 1 <<< "$output" | jq -r '.timestamp // 0')
-        local last_ts=$(tail -n 1 <<< "$output" | jq -r '.timestamp // 0')
-        local duration_ms=$((last_ts - first_ts))
-        local duration=$(printf "%.3f" "$(bc <<< "scale=3; $duration_ms / 1000")")
-
-        # Sum up costs from all steps.
-        local cost=$(jq -s 'map(.part.cost // 0) | add' <<< "$output")
-    else
-        local result=$(jq -r '.result // ""' <<< "$output")
-        local cost=$(jq -r '.total_cost_usd // 0' <<< "$output")
-        local duration_ms=$(jq -r '.duration_ms // 0' <<< "$output")
-        local duration=$(printf "%.3f" "$(bc <<< "scale=3; $duration_ms / 1000")")
-    fi
+    result=$(jq -r '.result // ""' <<< "$output")
+    cost=$(jq -r '.total_cost_usd // 0' <<< "$output")
+    duration_ms=$(jq -r '.duration_ms // 0' <<< "$output")
+    duration=$(printf "%.3f" "$(bc <<< "scale=3; $duration_ms / 1000")")
 
     echo "$result"
-    echo "" >&2
-    echo "Cost: \$$(round_up_cents "$cost")" >&2
-    echo "Duration: $(format_duration "$duration")" >&2
+    echo ""
+    echo "Cost: \$$(round_up_cents "$cost")"
+    echo "Duration: $(format_duration "$duration")"
 }
 
-# ============================================================================
-# Common Functions
-# ============================================================================
-
 build_image() {
-    local today="$1"
-    local use_cache="$2"
+    local use_cache="$1"
 
     echo "Building Docker image..." >&2
+
     local build_args=(
-        -f "$dockerfile_path"
-        --target "$DOCKER_TARGET"
-        --build-arg USERNAME="$username"
-        --build-arg BUILD_DATE="$today"
+        --build-arg UID="$(id -u)"
+        --build-arg GID="$(id -g)"
+        --build-arg HOME="$HOME"
+        --build-arg BUILD_DATE="$(date +%Y-%m-%d)"
+        --build-arg CLAUDE_CODE_CHANNEL="stable"
     )
 
     if [[ "$use_cache" == "false" ]]; then
@@ -393,48 +222,28 @@ build_image() {
         build_args+=(--no-cache)
     fi
 
-    build_args+=(
-        -t "$DOCKER_IMAGE"
-        "$devel_dir/dotfiles"
-    )
+    build_args+=(--tag "$docker_image_name")
 
-    if docker build "${build_args[@]}" >&2; then
-        # Clean up dangling images.
-        if ! docker image prune -f >&2 2> /dev/null; then
-            echo "Warning: Could not clean up dangling Docker images" >&2
-        fi
-        return 0
-    else
-        echo "Warning: Docker build failed" >&2
-        # Clean up dangling images.
-        if ! docker image prune -f >&2 2> /dev/null; then
-            echo "Warning: Could not clean up dangling Docker images" >&2
-        fi
-        return 1
-    fi
+    # Pipe the Dockerfile via stdin (`-`) so no build context is sent.
+    docker build "${build_args[@]}" - < "$dockerfile_path" >&2
 }
 
 generate_container_name() {
-    local dir_basename=$(basename "$current_dir")
-    echo "${CONTAINER_PREFIX}_${dir_basename:0:53}_$(shuf -i 1-999999 -n 1)"
+    local dir_basename
+    dir_basename=$(basename "$current_dir" | tr -cd 'a-zA-Z0-9_.-')
+    echo "${container_prefix}_${dir_basename:0:44}_$(shuf -i 1-999999 -n 1)"
 }
 
-# Run harness in Docker container.
-# Usage: run_harness [--exec] [--minimal] [args...]
-# --exec: Use exec to replace current process
-# --minimal: Skip mounts and environment, just run with --rm
-run_harness() {
+# Run Claude Code in a Docker container.
+# Usage: run_container [--exec] [args...]
+# --exec: Use exec to replace current process.
+run_container() {
     local use_exec=false
-    local minimal=false
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --exec)
                 use_exec=true
-                shift
-                ;;
-            --minimal)
-                minimal=true
                 shift
                 ;;
             *)
@@ -443,131 +252,143 @@ run_harness() {
         esac
     done
 
-    local cmd=(docker run)
+    local cmd=(
+        docker run --rm --init
+        --add-host "host.docker.internal:host-gateway"
+    )
 
-    # Only use -i if stdin is a TTY.
-    if [ -t 0 ]; then
-        cmd+=(-i)
+    # When processing output, don't allocate a TTY or attach stdin
+    # interactively so we can capture the output. When stdin is not a TTY, also
+    # skip both flags.
+    if [[ "$process_output" != "true" ]] && [ -t 0 ]; then
+        cmd+=(--interactive --tty)
     fi
 
-    container_home="/home/$username"
+    cmd+=(--name "$(generate_container_name)")
 
-    if [[ "$minimal" == "true" ]]; then
-        cmd+=(
-            -t
-            --init
-            --rm
-            --name "$(generate_container_name)"
-            "$DOCKER_IMAGE"
-            "$@"
+    # Mount current directory.
+    cmd+=(--volume "$current_dir:$current_dir")
+
+    # If this is not the main Git worktree, also mount the main worktree.
+    if [ -f "$current_dir/.git" ]; then
+        # .git is a file, not a directory - this is not the main worktree.
+        main_worktree=$(
+            git worktree list --porcelain \
+                | grep -m1 "^worktree " | sed 's/^worktree //'
         )
-    else
+        main_worktree_realpath=$(realpath "$main_worktree")
+
+        if [[ "$main_worktree_realpath/" != "$devel_dir/"* ]]; then
+            echo "Error: Main worktree must be in ~/devel" >&2
+            exit 1
+        fi
+
+        cmd+=(--volume "$main_worktree_realpath:$main_worktree_realpath")
+    fi
+
+    # Mount `dotfiles` so symlinks work.
+    if [ "$current_dir" != "$devel_dir/dotfiles" ]; then
+        cmd+=(--volume "$devel_dir/dotfiles:$devel_dir/dotfiles:ro")
+    fi
+    # Mount `dotfiles-secret` so symlinks work.
+    if [ "$current_dir" != "$devel_dir/dotfiles-secret" ]; then
         cmd+=(
-            -t
-            --init
-            --rm
-            --name "$(generate_container_name)"
-            --user "$(id -u):$(id -g)"
-            --group-add 0
+            --volume "$devel_dir/dotfiles-secret:$devel_dir/dotfiles-secret:ro"
         )
+    fi
 
-        cmd+=(-v "$current_dir:$container_home/devel/$project_relative_dir")
-
-        # If this is not the main Git worktree, also mount the main worktree.
-        if [ -f "$current_dir/.git" ]; then
-            # .git is a file, not a directory - this is not the main worktree.
-            main_worktree=$(
-                git worktree list --porcelain \
-                    | grep -m1 "^worktree " | cut -d' ' -f2
-            )
-            main_worktree_realpath=$(realpath "$main_worktree")
-
-            if [[ "$main_worktree_realpath" != "$devel_dir"* ]]; then
-                echo "Error: Main worktree must be in ~/devel" >&2
-                exit 1
+    # Mount additional projects from `AGENTS_ADDITIONAL_PROJECTS`.
+    if [ -n "${AGENTS_ADDITIONAL_PROJECTS:-}" ]; then
+        IFS=':' read -ra ADDITIONAL_PROJECTS <<< "$AGENTS_ADDITIONAL_PROJECTS"
+        for additional_project in "${ADDITIONAL_PROJECTS[@]}"; do
+            # Trim whitespace.
+            additional_project=$(sed 's/^[[:space:]]*//;s/[[:space:]]*$//' <<< "$additional_project")
+            if [ -n "$additional_project" ]; then
+                # Skip if this is the current project to avoid duplicate
+                # mounts.
+                if [ "$additional_project" == "$project_relative_dir" ]; then
+                    echo "Skipping additional mount for current project: $additional_project" >&2
+                    continue
+                fi
+                project_path="$devel_dir/$additional_project"
+                if [ -d "$project_path" ]; then
+                    echo "Additional mount point: $additional_project" >&2
+                    cmd+=(--volume "$project_path:$project_path:ro")
+                else
+                    echo "Warning: Additional project '$additional_project' does not exist at $project_path" >&2
+                fi
             fi
+        done
+    fi
 
-            # Calculate relative path from `$devel_dir`.
-            main_worktree_relative="${main_worktree_realpath#"$devel_dir"/}"
-            cmd+=(
-                -v "$main_worktree_realpath:$container_home/devel/$main_worktree_relative"
-            )
-        fi
+    cmd+=(
+        --volume "$devel_dir/dotfiles/bin/ai_commit:/usr/local/bin/ai_commit:ro"
+        --volume "$devel_dir/dotfiles/bin/review_diff:/usr/local/bin/review_diff:ro"
+        --volume "$HOME/.config/git:$HOME/.config/git:ro"
+    )
 
-        # Mount my dotfiles so symlinks work.
-        if [ "$current_dir" != "$devel_dir/dotfiles" ]; then
-            cmd+=(-v "$devel_dir/dotfiles:$container_home/devel/dotfiles:ro")
-        fi
-        # Mount my dotfiles so symlinks work.
-        if [ "$current_dir" != "$devel_dir/dotfiles-secret" ]; then
-            cmd+=(-v "$devel_dir/dotfiles-secret:$container_home/devel/dotfiles-secret:ro")
-        fi
+    # Claude Code mounts.
+    cmd+=(
+        --volume "$HOME/.claude-$profile:$HOME/.claude"
+        --volume "$HOME/.claude-$profile.json:$HOME/.claude.json"
+    )
 
-        # Mount additional projects from `AGENTS_ADDITIONAL_PROJECTS`.
-        if [ -n "${AGENTS_ADDITIONAL_PROJECTS:-}" ]; then
-            IFS=':' read -ra ADDITIONAL_PROJECTS <<< "$AGENTS_ADDITIONAL_PROJECTS"
-            for additional_project in "${ADDITIONAL_PROJECTS[@]}"; do
-                # Trim whitespace.
-                additional_project=$(xargs <<< "$additional_project")
-                if [ -n "$additional_project" ]; then
-                    # Skip if this is the current project to avoid duplicate
-                    # mounts.
-                    if [ "$additional_project" == "$project_relative_dir" ]; then
-                        echo "Skipping additional mount for current project: $additional_project" >&2
-                        continue
-                    fi
-                    project_path="$devel_dir/$additional_project"
-                    if [ -d "$project_path" ]; then
-                        echo "Additional mount point: $additional_project" >&2
-                        cmd+=(-v "$project_path:$container_home/devel/$additional_project:ro")
-                    else
-                        echo "Warning: Additional project '$additional_project' does not exist at $project_path" >&2
-                    fi
+    # Environment variables.
+    cmd+=(
+        --env ANTHROPIC_API_KEY
+        --env GH_TOKEN
+        --env "TZ=${TZ:-$(readlink /etc/localtime 2> /dev/null | sed 's|.*/zoneinfo/||')}"
+        --env "AGENT_PROFILE=$profile"
+        --env RIPGREP_CONFIG_PATH
+    )
+
+    # Terminal configuration.
+    cmd+=(
+        --env TERM
+        --env COLORTERM
+        --env FORCE_COLOR
+        --env NO_COLOR
+    )
+
+    # Relay additional environment variables from
+    # `AGENTS_ADDITIONAL_ENV_VARS`.
+    if [ -n "${AGENTS_ADDITIONAL_ENV_VARS:-}" ]; then
+        IFS=':' read -ra ADDITIONAL_ENV_VARS <<< "$AGENTS_ADDITIONAL_ENV_VARS"
+        for additional_env_var in "${ADDITIONAL_ENV_VARS[@]}"; do
+            # Trim whitespace.
+            additional_env_var=$(sed 's/^[[:space:]]*//;s/[[:space:]]*$//' <<< "$additional_env_var")
+            if [ -n "$additional_env_var" ]; then
+                if [[ ! "$additional_env_var" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+                    echo "Warning: Skipping invalid env var name: $additional_env_var" >&2
+                    continue
                 fi
-            done
-        fi
+                echo "Additional environment variable: $additional_env_var" >&2
+                cmd+=(--env "$additional_env_var")
+            fi
+        done
+    fi
 
+    # Set up Docker access from inside the container.
+    if [ -S "$HOME/.docker/run/docker.sock" ]; then
+        docker_socket="$HOME/.docker/run/docker.sock"
+    elif [ -S "/var/run/docker.sock" ]; then
+        docker_socket="/var/run/docker.sock"
+    else
+        echo "Warning: Docker socket not found, Docker will not be available inside the container" >&2
+        docker_socket=""
+    fi
+    if [ -n "$docker_socket" ]; then
         cmd+=(
-            -v "$devel_dir/dotfiles/bin/ai_commit:/usr/local/bin/ai_commit:ro"
-            -v "$devel_dir/dotfiles/bin/review_diff:/usr/local/bin/review_diff:ro"
-            -v "$HOME/.config/git:$container_home/.config/git:ro"
-        )
-
-        # Set up harness-specific mounts.
-        setup_docker_mounts cmd
-
-        # Set up harness-specific environment variables.
-        setup_docker_env cmd
-
-        cmd+=(-e "TZ=$(date "+%Z")")
-        cmd+=(-e "AGENT_PROFILE=$profile")
-
-        # Relay additional environment variables from
-        # `AGENTS_ADDITIONAL_ENV_VARS`.
-        if [ -n "${AGENTS_ADDITIONAL_ENV_VARS:-}" ]; then
-            IFS=':' read -ra ADDITIONAL_ENV_VARS <<< "$AGENTS_ADDITIONAL_ENV_VARS"
-            for additional_env_var in "${ADDITIONAL_ENV_VARS[@]}"; do
-                # Trim whitespace.
-                additional_env_var=$(xargs <<< "$additional_env_var")
-                if [ -n "$additional_env_var" ]; then
-                    echo "Additional environment variable: $additional_env_var" >&2
-                    cmd+=(-e "$additional_env_var")
-                fi
-            done
-        fi
-
-        # Set up Docker access from inside the container.
-        cmd+=(
-            -v "$HOME/.docker/run/docker.sock:/var/run/docker.sock"
-            -e "DOCKER_HOST=unix:///var/run/docker.sock"
-        )
-
-        cmd+=(
-            -w "$container_home/devel/$project_relative_dir"
-            "$DOCKER_IMAGE"
-            "$@"
+            --volume "$docker_socket:/var/run/docker.sock"
+            --env "DOCKER_HOST=unix:///var/run/docker.sock"
         )
     fi
+
+    cmd+=(
+        --workdir "$current_dir"
+        "$docker_image_name"
+        "$@"
+    )
 
     echo "Running container..." >&2
 
@@ -581,7 +402,17 @@ run_harness() {
 # Function to round cost up to the next cent for display.
 round_up_cents() {
     local value=$1
-    local rounded=$(bc <<< "scale=0; tmp = $value * 100; tmp = tmp / 1; if (tmp < $value * 100) tmp = tmp + 1; scale=2; tmp / 100")
+    local rounded
+    rounded=$(
+        bc << EOF
+scale=0
+tmp = $value * 100
+tmp = tmp / 1
+if (tmp < $value * 100) tmp = tmp + 1
+scale=2
+tmp / 100
+EOF
+    )
     printf "%.2f" "$rounded"
 }
 
@@ -595,10 +426,15 @@ format_duration() {
         return
     fi
 
-    local hours=$(bc <<< "$total_seconds / 3600")
-    local remainder=$(bc <<< "$total_seconds - ($hours * 3600)")
-    local minutes=$(bc <<< "$remainder / 60")
-    local seconds=$(bc <<< "$remainder - ($minutes * 60)")
+    local hours
+    local remainder
+    local minutes
+    local seconds
+
+    hours=$(bc <<< "$total_seconds / 3600")
+    remainder=$(bc <<< "$total_seconds - ($hours * 3600)")
+    minutes=$(bc <<< "$remainder / 60")
+    seconds=$(bc <<< "$remainder - ($minutes * 60)")
 
     local result=""
     if [ "$hours" -gt 0 ]; then
@@ -615,62 +451,6 @@ format_duration() {
 # Main Execution
 # ============================================================================
 
-mkdir -p "$(dirname "$BUILD_DATE_FILE")"
-if [[ ! -f "$BUILD_DATE_FILE" ]]; then
-    echo "never" > "$BUILD_DATE_FILE"
-fi
-if [[ ! -f "$BUILD_MTIME_FILE" ]]; then
-    echo "0" > "$BUILD_MTIME_FILE"
-fi
-
-dockerfile_mtime=$(stat -c %Y "$dockerfile_path" 2> /dev/null || stat -f %m "$dockerfile_path" 2> /dev/null || echo "0")
-last_build_date=$(cat "$BUILD_DATE_FILE")
-last_build_mtime=$(cat "$BUILD_MTIME_FILE")
-today=$(date +%Y-%m-%d)
-
-if [[ "$no_rebuild" == "true" ]]; then
-    # Skip rebuild entirely - verify image exists.
-    if ! docker image inspect "$DOCKER_IMAGE" > /dev/null 2>&1; then
-        echo "Error: Docker image does not exist and --no-rebuild was specified" >&2
-        exit 1
-    fi
-    echo "Skipping rebuild (--no-rebuild specified)" >&2
-elif [[ "$force_rebuild" == "true" ]] \
-    || [[ "$last_build_date" != "$today" ]] \
-    || [[ "$dockerfile_mtime" -gt "$last_build_mtime" ]]; then
-    use_cache="true"
-    if [[ "$no_build_cache" == "true" ]]; then
-        use_cache="false"
-    fi
-    if ! build_image "$today" "$use_cache"; then
-        if ! docker image inspect "$DOCKER_IMAGE" > /dev/null 2>&1; then
-            echo "Error: Docker image does not exist and build failed" >&2
-            exit 1
-        fi
-        echo "" >&2
-        echo "========================================" >&2
-        echo "WARNING: BUILD FAILED - OLD IMAGE EXISTS" >&2
-        echo "========================================" >&2
-        echo "The Docker build failed, but an older image is available." >&2
-        echo "This image may have outdated dependencies or be missing recent fixes." >&2
-        echo "" >&2
-        read -p "Do you want to continue with the old image? [y/N] " -n 1 -r >&2
-        echo "" >&2
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            echo "Aborted by user" >&2
-            exit 1
-        fi
-        echo "Continuing with existing Docker image..." >&2
-    else
-        echo "$today" > "$BUILD_DATE_FILE"
-        echo "$dockerfile_mtime" > "$BUILD_MTIME_FILE"
-    fi
-fi
-
-if [[ "$show_harness_help" == "true" ]]; then
-    run_harness --exec --minimal --help
-fi
-
 if [ -z "$profile" ]; then
     component_count=$(tr '/' '\n' <<< "$project_relative_dir" | wc -l)
     if [ "$component_count" -gt 1 ]; then
@@ -680,7 +460,7 @@ if [ -z "$profile" ]; then
     fi
 fi
 
-echo "Running $HARNESS_NAME with profile '$profile'..." >&2
+echo "Profile '$profile'..." >&2
 
 # Validate profile name to prevent command injection.
 # Max length: 64 characters, alphanumeric with dots, dashes, underscores.
@@ -689,66 +469,49 @@ if [[ ! "$profile" =~ ^[a-zA-Z0-9_]([a-zA-Z0-9._-]{0,62}[a-zA-Z0-9_])?$ ]]; then
     exit 1
 fi
 
-# Fetch API keys from 1Password if not already set.
-if [ -z "${OPENCODE_API_KEY:-}${CLAUDE_CODE_API_KEY:-}${GH_TOKEN:-}" ]; then
-    echo -n "Fetching AI Agents configuration from 1Password..." >&2
-    if ! SECRETS=$(op read "op://Private/AI Agents Configuration/notesPlain" 2>&1); then
-        echo "Error: Failed to retrieve configuration from 1Password" >&2
-        echo "Make sure you are logged in to 1Password CLI (run: op signin)" >&2
-        exit 1
-    fi
-    echo " done!" >&2
+# Fetch API key and GitHub token from 1Password if not already provided.
+if [[ "${AGENT_ENV_SET:-}" != "true" ]]; then
+    # Fetch API key from 1Password if not already set.
+    if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+        echo -n "Fetching AI Agents configuration from 1Password..." >&2
+        if ! SECRETS=$(op read "op://Private/AI Agents Configuration/notesPlain" 2>&1); then
+            echo "Error: Failed to retrieve configuration from 1Password" >&2
+            echo "Make sure you are logged in to 1Password CLI (run: op signin)" >&2
+            exit 1
+        fi
+        echo " done!" >&2
 
-    # Validate that we got valid JSON.
-    if ! jq empty <<< "$SECRETS" 2> /dev/null; then
-        echo "Error: Retrieved secret is not valid JSON" >&2
-        exit 1
-    fi
+        # Validate that we got valid JSON.
+        if ! jq empty <<< "$SECRETS" 2> /dev/null; then
+            echo "Error: Retrieved secret is not valid JSON" >&2
+            exit 1
+        fi
 
-    # Check if fallback to username profile is allowed.
-    fallback_to_username=$(jq -r --arg p "$profile" \
-        '.profiles[$p].fallback_to_username // false' \
-        <<< "$SECRETS")
+        # Check if fallback to username profile is allowed.
+        fallback_to_username=$(jq -r --arg p "$profile" \
+            '.profiles[$p].fallback_to_username // false' \
+            <<< "$SECRETS")
 
-    # Extract API keys, falling back to the username profile only if the
-    # profile allows it via `fallback_to_username`.
-    if [ -z "${OPENCODE_API_KEY:-}" ]; then
+        # Extract API key, falling back to the username profile only if the
+        # profile allows it via `fallback_to_username`.
         if [[ "$fallback_to_username" == "true" ]]; then
-            OPENCODE_API_KEY=$(jq -r --arg p "$profile" --arg u "$username" \
-                '(.profiles[$p].opencode_api_key // .profiles[$u].opencode_api_key) // empty' \
+            ANTHROPIC_API_KEY=$(jq -r --arg p "$profile" --arg u "$username" \
+                '(.profiles[$p].api_key // .profiles[$u].api_key) // empty' \
                 <<< "$SECRETS")
         else
-            OPENCODE_API_KEY=$(jq -r --arg p "$profile" \
-                '.profiles[$p].opencode_api_key // empty' \
-                <<< "$SECRETS")
-        fi
-
-        if [[ -z "$OPENCODE_API_KEY" || "$OPENCODE_API_KEY" == "null" ]]; then
-            echo "Warning: No OpenCode API key found for profile '$profile'" >&2
-        else
-            export OPENCODE_API_KEY
-        fi
-    fi
-
-    if [ -z "${CLAUDE_CODE_API_KEY:-}" ]; then
-        if [[ "$fallback_to_username" == "true" ]]; then
-            CLAUDE_CODE_API_KEY=$(jq -r --arg p "$profile" --arg u "$username" \
-                '(.profiles[$p].claude_code_api_key // .profiles[$u].claude_code_api_key) // empty' \
-                <<< "$SECRETS")
-        else
-            CLAUDE_CODE_API_KEY=$(jq -r --arg p "$profile" \
-                '.profiles[$p].claude_code_api_key // empty' \
+            ANTHROPIC_API_KEY=$(jq -r --arg p "$profile" \
+                '.profiles[$p].api_key // empty' \
                 <<< "$SECRETS")
         fi
 
-        if [[ -z "$CLAUDE_CODE_API_KEY" || "$CLAUDE_CODE_API_KEY" == "null" ]]; then
-            echo "Warning: No Claude Code API key found for profile '$profile'" >&2
+        if [[ -z "$ANTHROPIC_API_KEY" || "$ANTHROPIC_API_KEY" == "null" ]]; then
+            echo "Warning: No API key found for profile '$profile'" >&2
         else
-            export CLAUDE_CODE_API_KEY
+            export ANTHROPIC_API_KEY
         fi
     fi
 
-    # Fetch GitHub token if not set.
+    # Fetch GitHub token from 1Password if not already set.
     if [ -z "${GH_TOKEN:-}" ]; then
         echo -n "Fetching GitHub token from 1Password..." >&2
         if ! GH_TOKEN=$(op read "op://Private/GH Token/notesPlain" 2>&1); then
@@ -769,37 +532,92 @@ fi
 
 if [[ "$env_only" == "true" ]]; then
     # Output shell commands to be eval'd for environment variable export.
-    [ -n "${OPENCODE_API_KEY:-}" ] && printf "export OPENCODE_API_KEY=%q\n" "$OPENCODE_API_KEY"
-    [ -n "${CLAUDE_CODE_API_KEY:-}" ] && printf "export CLAUDE_CODE_API_KEY=%q\n" "$CLAUDE_CODE_API_KEY"
+    [ -n "${ANTHROPIC_API_KEY:-}" ] \
+        && printf "export ANTHROPIC_API_KEY=%q\n" "$ANTHROPIC_API_KEY"
     [ -n "${GH_TOKEN:-}" ] && printf "export GH_TOKEN=%q\n" "$GH_TOKEN"
-    printf "export AGENTS_HARNESS=%q\n" "$harness"
+    echo "export AGENT_ENV_SET=true"
     echo "Environment variables exported for profile '$profile'" >&2
     exit 0
 fi
 
-if [[ "$harness" == "claude" ]]; then
-    cp -R "$HOME/.claude/"* "$HOME/.claude-$profile"
-    [ -f "$HOME/.claude-$profile.json" ] \
-        || echo "{}" > "$HOME/.claude-$profile.json"
+today=$(date +%Y-%m-%d)
+
+# Get last build date from the Docker image metadata (empty if image doesn't
+# exist).
+last_build_date=$(
+    docker image inspect "$docker_image_name" \
+        --format '{{.Metadata.LastTagTime.Format "2006-01-02"}}' \
+        2> /dev/null \
+        || true
+)
+
+# Get the image's creation timestamp (seconds since epoch, empty if image
+# doesn't exist).
+last_build_timestamp=$(
+    docker image inspect "$docker_image_name" \
+        --format '{{.Metadata.LastTagTime.Unix}}' \
+        2> /dev/null \
+        || true
+)
+
+# Get the Dockerfile's modification time (seconds since epoch).
+dockerfile_mtime=$(
+    stat -c %Y "$dockerfile_path" 2> /dev/null \
+        || stat -f %m "$dockerfile_path" 2> /dev/null \
+        || echo "0"
+)
+
+needs_rebuild=false
+if [[ "$no_build_cache" == "true" ]]; then
+    needs_rebuild=true
+elif [[ "$force_rebuild" == "true" ]]; then
+    needs_rebuild=true
+elif [[ "$last_build_date" != "$today" ]]; then
+    needs_rebuild=true
+elif [[ -n "$last_build_timestamp" ]] \
+    && [[ "$dockerfile_mtime" -gt "$last_build_timestamp" ]]; then
+    needs_rebuild=true
+elif [[ -z "$last_build_date" ]]; then
+    # Image doesn't exist at all.
+    needs_rebuild=true
 fi
 
-# Detect if we're in print mode and handle `--raw-output` accordingly.
-if is_print_mode; then
-    # We're in print mode.
-    if [[ "$raw_output" == "true" ]]; then
-        # Just pass through raw JSON output.
-        run_harness --exec "${harness_args[@]}"
-    else
-        # Format the output with cost and duration.
-        output=$(run_harness "${harness_args[@]}")
-        process_print_output "$output"
+if [[ "$no_rebuild" == "true" ]]; then
+    # Skip rebuild entirely - verify image exists.
+    if [[ -z "$last_build_date" ]]; then
+        echo "Error: Docker image does not exist and --no-rebuild was specified" >&2
+        exit 1
     fi
-else
-    # Not in print mode - warn if `--raw-output` is present.
-    if [[ "$raw_output" == "true" ]]; then
-        echo "Warning: --raw-output has no effect outside print mode" >&2
+    echo "Skipping rebuild (--no-rebuild specified)" >&2
+elif [[ "$needs_rebuild" == "true" ]]; then
+    use_cache="true"
+    if [[ "$no_build_cache" == "true" ]]; then
+        use_cache="false"
     fi
+    if ! build_image "$use_cache"; then
+        if [[ "$allow_stale" == "true" ]]; then
+            if [[ -z "$last_build_date" ]]; then
+                echo "Error: Docker build failed and no existing image found" >&2
+                exit 1
+            fi
+            echo "Build failed, using existing image (--allow-stale)" >&2
+        else
+            echo "Error: Docker build failed" >&2
+            exit 1
+        fi
+    fi
+fi
 
-    # Pass all arguments directly to the harness.
-    run_harness --exec "${harness_args[@]}"
+mkdir -p "$HOME/.claude-$profile"
+cp -a "$HOME/.claude/." "$HOME/.claude-$profile"
+[ -f "$HOME/.claude-$profile.json" ] \
+    || echo "{}" > "$HOME/.claude-$profile.json"
+
+if [[ "$process_output" == "true" ]]; then
+    # Capture output and process it.
+    output=$(run_container "${harness_args[@]}")
+    process_print_output "$output"
+else
+    # Pass all arguments directly to Claude Code.
+    run_container --exec "${harness_args[@]}"
 fi
