@@ -1,0 +1,29 @@
+default_profile = ""
+
+[theme]
+name = "catppuccin-latte"
+
+[updates]
+check_enabled = false
+
+[worktree]
+enabled = false
+
+[sandbox]
+enabled_by_default = false
+
+[tmux]
+status_bar = "disabled"
+mouse = "disabled"
+
+[session]
+default_tool = "claude"
+
+[sound]
+enabled = false
+mode = "random"
+
+[app_state]
+has_seen_welcome = true
+last_seen_version = "0.15.1"
+has_seen_custom_instruction_warning = false

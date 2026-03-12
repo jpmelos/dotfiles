@@ -210,6 +210,12 @@ container_prefix="claude_code"
 # Helper functions
 # ============================================================================
 
+# Transform a link into a hard copy.
+dereference() {
+    tmp=$(mktemp) || return
+    cp -L "$1" "$tmp" && mv "$tmp" "$1"
+}
+
 # Process Claude Code output from print mode.
 process_print_output() {
     local output="$1"
@@ -310,6 +316,10 @@ run_container() {
         # Claude Code mounts.
         --volume "$HOME/.claude-$profile:$HOME/.claude"
         --volume "$HOME/.claude-$profile.json:$HOME/.claude.json"
+
+        # Agent of Empires environment variables and mounts.
+        --env "AOE_INSTANCE_ID"
+        --volume "/tmp/aoe-hooks:/tmp/aoe-hooks"
 
         # Anthropic's API key if available. If not defined, Claude Code will
         # check for OAuth credentials. If not there too, it will ask the user
@@ -658,6 +668,8 @@ fi
 
 mkdir -p "$HOME/.claude-$profile"
 cp -a "$HOME/.claude/." "$HOME/.claude-$profile"
+# Make `~/claude-$profile/settings.json` a hard copy, not a symlink.
+dereference "$HOME/.claude-$profile/settings.json"
 [ -f "$HOME/.claude-$profile.json" ] \
     || echo "{}" > "$HOME/.claude-$profile.json"
 
