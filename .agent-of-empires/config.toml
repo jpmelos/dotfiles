@@ -21,8 +21,8 @@ default_tool = "claude"
 
 [sound]
 enabled = true
-on_start = "coins.wav"
-on_running = "coins.wav"
+# on_start = "coins.wav"
+# on_running = "coins.wav"
 on_waiting = "coins.wav"
 on_idle = "coins.wav"
 on_error = "coins.wav"
