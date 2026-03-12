@@ -279,8 +279,60 @@ run_container() {
     done
 
     local cmd=(
-        docker run --rm --init
+        docker run
+
+        # Delete the container when it exits.
+        --rm
+
+        # Run an init process that will properly manage signals and other OS
+        # facilities.
+        --init
+
+        # Container name.
+        --name "$(generate_container_name)"
+
+        # So that the agent can reach services running on the host via
+        # `host.docker.internal`.
         --add-host "host.docker.internal:host-gateway"
+
+        # Mount current directory and set it as the working directory.
+        --volume "$current_dir:$current_dir"
+        --workdir "$current_dir"
+
+        # Mount git configuration so my aliases and other preferences are in
+        # effect.
+        --volume "$HOME/.config/git:$HOME/.config/git:ro"
+
+        # Some binaries that my agents need.
+        --volume "$devel_dir/dotfiles/bin/ai_commit:/usr/local/bin/ai_commit:ro"
+        --volume "$devel_dir/dotfiles/bin/review_diff:/usr/local/bin/review_diff:ro"
+
+        # Claude Code mounts.
+        --volume "$HOME/.claude-$profile:$HOME/.claude"
+        --volume "$HOME/.claude-$profile.json:$HOME/.claude.json"
+
+        # Anthropic's API key if available. If not defined, Claude Code will
+        # check for OAuth credentials. If not there too, it will ask the user
+        # how they want to login.
+        --env ANTHROPIC_API_KEY
+
+        # This is so the agent can use `gh`.
+        --env GH_TOKEN
+
+        # This enables sessions to show up with the right timestamps.
+        --env "TZ=${TZ:-$(readlink /etc/localtime 2> /dev/null | sed 's|.*/zoneinfo/||')}"
+
+        # This is used to show the active profile in the status line.
+        --env "AGENT_PROFILE=$profile"
+
+        # Claude Code uses this to know search for file suggestions on `@`.
+        --env RIPGREP_CONFIG_PATH
+
+        # Terminal configuration.
+        --env TERM
+        --env COLORTERM
+        --env FORCE_COLOR
+        --env NO_COLOR
     )
 
     # When processing output or in print mode, don't allocate a TTY or attach
@@ -291,11 +343,6 @@ run_container() {
         && [ -t 0 ]; then
         cmd+=(--interactive --tty)
     fi
-
-    cmd+=(--name "$(generate_container_name)")
-
-    # Mount current directory.
-    cmd+=(--volume "$current_dir:$current_dir")
 
     # If this is not the main Git worktree, also mount the main worktree.
     if [ -f "$current_dir/.git" ]; then
@@ -349,35 +396,6 @@ run_container() {
         done
     fi
 
-    cmd+=(
-        --volume "$devel_dir/dotfiles/bin/ai_commit:/usr/local/bin/ai_commit:ro"
-        --volume "$devel_dir/dotfiles/bin/review_diff:/usr/local/bin/review_diff:ro"
-        --volume "$HOME/.config/git:$HOME/.config/git:ro"
-    )
-
-    # Claude Code mounts.
-    cmd+=(
-        --volume "$HOME/.claude-$profile:$HOME/.claude"
-        --volume "$HOME/.claude-$profile.json:$HOME/.claude.json"
-    )
-
-    # Environment variables.
-    cmd+=(
-        --env ANTHROPIC_API_KEY
-        --env GH_TOKEN
-        --env "TZ=${TZ:-$(readlink /etc/localtime 2> /dev/null | sed 's|.*/zoneinfo/||')}"
-        --env "AGENT_PROFILE=$profile"
-        --env RIPGREP_CONFIG_PATH
-    )
-
-    # Terminal configuration.
-    cmd+=(
-        --env TERM
-        --env COLORTERM
-        --env FORCE_COLOR
-        --env NO_COLOR
-    )
-
     # Relay additional environment variables from
     # `AGENTS_ADDITIONAL_ENV_VARS`.
     if [ -n "${AGENTS_ADDITIONAL_ENV_VARS:-}" ]; then
@@ -413,8 +431,10 @@ run_container() {
     fi
 
     cmd+=(
-        --workdir "$current_dir"
+        # The image we just built.
         "$docker_image_name"
+
+        # Whatever arguments we want to pass to the harness.
         "$@"
     )
 
