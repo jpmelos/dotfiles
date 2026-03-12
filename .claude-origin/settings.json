@@ -56,6 +56,49 @@
             "Bash(bash jpenv-bin/tests.bash:*)"
         ]
     },
+    "hooks": {
+        "Notification": [
+            {
+                "hooks": [
+                    {
+                        "command": "~/.claude/aoe-hook.sh waiting",
+                        "type": "command"
+                    }
+                ],
+                "matcher": "permission_prompt|elicitation_dialog"
+            }
+        ],
+        "PreToolUse": [
+            {
+                "hooks": [
+                    {
+                        "command": "~/.claude/aoe-hook.sh running",
+                        "type": "command"
+                    }
+                ]
+            }
+        ],
+        "Stop": [
+            {
+                "hooks": [
+                    {
+                        "command": "~/.claude/aoe-hook.sh idle",
+                        "type": "command"
+                    }
+                ]
+            }
+        ],
+        "UserPromptSubmit": [
+            {
+                "hooks": [
+                    {
+                        "command": "~/.claude/aoe-hook.sh running",
+                        "type": "command"
+                    }
+                ]
+            }
+        ]
+    },
     "env": {
         "BASH_DEFAULT_TIMEOUT_MS": "300000",
         "BASH_MAX_TIMEOUT_MS": "300000",
