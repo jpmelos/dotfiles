@@ -667,7 +667,7 @@ elif [[ "$needs_rebuild" == "true" ]]; then
 fi
 
 mkdir -p "$HOME/.claude-$profile"
-cp -a "$HOME/.claude/." "$HOME/.claude-$profile"
+cp -a "$HOME/.claude-origin/." "$HOME/.claude-$profile"
 # Make `~/claude-$profile/settings.json` a hard copy, not a symlink.
 dereference "$HOME/.claude-$profile/settings.json"
 [ -f "$HOME/.claude-$profile.json" ] \
