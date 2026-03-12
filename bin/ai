@@ -510,12 +510,7 @@ format_duration() {
 # ============================================================================
 
 if [ -z "$profile" ]; then
-    component_count=$(tr '/' '\n' <<< "$project_relative_dir" | wc -l)
-    if [ "$component_count" -gt 1 ]; then
-        profile="$(cut -d'/' -f1 <<< "$project_relative_dir")"
-    else
-        profile="$username"
-    fi
+    profile="$(project_profile_name)"
 fi
 
 echo "Profile '$profile'..." >&2

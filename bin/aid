@@ -7,4 +7,5 @@ if [[ $# -eq 0 ]]; then
     exit 1
 fi
 
-aoe add --title "$*"
+profile_name="$(project_profile_name)"
+aoe add --group "$profile_name" --title "$*"

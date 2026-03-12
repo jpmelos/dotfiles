@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# Detect the project profile name based on the current directory relative to
+# `~/devel`. If the path has multiple components (e.g., `orgname/project`), the
+# first component is the profile. Otherwise, the username is the profile.
+
+devel_dir="$(realpath "$HOME/devel")"
+if [[ ! -d "$devel_dir" ]]; then
+    echo "Error: ~/devel does not exist" >&2
+    exit 1
+fi
+
+current_dir="$(realpath "$(pwd)")"
+if [[ "$current_dir/" != "$devel_dir/"* ]]; then
+    echo "Error: not inside ~/devel" >&2
+    exit 1
+fi
+
+if [[ "$current_dir" == "$devel_dir" ]]; then
+    echo "Error: Cannot run from ~/devel root, must be in a subdirectory" >&2
+    exit 1
+fi
+
+project_relative_dir="${current_dir#"$devel_dir"/}"
+username="$(whoami)"
+
+component_count=$(tr '/' '\n' <<< "$project_relative_dir" | wc -l)
+if [ "$component_count" -gt 1 ]; then
+    profile="$(cut -d'/' -f1 <<< "$project_relative_dir")"
+else
+    profile="$username"
+fi
+
+echo "$profile"
