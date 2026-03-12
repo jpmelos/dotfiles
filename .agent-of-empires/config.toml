@@ -25,7 +25,7 @@ enabled = true
 # on_running = "coins.wav"
 on_waiting = "coins.wav"
 on_idle = "coins.wav"
-on_error = "coins.wav"
+# on_error = "coins.wav"
 
 [sound.mode]
 specific = ""
