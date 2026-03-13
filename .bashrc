@@ -668,6 +668,49 @@ change_commit_date() {
     GIT_COMMITTER_DATE="$date" git commit --amend --no-verify --no-edit --date="$date"
 }
 
+#########################################
+#                                       #
+#    Project navigation with ~/devel    #
+#                                       #
+#########################################
+
+# Navigate to a project in ~/devel with TUI selection.
+x() {
+    local devel_dir="$HOME/devel"
+
+    if [ ! -d "$devel_dir" ]; then
+        echo "Error: $devel_dir does not exist."
+        return 1
+    fi
+
+    _x_list_projects() {
+        local entry
+        for entry in "$1"/*/; do
+            if [ -e "${entry}.git" ] && [ ! -e "${entry}.x-ignore" ]; then
+                local relative="${entry#"$devel_dir"/}"
+                echo "${relative%/}"
+            elif [ -d "$entry" ]; then
+                _x_list_projects "${entry%/}"
+            fi
+        done
+    }
+
+    local project=$(
+        _x_list_projects "$devel_dir" \
+            | sort \
+            | fzf --prompt="Select project: " --height=40% --reverse --query="$*"
+    )
+
+    unset -f _x_list_projects
+
+    if [ -z "$project" ]; then
+        echo "No project selected."
+        return 1
+    fi
+
+    cd "$devel_dir/$project"
+}
+
 ################
 #              #
 #    Docker    #
