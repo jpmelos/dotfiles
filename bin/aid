@@ -7,5 +7,20 @@ if [[ $# -eq 0 ]]; then
     exit 1
 fi
 
-profile_name="$(project_profile_name)"
-aoe add --group "$profile_name" --title "$*"
+# If `.git` is a file (worktree), resolve to the main repository directory.
+# Otherwise, use the current directory.
+if [[ -f .git ]]; then
+    # `.git` file contains: `gitdir: /path/to/main/.git/worktrees/<name>`.
+    main_git_dir="$(sed 's/^gitdir: //' .git)"
+    # Resolve to the main repo's `.git` directory (strip `/worktrees/<name>`).
+    main_git_dir="$(realpath "$main_git_dir/../..")"
+    # The main repository is the parent of the `.git` directory.
+    project_dir="$(dirname "$main_git_dir")"
+else
+    project_dir="$(pwd)"
+fi
+
+devel_dir="$(realpath "$HOME/devel")"
+group_name="${project_dir#"$devel_dir"/}"
+
+aoe add --group "$group_name" --title "$*"
