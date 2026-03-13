@@ -292,6 +292,11 @@ run_container() {
         # facilities.
         --init
 
+        # Configure user.
+        --user "$(id -u):$(id -g)"
+        # This is needed to have access to the Docker socket.
+        --group-add 0
+
         # Container name.
         --name "$(generate_container_name)"
 
