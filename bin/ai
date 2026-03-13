@@ -638,7 +638,7 @@ fi
 if [[ "$no_rebuild" == "true" ]]; then
     # Skip rebuild entirely - verify image exists.
     if [[ -z "$last_build_date" ]]; then
-        echo "Error: Docker image does not exist and --no-rebuild was specified" >&2
+        echo "Error: Docker image '$docker_image_name' does not exist and --no-rebuild was specified" >&2
         exit 1
     fi
     echo "Skipping rebuild (--no-rebuild specified)" >&2
@@ -650,7 +650,7 @@ elif [[ "$needs_rebuild" == "true" ]]; then
     if ! build_image "$use_cache"; then
         if [[ "$allow_stale" == "true" ]]; then
             if [[ -z "$last_build_date" ]]; then
-                echo "Error: Docker build failed and no existing image found" >&2
+                echo "Error: Docker build failed and no existing image '$docker_image_name' found" >&2
                 exit 1
             fi
             echo "Build failed, using existing image (--allow-stale)" >&2
