@@ -23,4 +23,4 @@ fi
 devel_dir="$(realpath "$HOME/devel")"
 group_name="${project_dir#"$devel_dir"/}"
 
-aoe add --group "$group_name" --title "$*"
+aoe add --group "$group_name" --title "$*" --launch
