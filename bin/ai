@@ -106,8 +106,6 @@ if [[ "$current_dir" == "$devel_dir" ]]; then
     exit 1
 fi
 
-project_relative_dir="${current_dir#"$devel_dir"/}"
-
 profile=""
 env_only=false
 process_output=false
@@ -301,8 +299,9 @@ run_container() {
         # `host.docker.internal`.
         --add-host "host.docker.internal:host-gateway"
 
-        # Mount current directory and set it as the working directory.
-        --volume "$current_dir:$current_dir"
+        # Mount the entire `~/devel` directory and set the current directory as
+        # the working directory.
+        --volume "$devel_dir:$devel_dir"
         --workdir "$current_dir"
 
         # Mount git configuration so my aliases and other preferences are in
@@ -352,58 +351,6 @@ run_container() {
         && [[ "$harness_print_mode" != "true" ]] \
         && [ -t 0 ]; then
         cmd+=(--interactive --tty)
-    fi
-
-    # If this is not the main Git worktree, also mount the main worktree.
-    if [ -f "$current_dir/.git" ]; then
-        # .git is a file, not a directory - this is not the main worktree.
-        main_worktree=$(
-            git worktree list --porcelain \
-                | grep -m1 "^worktree " | sed 's/^worktree //'
-        )
-        main_worktree_realpath=$(realpath "$main_worktree")
-
-        if [[ "$main_worktree_realpath/" != "$devel_dir/"* ]]; then
-            echo "Error: Main worktree must be in ~/devel" >&2
-            exit 1
-        fi
-
-        cmd+=(--volume "$main_worktree_realpath:$main_worktree_realpath")
-    fi
-
-    # Mount `dotfiles` so symlinks work.
-    if [ "$current_dir" != "$devel_dir/dotfiles" ]; then
-        cmd+=(--volume "$devel_dir/dotfiles:$devel_dir/dotfiles:ro")
-    fi
-    # Mount `dotfiles-secret` so symlinks work.
-    if [ "$current_dir" != "$devel_dir/dotfiles-secret" ]; then
-        cmd+=(
-            --volume "$devel_dir/dotfiles-secret:$devel_dir/dotfiles-secret:ro"
-        )
-    fi
-
-    # Mount additional projects from `AGENTS_ADDITIONAL_PROJECTS`.
-    if [ -n "${AGENTS_ADDITIONAL_PROJECTS:-}" ]; then
-        IFS=':' read -ra ADDITIONAL_PROJECTS <<< "$AGENTS_ADDITIONAL_PROJECTS"
-        for additional_project in "${ADDITIONAL_PROJECTS[@]}"; do
-            # Trim whitespace.
-            additional_project=$(sed 's/^[[:space:]]*//;s/[[:space:]]*$//' <<< "$additional_project")
-            if [ -n "$additional_project" ]; then
-                # Skip if this is the current project to avoid duplicate
-                # mounts.
-                if [ "$additional_project" == "$project_relative_dir" ]; then
-                    echo "Skipping additional mount for current project: $additional_project" >&2
-                    continue
-                fi
-                project_path="$devel_dir/$additional_project"
-                if [ -d "$project_path" ]; then
-                    echo "Additional mount point: $additional_project" >&2
-                    cmd+=(--volume "$project_path:$project_path:ro")
-                else
-                    echo "Warning: Additional project '$additional_project' does not exist at $project_path" >&2
-                fi
-            fi
-        done
     fi
 
     # Relay additional environment variables from
