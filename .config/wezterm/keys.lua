@@ -56,11 +56,13 @@ function module.apply_to_config(config)
             process_integration.is_in_claude,
             wezterm.action({ SendString = "\r" })
         ),
-        -- Clear screen.
+        -- Clear screen. When tmux is running, forward to tmux so its own `C-n`
+        -- binding handles the `C-l` translation (WezTerm sending `C-l`
+        -- directly would trigger tmux's pane navigation instead).
         bind_if_else_forward(
             "CTRL",
             "n",
-            process_integration.is_outside_vim,
+            process_integration.is_outside_vim_and_tmux,
             action.SendKey({ key = "l", mods = "CTRL" })
         ),
         -- Copy mode.
@@ -157,28 +159,31 @@ function module.apply_to_config(config)
                 top_level = true,
             }),
         },
+        -- Pane navigation. When tmux or nvim is running, always forward so
+        -- they handle their own pane navigation (with WezTerm fallback at the
+        -- edge).
         bind_if_else_forward(
             "CTRL",
             "h",
-            process_integration.is_outside_vim,
+            process_integration.is_outside_vim_and_tmux,
             action.ActivatePaneDirection("Left")
         ),
         bind_if_else_forward(
             "CTRL",
             "j",
-            process_integration.is_outside_vim,
+            process_integration.is_outside_vim_and_tmux,
             action.ActivatePaneDirection("Down")
         ),
         bind_if_else_forward(
             "CTRL",
             "k",
-            process_integration.is_outside_vim,
+            process_integration.is_outside_vim_and_tmux,
             action.ActivatePaneDirection("Up")
         ),
         bind_if_else_forward(
             "CTRL",
             "l",
-            process_integration.is_outside_vim,
+            process_integration.is_outside_vim_and_tmux,
             action.ActivatePaneDirection("Right")
         ),
         -- Debug overlay.
