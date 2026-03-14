@@ -6,5 +6,10 @@ return {
         { "<C-k>", "<cmd>NavigatorUp<cr>", mode = "n" },
         { "<C-j>", "<cmd>NavigatorDown<cr>", mode = "n" },
     },
-    config = true,
+    config = function()
+        vim.env.TERM_PROGRAM = "WezTerm"
+        require("Navigator").setup({
+            mux = require("Navigator.mux.wezterm"):new(),
+        })
+    end,
 }
