@@ -464,6 +464,10 @@ format_duration() {
 # Main Execution
 # ============================================================================
 
+if [ -n "${AOE_INSTANCE_ID:-}" ]; then
+    echo "Agent of Empires detected: $AOE_INSTANCE_ID" >&2
+fi
+
 if [ -z "$profile" ]; then
     profile="$(project_profile_name)"
 fi
