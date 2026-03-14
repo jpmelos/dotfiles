@@ -204,6 +204,10 @@ dockerfile_path="$devel_dir/dotfiles/references/ai_containers/Dockerfile"
 docker_image_name="$username-claude:latest"
 container_prefix="claude_code"
 
+# Profiles that don't require an API key from 1Password. These profiles rely
+# on other authentication methods (e.g., OAuth).
+no_api_key_profiles=(jpmelos)
+
 # ============================================================================
 # Helper functions
 # ============================================================================
@@ -476,9 +480,20 @@ fi
 
 # Fetch API key and GitHub token from 1Password if not already provided.
 if [[ "${AGENT_ENV_SET:-}" != "true" ]]; then
+    # Check if this profile skips API key fetching.
+    skip_api_key=false
+    for no_api_key_profile in "${no_api_key_profiles[@]}"; do
+        if [[ "$profile" == "$no_api_key_profile" ]]; then
+            skip_api_key=true
+            break
+        fi
+    done
+
     # Fetch API key from 1Password if not already set.
-    if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
-        echo -n "Fetching agents configuration from 1Password..." >&2
+    if [[ "$skip_api_key" == "true" ]]; then
+        echo "Skipping API key fetch (profile '$profile' does not require one)" >&2
+    elif [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+        echo -n "Fetching API key from 1Password..." >&2
         if ! SECRETS=$(op read "op://Private/AI Agents Configuration/notesPlain" 2>&1); then
             echo "Error: Failed to retrieve configuration from 1Password" >&2
             echo "Make sure you are logged in to 1Password CLI (run: op signin)" >&2
@@ -497,9 +512,21 @@ if [[ "${AGENT_ENV_SET:-}" != "true" ]]; then
             '.profiles[$p].fallback_to_username // false' \
             <<< "$SECRETS")
 
+        # Even if the profile config allows it, don't fall back if the username
+        # profile is listed in `no_api_key_profiles`.
+        username_skip_api_key=false
+        for no_api_key_profile in "${no_api_key_profiles[@]}"; do
+            if [[ "$username" == "$no_api_key_profile" ]]; then
+                username_skip_api_key=true
+                break
+            fi
+        done
+
         # Extract API key, falling back to the username profile only if the
-        # profile allows it via `fallback_to_username`.
-        if [[ "$fallback_to_username" == "true" ]]; then
+        # profile allows it via `fallback_to_username` and the username
+        # profile itself requires an API key.
+        if [[ "$fallback_to_username" == "true" ]] \
+            && [[ "$username_skip_api_key" != "true" ]]; then
             ANTHROPIC_API_KEY=$(jq -r --arg p "$profile" --arg u "$username" \
                 '(.profiles[$p].api_key // .profiles[$u].api_key) // empty' \
                 <<< "$SECRETS")
@@ -509,7 +536,7 @@ if [[ "${AGENT_ENV_SET:-}" != "true" ]]; then
                 <<< "$SECRETS")
         fi
 
-        if [[ -z "$ANTHROPIC_API_KEY" || "$ANTHROPIC_API_KEY" == "null" ]]; then
+        if [[ -z "$ANTHROPIC_API_KEY" ]]; then
             echo "Warning: No API key found for profile '$profile'" >&2
         else
             export ANTHROPIC_API_KEY
