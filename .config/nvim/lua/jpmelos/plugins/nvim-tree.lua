@@ -118,6 +118,9 @@ return {
             git = {
                 ignore = false, -- Do not omit files ignored by git.
             },
+            filters = {
+                custom = { "^\\.git$", "__pycache__" },
+            },
             on_attach = on_attach,
         })
 
