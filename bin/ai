@@ -465,7 +465,7 @@ if [ -z "$profile" ]; then
     profile="$(project_profile_name)"
 fi
 
-echo "Profile '$profile'..." >&2
+echo "Profile: $profile" >&2
 
 # Validate profile name to prevent command injection.
 # Max length: 64 characters, alphanumeric with dots, dashes, underscores.
@@ -478,7 +478,7 @@ fi
 if [[ "${AGENT_ENV_SET:-}" != "true" ]]; then
     # Fetch API key from 1Password if not already set.
     if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
-        echo -n "Fetching AI Agents configuration from 1Password..." >&2
+        echo -n "Fetching agents configuration from 1Password..." >&2
         if ! SECRETS=$(op read "op://Private/AI Agents Configuration/notesPlain" 2>&1); then
             echo "Error: Failed to retrieve configuration from 1Password" >&2
             echo "Make sure you are logged in to 1Password CLI (run: op signin)" >&2
