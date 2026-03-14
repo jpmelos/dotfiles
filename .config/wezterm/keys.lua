@@ -20,7 +20,7 @@ local function bind_if_else(cond, key, mods, if_action, else_action)
     }
 end
 
-local function bind_if(cond, key, mods, if_action)
+local function bind_if_else_forward(cond, key, mods, if_action)
     return bind_if_else(
         cond,
         key,
@@ -44,20 +44,20 @@ function module.apply_to_config(config)
         },
         -- Enter for new lines in Claude.
         -- SHIFT + Enter to send the prompt in Claude.
-        bind_if(
+        bind_if_else_forward(
             process_integration.is_in_claude,
             "Enter",
             "",
             wezterm.action({ SendString = "\x1b\r" })
         ),
-        bind_if(
+        bind_if_else_forward(
             process_integration.is_in_claude,
             "Enter",
             "SHIFT",
             wezterm.action({ SendString = "\r" })
         ),
         -- Clear screen.
-        bind_if(
+        bind_if_else_forward(
             process_integration.is_outside_vim,
             "n",
             "CTRL",
@@ -156,25 +156,25 @@ function module.apply_to_config(config)
                 size = { Percent = 25 },
             }),
         },
-        bind_if(
+        bind_if_else_forward(
             process_integration.is_outside_vim,
             "h",
             "CTRL",
             action.ActivatePaneDirection("Left")
         ),
-        bind_if(
+        bind_if_else_forward(
             process_integration.is_outside_vim,
             "j",
             "CTRL",
             action.ActivatePaneDirection("Down")
         ),
-        bind_if(
+        bind_if_else_forward(
             process_integration.is_outside_vim,
             "k",
             "CTRL",
             action.ActivatePaneDirection("Up")
         ),
-        bind_if(
+        bind_if_else_forward(
             process_integration.is_outside_vim,
             "l",
             "CTRL",
