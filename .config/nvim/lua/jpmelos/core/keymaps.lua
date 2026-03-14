@@ -49,8 +49,12 @@ K(
 )
 
 -- Tab navigation.
-K("n", "<C-M-h>", "<cmd>tabp<CR>", { desc = "Previous tab" })
-K("n", "<C-M-l>", "<cmd>tabn<CR>", { desc = "Next tab" })
+K("n", "<C-S-M-j>", "<cmd>tabp<CR>", { desc = "Previous tab" })
+K("n", "<C-S-M-k>", "<cmd>tabn<CR>", { desc = "Next tab" })
+
+-- Tab reordering.
+K("n", "<C-S-M-y>", "<cmd>tabmove -1<CR>", { desc = "Move tab left" })
+K("n", "<C-S-M-o>", "<cmd>tabmove +1<CR>", { desc = "Move tab right" })
 
 -- These mappings control the size of splits (height/width)
 K("n", "<M-h>", "<c-W><")
