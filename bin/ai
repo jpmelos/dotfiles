@@ -23,7 +23,6 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 #/ Configuration:
 #/   Expects 1Password items at:
 #/   - `op://Private/AI Agents Configuration/notesPlain` (API keys)
-#/   - `op://Private/GH Token/notesPlain` (GitHub token)
 #/
 #/   API keys format (JSON):
 #/   ```
@@ -335,7 +334,7 @@ run_container() {
         --env ANTHROPIC_API_KEY
 
         # This is so the agent can use `gh`.
-        --env GH_TOKEN
+        --env "GH_TOKEN=$(gh auth token)"
 
         # This enables sessions to show up with the right timestamps.
         --env "TZ=${TZ:-$(readlink /etc/localtime 2> /dev/null | sed 's|.*/zoneinfo/||')}"
@@ -543,30 +542,12 @@ if [[ "${AGENT_ENV_SET:-}" != "true" ]]; then
         fi
     fi
 
-    # Fetch GitHub token from 1Password if not already set.
-    if [ -z "${GH_TOKEN:-}" ]; then
-        echo -n "Fetching GitHub token from 1Password..." >&2
-        if ! GH_TOKEN=$(op read "op://Private/GH Token/notesPlain" 2>&1); then
-            echo "Error: Failed to retrieve GH_TOKEN from 1Password" >&2
-            echo "Make sure you are logged in to 1Password CLI (run: op signin)" >&2
-            exit 1
-        fi
-        echo " done!" >&2
-
-        if [[ -z "$GH_TOKEN" ]]; then
-            echo "Error: GH_TOKEN is empty" >&2
-            exit 1
-        fi
-
-        export GH_TOKEN
-    fi
 fi
 
 if [[ "$env_only" == "true" ]]; then
     # Output shell commands to be eval'd for environment variable export.
     [ -n "${ANTHROPIC_API_KEY:-}" ] \
         && printf "export ANTHROPIC_API_KEY=%q\n" "$ANTHROPIC_API_KEY"
-    [ -n "${GH_TOKEN:-}" ] && printf "export GH_TOKEN=%q\n" "$GH_TOKEN"
     echo "export AGENT_ENV_SET=true"
     echo "Environment variables exported for profile '$profile'" >&2
     exit 0
