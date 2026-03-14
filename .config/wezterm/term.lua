@@ -166,7 +166,7 @@ local function get_current_process_names(pane)
     return process_names
 end
 
-function m.is_process_running(pane, process_names)
+function m.any_process_is_running(pane, process_names)
     local current = get_current_process_names(pane)
     for _, candidate in ipairs(process_names) do
         for _, name in ipairs(current) do
