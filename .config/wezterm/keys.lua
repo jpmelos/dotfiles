@@ -154,6 +154,7 @@ function module.apply_to_config(config)
             action = action.SplitPane({
                 direction = "Down",
                 size = { Percent = 25 },
+                top_level = true,
             }),
         },
         bind_if_else_forward(
