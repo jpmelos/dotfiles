@@ -4,7 +4,7 @@ local module = {}
 
 local process_integration = require("process-integration")
 
-local function bind_if_else(cond, key, mods, if_action, else_action)
+local function bind_if_else(mods, key, cond, if_action, else_action)
     local function callback(win, pane)
         if cond(pane) then
             win:perform_action(if_action, pane)
@@ -20,11 +20,11 @@ local function bind_if_else(cond, key, mods, if_action, else_action)
     }
 end
 
-local function bind_if_else_forward(cond, key, mods, if_action)
+local function bind_if_else_forward(mods, key, cond, if_action)
     return bind_if_else(
-        cond,
-        key,
         mods,
+        key,
+        cond,
         if_action,
         action.SendKey({ key = key, mods = mods })
     )
@@ -45,22 +45,22 @@ function module.apply_to_config(config)
         -- Enter for new lines in Claude.
         -- SHIFT + Enter to send the prompt in Claude.
         bind_if_else_forward(
-            process_integration.is_in_claude,
-            "Enter",
             "",
+            "Enter",
+            process_integration.is_in_claude,
             wezterm.action({ SendString = "\x1b\r" })
         ),
         bind_if_else_forward(
-            process_integration.is_in_claude,
-            "Enter",
             "SHIFT",
+            "Enter",
+            process_integration.is_in_claude,
             wezterm.action({ SendString = "\r" })
         ),
         -- Clear screen.
         bind_if_else_forward(
-            process_integration.is_outside_vim,
-            "n",
             "CTRL",
+            "n",
+            process_integration.is_outside_vim,
             action.SendKey({ key = "l", mods = "CTRL" })
         ),
         -- Copy mode.
@@ -78,16 +78,16 @@ function module.apply_to_config(config)
         -- Clipboard.
         -- Disable `cmd+c` in Neovim to train muscle memory to use `y` instead.
         bind_if_else(
-            process_integration.is_outside_vim,
-            "c",
             "SUPER",
+            "c",
+            process_integration.is_outside_vim,
             action.CopyTo("Clipboard"),
             action.Nop
         ),
         bind_if_else(
-            process_integration.is_outside_vim,
-            "v",
             "SUPER",
+            "v",
+            process_integration.is_outside_vim,
             action.PasteFrom("Clipboard"),
             action.SendKey({ key = "v", mods = "CTRL|SHIFT" })
         ),
@@ -157,27 +157,27 @@ function module.apply_to_config(config)
             }),
         },
         bind_if_else_forward(
-            process_integration.is_outside_vim,
-            "h",
             "CTRL",
+            "h",
+            process_integration.is_outside_vim,
             action.ActivatePaneDirection("Left")
         ),
         bind_if_else_forward(
-            process_integration.is_outside_vim,
-            "j",
             "CTRL",
+            "j",
+            process_integration.is_outside_vim,
             action.ActivatePaneDirection("Down")
         ),
         bind_if_else_forward(
-            process_integration.is_outside_vim,
-            "k",
             "CTRL",
+            "k",
+            process_integration.is_outside_vim,
             action.ActivatePaneDirection("Up")
         ),
         bind_if_else_forward(
-            process_integration.is_outside_vim,
-            "l",
             "CTRL",
+            "l",
+            process_integration.is_outside_vim,
             action.ActivatePaneDirection("Right")
         ),
         -- Debug overlay.
