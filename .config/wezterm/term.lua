@@ -8,17 +8,15 @@ local function is_claude_code_container(container_name)
         or container_name:match("^agentcontainer_")
 end
 
--- Resolve the process name when docker is the foreground process on the TTY.
+-- Resolve the process name when `docker` is the foreground process on the TTY.
 local function resolve_docker_process(args_line)
     local docker_subcommand = args_line:match("docker%s+(%S+)")
-
     if docker_subcommand ~= "run" then
         return "docker"
     end
 
     local container_name = args_line:match("%-%-name%s+(%S+)")
         or args_line:match("%-%-name=(%S+)")
-
     if container_name == nil then
         return "docker"
     end
@@ -30,23 +28,27 @@ local function resolve_docker_process(args_line)
     return "docker"
 end
 
--- Resolve the process name when tmux is the foreground process on the TTY.
--- Uses the WezTerm pane's TTY to find the tmux client, then looks up the
--- foreground process on the active tmux pane's TTY.
-local function resolve_tmux_process(tty)
-    -- Find the tmux session attached from this TTY.
+-- Resolve the tmux pane TTY when `tmux` is active on the given TTY. Uses the
+-- WezTerm pane's TTY to find the `tmux` client, then looks up the active
+-- `tmux` pane's TTY.
+--
+-- Returns `(pane_tty, true)` when a `tmux` client is found and the pane TTY
+-- can be resolved. Returns `(nil, true)` when a client is found but the pane
+-- TTY cannot be determined. Returns `(nil, false)` when no `tmux` client is
+-- attached to this TTY.
+local function resolve_tmux_pane_tty(tty)
+    -- Find the `tmux` session attached to this TTY.
     local success, stdout = wezterm.run_child_process({
         "/opt/homebrew/bin/tmux",
         "list-clients",
         "-F",
         "#{client_tty} #{session_name}",
     })
-
     if not success or stdout:match("^%s*$") then
-        return "tmux"
+        return nil, false
     end
 
-    -- Match the client connected from our TTY to find the session name.
+    -- Match the client TTY to our TTY to find the session name.
     local session_name = nil
     for line in stdout:gmatch("[^\n]+") do
         local client_tty, session = line:match("^(%S+)%s+(.+)")
@@ -55,9 +57,8 @@ local function resolve_tmux_process(tty)
             break
         end
     end
-
     if session_name == nil then
-        return "tmux"
+        return nil, false
     end
 
     -- Get the active pane's TTY in this session.
@@ -69,42 +70,48 @@ local function resolve_tmux_process(tty)
         "-p",
         "#{pane_tty}",
     })
-
     if not success or stdout:match("^%s*$") then
-        return "tmux"
+        return nil, true
     end
 
     local pane_tty = stdout:match("^%s*(%S+)")
     if pane_tty == nil then
-        return "tmux"
+        return nil, true
     end
 
-    -- Find the foreground process on the tmux pane's TTY.
-    success, stdout, _ = wezterm.run_child_process({
+    return pane_tty, true
+end
+
+-- Find the foreground process on a TTY using `ps stat` '+' filtering.
+local function find_foreground_process(tty)
+    -- Use `stat` (not state) to get the '+' foreground process group
+    -- indicator.
+    local success, stdout, _ = wezterm.run_child_process({
         "sh",
         "-c",
         "ps -o stat= -o args= -t"
-            .. wezterm.shell_quote_arg(pane_tty)
+            .. wezterm.shell_quote_arg(tty)
             .. " | awk '$1 ~ /\\+/ {line=$0} END {if (line) print line}'",
     })
 
     if not success or stdout:match("^%s*$") then
-        return "tmux"
+        return nil, nil
     end
 
+    -- Extract the full arguments (everything after the `stat` column).
     local args = stdout:match("^%s*%S+%s+(.+)")
     if args == nil then
-        return "tmux"
+        return nil, nil
     end
 
     local process_path = args:match("^(%S+)")
     if process_path == nil then
-        return "tmux"
+        return nil, nil
     end
 
     -- Strip leading dash (login shell indicator).
     process_path = process_path:gsub("^%-", "")
-    -- Strip path prefix.
+    -- Strip path prefix (e.g. /usr/bin/docker -> docker).
     local process_name = process_path:match("([^/]+)$")
 
     return process_name, args
@@ -116,53 +123,27 @@ local function get_current_process_name(pane)
         return nil
     end
 
-    -- Find the foreground process on the host TTY.
-    -- Use stat (not state) to get the '+' foreground process group indicator.
-    local success, stdout, _ = wezterm.run_child_process({
-        "sh",
-        "-c",
-        "ps -o stat= -o args= -t"
-            .. wezterm.shell_quote_arg(tty)
-            .. " | awk '$1 ~ /\\+/ {line=$0} END {if (line) print line}'",
-    })
+    -- Check for a `tmux` client on this TTY first. `tmux` calls `setpgid(0,
+    -- 0)` at startup, which moves it into its own process group while ignoring
+    -- `SIGTTIN`/`SIGTTOU` so it can still use the terminal. This makes it
+    -- invisible to the `ps stat` '+' foreground filter, so we detect it by
+    -- querying `tmux` directly instead.
+    local pane_tty, tmux_found = resolve_tmux_pane_tty(tty)
+    if tmux_found and pane_tty == nil then
+        -- We are in `tmux` but can't identify the TTY. We can't proceed from
+        -- here.
+        return "tmux"
+    end
 
-    if not success or stdout:match("^%s*$") then
+    local process_name, args = find_foreground_process(pane_tty or tty)
+    if process_name == nil then
         return nil
     end
 
-    -- Extract the full args (everything after the stat column).
-    local args = stdout:match("^%s*%S+%s+(.+)")
-    if args == nil then
-        return nil
-    end
-
-    local process_path = args:match("^(%S+)")
-    if process_path == nil then
-        return nil
-    end
-
-    -- Strip leading dash (login shell indicator).
-    process_path = process_path:gsub("^%-", "")
-    -- Strip path prefix (e.g. /usr/bin/docker -> docker).
-    local process_name = process_path:match("([^/]+)$")
-
-    -- Dig through docker and tmux layers. If a resolver returns its own
-    -- process name, it means it couldn't dig deeper.
-    while process_name == "docker" or process_name == "tmux" do
-        if process_name == "docker" then
-            local resolved = resolve_docker_process(args)
-            if resolved == "docker" then
-                return "docker"
-            end
-            process_name = resolved
-        elseif process_name == "tmux" then
-            local resolved, resolved_args = resolve_tmux_process(tty)
-            if resolved == "tmux" then
-                return "tmux"
-            end
-            process_name = resolved
-            args = resolved_args
-        end
+    -- If the foreground process is `docker`, try to identify what's running
+    -- inside the container.
+    if process_name == "docker" then
+        process_name = resolve_docker_process(args)
     end
 
     return process_name
