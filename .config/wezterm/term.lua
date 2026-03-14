@@ -8,24 +8,26 @@ local function is_claude_code_container(container_name)
         or container_name:match("^agentcontainer_")
 end
 
--- Resolve the process name when `docker` is the foreground process on the TTY.
-local function resolve_docker_process(args_line)
+-- Resolve the inner process name when `docker` is the foreground process on
+-- the TTY. Returns the name of the process running inside the container, or
+-- `nil` if it cannot be determined.
+local function resolve_docker_inner_process(args_line)
     local docker_subcommand = args_line:match("docker%s+(%S+)")
     if docker_subcommand ~= "run" then
-        return "docker"
+        return nil
     end
 
     local container_name = args_line:match("%-%-name%s+(%S+)")
         or args_line:match("%-%-name=(%S+)")
     if container_name == nil then
-        return "docker"
+        return nil
     end
 
     if is_claude_code_container(container_name) then
         return "claude"
     end
 
-    return "docker"
+    return nil
 end
 
 -- Resolve the tmux pane TTY when `tmux` is active on the given TTY. Uses the
@@ -117,11 +119,17 @@ local function find_foreground_process(tty)
     return process_name, args
 end
 
-local function get_current_process_name(pane)
+-- Return a list of process names representing the nesting stack. If inside
+-- `tmux`, `"tmux"` is the first element. If inside `docker`, `"docker"` comes
+-- next. Finally, the innermost process name is appended when it can be
+-- determined.
+local function get_current_process_names(pane)
     local tty = pane:get_tty_name()
     if tty == nil then
-        return nil
+        return {}
     end
+
+    local process_names = {}
 
     -- Check for a `tmux` client on this TTY first. `tmux` calls `setpgid(0,
     -- 0)` at startup, which moves it into its own process group while ignoring
@@ -129,28 +137,45 @@ local function get_current_process_name(pane)
     -- invisible to the `ps stat` '+' foreground filter, so we detect it by
     -- querying `tmux` directly instead.
     local pane_tty, tmux_found = resolve_tmux_pane_tty(tty)
-    if tmux_found and pane_tty == nil then
-        -- We are in `tmux` but can't identify the TTY. We can't proceed from
-        -- here.
-        return "tmux"
+    if tmux_found then
+        table.insert(process_names, "tmux")
+        if pane_tty == nil then
+            -- We are in `tmux` but can't identify the pane TTY. We can't
+            -- proceed from here.
+            return process_names
+        end
     end
 
     local process_name, args = find_foreground_process(pane_tty or tty)
     if process_name == nil then
-        return nil
+        return process_names
     end
 
-    -- If the foreground process is `docker`, try to identify what's running
-    -- inside the container.
+    -- If the foreground process is `docker`, add it to the stack and try to
+    -- identify what's running inside the container.
     if process_name == "docker" then
-        process_name = resolve_docker_process(args)
+        table.insert(process_names, "docker")
+        local inner_process = resolve_docker_inner_process(args)
+        if inner_process ~= nil then
+            table.insert(process_names, inner_process)
+        end
+    else
+        table.insert(process_names, process_name)
     end
 
-    return process_name
+    return process_names
 end
 
-function m.is_process_running(pane, process_name)
-    return get_current_process_name(pane) == process_name
+function m.is_process_running(pane, process_names)
+    local current = get_current_process_names(pane)
+    for _, candidate in ipairs(process_names) do
+        for _, name in ipairs(current) do
+            if name == candidate then
+                return true
+            end
+        end
+    end
+    return false
 end
 
 return m
