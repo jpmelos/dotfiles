@@ -23,12 +23,7 @@ delete_branch_on_cleanup = false
 enabled_by_default = false
 default_image = "ghcr.io/njbrake/aoe-sandbox:latest"
 extra_volumes = []
-environment = [
-    "TERM",
-    "COLORTERM",
-    "FORCE_COLOR",
-    "NO_COLOR",
-]
+environment = ["TERM", "COLORTERM", "FORCE_COLOR", "NO_COLOR"]
 auto_cleanup = true
 default_terminal_mode = "host"
 volume_ignores = []
@@ -37,7 +32,7 @@ container_runtime = "docker"
 
 [tmux]
 status_bar = "disabled"
-mouse = "disabled"
+mouse = "enabled"
 
 [session]
 default_tool = "claude"
