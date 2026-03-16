@@ -51,13 +51,11 @@ eval "$(starship init bash)"
 [ -f ~/.autoenv_authorized ] || touch ~/.autoenv_authorized
 [ -f ~/.autoenv_not_authorized ] || touch ~/.autoenv_not_authorized
 
-# The variables below don't need to be exported because we're sourcing the
-# autoenv activation script.
 # Enable autoenv leave too.
-AUTOENV_ENABLE_LEAVE=1
+export AUTOENV_ENABLE_LEAVE=1
 # Rename autoenv files to less generic names.
-AUTOENV_ENV_FILENAME=.autoenv.enter
-AUTOENV_ENV_LEAVE_FILENAME=.autoenv.leave
+export AUTOENV_ENV_FILENAME=.autoenv.enter
+export AUTOENV_ENV_LEAVE_FILENAME=.autoenv.leave
 
 source ~/.autoenv/activate.sh
 
@@ -676,39 +674,18 @@ change_commit_date() {
 
 # Navigate to a project in ~/devel with TUI selection.
 x() {
-    local devel_dir="$HOME/devel"
-
-    if [ ! -d "$devel_dir" ]; then
-        echo "Error: $devel_dir does not exist."
-        return 1
-    fi
-
-    _x_list_projects() {
-        local entry
-        for entry in "$1"/*/; do
-            if [ -e "${entry}.git" ] && [ ! -e "${entry}.x-ignore" ]; then
-                local relative="${entry#"$devel_dir"/}"
-                echo "${relative%/}"
-            elif [ -d "$entry" ]; then
-                _x_list_projects "${entry%/}"
-            fi
-        done
-    }
-
-    local project=$(
-        _x_list_projects "$devel_dir" \
-            | sort \
+    local project
+    project=$(
+        list_project_dirs \
             | fzf --prompt="Select project: " --height=40% --reverse --query="$*"
     )
-
-    unset -f _x_list_projects
 
     if [ -z "$project" ]; then
         echo "No project selected."
         return 1
     fi
 
-    cd "$devel_dir/$project"
+    cd "$HOME/devel/$project"
 }
 
 ################

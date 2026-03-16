@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+devel_dir="$(realpath "$HOME/devel")"
+
+if [ ! -d "$devel_dir" ]; then
+    echo "Error: $devel_dir does not exist." >&2
+    exit 1
+fi
+
+list_projects() {
+    local dir="$1"
+    local entry
+
+    for entry in "$dir"/*/; do
+        [ -d "$entry" ] || continue
+
+        if [ -e "${entry}.git" ] && [ ! -e "${entry}.list_project_dirs_ignore" ]; then
+            # Valid project. Print it and don't descend further.
+            local relative="${entry#"$devel_dir"/}"
+            echo "${relative%/}"
+        else
+            # Either no .git, or ignored. Descend to find nested projects.
+            list_projects "${entry%/}"
+        fi
+    done
+}
+
+list_projects "$devel_dir" | sort

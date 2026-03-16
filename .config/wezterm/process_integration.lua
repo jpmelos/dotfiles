@@ -14,4 +14,8 @@ function m.is_in_claude(pane)
     return term.any_process_is_running(pane, { "claude" })
 end
 
+function m.is_in_aoe(pane)
+    return term.any_process_is_running(pane, { "aoe" })
+end
+
 return m

@@ -1,4 +1,5 @@
 local wezterm = require("wezterm")
+local strings = require("strings")
 
 local m = {}
 
@@ -162,6 +163,8 @@ local function get_current_process_names(pane)
     else
         table.insert(process_names, process_name)
     end
+
+    wezterm.log_info("Process names: " .. strings.dump(process_names))
 
     return process_names
 end
