@@ -720,10 +720,12 @@ x() {
 # Docker aliases.
 alias d='docker'
 alias dps="docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
+alias drm="docker rm -f"
 
 # Docker Compose aliases.
 alias dc='docker compose'
-alias dcps="dc ps -a --format 'table {{.Name}}\t{{.Service}}\t{{.Status}}\t{{.Ports}}'"
+alias dcps="docker compose ps -a --format 'table {{.Name}}\t{{.Service}}\t{{.Status}}\t{{.Ports}}'"
+alias dcls="docker compose ls"
 
 # Docker exec into a container with TUI selection.
 dx() {
@@ -759,11 +761,6 @@ dk() {
 
     echo "Killing container: $container_name"
     docker kill "$container_name"
-}
-
-# List all active Docker Compose environments.
-dcls() {
-    docker compose ls
 }
 
 # Drop an active Docker Compose environment.
