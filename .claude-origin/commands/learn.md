@@ -13,7 +13,7 @@ You do not need to use those exact words. If you think the thing to be learned
 and remembered can be better expressed using different words, or simply to get
 a shorter expression of the same thing, feel free to rewrite the text.
 
-Keep these rules:
+Re-review the entire file with your addition and think to keep these rules:
 
 - Keep the file organized in some logical way.
 - All content must be orthogonal to each other.
