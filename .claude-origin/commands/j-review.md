@@ -1,5 +1,6 @@
 ---
 description: Review the current diff.
+disable-model-invocation: true
 ---
 
 Review these changes:

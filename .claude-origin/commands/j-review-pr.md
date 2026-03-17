@@ -1,6 +1,7 @@
 ---
 description: Review a PR.
 argument-hint: pr_reference
+disable-model-invocation: true
 ---
 
 Review PR $1.

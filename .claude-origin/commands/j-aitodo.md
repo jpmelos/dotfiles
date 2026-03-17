@@ -1,5 +1,6 @@
 ---
 description: Implement what's described in `AITODO` comments.
+disable-model-invocation: true
 ---
 
 Here are all occurrences of `AITODO` in this codebase:
