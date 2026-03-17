@@ -89,12 +89,14 @@ end
 local function find_foreground_process(tty)
     -- Use `stat` (not state) to get the '+' foreground process group
     -- indicator.
+    -- Exclude zombie processes (stat contains 'Z'). Sometimes tmux appears as
+    -- a zombie `(tmux)` alongside the real foreground process.
     local success, stdout, _ = wezterm.run_child_process({
         "sh",
         "-c",
         "ps -o stat= -o args= -t"
             .. wezterm.shell_quote_arg(tty)
-            .. " | awk '$1 ~ /\\+/ {line=$0} END {if (line) print line}'",
+            .. " | awk '$1 ~ /\\+/ && $1 !~ /Z/ {line=$0} END {if (line) print line}'",
     })
 
     if not success or stdout:match("^%s*$") then
