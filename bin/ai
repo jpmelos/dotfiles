@@ -592,18 +592,24 @@ dockerfile_mtime=$(
 )
 
 needs_rebuild=false
+rebuild_reason=""
 if [[ "$no_build_cache" == "true" ]]; then
     needs_rebuild=true
+    rebuild_reason="--no-build-cache specified"
 elif [[ "$force_rebuild" == "true" ]]; then
     needs_rebuild=true
-elif [[ "$last_build_date" != "$today" ]]; then
-    needs_rebuild=true
-elif [[ -n "$last_build_timestamp" ]] \
-    && [[ "$dockerfile_mtime" -gt "$last_build_timestamp" ]]; then
-    needs_rebuild=true
+    rebuild_reason="--force-rebuild specified"
 elif [[ -z "$last_build_date" ]]; then
     # Image doesn't exist at all.
     needs_rebuild=true
+    rebuild_reason="image does not exist"
+elif [[ "$last_build_date" != "$today" ]]; then
+    needs_rebuild=true
+    rebuild_reason="image is from $last_build_date, today is $today"
+elif [[ -n "$last_build_timestamp" ]] \
+    && [[ "$dockerfile_mtime" -gt "$last_build_timestamp" ]]; then
+    needs_rebuild=true
+    rebuild_reason="Dockerfile modified after last build"
 fi
 
 if [[ "$no_rebuild" == "true" ]]; then
@@ -612,8 +618,13 @@ if [[ "$no_rebuild" == "true" ]]; then
         echo "Error: Docker image '$docker_image_name' does not exist and --no-rebuild was specified" >&2
         exit 1
     fi
-    echo "Skipping rebuild (--no-rebuild specified)" >&2
+    if [[ "$needs_rebuild" == "true" ]]; then
+        echo "Skipping rebuild despite: $rebuild_reason (--no-rebuild specified)" >&2
+    else
+        echo "Skipping rebuild (--no-rebuild specified, image is up to date)" >&2
+    fi
 elif [[ "$needs_rebuild" == "true" ]]; then
+    echo "Rebuilding image: $rebuild_reason" >&2
     use_cache="true"
     if [[ "$no_build_cache" == "true" ]]; then
         use_cache="false"
@@ -630,6 +641,8 @@ elif [[ "$needs_rebuild" == "true" ]]; then
             exit 1
         fi
     fi
+else
+    echo "Image is up to date, skipping rebuild." >&2
 fi
 
 mkdir -p "$HOME/.claude-$profile"
