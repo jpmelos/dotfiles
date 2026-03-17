@@ -3,6 +3,8 @@
 - *Never* use built-in tools like `AskUserQuestion` to ask questions. Instead,
   ask directly in the chat and wait for a response.
 - When unsure about the codebase, ask for clarification rather than guessing.
+- When planning (writing plans, specs, etc.), discuss the plan in the chat.
+  *Never* write it to a file unless the user explicitly asks you to.
 - The project root is *always* the current working directory.
 - When citing code paths, *always* use paths *relative* to the project root,
   including the most relevant lines when applicable.
