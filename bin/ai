@@ -211,6 +211,15 @@ no_api_key_profiles=(jpmelos)
 # Helper functions
 # ============================================================================
 
+# Get formatted date in local time.
+get_date() {
+    if [ "$(uname -s)" == "Darwin" ]; then
+        date -r "$1" "+%Y-%m-%d"
+    else
+        date -d "@$1" "+%Y-%m-%d"
+    fi
+}
+
 # Transform a link into a hard copy.
 dereference() {
     tmp=$(mktemp) || return
@@ -559,15 +568,6 @@ fi
 
 today=$(date +%Y-%m-%d)
 
-# Get last build date from the Docker image metadata (empty if image doesn't
-# exist).
-last_build_date=$(
-    docker image inspect "$docker_image_name" \
-        --format '{{.Metadata.LastTagTime.Format "2006-01-02"}}' \
-        2> /dev/null \
-        || true
-)
-
 # Get the image's creation timestamp (seconds since epoch, empty if image
 # doesn't exist).
 last_build_timestamp=$(
@@ -576,6 +576,13 @@ last_build_timestamp=$(
         2> /dev/null \
         || true
 )
+
+# Derive the last build date in local time from the timestamp.
+if [[ -n "$last_build_timestamp" ]]; then
+    last_build_date=$(get_date "$last_build_timestamp")
+else
+    last_build_date=""
+fi
 
 # Get the Dockerfile's modification time (seconds since epoch).
 dockerfile_mtime=$(
