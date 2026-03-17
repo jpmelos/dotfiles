@@ -8,7 +8,6 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 #/ Options:
 #/   --profile <name>  Specify profile for API key lookup (default: auto-detect
 #/                     from path, first component after `~/devel`)
-#/   --env             Only export environment variables, don't run
 #/   --process-output  Capture and process output (requires `--print` and
 #/                     `--output-format json` in harness args)
 #/   --force-rebuild   Force rebuild of Docker image
@@ -21,19 +20,21 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 #/ Arguments after `--` are passed directly to Claude Code.
 #/
 #/ Configuration:
-#/   Expects 1Password items at:
-#/   - `op://Private/AI Agents Configuration/notesPlain` (API keys)
+#/   Expects a configuration file at `~/config.json` (requires `chmod 600`)
+#/   with API keys and other configuration.
 #/
-#/   API keys format (JSON):
+#/   Configuration format:
 #/   ```
 #/   {
-#/     "profiles": {
-#/       "username": {
-#/         "api_key": "sk-..."
-#/       },
-#/       "orgname": {
-#/         "api_key": "sk-...",
-#/         "fallback_to_username": bool
+#/     "claude_code": {
+#/       "profiles": {
+#/         "username": {
+#/           "api_key": "sk-..."
+#/         },
+#/         "orgname": {
+#/           "api_key": "sk-...",
+#/           "fallback_to_username": bool
+#/         }
 #/       }
 #/     }
 #/   }
@@ -81,32 +82,7 @@ if ! command -v shuf &> /dev/null; then
     exit 1
 fi
 
-if [[ "${AGENT_ENV_SET:-}" != "true" ]]; then
-    if ! command -v op &> /dev/null; then
-        echo "Error: 1Password CLI (op) is not installed" >&2
-        exit 1
-    fi
-fi
-
-devel_dir="$(realpath "$HOME/devel")"
-if [[ ! -d "$devel_dir" ]]; then
-    echo "Error: $HOME/devel does not exist" >&2
-    exit 1
-fi
-
-current_dir="$(realpath "$(pwd)")"
-if [[ "$current_dir/" != "$devel_dir/"* ]]; then
-    echo "Error: not inside ~/devel" >&2
-    exit 1
-fi
-
-if [[ "$current_dir" == "$devel_dir" ]]; then
-    echo "Error: Cannot run from ~/devel root, must be in a subdirectory" >&2
-    exit 1
-fi
-
 profile=""
-env_only=false
 process_output=false
 force_rebuild=false
 no_build_cache=false
@@ -126,10 +102,6 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             fi
             profile="$1"
-            shift
-            ;;
-        --env)
-            env_only=true
             shift
             ;;
         --process-output)
@@ -197,16 +169,6 @@ if [[ "$show_help" == "true" ]]; then
     exit 0
 fi
 
-username="$(whoami)"
-
-dockerfile_path="$devel_dir/dotfiles/references/ai_containers/Dockerfile"
-docker_image_name="$username-claude:latest"
-container_prefix="claude_code"
-
-# Profiles that don't require an API key from 1Password. These profiles rely
-# on other authentication methods (e.g., OAuth).
-no_api_key_profiles=(jpmelos)
-
 # ============================================================================
 # Helper functions
 # ============================================================================
@@ -273,7 +235,7 @@ build_image() {
 generate_container_name() {
     local dir_basename
     dir_basename=$(basename "$current_dir" | tr -cd 'a-zA-Z0-9_.-')
-    echo "${container_prefix}_${dir_basename:0:44}_$(shuf -i 1-999999 -n 1)"
+    echo "claude_code_${dir_basename:0:44}_$(shuf -i 1-999999 -n 1)"
 }
 
 # Run Claude Code in a Docker container.
@@ -333,10 +295,6 @@ run_container() {
         --volume "$HOME/.claude-$profile:$HOME/.claude"
         --volume "$HOME/.claude-$profile.json:$HOME/.claude.json"
 
-        # Agent of Empires environment variables and mounts.
-        --env "AOE_INSTANCE_ID"
-        --volume "/tmp/aoe-hooks:/tmp/aoe-hooks"
-
         # Anthropic's API key if available. If not defined, Claude Code will
         # check for OAuth credentials. If not there too, it will ask the user
         # how they want to login.
@@ -348,8 +306,15 @@ run_container() {
         # This enables sessions to show up with the right timestamps.
         --env "TZ=${TZ:-$(readlink /etc/localtime 2> /dev/null | sed 's|.*/zoneinfo/||')}"
 
-        # This is used to show the active profile in the status line.
+        # This is used to show the active profile and project in the status
+        # line.
         --env "AGENT_PROFILE=$profile"
+        --env "PROJECT_NAME=$project_name"
+
+        # Agent of Empires environment variables and mounts.
+        --env "AOE_INSTANCE_ID=$aoe_instance_id"
+        --env "AOE_SESSION_NAME=$aoe_session_name"
+        --volume "/tmp/aoe-hooks:/tmp/aoe-hooks"
 
         # Claude Code uses this to know search for file suggestions on `@`.
         --env RIPGREP_CONFIG_PATH
@@ -473,100 +438,134 @@ format_duration() {
 # Main Execution
 # ============================================================================
 
-if [ -n "${AOE_INSTANCE_ID:-}" ]; then
-    echo "Agent of Empires detected: $AOE_INSTANCE_ID" >&2
+username="$(whoami)"
+
+devel_dir="$(realpath "$HOME/devel")"
+if [[ ! -d "$devel_dir" ]]; then
+    echo "Error: $HOME/devel does not exist" >&2
+    exit 1
+fi
+
+current_dir="$(realpath "$(pwd)")"
+if [[ "$current_dir/" != "$devel_dir/"* ]]; then
+    echo "Error: not inside ~/devel" >&2
+    exit 1
+fi
+if [[ "$current_dir" == "$devel_dir" ]]; then
+    echo "Error: Cannot run from ~/devel root, must be in a subdirectory" >&2
+    exit 1
 fi
 
 if [ -z "$profile" ]; then
     profile="$(project_profile_name)"
 fi
-
-echo "Profile: $profile" >&2
-
 # Validate profile name to prevent command injection.
 # Max length: 64 characters, alphanumeric with dots, dashes, underscores.
 if [[ ! "$profile" =~ ^[a-zA-Z0-9_]([a-zA-Z0-9._-]{0,62}[a-zA-Z0-9_])?$ ]]; then
     echo "Error: Invalid profile name '$profile'" >&2
     exit 1
 fi
+# Profiles that don't require an API key. These profiles rely on other
+# authentication methods (e.g., OAuth).
+no_api_key_profiles=(jpmelos)
 
-# Fetch API key and GitHub token from 1Password if not already provided.
-if [[ "${AGENT_ENV_SET:-}" != "true" ]]; then
-    # Check if this profile skips API key fetching.
-    skip_api_key=false
+# Compute the project name (path relative to ~/devel/).
+project_name="${current_dir#"$devel_dir/"}"
+
+# Get AoE session info if available.
+aoe_instance_id=""
+aoe_session_name=""
+if command -v aoe &> /dev/null; then
+    if aoe_session_json=$(aoe session current --json 2> /dev/null); then
+        aoe_instance_id=$(jq -r '.id // ""' <<< "$aoe_session_json")
+        aoe_session_name=$(jq -r '.session // ""' <<< "$aoe_session_json")
+    fi
+fi
+
+echo "Profile: $profile" >&2
+echo "Project: $project_name" >&2
+if [ -n "$aoe_instance_id" ]; then
+    echo "Agent of Empires detected: $aoe_instance_id (session: $aoe_session_name)" >&2
+fi
+
+# Fetch API key from ~/secrets.json if not already provided.
+# Check if this profile skips API key fetching.
+skip_api_key=false
+for no_api_key_profile in "${no_api_key_profiles[@]}"; do
+    if [[ "$profile" == "$no_api_key_profile" ]]; then
+        skip_api_key=true
+        break
+    fi
+done
+
+# Fetch API key from secrets file if not already set.
+if [[ "$skip_api_key" == "true" ]]; then
+    echo "Skipping API key fetch (profile '$profile' does not require one)" >&2
+elif [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+    secrets_file="$HOME/secrets.json"
+
+    if [[ ! -f "$secrets_file" ]]; then
+        echo "Error: Secrets file not found at $secrets_file" >&2
+        exit 1
+    fi
+
+    # Verify the file is not readable by group or others.
+    file_perms=$(stat -c %a "$secrets_file" 2> /dev/null \
+        || stat -f %Lp "$secrets_file" 2> /dev/null)
+    if [[ "$file_perms" != "600" ]]; then
+        echo "Error: $secrets_file has permissions $file_perms, expected 600" >&2
+        exit 1
+    fi
+
+    SECRETS=$(< "$secrets_file")
+
+    # Validate that we got valid JSON.
+    if ! jq empty <<< "$SECRETS" 2> /dev/null; then
+        echo "Error: $secrets_file is not valid JSON" >&2
+        exit 1
+    fi
+
+    # Check if fallback to username profile is allowed.
+    fallback_to_username=$(jq -r --arg p "$profile" \
+        '.claude_code.profiles[$p].fallback_to_username // false' \
+        <<< "$SECRETS")
+
+    # Even if the profile config allows it, don't fall back if the username
+    # profile is listed in `no_api_key_profiles`.
+    username_skip_api_key=false
     for no_api_key_profile in "${no_api_key_profiles[@]}"; do
-        if [[ "$profile" == "$no_api_key_profile" ]]; then
-            skip_api_key=true
+        if [[ "$username" == "$no_api_key_profile" ]]; then
+            username_skip_api_key=true
             break
         fi
     done
 
-    # Fetch API key from 1Password if not already set.
-    if [[ "$skip_api_key" == "true" ]]; then
-        echo "Skipping API key fetch (profile '$profile' does not require one)" >&2
-    elif [ -z "${ANTHROPIC_API_KEY:-}" ]; then
-        echo -n "Fetching API key from 1Password..." >&2
-        if ! SECRETS=$(op read "op://Private/AI Agents Configuration/notesPlain" 2>&1); then
-            echo "Error: Failed to retrieve configuration from 1Password" >&2
-            echo "Make sure you are logged in to 1Password CLI (run: op signin)" >&2
-            exit 1
-        fi
-        echo " done!" >&2
-
-        # Validate that we got valid JSON.
-        if ! jq empty <<< "$SECRETS" 2> /dev/null; then
-            echo "Error: Retrieved secret is not valid JSON" >&2
-            exit 1
-        fi
-
-        # Check if fallback to username profile is allowed.
-        fallback_to_username=$(jq -r --arg p "$profile" \
-            '.profiles[$p].fallback_to_username // false' \
+    # Extract API key, falling back to the username profile only if the profile
+    # allows it via `fallback_to_username` and the username profile itself
+    # requires an API key.
+    if [[ "$fallback_to_username" == "true" ]] \
+        && [[ "$username_skip_api_key" != "true" ]]; then
+        ANTHROPIC_API_KEY=$(jq -r --arg p "$profile" --arg u "$username" \
+            '(.claude_code.profiles[$p].api_key // .claude_code.profiles[$u].api_key) // empty' \
             <<< "$SECRETS")
-
-        # Even if the profile config allows it, don't fall back if the username
-        # profile is listed in `no_api_key_profiles`.
-        username_skip_api_key=false
-        for no_api_key_profile in "${no_api_key_profiles[@]}"; do
-            if [[ "$username" == "$no_api_key_profile" ]]; then
-                username_skip_api_key=true
-                break
-            fi
-        done
-
-        # Extract API key, falling back to the username profile only if the
-        # profile allows it via `fallback_to_username` and the username
-        # profile itself requires an API key.
-        if [[ "$fallback_to_username" == "true" ]] \
-            && [[ "$username_skip_api_key" != "true" ]]; then
-            ANTHROPIC_API_KEY=$(jq -r --arg p "$profile" --arg u "$username" \
-                '(.profiles[$p].api_key // .profiles[$u].api_key) // empty' \
-                <<< "$SECRETS")
-        else
-            ANTHROPIC_API_KEY=$(jq -r --arg p "$profile" \
-                '.profiles[$p].api_key // empty' \
-                <<< "$SECRETS")
-        fi
-
-        if [[ -z "$ANTHROPIC_API_KEY" ]]; then
-            echo "Warning: No API key found for profile '$profile'" >&2
-        else
-            export ANTHROPIC_API_KEY
-        fi
+    else
+        ANTHROPIC_API_KEY=$(jq -r --arg p "$profile" \
+            '.claude_code.profiles[$p].api_key // empty' \
+            <<< "$SECRETS")
     fi
 
-fi
-
-if [[ "$env_only" == "true" ]]; then
-    # Output shell commands to be eval'd for environment variable export.
-    [ -n "${ANTHROPIC_API_KEY:-}" ] \
-        && printf "export ANTHROPIC_API_KEY=%q\n" "$ANTHROPIC_API_KEY"
-    echo "export AGENT_ENV_SET=true"
-    echo "Environment variables exported for profile '$profile'" >&2
-    exit 0
+    if [[ -z "$ANTHROPIC_API_KEY" ]]; then
+        echo "Error: No API key found for profile '$profile'" >&2
+        exit 1
+    else
+        export ANTHROPIC_API_KEY
+    fi
 fi
 
 today=$(date +%Y-%m-%d)
+
+docker_image_name="$username-claude:latest"
+dockerfile_path="$devel_dir/dotfiles/references/ai_containers/Dockerfile"
 
 # Get the image's creation timestamp (seconds since epoch, empty if image
 # doesn't exist).
@@ -577,7 +576,7 @@ last_build_timestamp=$(
         2> "$inspect_stderr_file" \
         || true
 )
-inspect_stderr=$(<"$inspect_stderr_file")
+inspect_stderr=$(< "$inspect_stderr_file")
 rm -f "$inspect_stderr_file"
 
 # Derive the last build date in local time from the timestamp.

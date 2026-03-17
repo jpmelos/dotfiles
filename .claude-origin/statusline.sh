@@ -16,5 +16,12 @@ COST=$(jq -r '.cost.total_cost_usd' <<< "$input")
 USED_PERCENTAGE=$(jq -r '.context_window.used_percentage // 0' <<< "$input")
 
 PROFILE="${AGENT_PROFILE:-unknown}"
+PROJECT="${PROJECT_NAME:-}"
+BRANCH="$(git branch --show-current 2> /dev/null || true)"
+SESSION="${AOE_SESSION_NAME:-}"
 
-echo "👤 $PROFILE 🤖 $MODEL 💰 \$$(round_up_cents "$COST") 🪟 $(printf "%.0f" "$USED_PERCENTAGE")% used"
+status="👤 $PROFILE 📌 $PROJECT"
+[ -n "$BRANCH" ] && status="$status 🌿 $BRANCH"
+[ -n "$SESSION" ] && status="$status 🎯 $SESSION"
+status="$status 🤖 $MODEL 💰 \$$(round_up_cents "$COST") 🪟 $(printf "%.0f" "$USED_PERCENTAGE")% used"
+echo "$status"
