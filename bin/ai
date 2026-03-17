@@ -570,12 +570,15 @@ today=$(date +%Y-%m-%d)
 
 # Get the image's creation timestamp (seconds since epoch, empty if image
 # doesn't exist).
+inspect_stderr_file=$(mktemp)
 last_build_timestamp=$(
     docker image inspect "$docker_image_name" \
         --format '{{.Metadata.LastTagTime.Unix}}' \
-        2> /dev/null \
+        2> "$inspect_stderr_file" \
         || true
 )
+inspect_stderr=$(<"$inspect_stderr_file")
+rm -f "$inspect_stderr_file"
 
 # Derive the last build date in local time from the timestamp.
 if [[ -n "$last_build_timestamp" ]]; then
@@ -603,6 +606,9 @@ elif [[ -z "$last_build_date" ]]; then
     # Image doesn't exist at all.
     needs_rebuild=true
     rebuild_reason="image does not exist"
+    if [[ -n "$inspect_stderr" ]]; then
+        echo "docker image inspect: $inspect_stderr" >&2
+    fi
 elif [[ "$last_build_date" != "$today" ]]; then
     needs_rebuild=true
     rebuild_reason="image is from $last_build_date, today is $today"
