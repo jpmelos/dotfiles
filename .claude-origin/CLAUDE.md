@@ -42,6 +42,8 @@
 - Use the `gh` CLI to interact with GitHub URLs and repositories.
   - Use `gh --help` for help.
   - Use `git remote --verbose` to check if the repository is on GitHub.
+- When a tool call or command is denied due to permissions, read
+  `~/.claude/settings.json` to discover which alternatives are allowed.
 
 # Environment
 
