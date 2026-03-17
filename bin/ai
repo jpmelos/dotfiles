@@ -19,6 +19,9 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 #/
 #/ Arguments after `--` are passed directly to Claude Code.
 #/
+#/ If run outside of ~/devel or from ~/devel itself (not in a project),
+#/ defaults to ~/devel/dotfiles as the working directory.
+#/
 #/ Configuration:
 #/   Expects a configuration file at `~/config.json` (requires `chmod 600`)
 #/   with API keys and other configuration.
@@ -452,17 +455,13 @@ if [[ ! -d "$devel_dir" ]]; then
 fi
 
 current_dir="$(realpath "$(pwd)")"
-if [[ "$current_dir/" != "$devel_dir/"* ]]; then
-    echo "Error: not inside ~/devel" >&2
-    exit 1
-fi
-if [[ "$current_dir" == "$devel_dir" ]]; then
-    echo "Error: Cannot run from ~/devel root, must be in a subdirectory" >&2
-    exit 1
+if [[ "$current_dir/" != "$devel_dir/"* ]] || [[ "$current_dir" == "$devel_dir" ]]; then
+    current_dir="$devel_dir/dotfiles"
+    echo "Not inside a ~/devel project, defaulting to $current_dir" >&2
 fi
 
 if [ -z "$profile" ]; then
-    profile="$(project_profile_name)"
+    profile="$(cd "$current_dir" && project_profile_name)"
 fi
 # Validate profile name to prevent command injection.
 # Max length: 64 characters, alphanumeric with dots, dashes, underscores.
@@ -655,6 +654,7 @@ else
     echo "Image is up to date, skipping rebuild." >&2
 fi
 
+# Different profiles have different projects, todos, chat histories, etc.
 mkdir -p "$HOME/.claude-$profile"
 cp -a "$HOME/.claude-origin/." "$HOME/.claude-$profile"
 # Make `~/claude-$profile/settings.json` a hard copy, not a symlink.
