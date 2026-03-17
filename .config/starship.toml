@@ -11,6 +11,7 @@ $git_branch\
 $git_commit\
 $git_state\
 $git_status\
+$python\
 $sudo\
 $cmd_duration\
 $line_break\
