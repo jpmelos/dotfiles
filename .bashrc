@@ -283,7 +283,7 @@ __git_complete gy git_cherry_pick
 ###################
 
 # Find current default interface.
-if [ "$JPMELOS_IS_MACOS" = "true" ]; then
+if [ "$(uname -s)" = "Darwin" ]; then
     default_if() {
         route -n get default | grep 'interface:' | awk '{print $2}'
     }
@@ -294,7 +294,7 @@ else
 fi
 
 # Find the IP of the interface to the default gateway.
-if [ "$JPMELOS_IS_MACOS" = "true" ]; then
+if [ "$(uname -s)" = "Darwin" ]; then
     default_if_ip() {
         ifconfig "$(default_if)" | grep 'inet ' | awk '{print $2}'
     }
@@ -305,7 +305,7 @@ else
 fi
 
 # Updates the system.
-if [ "$JPMELOS_IS_MACOS" = "true" ]; then
+if [ "$(uname -s)" = "Darwin" ]; then
     update() {
         brew update
         brew upgrade
@@ -377,7 +377,7 @@ gz() {
 
 # Normalize `open` across Linux, macOS, and Windows.
 # This is needed to make the `o` function (see below) cross-platform.
-if [ ! $(uname -s) = 'Darwin' ]; then
+if [ "$(uname -s)" != "Darwin" ]; then
     if grep -q Microsoft /proc/version; then
         # Ubuntu on Windows using the Linux subsystem
         alias open='explorer.exe'

@@ -1,12 +1,5 @@
 # vim: set ft=sh :
 
-# Are we on a Mac?
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    JPMELOS_IS_MACOS="true"
-else
-    JPMELOS_IS_MACOS="false"
-fi
-
 #################
 #               #
 #    Imports    #
@@ -25,7 +18,7 @@ fi
 # Set the PATH. Things are always prepended, so the last entry to be entered
 # here is the one with the highest priority.
 # Binaries installed by Homebrew.
-if [[ $JPMELOS_IS_MACOS == "true" ]]; then
+if [ "$(uname -s)" = "Darwin" ]; then
     field_prepend PATH /opt/homebrew/bin
 fi
 # Binaries not managed via a package manager.
