@@ -4,15 +4,17 @@
     "permissions": {
         "defaultMode": "dontAsk",
         "deny": [
-            "Edit(jpenv-bin/**)",
+            "Write(//**/.claude/**)",
+            "Edit(//**/.claude/**)",
+            "Write(/jpenv-bin/**)",
+            "Edit(/jpenv-bin/**)",
             "EnterPlanMode"
         ],
         "allow": [
             "Read",
             "Write",
             "Edit",
-            "WebFetch",
-            "WebSearch",
+            "Skill",
             "Bash(true)",
             "Bash(false)",
             "Bash(date)",
@@ -26,8 +28,8 @@
             "Bash(tail:*)",
             "Bash(cut:*)",
             "Bash(mkdir:*)",
-            "Bash(mv:*)",
-            "Bash(rm:*)",
+            "Bash(safe_mv:*)",
+            "Bash(safe_rm:*)",
             "Bash(git remote --verbose)",
             "Bash(git branch --show-current)",
             "Bash(git log:*)",
@@ -35,7 +37,6 @@
             "Bash(git rev-list:*)",
             "Bash(git status:*)",
             "Bash(git diff:*)",
-            "Bash(git reset:*)",
             "Bash(gh search:*)",
             "Bash(gh issue list:*)",
             "Bash(gh issue status:*)",
@@ -50,7 +51,6 @@
             "Bash(which:*)",
             "Bash(python3 -m py_compile:*)",
             "Bash(review_diff)",
-            "Bash(ralph --validate:*)",
             "Bash(ai_commit:*)",
             "Bash(bash jpenv-bin/lint.bash:*)",
             "Bash(bash jpenv-bin/tests.bash:*)"

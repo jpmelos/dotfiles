@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# This is just to allow Claude Code to rename files. Since it always runs
+# inside a Docker container and it only has access to things that are under
+# version control, this is fine.
+
+exec mv "$@"

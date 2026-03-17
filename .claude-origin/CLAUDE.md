@@ -34,6 +34,8 @@
   - If either script doesn't exist, report that you can't perform the action.
     *Always* use the exact commands above — never call `bash` with the full
     path to the script.
+- To rename or delete files, use `safe_mv` and `safe_rm` instead of `mv` and
+  `rm`. The API is identical.
 - To commit, always run `ai_commit Commit message goes here`. Never call
   `git commit` directly.
   - Do not stage files (`git add`) or similar. Just call `ai_commit` and it
