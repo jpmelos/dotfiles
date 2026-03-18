@@ -493,7 +493,7 @@ if [ -n "$aoe_instance_id" ]; then
     echo "Agent of Empires detected: $aoe_instance_id (session: $aoe_session_name)" >&2
 fi
 
-# Fetch API key from ~/secrets.json if not already provided.
+# Fetch API key from ~/config.json if not already provided.
 # Check if this profile skips API key fetching.
 skip_api_key=false
 for no_api_key_profile in "${no_api_key_profiles[@]}"; do
@@ -503,37 +503,37 @@ for no_api_key_profile in "${no_api_key_profiles[@]}"; do
     fi
 done
 
-# Fetch API key from secrets file if not already set.
+# Fetch API key from config file if not already set.
 if [[ "$skip_api_key" == "true" ]]; then
     echo "Skipping API key fetch (profile '$profile' does not require one)" >&2
 elif [ -z "${ANTHROPIC_API_KEY:-}" ]; then
-    secrets_file="$HOME/secrets.json"
+    config_file="$HOME/config.json"
 
-    if [[ ! -f "$secrets_file" ]]; then
-        echo "Error: Secrets file not found at $secrets_file" >&2
+    if [[ ! -f "$config_file" ]]; then
+        echo "Error: Config file not found at $config_file" >&2
         exit 1
     fi
 
     # Verify the file is not readable by group or others.
-    file_perms=$(stat -c %a "$secrets_file" 2> /dev/null \
-        || stat -f %Lp "$secrets_file" 2> /dev/null)
+    file_perms=$(stat -c %a "$config_file" 2> /dev/null \
+        || stat -f %Lp "$config_file" 2> /dev/null)
     if [[ "$file_perms" != "600" ]]; then
-        echo "Error: $secrets_file has permissions $file_perms, expected 600" >&2
+        echo "Error: $config_file has permissions $file_perms, expected 600" >&2
         exit 1
     fi
 
-    SECRETS=$(< "$secrets_file")
+    CONFIG=$(< "$config_file")
 
     # Validate that we got valid JSON.
-    if ! jq empty <<< "$SECRETS" 2> /dev/null; then
-        echo "Error: $secrets_file is not valid JSON" >&2
+    if ! jq empty <<< "$CONFIG" 2> /dev/null; then
+        echo "Error: $config_file is not valid JSON" >&2
         exit 1
     fi
 
     # Check if fallback to username profile is allowed.
     fallback_to_username=$(jq -r --arg p "$profile" \
         '.claude_code.profiles[$p].fallback_to_username // false' \
-        <<< "$SECRETS")
+        <<< "$CONFIG")
 
     # Even if the profile config allows it, don't fall back if the username
     # profile is listed in `no_api_key_profiles`.
@@ -552,11 +552,11 @@ elif [ -z "${ANTHROPIC_API_KEY:-}" ]; then
         && [[ "$username_skip_api_key" != "true" ]]; then
         ANTHROPIC_API_KEY=$(jq -r --arg p "$profile" --arg u "$username" \
             '(.claude_code.profiles[$p].api_key // .claude_code.profiles[$u].api_key) // empty' \
-            <<< "$SECRETS")
+            <<< "$CONFIG")
     else
         ANTHROPIC_API_KEY=$(jq -r --arg p "$profile" \
             '.claude_code.profiles[$p].api_key // empty' \
-            <<< "$SECRETS")
+            <<< "$CONFIG")
     fi
 
     if [[ -z "$ANTHROPIC_API_KEY" ]]; then
