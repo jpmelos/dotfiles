@@ -62,7 +62,6 @@
             "Bash(gh release view *)",
             "Bash(whois *)",
             "Bash(which *)",
-            "Bash(python3 -m py_compile *)",
             "Bash(review_diff)",
             "Bash(ai_commit *)",
             "Bash(bash jpenv-bin/lint.bash)",

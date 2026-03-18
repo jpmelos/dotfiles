@@ -262,9 +262,6 @@ run_container() {
     local cmd=(
         docker run
 
-        # Make the entire filesystem read-only.
-        --read-only
-
         # Delete the container when it exits.
         --rm
 
@@ -283,6 +280,10 @@ run_container() {
         # So that the agent can reach services running on the host via
         # `host.docker.internal`.
         --add-host "host.docker.internal:host-gateway"
+
+        # Make the entire filesystem read-only.
+        --read-only
+        --tmpfs /tmp
 
         # Mount the entire `~/devel` directory and set the current directory as
         # the working directory.
