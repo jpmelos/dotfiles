@@ -15,6 +15,8 @@
 - Prefer descriptive variable names over shorter ones (e.g., `thread_id`
   instead of `tid`). The only exceptions are very short for-loops, Python
   comprehensions, or similar structures.
+- In comments, use single backticks (Markdown style, e.g., `` `value` ``) for
+  inline code references, *never* double backticks (reST style).
 - *Always* use complete punctuation in comments, including a period (full stop)
   at the end. For example:
   ```

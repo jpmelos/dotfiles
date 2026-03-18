@@ -4,8 +4,10 @@
     "permissions": {
         "defaultMode": "dontAsk",
         "deny": [
-            "Write(//**/.claude/**)",
-            "Edit(//**/.claude/**)",
+            "Write(~/.claude/settings.json)",
+            "Edit(~/.claude/settings.json)",
+            "Write(~/.claude/scripts/**)",
+            "Edit(~/.claude/scripts/**)",
             "Write(/jpenv-bin/**)",
             "Edit(/jpenv-bin/**)",
             "EnterPlanMode"
@@ -75,7 +77,7 @@
             {
                 "hooks": [
                     {
-                        "command": "~/.claude/aoe-hook.sh waiting",
+                        "command": "~/.claude/scripts/aoe-hook.sh waiting",
                         "type": "command"
                     }
                 ],
@@ -86,7 +88,7 @@
             {
                 "hooks": [
                     {
-                        "command": "~/.claude/aoe-hook.sh running",
+                        "command": "~/.claude/scripts/aoe-hook.sh running",
                         "type": "command"
                     }
                 ]
@@ -96,7 +98,7 @@
             {
                 "hooks": [
                     {
-                        "command": "~/.claude/aoe-hook.sh idle",
+                        "command": "~/.claude/scripts/aoe-hook.sh idle",
                         "type": "command"
                     }
                 ]
@@ -106,7 +108,7 @@
             {
                 "hooks": [
                     {
-                        "command": "~/.claude/aoe-hook.sh running",
+                        "command": "~/.claude/scripts/aoe-hook.sh running",
                         "type": "command"
                     }
                 ]
@@ -130,11 +132,11 @@
     },
     "fileSuggestion": {
         "type": "command",
-        "command": "~/.claude/file-suggestions.sh"
+        "command": "~/.claude/scripts/file-suggestions.sh"
     },
     "statusLine": {
         "type": "command",
-        "command": "~/.claude/statusline.sh"
+        "command": "~/.claude/scripts/statusline.sh"
     },
     "spinnerVerbs": {
         "mode": "replace",
