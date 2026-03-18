@@ -116,22 +116,22 @@ function module.apply_to_config(config)
             action = action.SpawnTab("CurrentPaneDomain"),
         },
         {
-            key = "j",
+            key = "h",
             mods = "CTRL|META",
             action = action.ActivateTabRelativeNoWrap(-1),
         },
         {
-            key = "k",
+            key = "l",
             mods = "CTRL|META",
             action = action.ActivateTabRelativeNoWrap(1),
         },
         {
-            key = "u",
+            key = "y",
             mods = "CTRL|META",
             action = action.MoveTabRelative(-1),
         },
         {
-            key = "i",
+            key = "o",
             mods = "CTRL|META",
             action = action.MoveTabRelative(1),
         },
