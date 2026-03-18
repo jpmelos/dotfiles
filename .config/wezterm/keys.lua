@@ -36,6 +36,21 @@ function module.apply_to_config(config)
 
     config.leader = { key = "a", mods = "CTRL", timeout_milliseconds = 10000 }
 
+    config.mouse_bindings = {
+        -- Require SHIFT+CLICK for opening links.
+        {
+            event = { Up = { streak = 1, button = "Left" } },
+            mods = "SHIFT",
+            action = wezterm.action.OpenLinkAtMouseCursor,
+        },
+        -- Stop CLICK from opening URLs (it still opens with SHIFT).
+        {
+            event = { Up = { streak = 1, button = "Left" } },
+            mods = "NONE",
+            action = wezterm.action.DisableDefaultAssignment,
+        },
+    }
+
     config.keys = {
         -- Configuration.
         {
