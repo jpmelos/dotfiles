@@ -59,3 +59,7 @@
 - You are running inside a Docker container.
 - Services on `localhost`, `127.0.0.1`, or other loopback interfaces are
   actually running on the host machine. Access them via `host.docker.internal`.
+- Source code for dependencies may be available under `~/devel`. Projects are
+  either directly inside `~/devel` or organized in subdirectories named after
+  the owning organization. Look there when you need to inspect dependency
+  interfaces, types, or behavior.
