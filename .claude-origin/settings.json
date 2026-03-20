@@ -13,9 +13,12 @@
             "EnterPlanMode"
         ],
         "allow": [
+            "Glob",
+            "Grep",
             "Read",
             "Write",
             "Edit",
+            "Agent",
             "Skill",
             "Bash(true)",
             "Bash(false)",
