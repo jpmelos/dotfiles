@@ -153,11 +153,13 @@ __git_complete gaa git_add
 __git_complete gapa git_add
 
 alias gb='g b'
+alias gbc='g bc'
 alias gbr='g br'
 alias gbn='g bn'
 alias gbd='g bd'
 alias gbdd='g bdd'
 __git_complete gb git_branch
+__git_complete gbc git_branch
 __git_complete gbr git_branch
 __git_complete gbn git_checkout
 __git_complete gbd git_branch
