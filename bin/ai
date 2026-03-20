@@ -660,8 +660,15 @@ mkdir -p "$HOME/.claude-$profile"
 cp -a "$HOME/.claude-origin/." "$HOME/.claude-$profile"
 # Make `~/claude-$profile/settings.json` a hard copy, not a symlink.
 dereference "$HOME/.claude-$profile/settings.json"
-[ -f "$HOME/.claude-$profile.json" ] \
-    || echo "{}" > "$HOME/.claude-$profile.json"
+if [[ ! -f "$HOME/.claude-$profile.json" ]]; then
+    if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
+        # Pre-approve the API key so we don't have to.
+        approved="${ANTHROPIC_API_KEY: -20}"
+        echo "{\"customApiKeyResponses\": {\"approved\": [\"$approved\"]}}" > "$HOME/.claude-$profile.json"
+    else
+        echo "{}" > "$HOME/.claude-$profile.json"
+    fi
+fi
 
 if [[ "$process_output" == "true" ]]; then
     # Capture output and process it.
