@@ -211,10 +211,12 @@ __git_complete glp git_log
 
 alias gm='g m'
 alias gmm='g mm'
+alias gmom='g mom'
 alias gmc='g mc'
 alias gma='g ma'
 __git_complete gm git_merge
 __git_complete gmm git_merge
+__git_complete gmom git_merge
 __git_complete gmc git_merge
 __git_complete gma git_merge
 
@@ -235,14 +237,18 @@ __git_complete gpsf git_push
 
 alias grb='g rb'
 alias grbm='g rbm'
+alias grbom='g rbom'
 alias grbi='g rbi'
 alias grbim='g rbim'
+alias grbiom='g rbiom'
 alias grbc='g rbc'
 alias grba='g rba'
 __git_complete grb git_rebase
 __git_complete grbm git_rebase
+__git_complete grbom git_rebase
 __git_complete grbi git_rebase
 __git_complete grbim git_rebase
+__git_complete grbiom git_rebase
 __git_complete grbc git_rebase
 __git_complete grba git_rebase
 
@@ -250,10 +256,12 @@ alias grs='g rs'
 alias grsu='g rsu'
 alias grso='g rso'
 alias grsm='g rsm'
+alias grsom='g rsom'
 __git_complete grs git_reset
 __git_complete grsu git_reset
 __git_complete grso git_reset
 __git_complete grsm git_reset
+__git_complete grsom git_reset
 
 alias gsh='g sh'
 alias gshf='g shf'

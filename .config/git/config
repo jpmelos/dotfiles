@@ -75,6 +75,7 @@
 
 [alias]
     main-branch = ! ~/devel/dotfiles/references/scripts/check-for-git-remote-head.sh && git symbolic-ref refs/remotes/origin/HEAD | cut -d'/' -f4
+    main-branch-remote = ! git rev-parse --abbrev-ref $(git main-branch)@{upstream}
     root = rev-parse --show-toplevel
     nuke = "! f() { source "$HOME/devel/dotfiles/references/scripts/gitfunctions.sh"; __git_nuke; }; f"
     big-revert = "! f() { source "$HOME/devel/dotfiles/references/scripts/gitfunctions.sh"; __git_big_revert; }; f"
@@ -139,8 +140,8 @@
     dcf = diff --cached --stat
     dm = ! git diff $(git main-branch)...HEAD
     dmf = ! git diff $(git main-branch)...HEAD --stat
-    dom = ! git diff origin/$(git main-branch)...HEAD
-    domf = ! git diff origin/$(git main-branch)...HEAD --stat
+    dom = ! git diff $(git main-branch-remote)...HEAD
+    domf = ! git diff $(git main-branch-remote)...HEAD --stat
 
     # l = log
     l = "! f() { git log --color=always --oneline --graph --decorate $@ | awk -f ~/devel/dotfiles/references/scripts/git-log-prepend-number-awk.sh | less -R; }; f"
@@ -150,6 +151,7 @@
     # m = merge
     m = merge
     mm = ! git merge $(git main-branch)
+    mom = ! git merge $(git main-branch-remote)
     mc = merge --continue
     ma = merge --abort
 
@@ -167,9 +169,11 @@
 
     # rb = rebase
     rb = rebase
-    rbm = ! git rebase origin/$(git main-branch)
+    rbm = ! git rebase $(git main-branch)
+    rbom = ! git rebase $(git main-branch-remote)
     rbi = rebase -i
-    rbim = ! git rebase -i origin/$(git main-branch)
+    rbim = ! git rebase -i $(git main-branch)
+    rbiom = ! git rebase -i $(git main-branch-remote)
     rbc = rebase --continue
     rba = rebase --abort
 
@@ -177,7 +181,8 @@
     rs = reset
     rsu = reset HEAD~1
     rso = reset --hard @{upstream}
-    rsm = ! git reset --hard origin/$(git main-branch)
+    rsm = ! git reset --hard $(git main-branch)
+    rsom = ! git reset --hard $(git main-branch-remote)
 
     # sh = show
     sh = "! f() { if [[ \"$1\" =~ ^- ]]; then HEADN=\"${1#-}\"; shift; git show \"HEAD~$HEADN\" $@; else git show \"$@\"; fi; }; f"
