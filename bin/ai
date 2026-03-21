@@ -611,6 +611,9 @@ elif [[ -z "$last_build_date" ]]; then
     rebuild_reason="image does not exist"
     if [[ -n "$inspect_stderr" ]]; then
         echo "docker image inspect: $inspect_stderr" >&2
+        if [[ "$inspect_stderr" == *"No such image"* ]]; then
+            exit 1
+        fi
     fi
 elif [[ "$last_build_date" != "$today" ]]; then
     needs_rebuild=true
