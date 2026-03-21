@@ -221,7 +221,6 @@ build_image() {
         --build-arg GID="$(id -g)"
         --build-arg HOME="$HOME"
         --build-arg BUILD_DATE="$(date +%Y-%m-%d)"
-        --build-arg CLAUDE_CODE_CHANNEL="stable"
     )
 
     if [[ "$use_cache" == "false" ]]; then
