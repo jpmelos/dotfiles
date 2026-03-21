@@ -583,6 +583,26 @@ last_build_timestamp=$(
 )
 inspect_stderr=$(< "$inspect_stderr_file")
 rm -f "$inspect_stderr_file"
+# TODO: Remove this once it's not needed anymore. There is some bug in Docker
+# in which sometimes `docker image inspect` can't find an image, but then you
+# run `docker image ls` and then `docker image inspect` again, and it works...
+# This is an attempt to automatically overcome it.
+if [[ "$inspect_stderr" == *"No such image"* ]]; then
+    echo "WARNING: image not found, trying to fix it" >&2
+    docker image ls "$docker_image_name" > /dev/null 2>&1
+    inspect_stderr_file=$(mktemp)
+    last_build_timestamp=$(
+        docker image inspect "$docker_image_name" \
+            --format '{{.Metadata.LastTagTime.Unix}}' \
+            2> "$inspect_stderr_file" \
+            || true
+    )
+    inspect_stderr=$(< "$inspect_stderr_file")
+    rm -f "$inspect_stderr_file"
+    if [[ "$inspect_stderr" != *"No such image"* ]]; then
+        echo "WARNING: 'docker image ls' fixed it" >&2
+    fi
+fi
 
 # Derive the last build date in local time from the timestamp.
 if [[ -n "$last_build_timestamp" ]]; then
@@ -612,9 +632,6 @@ elif [[ -z "$last_build_date" ]]; then
     rebuild_reason="image does not exist"
     if [[ -n "$inspect_stderr" ]]; then
         echo "docker image inspect: $inspect_stderr" >&2
-        if [[ "$inspect_stderr" == *"No such image"* ]]; then
-            exit 1
-        fi
     fi
 elif [[ "$last_build_date" != "$today" ]]; then
     needs_rebuild=true
