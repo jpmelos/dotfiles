@@ -672,6 +672,9 @@ if [[ ! -f "$HOME/.claude-$profile.json" ]]; then
     fi
 fi
 
+# Always restrict setting sources to user and local.
+harness_args=(--setting-sources user,local "${harness_args[@]}")
+
 if [[ "$process_output" == "true" ]]; then
     # Capture output and process it.
     output=$(run_container "${harness_args[@]}")
