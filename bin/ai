@@ -282,7 +282,8 @@ run_container() {
 
         # Make the entire filesystem read-only.
         --read-only
-        --tmpfs /tmp
+        --tmpfs "/tmp"
+        --volume "/tmp/claude-code-shared:/tmp/claude-code-shared"
 
         # Mount the entire `~/devel` directory and set the current directory as
         # the working directory.
