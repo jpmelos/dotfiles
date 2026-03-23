@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+dir="."
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --dir)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: --dir requires a value" >&2
+                exit 1
+            fi
+            dir="$2"
+            shift 2
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+if [[ $# -eq 0 ]]; then
+    echo "Error: Please provide a title for the session" >&2
+    exit 1
+fi
+
+project_dir="$(realpath "$dir")"
+main_project_dir="$project_dir"
+
+# If `.git` is a file (worktree), resolve to the main repository directory.
+if [[ -f "$project_dir/.git" ]]; then
+    # `.git` file contains: `gitdir: /path/to/main/.git/worktrees/<name>`.
+    main_git_dir="$(sed 's/^gitdir: //' "$project_dir/.git")"
+    # Resolve to the main repo's `.git` directory (strip `/worktrees/<name>`).
+    main_git_dir="$(realpath "$main_git_dir/../..")"
+    # The main repository is the parent of the `.git` directory.
+    main_project_dir="$(dirname "$main_git_dir")"
+fi
+
+devel_dir="$(realpath "$HOME/devel")"
+group_name="${main_project_dir#"$devel_dir"/}"
+
+aoe add --group "$group_name" --title "$@" "$project_dir"
