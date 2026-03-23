@@ -7,10 +7,10 @@ return {
         "rcarriga/nvim-dap-ui",
     },
     config = function()
+        require("nvim-dap-repl-highlights").setup()
         local parsers = require("nvim-treesitter.parsers")
         if not parsers.has_parser("dap_repl") then
             vim.cmd("TSInstall dap_repl")
         end
-        require("nvim-dap-repl-highlights").setup()
     end,
 }
