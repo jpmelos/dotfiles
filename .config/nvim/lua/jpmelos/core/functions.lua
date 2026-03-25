@@ -11,6 +11,13 @@ function LogEvent(tag, args)
     )
 end
 
+function Log(message)
+    if not vim.g.is_debug then
+        return
+    end
+    vim.api.nvim_echo({ { message } }, true, {})
+end
+
 function Input(title, default_value, callback)
     local Input = require("nui.input")
     local event = require("nui.utils.autocmd").event

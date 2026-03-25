@@ -211,9 +211,14 @@ return {
         -- (with a bang).
         api.nvim_create_autocmd("BufWritePost", {
             callback = function()
-                -- Do not autoformat if we're saving because Neovim lost focus
-                -- or if we're inside the format callback.
-                if g.inside_format_cb or not g.nvim_has_focus then
+                -- Do not autoformat if we're inside the format callback.
+                if g.inside_format_cb then
+                    return
+                end
+
+                -- Do not autoformat if we're saving because Neovim lost focus.
+                if not g.nvim_has_focus then
+                    Log("Autoformat: skipping because Neovim lost focus.")
                     return
                 end
 
@@ -226,11 +231,19 @@ return {
                         -- Save, and then run the formatter. This may leave the
                         -- buffer in an unsaved state again if the formatter
                         -- changes the file.
+                        Log(
+                            "Autoformat: formatting because buffer-local "
+                                .. "autoformat is enabled."
+                        )
                         do_format(conform)
+                    else
+                        -- It is `false`, which means we don't want to
+                        -- autoformat this buffer.
+                        Log(
+                            "Autoformat: skipping because buffer-local "
+                                .. "autoformat is disabled."
+                        )
                     end
-
-                    -- Then it is `false`, which means we don't want to
-                    -- autoformat this buffer.
                     return
                 end
 
@@ -250,6 +263,13 @@ return {
                                 filename:matchglob(pattern)
                                 or vim.bo.filetype == pattern
                             then
+                                Log(
+                                    "Autoformat: skipping because filetype "
+                                        .. "or filename matches disable "
+                                        .. "pattern '"
+                                        .. pattern
+                                        .. "'."
+                                )
                                 return
                             end
                         end
@@ -260,7 +280,12 @@ return {
                     -- Save, and then run the formatter. This may leave the
                     -- buffer in an unsaved state again if the formatter
                     -- changes the file.
+                    Log(
+                        "Autoformat: formatting because autoformat is "
+                            .. "enabled globally."
+                    )
                     do_format(conform)
+                    return
                 end
 
                 if type(g.enable_autoformat) == "string" then
@@ -275,16 +300,39 @@ return {
                             filename:matchglob(pattern)
                             or vim.bo.filetype == pattern
                         then
+                            Log(
+                                "Autoformat: formatting because filetype "
+                                    .. "or filename matches enable "
+                                    .. "pattern '"
+                                    .. pattern
+                                    .. "'."
+                            )
                             do_format(conform)
-                            break
+                            return
                         end
                     end
                 end
 
-                -- At this point, `g.enable_autoformat` is either `nil` or
-                -- `false`, and either way we don't want to autoformat the
-                -- buffer: we only want to autoformat if it is explicitly
-                -- enabled.
+                -- At this point, `g.enable_autoformat` is either `nil`,
+                -- `false`, or a table with no matching pattern, and either
+                -- way we don't want to autoformat the buffer: we only want
+                -- to autoformat if it is explicitly enabled.
+                if type(g.enable_autoformat) == "table" then
+                    Log(
+                        "Autoformat: skipping because no pattern in "
+                            .. "vim.g.enable_autoformat matches this file."
+                    )
+                elseif g.enable_autoformat == false then
+                    Log(
+                        "Autoformat: skipping because autoformat is "
+                            .. "explicitly disabled globally."
+                    )
+                else
+                    Log(
+                        "Autoformat: skipping because autoformat is not "
+                            .. "enabled (vim.g.enable_autoformat is nil)."
+                    )
+                end
             end,
         })
 

@@ -1,3 +1,5 @@
+vim.g.is_debug = vim.env.NVIM_DEBUG == "true"
+
 function GetFunctionLocation(func)
     local info = debug.getinfo(func, "S")
     if not info then
