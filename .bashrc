@@ -202,6 +202,9 @@ __git_complete gdmf git_diff
 __git_complete gdom git_diff
 __git_complete gdomf git_diff
 
+alias gf='g f'
+__git_complete gf git_fetch
+
 alias gl='g l'
 alias gll='g ll'
 alias glp='g lp'

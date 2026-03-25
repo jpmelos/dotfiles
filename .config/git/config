@@ -86,7 +86,7 @@
     # c = commit
     # d = diff
     # e =
-    # f =
+    # f = fetch
     # g =
     # h = reserved for `gh` (GitHub's CLI tool)
     # i =
@@ -142,6 +142,9 @@
     dmf = ! git diff $(git main-branch)...HEAD --stat
     dom = ! git diff $(git main-branch-remote)...HEAD
     domf = ! git diff $(git main-branch-remote)...HEAD --stat
+
+    # f = fetch
+    f = fetch --all
 
     # l = log
     l = "! f() { git log --color=always --oneline --graph --decorate $@ | awk -f ~/devel/dotfiles/references/scripts/git-log-prepend-number-awk.sh | less -R; }; f"
