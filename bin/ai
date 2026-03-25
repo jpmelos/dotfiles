@@ -678,8 +678,35 @@ fi
 # Different profiles have different projects, todos, chat histories, etc.
 mkdir -p "$HOME/.claude-$profile"
 cp -a "$HOME/.claude-origin/." "$HOME/.claude-$profile"
-# Make `~/claude-$profile/settings.json` a hard copy, not a symlink.
+
+# Make hard copies of symlinked files before modifying them.
+# This is dereferenced because Claude Code sometimes changes this file, and I
+# don't want those changes to affect my dotfiles.
 dereference "$HOME/.claude-$profile/settings.json"
+# This is dereferenced because I make changes to it just below.
+dereference "$HOME/.claude-$profile/CLAUDE.md"
+
+# Replace the project list marker in CLAUDE.md with the actual project list.
+claude_md_path="$HOME/.claude-$profile/CLAUDE.md"
+if grep -qF '<DEPENDENCIES_LIST>' "$claude_md_path" 2> /dev/null; then
+    raw_project_list_file=$(mktemp)
+    "$devel_dir/dotfiles/bin/list_project_dirs" > "$raw_project_list_file"
+    if [[ -s "$raw_project_list_file" ]]; then
+        claude_md_tmp=$(mktemp)
+        while IFS= read -r line; do
+            if [[ "$line" == *'<DEPENDENCIES_LIST>'* ]]; then
+                # Extract the indentation from the marker line.
+                indent="${line%%- <DEPENDENCIES_LIST>*}"
+                sed "s/^/${indent}- /" "$raw_project_list_file"
+            else
+                printf '%s\n' "$line"
+            fi
+        done < "$claude_md_path" > "$claude_md_tmp" \
+            && mv "$claude_md_tmp" "$claude_md_path"
+    fi
+    rm -f "$raw_project_list_file"
+fi
+
 if [[ ! -f "$HOME/.claude-$profile.json" ]]; then
     if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
         # Pre-approve the API key so we don't have to.

@@ -61,5 +61,7 @@
   actually running on the host machine. Access them via `host.docker.internal`.
 - Source code for dependencies may be available under `~/devel`. Projects are
   either directly inside `~/devel` or organized in subdirectories named after
-  the owning organization. Look there when you need to inspect dependency
-  interfaces, types, or behavior.
+  the owning organization. Use these to inspect dependency interfaces, types,
+  or behavior. Always verify the checked-out version is compatible with what
+  the current project uses before relying on it.
+  - <DEPENDENCIES_LIST>
