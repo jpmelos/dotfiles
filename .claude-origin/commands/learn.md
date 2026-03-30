@@ -1,9 +1,9 @@
 ---
-description: Edit the global `CLAUDE.md` to learn new things.
+description: Edit the user `CLAUDE.md` to learn new things.
 disable-model-invocation: true
 ---
 
-Edit the `CLAUDE.md` file in `~/.claude` to learn these new things:
+Edit `~/devel/dotfiles/.claude-origin/CLAUDE.md` to learn these new things:
 
 ```
 $ARGUMENTS
