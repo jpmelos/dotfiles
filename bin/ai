@@ -717,6 +717,128 @@ if [[ ! -f "$HOME/.claude-$profile.json" ]]; then
     fi
 fi
 
+# Rename project-local `.claude` commands and skills with a `p-` prefix so they
+# don't shadow user-level commands and skills. Mark tracked files with
+# `--skip-worktree` so Git ignores the renames, and add the new files to
+# `.git/info/exclude` so they are not committed.
+if git -C "$current_dir" rev-parse --git-dir &> /dev/null; then
+    git_dir=$(git -C "$current_dir" rev-parse --git-dir)
+    exclude_file="$git_dir/info/exclude"
+    mkdir -p "$(dirname "$exclude_file")"
+
+    # Resolve the real paths of the commands and skills directories (following
+    # symlinks) so `git ls-files` returns the tracked files within them, not
+    # just the symlink entries.
+    commands_real_relpath=""
+    if [[ -d "$current_dir/.claude/commands" ]]; then
+        commands_real_relpath=$(
+            realpath "$current_dir/.claude/commands" \
+                | sed "s|^$current_dir/||"
+        )
+    fi
+    skills_real_relpath=""
+    if [[ -d "$current_dir/.claude/skills" ]]; then
+        skills_real_relpath=$(
+            realpath "$current_dir/.claude/skills" \
+                | sed "s|^$current_dir/||"
+        )
+    fi
+
+    # Use `git ls-files` (with `-v` to include skip-worktree files) as the
+    # source of truth for tracked commands and skills.
+    ls_files_args=()
+    [[ -n "$commands_real_relpath" ]] \
+        && ls_files_args+=("$commands_real_relpath")
+    [[ -n "$skills_real_relpath" ]] && ls_files_args+=("$skills_real_relpath")
+
+    all_tracked_claude=""
+    if [[ ${#ls_files_args[@]} -gt 0 ]]; then
+        all_tracked_claude=$(
+            git -C "$current_dir" ls-files -v "${ls_files_args[@]}" \
+                2> /dev/null || true
+        )
+    fi
+
+    # Process commands: foo.md -> p-foo.md (under the resolved directory).
+    if [[ -n "$commands_real_relpath" ]] && [[ -n "$all_tracked_claude" ]]; then
+        tracked_commands=$(
+            sed -n "s|^. ${commands_real_relpath}/||p" \
+                <<< "$all_tracked_claude" || true
+        )
+        if [[ -n "$tracked_commands" ]]; then
+            while IFS= read -r local_basename; do
+                git_rel_path="$commands_real_relpath/$local_basename"
+                git -C "$current_dir" update-index --skip-worktree \
+                    "$git_rel_path" 2> /dev/null || true
+                src="$current_dir/$git_rel_path"
+                dest="$current_dir/$commands_real_relpath/p-$local_basename"
+                # Ensure the p-prefixed copy exists. If it doesn't, extract
+                # the content directly from git. `git checkout` won't work
+                # here because skip-worktree makes it a no-op.
+                if [[ ! -f "$dest" ]]; then
+                    git -C "$current_dir" show "HEAD:$git_rel_path" > "$dest"
+                fi
+                # Remove the original if it's still around.
+                rm -f "$src"
+                # Ensure the p-prefixed file is in the exclude file.
+                new_rel_path="$commands_real_relpath/p-$local_basename"
+                if ! grep -qxF "$new_rel_path" "$exclude_file" \
+                    2> /dev/null; then
+                    echo "$new_rel_path" >> "$exclude_file"
+                fi
+            done <<< "$tracked_commands"
+        fi
+    fi
+
+    # Process skills: foo/ -> p-foo/ (under the resolved directory).
+    # Extract unique top-level skill directory names from tracked paths.
+    if [[ -n "$skills_real_relpath" ]] && [[ -n "$all_tracked_claude" ]]; then
+        tracked_skill_names=$(
+            sed -n "s|^. ${skills_real_relpath}/||p" <<< "$all_tracked_claude" \
+                | cut -d/ -f1 | sort -u || true
+        )
+        if [[ -n "$tracked_skill_names" ]]; then
+            while IFS= read -r skill_name; do
+                # Mark all tracked files in this skill with skip-worktree.
+                tracked_skill_files=$(
+                    sed -n "s/^. //p" <<< "$all_tracked_claude" \
+                        | grep "^${skills_real_relpath}/$skill_name/" || true
+                )
+                if [[ -n "$tracked_skill_files" ]]; then
+                    while IFS= read -r file; do
+                        git -C "$current_dir" update-index --skip-worktree \
+                            "$file" 2> /dev/null || true
+                    done <<< "$tracked_skill_files"
+                fi
+                src="$current_dir/$skills_real_relpath/$skill_name"
+                dest="$current_dir/$skills_real_relpath/p-$skill_name"
+                # Ensure the p-prefixed copy exists. If it doesn't, extract
+                # each file directly from git. `git checkout` won't work
+                # here because skip-worktree makes it a no-op.
+                if [[ ! -d "$dest" ]]; then
+                    if [[ -n "$tracked_skill_files" ]]; then
+                        while IFS= read -r file; do
+                            file_within_skill="${file#"$skills_real_relpath/$skill_name/"}"
+                            dest_file="$dest/$file_within_skill"
+                            mkdir -p "$(dirname "$dest_file")"
+                            git -C "$current_dir" show "HEAD:$file" \
+                                > "$dest_file"
+                        done <<< "$tracked_skill_files"
+                    fi
+                fi
+                # Remove the original if it's still around.
+                rm -rf "$src"
+                # Ensure the p-prefixed directory is in the exclude file.
+                new_rel_dir="$skills_real_relpath/p-$skill_name/"
+                if ! grep -qxF "$new_rel_dir" "$exclude_file" \
+                    2> /dev/null; then
+                    echo "$new_rel_dir" >> "$exclude_file"
+                fi
+            done <<< "$tracked_skill_names"
+        fi
+    fi
+fi
+
 # Always restrict setting sources to user and local.
 harness_args=(--setting-sources user,local "${harness_args[@]}")
 
