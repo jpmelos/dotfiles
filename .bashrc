@@ -49,7 +49,7 @@ export AUTOENV_ENABLE_LEAVE=1
 export AUTOENV_ENV_FILENAME=.autoenv.enter
 export AUTOENV_ENV_LEAVE_FILENAME=.autoenv.leave
 
-source ~/.autoenv/activate.sh
+source ~/devel/autoenv/activate.sh
 
 ################################
 #                              #
