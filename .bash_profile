@@ -69,9 +69,6 @@ export RIPGREP_CONFIG_PATH="$HOME/devel/dotfiles/.config/ripgrep/ripgreprc"
 # 1Password configuration.
 export OP_ACCOUNT=my.1password.com
 
-# Default to Claude Code.
-export AGENTS_HARNESS="claude"
-
 ###############################
 #                             #
 #    Python-specific stuff    #
