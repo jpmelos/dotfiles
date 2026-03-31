@@ -22,21 +22,13 @@ shopt -s histverify no_empty_cmd_completion
 #              #
 ################
 
-run_autoenv_on_init() {
-    if [ -z "$AUTOENV_RAN_ON_INIT" ]; then
-        cd /
-        cd - > /dev/null
-        AUTOENV_RAN_ON_INIT=1
-    fi
-}
-
 BASH_TERMINAL_TITLE="bash"
 reset_terminal_title() {
     echo -ne "\033]0;$BASH_TERMINAL_TITLE\007"
 }
 
 if [[ "$PROMPT_COMMAND" != *"reset_terminal_title"* ]]; then
-    export PROMPT_COMMAND="history -a; history -n; run_autoenv_on_init; reset_terminal_title; ${PROMPT_COMMAND}"
+    export PROMPT_COMMAND="history -a; history -n; reset_terminal_title; ${PROMPT_COMMAND}"
 fi
 
 eval "$(starship init bash)"
