@@ -29,30 +29,37 @@ if [ $# -gt 0 ]; then
     HAS_COMMAND=true
 fi
 
-# Fetch Telegram credentials from 1Password.
-TELEGRAM_BOT_SECRET=$(
-    op item get "Telegram Bot" \
-        --vault "Private" --format json \
-        | jq -r ".fields[0].value"
-)
-if [ -z "$TELEGRAM_BOT_SECRET" ] || [ "$TELEGRAM_BOT_SECRET" = "null" ]; then
-    echo "Error: Failed to fetch Telegram Bot secret from 1Password" >&2
+# Fetch Telegram credentials from ~/config.json.
+config_file="$HOME/config.json"
+if [[ ! -f "$config_file" ]]; then
+    echo "Error: Config file not found at $config_file" >&2
     exit 1
 fi
 
-TELEGRAM_BOT_TOKEN=$(
-    toml get <(echo "$TELEGRAM_BOT_SECRET") . | jq -r ".telegram_bot.bot_token"
-)
-if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ "$TELEGRAM_BOT_TOKEN" = "null" ]; then
-    echo "Error: Failed to parse telegram_bot.bot_id from secret" >&2
+# Verify the file is not readable by group or others.
+file_perms=$(stat -c %a "$config_file" 2> /dev/null \
+    || stat -f %Lp "$config_file" 2> /dev/null)
+if [[ "$file_perms" != "600" ]]; then
+    echo "Error: $config_file has permissions $file_perms, expected 600" >&2
     exit 1
 fi
 
-TELEGRAM_CHAT_ID=$(
-    toml get <(echo "$TELEGRAM_BOT_SECRET") . | jq -r ".telegram_bot.chat_id"
-)
-if [ -z "$TELEGRAM_CHAT_ID" ] || [ "$TELEGRAM_CHAT_ID" = "null" ]; then
-    echo "Error: Failed to parse telegram_bot.channel_id from secret" >&2
+CONFIG=$(< "$config_file")
+
+if ! jq empty <<< "$CONFIG" 2> /dev/null; then
+    echo "Error: $config_file is not valid JSON" >&2
+    exit 1
+fi
+
+TELEGRAM_BOT_TOKEN=$(jq -r '.telegram_bot.bot_token // empty' <<< "$CONFIG")
+if [[ -z "$TELEGRAM_BOT_TOKEN" ]]; then
+    echo "Error: telegram_bot.bot_token not found in $config_file" >&2
+    exit 1
+fi
+
+TELEGRAM_CHAT_ID=$(jq -r '.telegram_bot.chat_id // empty' <<< "$CONFIG")
+if [[ -z "$TELEGRAM_CHAT_ID" ]]; then
+    echo "Error: telegram_bot.chat_id not found in $config_file" >&2
     exit 1
 fi
 
