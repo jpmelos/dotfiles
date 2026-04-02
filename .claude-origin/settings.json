@@ -27,6 +27,8 @@
             "Bash(date *)",
             "Bash(echo)",
             "Bash(echo *)",
+            "Bash(cd)",
+            "Bash(cd *)",
             "Bash(ls)",
             "Bash(ls *)",
             "Bash(grep *)",
