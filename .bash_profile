@@ -63,8 +63,10 @@ export PAGER="less -S"
 # Sets the default editor for various commands.
 export EDITOR="nvim"
 
-# Configure ripgrep to use a configuration file.
-export RIPGREP_CONFIG_PATH="$HOME/devel/dotfiles/.config/ripgrep/ripgreprc"
+# Configure ripgrep to use a configuration file (if not configured yet).
+if [[ -z "${RIPGREP_CONFIG_PATH:-}" ]]; then
+    export RIPGREP_CONFIG_PATH="$HOME/devel/dotfiles/.config/ripgrep/ripgreprc"
+fi
 
 # 1Password configuration.
 export OP_ACCOUNT=my.1password.com
