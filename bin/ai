@@ -35,16 +35,12 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 #/           "api_key": "sk-..."
 #/         },
 #/         "orgname": {
-#/           "api_key": "sk-...",
-#/           "fallback_to_username": bool
+#/           "api_key": "sk-..."
 #/         }
 #/       }
 #/     }
 #/   }
 #/   ```
-#/
-#/   If a profile has `"fallback_to_username": true`, missing API keys fall
-#/   back to the username profile. Otherwise, no fallback is attempted.
 
 # ============================================================================
 # Initial checks and configuration
@@ -530,34 +526,9 @@ elif [ -z "${ANTHROPIC_API_KEY:-}" ]; then
         exit 1
     fi
 
-    # Check if fallback to username profile is allowed.
-    fallback_to_username=$(jq -r --arg p "$profile" \
-        '.claude_code.profiles[$p].fallback_to_username // false' \
+    ANTHROPIC_API_KEY=$(jq -r --arg p "$profile" \
+        '.claude_code.profiles[$p].api_key // empty' \
         <<< "$CONFIG")
-
-    # Even if the profile config allows it, don't fall back if the username
-    # profile is listed in `no_api_key_profiles`.
-    username_skip_api_key=false
-    for no_api_key_profile in "${no_api_key_profiles[@]}"; do
-        if [[ "$username" == "$no_api_key_profile" ]]; then
-            username_skip_api_key=true
-            break
-        fi
-    done
-
-    # Extract API key, falling back to the username profile only if the profile
-    # allows it via `fallback_to_username` and the username profile itself
-    # requires an API key.
-    if [[ "$fallback_to_username" == "true" ]] \
-        && [[ "$username_skip_api_key" != "true" ]]; then
-        ANTHROPIC_API_KEY=$(jq -r --arg p "$profile" --arg u "$username" \
-            '(.claude_code.profiles[$p].api_key // .claude_code.profiles[$u].api_key) // empty' \
-            <<< "$CONFIG")
-    else
-        ANTHROPIC_API_KEY=$(jq -r --arg p "$profile" \
-            '.claude_code.profiles[$p].api_key // empty' \
-            <<< "$CONFIG")
-    fi
 
     if [[ -z "$ANTHROPIC_API_KEY" ]]; then
         echo "Error: No API key found for profile '$profile'" >&2
