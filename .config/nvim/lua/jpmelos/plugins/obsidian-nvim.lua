@@ -7,7 +7,6 @@ return {
         "nvim-lua/plenary.nvim",
         "hrsh7th/nvim-cmp",
         "nvim-telescope/telescope.nvim",
-        "nvim-treesitter/nvim-treesitter",
         "iamcco/markdown-preview.nvim",
     },
     -- Only load when we are in one of the defined workspaces.

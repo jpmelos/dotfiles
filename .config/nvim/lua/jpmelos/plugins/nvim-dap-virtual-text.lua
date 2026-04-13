@@ -1,10 +1,7 @@
 return {
     "theHamsta/nvim-dap-virtual-text",
     lazy = true,
-    dependencies = {
-        "nvim-treesitter/nvim-treesitter",
-        "mfussenegger/nvim-dap",
-    },
+    dependencies = { "mfussenegger/nvim-dap" },
     opts = {
         -- Show value in every definition. This doesn't mean it will show
         -- it for every reference. There's another setting for that.

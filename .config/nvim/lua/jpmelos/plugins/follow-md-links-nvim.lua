@@ -3,5 +3,4 @@
 return {
     "jghauser/follow-md-links.nvim",
     ft = "markdown",
-    dependencies = { "nvim-treesitter/nvim-treesitter" },
 }
