@@ -20,7 +20,9 @@ RUN apt-get update && \
         # JSON processing for status line.
         jq \
         # Arithmetic for status line.
-        bc && \
+        bc \
+        # Required to scrub secrets before calling bash commands.
+        bubblewrap && \
     rm -rf /var/lib/apt/lists/*
 
 # Add Docker's official GPG key and repository.
