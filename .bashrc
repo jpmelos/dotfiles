@@ -450,12 +450,16 @@ pending_devel() {
                 echo ""
                 git status --porcelain | head -n 10 | sed 's/^/    /'
             else
+                local should_pull=true
+
                 local current_branch=$(git rev-parse --abbrev-ref HEAD)
                 local upstream=$(git rev-parse --abbrev-ref --symbolic-full-name @{upstream} 2> /dev/null)
 
                 if [ -n "$upstream" ]; then
                     local ahead=$(git rev-list --count @{upstream}..HEAD)
                     if [ "$ahead" -gt 0 ]; then
+                        local should_pull=false
+
                         echo ""
                         echo -e "* \e[1m$repo_path\e[0m"
                         echo "    $current_branch needs to be pushed, $ahead commit(s) ahead"
@@ -463,6 +467,8 @@ pending_devel() {
                 fi
 
                 if [ "$current_branch" != "$main_branch" ]; then
+                    local should_pull=false
+
                     local main_upstream=$(git for-each-ref --format='%(upstream:short)' refs/heads/"$main_branch" 2> /dev/null)
                     if [ -n "$main_upstream" ]; then
                         local ahead=$(git rev-list --count "$main_upstream".."$main_branch")
@@ -472,6 +478,10 @@ pending_devel() {
                             echo -e "    $main_branch needs to be pushed, $ahead commit(s) ahead"
                         fi
                     fi
+                fi
+
+                if [ "$should_pull" = true ]; then
+                    git pull --quiet
                 fi
             fi
 
