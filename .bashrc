@@ -759,3 +759,76 @@ dk() {
 dcrm() {
     docker compose -p "$1" down
 }
+
+######################################
+#                                    #
+#    1Password local configuration   #
+#                                    #
+######################################
+
+# Manage the "Local Configuration" 1Password note as `~/config.json`.
+jc() {
+    local subcommand="${1:-}"
+
+    if [ -z "$subcommand" ]; then
+        echo "Usage: jc <get|save>"
+        return 1
+    fi
+
+    case "$subcommand" in
+        get)
+            local op_json
+            if ! op_json=$(op item get "Local Configuration" --fields notesPlain --format json 2>&1); then
+                echo "Error: Failed to get 'Local Configuration' from 1Password:" >&2
+                echo "$op_json" >&2
+                return 1
+            fi
+            op_content=$(jq -r '.value' <<< "$op_json")
+            printf '%s' "$op_content" > ~/config.json
+            echo "Saved to ~/config.json."
+            ;;
+        save)
+            local op_json
+            if ! op_json=$(op item get "Local Configuration" --fields notesPlain --format json 2>&1); then
+                echo "Error: Failed to get 'Local Configuration' from 1Password:" >&2
+                echo "$op_json" >&2
+                return 1
+            fi
+            op_content=$(jq -r '.value' <<< "$op_json")
+
+            if [ ! -f ~/config.json ]; then
+                echo "Error: ~/config.json does not exist." >&2
+                return 1
+            fi
+
+            local diff_output
+            diff_output=$(diff <(printf '%s\n' "$op_content") ~/config.json)
+            if [ -z "$diff_output" ]; then
+                echo "No differences found. 1Password is already up to date."
+                return 0
+            fi
+
+            echo "Diff (1Password → local):"
+            echo "$diff_output"
+            echo ""
+            read -r -n 1 -p "Update 1Password with local content? [y/N] "
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                echo "Cancelled."
+                return 0
+            fi
+
+            local local_content
+            local_content=$(cat ~/config.json)
+            if ! op item edit "Local Configuration" "notesPlain=$local_content"; then
+                echo "Error: Failed to update 'Local Configuration' in 1Password." >&2
+                return 1
+            fi
+            echo "Updated 1Password successfully."
+            ;;
+        *)
+            echo "Error: Unknown subcommand '$subcommand'. Use 'get' or 'save'." >&2
+            return 1
+            ;;
+    esac
+}
