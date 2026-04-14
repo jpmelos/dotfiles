@@ -466,9 +466,6 @@ if [[ ! "$profile" =~ ^[a-zA-Z0-9_]([a-zA-Z0-9._-]{0,62}[a-zA-Z0-9_])?$ ]]; then
     echo "Error: Invalid profile name '$profile'" >&2
     exit 1
 fi
-# Profiles that don't require an API key. These profiles rely on other
-# authentication methods (e.g., OAuth).
-no_api_key_profiles=(jpmelos)
 
 # Compute the project name (path relative to ~/devel/).
 project_name="${current_dir#"$devel_dir/"}"
@@ -489,52 +486,37 @@ if [ -n "$aoe_instance_id" ]; then
     echo "Agent of Empires detected: $aoe_instance_id (session: $aoe_session_name)" >&2
 fi
 
-# Fetch API key from ~/config.json if not already provided.
-# Check if this profile skips API key fetching.
-skip_api_key=false
-for no_api_key_profile in "${no_api_key_profiles[@]}"; do
-    if [[ "$profile" == "$no_api_key_profile" ]]; then
-        skip_api_key=true
-        break
-    fi
-done
-
-# Fetch API key from config file if not already set.
-if [[ "$skip_api_key" == "true" ]]; then
-    echo "Skipping API key fetch (profile '$profile' does not require one)" >&2
-elif [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+# Fetch API key from config file if not already set. If no key is found,
+# proceed without one (Claude Code will fall back to OAuth or prompt the user).
+if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
     config_file="$HOME/config.json"
 
-    if [[ ! -f "$config_file" ]]; then
-        echo "Error: Config file not found at $config_file" >&2
-        exit 1
-    fi
+    if [[ -f "$config_file" ]]; then
+        # Verify the file is not readable by group or others.
+        file_perms=$(stat -c %a "$config_file" 2> /dev/null \
+            || stat -f %Lp "$config_file" 2> /dev/null)
+        if [[ "$file_perms" != "600" ]]; then
+            echo "Error: $config_file has permissions $file_perms, expected 600" >&2
+            exit 1
+        fi
 
-    # Verify the file is not readable by group or others.
-    file_perms=$(stat -c %a "$config_file" 2> /dev/null \
-        || stat -f %Lp "$config_file" 2> /dev/null)
-    if [[ "$file_perms" != "600" ]]; then
-        echo "Error: $config_file has permissions $file_perms, expected 600" >&2
-        exit 1
-    fi
+        CONFIG=$(< "$config_file")
 
-    CONFIG=$(< "$config_file")
+        # Validate that we got valid JSON.
+        if ! jq empty <<< "$CONFIG" 2> /dev/null; then
+            echo "Error: $config_file is not valid JSON" >&2
+            exit 1
+        fi
 
-    # Validate that we got valid JSON.
-    if ! jq empty <<< "$CONFIG" 2> /dev/null; then
-        echo "Error: $config_file is not valid JSON" >&2
-        exit 1
-    fi
+        ANTHROPIC_API_KEY=$(jq -r --arg p "$profile" \
+            '.claude_code.profiles[$p].api_key // empty' \
+            <<< "$CONFIG")
 
-    ANTHROPIC_API_KEY=$(jq -r --arg p "$profile" \
-        '.claude_code.profiles[$p].api_key // empty' \
-        <<< "$CONFIG")
-
-    if [[ -z "$ANTHROPIC_API_KEY" ]]; then
-        echo "Error: No API key found for profile '$profile'" >&2
-        exit 1
-    else
-        export ANTHROPIC_API_KEY
+        if [[ -n "$ANTHROPIC_API_KEY" ]]; then
+            export ANTHROPIC_API_KEY
+        else
+            echo "No API key for profile '$profile', skipping" >&2
+        fi
     fi
 fi
 
