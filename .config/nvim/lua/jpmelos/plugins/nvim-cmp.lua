@@ -16,8 +16,12 @@ return {
             -- Configure the snippet engine. This is required, otherwise
             -- `nvim-cmp` may show weird behavior.
             window = {
-                completion = cmp.config.window.bordered(),
-                documentation = cmp.config.window.bordered(),
+                completion = cmp.config.window.bordered({
+                    border = "rounded",
+                }),
+                documentation = cmp.config.window.bordered({
+                    border = "rounded",
+                }),
             },
             mapping = cmp.mapping.preset.insert({
                 -- Trigger the suggestions modal.
