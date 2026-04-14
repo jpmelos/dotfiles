@@ -634,10 +634,31 @@ cp -a "$HOME/.claude-origin/." "$HOME/.claude-$profile"
 
 # Make hard copies of symlinked files before modifying them.
 # This is dereferenced because Claude Code sometimes changes this file, and I
-# don't want those changes to affect my dotfiles.
+# don't want those changes to affect my dotfiles. I also may change it
+# depending on profile settings below.
 dereference "$HOME/.claude-$profile/settings.json"
 # This is dereferenced because I make changes to it just below.
 dereference "$HOME/.claude-$profile/CLAUDE.md"
+
+# Apply the preferred model for the profile from ~/config.json if one is
+# defined.
+model_config_path="$HOME/config.json"
+if [[ -f "$model_config_path" ]]; then
+    preferred_model=$(jq -r --arg p "$profile" \
+        '.claude_code.profiles[$p].model // empty' \
+        "$model_config_path" 2> /dev/null || true)
+    if [[ -n "$preferred_model" ]]; then
+        profile_settings="$HOME/.claude-$profile/settings.json"
+        profile_settings_tmp=$(mktemp)
+        if jq --arg model "$preferred_model" '.model = $model' \
+            "$profile_settings" > "$profile_settings_tmp"; then
+            mv "$profile_settings_tmp" "$profile_settings"
+            echo "Model set to '$preferred_model' for profile '$profile'" >&2
+        else
+            rm -f "$profile_settings_tmp"
+        fi
+    fi
+fi
 
 # Replace the project list marker in CLAUDE.md with the actual project list.
 claude_md_path="$HOME/.claude-$profile/CLAUDE.md"
