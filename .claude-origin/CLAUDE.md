@@ -1,9 +1,9 @@
 # Critical
 
-- *Always* use single backticks for inline code references (Markdown style,
-  e.g., `value`). *Never* use double backticks (reST style, e.g., ``value``).
-  This applies *everywhere*: code comments, chat messages, commit messages,
-  PR descriptions — no exceptions.
+- **SINGLE BACKTICKS ONLY.** Use `` `value` ``, *never* ``` ``value`` ```. This
+  applies *everywhere* without exception: code comments, docstrings, chat
+  messages, commit messages, PR descriptions. Double backticks are reST syntax
+  and must *never* appear in any output you produce.
 
 # General
 
