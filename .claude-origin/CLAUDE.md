@@ -42,8 +42,8 @@
     *Always* use the exact commands above — never call `bash` with the full
     path to the script.
 - To rename or delete files, use `safe_mv` and `safe_rm` instead of `mv` and
-  `rm`. To delete directories, use `safe_rm -r` instead of `rmdir`. The API
-  is otherwise identical.
+  `rm`. To delete directories, use `safe_rm -r` instead of `rmdir`. The API is
+  otherwise identical.
 - To commit, always run `ai_commit Commit message goes here`. Never call
   `git commit` directly.
   - Do not stage files (`git add`) or similar. Just call `ai_commit` and it
