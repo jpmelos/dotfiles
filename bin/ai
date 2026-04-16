@@ -662,15 +662,15 @@ fi
 
 # Replace the project list marker in CLAUDE.md with the actual project list.
 claude_md_path="$HOME/.claude-$profile/CLAUDE.md"
-if grep -qF '<DEPENDENCIES_LIST>' "$claude_md_path" 2> /dev/null; then
+if grep -qF '<!-- DEPENDENCIES_LIST -->' "$claude_md_path" 2> /dev/null; then
     raw_project_list_file=$(mktemp)
     "$devel_dir/dotfiles/bin/list_project_dirs" > "$raw_project_list_file"
     if [[ -s "$raw_project_list_file" ]]; then
         claude_md_tmp=$(mktemp)
         while IFS= read -r line; do
-            if [[ "$line" == *'<DEPENDENCIES_LIST>'* ]]; then
+            if [[ "$line" == *'<!-- DEPENDENCIES_LIST -->'* ]]; then
                 # Extract the indentation from the marker line.
-                indent="${line%%- <DEPENDENCIES_LIST>*}"
+                indent="${line%%<!-- DEPENDENCIES_LIST -->*}"
                 sed "s/^/${indent}- /" "$raw_project_list_file"
             else
                 printf '%s\n' "$line"

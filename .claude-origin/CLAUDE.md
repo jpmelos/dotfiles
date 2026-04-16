@@ -65,4 +65,4 @@
   the owning organization. Use these to inspect dependency interfaces, types,
   or behavior. Always verify the checked-out version is compatible with what
   the current project uses before relying on it.
-  - <DEPENDENCIES_LIST>
+  <!-- DEPENDENCIES_LIST -->
