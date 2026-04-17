@@ -4,14 +4,13 @@
 
 [core]
     editor = nvim
-    pager = delta
+    pager = sh ~/devel/dotfiles/references/scripts/git-pager.sh
 
 [interactive]
     diffFilter = delta --color-only
 
 [delta]
     navigate = true
-    side-by-side = true
     line-numbers = true
 
 [init]
