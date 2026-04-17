@@ -15,12 +15,12 @@ get_diff() {
         return 0
     fi
 
-    local main_branch
     main_branch=$(git main-branch)
 
     diff=$(git diff "$main_branch...")
     git_command="git diff $main_branch..."
     if [ -n "$diff" ]; then
+        commits=$(git log "$main_branch..." --oneline)
         return 0
     fi
 
@@ -30,8 +30,25 @@ get_diff() {
 
 get_diff || exit 1
 
+if [ -n "${commits:-}" ]; then
+    cat << EOF
+The commits since $main_branch were obtained using:
+
+\`\`\`
+git log $main_branch... --oneline
+\`\`\`
+
+=================
+
+$commits
+
+=================
+
+EOF
+fi
+
 cat << EOF
-The changes were obtained using
+The changes were obtained using:
 
 \`\`\`
 $git_command
