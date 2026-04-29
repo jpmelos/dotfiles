@@ -362,7 +362,7 @@ fs() {
     fi
 }
 
-# Start an HTTP server from a directory, optionally specifying the port
+# Start an HTTP server from a directory, optionally specifying the port.
 server() {
     local addr="${1:-0.0.0.0}"
     local port="${2:-8000}"
