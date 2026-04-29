@@ -405,26 +405,6 @@ is_in_path() {
     builtin type -P "$1" &> /dev/null
 }
 
-cme() {
-    ENV_OUTPUT=$(cm --env 2>&1)
-    if [ $? -eq 0 ]; then
-        eval "$ENV_OUTPUT"
-    else
-        echo "Error: Failed to get environment from cm" >&2
-        exit 1
-    fi
-}
-
-oce() {
-    ENV_OUTPUT=$(oc --env 2>&1)
-    if [ $? -eq 0 ]; then
-        eval "$ENV_OUTPUT"
-    else
-        echo "Error: Failed to get environment from oc" >&2
-        exit 1
-    fi
-}
-
 pending_devel() {
     local devel_dir="$HOME/devel"
 
