@@ -661,6 +661,64 @@ change_commit_date() {
     GIT_COMMITTER_DATE="$date" git commit --amend --no-verify --no-edit --date="$date"
 }
 
+format_duration() {
+    local total_seconds="$1"
+
+    local days=$(( total_seconds / 86400 ))
+    local hours=$(( (total_seconds % 86400) / 3600 ))
+    local minutes=$(( (total_seconds % 3600) / 60 ))
+    local secs=$(( total_seconds % 60 ))
+
+    local duration=""
+    if [ "$days" -gt 0 ]; then
+        duration="${days}d${hours}h${minutes}m${secs}s"
+    elif [ "$hours" -gt 0 ]; then
+        duration="${hours}h${minutes}m${secs}s"
+    elif [ "$minutes" -gt 0 ]; then
+        duration="${minutes}m${secs}s"
+    else
+        duration="${secs}s"
+    fi
+
+    echo "$duration"
+}
+export -f format_duration
+
+# If only a time is given (HH:MM or HH:MM:SS), today is assumed. Seconds are optional.
+run_until() {
+    local deadline="$1"
+    shift
+
+    # If only a time is given, prepend today's date.
+    if [[ "$deadline" =~ ^[0-9]{2}:[0-9]{2}(:[0-9]{2})?$ ]]; then
+        deadline="$(date '+%Y-%m-%d') $deadline"
+    fi
+
+    # If seconds are missing, append ":00".
+    if [[ "$deadline" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}\ [0-9]{2}:[0-9]{2}$ ]]; then
+        deadline="$deadline:00"
+    fi
+
+    local deadline_epoch
+    deadline_epoch=$(date -j -f "%Y-%m-%d %H:%M:%S" "$deadline" +%s) || {
+        echo "Invalid date format. Use: YYYY-MM-DD HH:MM[:SS] or HH:MM[:SS]"
+        return 1
+    }
+
+    local now_epoch
+    now_epoch=$(date +%s)
+
+    local seconds_left=$((deadline_epoch - now_epoch))
+
+    if [ "$seconds_left" -le 0 ]; then
+        echo "Deadline already passed"
+        return 1
+    fi
+
+    echo "Running for $(format_duration "$seconds_left")..."
+    timeout "$seconds_left" "$@"
+}
+
 #########################################
 #                                       #
 #    Project navigation with ~/devel    #
