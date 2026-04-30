@@ -720,24 +720,8 @@ run_until() {
 }
 
 pretty_json() {
-    # Prettify a JSON string from stdin, print it, and copy it to the clipboard.
-    #
-    # Usage:
-    #   echo '{"key": "value"}' | pretty_json
-    #
-    # JSON naturally contains double-quotes, which are fine inside single-quoted
-    # shell strings. For JSON containing single-quotes, use a heredoc or
-    # ANSI-C quoting:
-    #
-    #   Heredoc (safest for arbitrary content):
-    #     pretty_json <<'EOF'
-    #     {"key": "it's a \"test\""}
-    #     EOF
-    #
-    #   ANSI-C quoting (escape single-quotes as \'):
-    #     echo $'{"key": "it\'s a test"}' | pretty_json
     local pretty
-    pretty=$(jq '.')
+    pretty=$(pbpaste | jq '.')
     echo "$pretty"
     echo "$pretty" | pbcopy
 }
