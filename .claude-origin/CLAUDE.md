@@ -51,6 +51,7 @@
     `safe_mv .bashrc.temp .bashrc`.
 - To commit, always run `ai_commit Commit message goes here`. Never call
   `git commit` directly.
+  - Only run `ai_commit` when the user explicitly asks for a commit.
   - Do not stage files (`git add`) or similar. Just call `ai_commit` and it
     will include all changes.
   - If the script doesn't exist, assume you are not allowed to create commits.
