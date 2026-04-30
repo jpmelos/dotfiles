@@ -44,6 +44,9 @@
 - To rename or delete files, use `safe_mv` and `safe_rm` instead of `mv` and
   `rm`. To delete directories, use `safe_rm -r` instead of `rmdir`. The API is
   otherwise identical.
+- To find files or directories by name, use `rg --files | rg <pattern>` or
+  `rg --files --glob '<pattern>'`. *Never* use `find` — you don't have
+  permission to run it.
 - If Write or Edit is denied on a file, work via a sibling path and `safe_mv`:
   - To write: create the content at `.bashrc.temp`, then
     `safe_mv .bashrc.temp .bashrc`.
