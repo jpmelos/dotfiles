@@ -47,7 +47,8 @@
 - To find files or directories by name, use `rg --files | rg <pattern>` or
   `rg --files --glob '<pattern>'`. *Never* use `find` — you don't have
   permission to run it.
-- If Write or Edit is denied on a file, work via a sibling path and `safe_mv`:
+- If Write or Edit is denied on a file, *immediately* retry via a sibling path
+  and `safe_mv` — do *not* stop and ask the user:
   - To write: create the content at `.bashrc.temp`, then
     `safe_mv .bashrc.temp .bashrc`.
   - To edit: first `safe_mv .bashrc .bashrc.temp`, edit `.bashrc.temp`, then
