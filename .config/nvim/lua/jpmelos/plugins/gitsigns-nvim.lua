@@ -16,11 +16,17 @@ return {
 
         -- Navigation.
         K("n", "]g", function()
-            gs.nav_hunk("next")
+            gs.nav_hunk("next", { target = "unstaged" })
         end, { desc = "Next hunk" })
         K("n", "[g", function()
-            gs.nav_hunk("prev")
+            gs.nav_hunk("prev", { target = "unstaged" })
         end, { desc = "Previous hunk" })
+        K("n", "]G", function()
+            gs.nav_hunk("next", { target = "staged" })
+        end, { desc = "Next staged hunk" })
+        K("n", "[G", function()
+            gs.nav_hunk("prev", { target = "staged" })
+        end, { desc = "Previous staged hunk" })
 
         -- Actions.
         K("n", "<leader>gs", gs.stage_hunk, { desc = "Stage hunk" })
