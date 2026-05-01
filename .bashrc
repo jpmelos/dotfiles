@@ -415,68 +415,85 @@ pending_devel() {
 
     local current_dir="$(pwd)"
 
-    find_git_repos() {
-        local dir="$1"
+    local -a projects
+    mapfile -t projects < <(list_project_dirs)
+    local total="${#projects[@]}"
 
-        if [ -d "$dir/.git" ]; then
-            cd "$dir"
+    if [ "$total" -eq 0 ]; then
+        echo -e "No projects found in \e[1m~/devel\e[0m."
+        return 0
+    fi
 
-            local main_branch=$(git main-branch)
-            local repo_path="${dir#$devel_dir/}"
+    echo -e "Checking for uncommitted changes in \e[1m~/devel\e[0m repositories ($total projects)..."
 
-            if [ "$(git status --porcelain | wc -l)" -gt 0 ]; then
-                echo ""
-                echo -e "* \e[1m$repo_path\e[0m"
-                echo ""
-                git status --porcelain | head -n 10 | sed 's/^/    /'
-            else
-                local should_pull=true
+    local bar_width=40
+    local index=0
+    local -a findings=()
+    local repo_path
+    for repo_path in "${projects[@]}"; do
+        index=$(( index + 1 ))
 
-                local current_branch=$(git rev-parse --abbrev-ref HEAD)
-                local upstream=$(git rev-parse --abbrev-ref --symbolic-full-name @{upstream} 2> /dev/null)
+        local filled=$(( index * bar_width / total ))
+        local bar=""
+        local i
+        for (( i = 0; i < filled; i++ )); do bar+="="; done
+        for (( i = filled; i < bar_width; i++ )); do bar+=" "; done
+        printf "\r[%s] %d/%d" "$bar" "$index" "$total"
 
-                if [ -n "$upstream" ]; then
-                    local ahead=$(git rev-list --count @{upstream}..HEAD)
-                    if [ "$ahead" -gt 0 ]; then
-                        local should_pull=false
+        cd "$devel_dir/$repo_path"
 
-                        echo ""
-                        echo -e "* \e[1m$repo_path\e[0m"
-                        echo "    $current_branch needs to be pushed, $ahead commit(s) ahead"
-                    fi
-                fi
+        local main_branch
+        main_branch=$(git main-branch)
 
-                if [ "$current_branch" != "$main_branch" ]; then
-                    local should_pull=false
+        if [ "$(git status --porcelain | wc -l)" -gt 0 ]; then
+            local status_output
+            status_output=$(git status --porcelain | head -n 10 | sed 's/^/    /')
+            findings+=("$(printf "* \033[1m%s\033[0m\n\n%s" "$repo_path" "$status_output")")
+        else
+            local should_pull=true
 
-                    local main_upstream=$(git for-each-ref --format='%(upstream:short)' refs/heads/"$main_branch" 2> /dev/null)
-                    if [ -n "$main_upstream" ]; then
-                        local ahead=$(git rev-list --count "$main_upstream".."$main_branch")
-                        if [ "$ahead" -gt 0 ]; then
-                            echo ""
-                            echo -e "* \e[1m$repo_path\e[0m"
-                            echo -e "    $main_branch needs to be pushed, $ahead commit(s) ahead"
-                        fi
-                    fi
-                fi
+            local current_branch
+            current_branch=$(git rev-parse --abbrev-ref HEAD)
+            local upstream
+            upstream=$(git rev-parse --abbrev-ref --symbolic-full-name @{upstream} 2>/dev/null || true)
 
-                if [ "$should_pull" = true ]; then
-                    git pull --quiet
+            if [ -n "$upstream" ]; then
+                local ahead
+                ahead=$(git rev-list --count @{upstream}..HEAD)
+                if [ "$ahead" -gt 0 ]; then
+                    should_pull=false
+                    findings+=("$(printf "* \033[1m%s\033[0m\n    %s needs to be pushed, %d commit(s) ahead" \
+                        "$repo_path" "$current_branch" "$ahead")")
                 fi
             fi
 
-            return
+            if [ "$current_branch" != "$main_branch" ]; then
+                should_pull=false
+
+                local main_upstream
+                main_upstream=$(git for-each-ref --format='%(upstream:short)' refs/heads/"$main_branch" 2>/dev/null)
+                if [ -n "$main_upstream" ]; then
+                    local main_ahead
+                    main_ahead=$(git rev-list --count "$main_upstream".."$main_branch")
+                    if [ "$main_ahead" -gt 0 ]; then
+                        findings+=("$(printf "* \033[1m%s\033[0m\n    %s needs to be pushed, %d commit(s) ahead" \
+                            "$repo_path" "$main_branch" "$main_ahead")")
+                    fi
+                fi
+            fi
+
+            if [ "$should_pull" = true ]; then
+                git pull --quiet
+            fi
         fi
+    done
 
-        for subdir in "$dir"/*; do
-            if [ -d "$subdir" ]; then
-                find_git_repos "$subdir"
-            fi
-        done
-    }
-
-    echo -e "Checking for uncommitted changes in \e[1m~/devel\e[0m repositories..."
-    find_git_repos "$devel_dir"
+    echo ""
+    local finding
+    for finding in "${findings[@]}"; do
+        echo ""
+        printf "%s\n" "$finding"
+    done
 
     cd "$current_dir"
 }
