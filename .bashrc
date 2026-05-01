@@ -664,10 +664,10 @@ change_commit_date() {
 format_duration() {
     local total_seconds="$1"
 
-    local days=$(( total_seconds / 86400 ))
-    local hours=$(( (total_seconds % 86400) / 3600 ))
-    local minutes=$(( (total_seconds % 3600) / 60 ))
-    local secs=$(( total_seconds % 60 ))
+    local days=$((total_seconds / 86400))
+    local hours=$(((total_seconds % 86400) / 3600))
+    local minutes=$(((total_seconds % 3600) / 60))
+    local secs=$((total_seconds % 60))
 
     local duration=""
     if [ "$days" -gt 0 ]; then
