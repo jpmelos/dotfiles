@@ -26,3 +26,7 @@ $character
 disabled = false
 format = '[$symbol\[$status(/$signal_name)\]]($style) '
 symbol = "✘"
+
+[git_status]
+ahead = '↑'
+behind = '↓'
