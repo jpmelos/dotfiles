@@ -431,13 +431,13 @@ pending_devel() {
     local -a findings=()
     local repo_path
     for repo_path in "${projects[@]}"; do
-        index=$(( index + 1 ))
+        index=$((index + 1))
 
-        local filled=$(( index * bar_width / total ))
+        local filled=$((index * bar_width / total))
         local bar=""
         local i
-        for (( i = 0; i < filled; i++ )); do bar+="="; done
-        for (( i = filled; i < bar_width; i++ )); do bar+=" "; done
+        for ((i = 0; i < filled; i++)); do bar+="="; done
+        for ((i = filled; i < bar_width; i++)); do bar+=" "; done
         printf "\r[%s] %d/%d" "$bar" "$index" "$total"
 
         cd "$devel_dir/$repo_path"
@@ -455,7 +455,7 @@ pending_devel() {
             local current_branch
             current_branch=$(git rev-parse --abbrev-ref HEAD)
             local upstream
-            upstream=$(git rev-parse --abbrev-ref --symbolic-full-name @{upstream} 2>/dev/null || true)
+            upstream=$(git rev-parse --abbrev-ref --symbolic-full-name @{upstream} 2> /dev/null || true)
 
             if [ -n "$upstream" ]; then
                 local ahead
@@ -471,7 +471,7 @@ pending_devel() {
                 should_pull=false
 
                 local main_upstream
-                main_upstream=$(git for-each-ref --format='%(upstream:short)' refs/heads/"$main_branch" 2>/dev/null)
+                main_upstream=$(git for-each-ref --format='%(upstream:short)' refs/heads/"$main_branch" 2> /dev/null)
                 if [ -n "$main_upstream" ]; then
                     local main_ahead
                     main_ahead=$(git rev-list --count "$main_upstream".."$main_branch")
