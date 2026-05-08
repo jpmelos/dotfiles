@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+mode="${1:-}"
+case "${mode}" in
+    diff | pr | files | head) ;;
+    *)
+        echo "Usage: review <diff|pr|files|head> [arguments...]" >&2
+        exit 1
+        ;;
+esac
+shift
+
+if [[ "${mode}" == "files" ]]; then
+    checklist_subject="Files are"
+    test_coverage_note=" (Tests may be in other files.)"
+else
+    checklist_subject="Change is"
+    test_coverage_note=""
+fi
+
+if [[ "${mode}" != "files" ]]; then
+    [[ "${mode}" == "head" ]] && artifact="commit" || artifact="PR"
+fi
+
+# Output
+
+case "${mode}" in
+    diff)
+        cat << END
+Review these changes:
+
+$(review_diff)
+END
+        ;;
+    pr)
+        cat << 'END'
+Review the PR referenced at the end of this message.
+
+The PR reference could be one of many things, act accordingly:
+- The branch name.
+  - Find the PR for this branch in the remote server (GitHub, GitLab, etc).
+- The PR URL.
+- The PR number.
+END
+        ;;
+    files)
+        echo "Review the files listed at the end of this message."
+        ;;
+    head)
+        cat << END
+Review these changes:
+
+=================
+
+$(git show HEAD)
+
+=================
+END
+        ;;
+esac
+
+echo
+
+if [[ "${mode}" == "files" ]]; then
+    cat << 'END'
+Provide a detailed explanation about what the contents of the files are about,
+and if you can figure it out, also explain why these files' existences is
+warranted. Feel free to read any files you feel are necessary to assist you in
+a more comprehensive review. Think very hard.
+END
+else
+    cat << 'END'
+Provide a detailed explanation about what the changes are about, and if you can
+figure it out, also explain why the changes would be desirable. Feel free to
+read any files you feel are necessary to assist you in a more comprehensive
+review. Think very hard.
+END
+fi
+
+if [[ "${mode}" != "files" ]]; then
+    cat << END
+
+Finally, provide your own version of:
+- A ${artifact} title, at most 50 characters.
+- A ${artifact} description that is concise and to the point, without excluding any
+  important topics that need to be covered.
+END
+fi
+
+echo
+
+echo "Review checklist:"
+echo "- ${checklist_subject} good and bug-free."
+echo "- Code is simple and readable."
+echo "- Functions and variables are well-named."
+echo "- Proper error handling."
+echo "- No exposed secrets or API keys."
+echo "- Input is validated and sanitized."
+echo "- Good test coverage.${test_coverage_note}"
+echo "- Code should have good performance characteristics."
+
+echo
+
+cat << 'END'
+Provide feedback organized by priority. Feedback items should be numbered
+C1..Cn, W1..Wn, S1..Sn:
+- Critical issues (must fix).
+- Warnings (should fix).
+- Suggestions (consider improving).
+
+Include specific examples of how to fix issues.
+
+Do not run compilers, linters, or tests.
+END

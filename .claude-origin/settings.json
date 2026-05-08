@@ -70,7 +70,7 @@
             "Bash(gh release view *)",
             "Bash(whois *)",
             "Bash(which *)",
-            "Bash(review_diff)",
+            "Bash(review *)",
             "Bash(ai_commit *)",
             "Bash(bash jpenv-bin/lint.bash)",
             "Bash(bash jpenv-bin/lint.bash *)",
