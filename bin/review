@@ -104,7 +104,9 @@ echo "- Code should have good performance characteristics."
 echo
 
 cat << 'END'
-Provide feedback organized by priority. Feedback items should be numbered
+Provide feedback organized by priority. Always include all three sections,
+even if a section has no findings — in that case, explicitly state so (e.g.,
+"There are no critical findings."). Feedback items should be numbered
 C1..Cn, W1..Wn, S1..Sn:
 - Critical issues (must fix).
 - Warnings (should fix).
