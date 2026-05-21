@@ -11,7 +11,8 @@
             "Edit(~/.claude/scripts/**)",
             "Write(/jpenv-bin/**)",
             "Edit(/jpenv-bin/**)",
-            "EnterPlanMode"
+            "EnterPlanMode",
+            "Skill(/review)"
         ],
         "allow": [
             "Glob",
