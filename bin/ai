@@ -817,6 +817,11 @@ fi
 # Always restrict setting sources to user and local.
 harness_args=(--setting-sources user,local "${harness_args[@]}")
 
+# Add all project directories to Claude's context.
+while IFS= read -r relative_project_dir; do
+    harness_args+=(--add-dir "$devel_dir/$relative_project_dir")
+done < <("$devel_dir/dotfiles/bin/list_project_dirs" 2> /dev/null || true)
+
 if [[ "$process_output" == "true" ]]; then
     # Capture output and process it.
     output=$(run_container "${harness_args[@]}")
