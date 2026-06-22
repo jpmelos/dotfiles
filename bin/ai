@@ -279,6 +279,9 @@ run_container() {
         # Make the entire filesystem read-only.
         --read-only
         --tmpfs "/tmp"
+        --env XDG_RUNTIME_DIR="/tmp"
+
+        # Path used to coordinate things that use Claude Code.
         --volume "/tmp/claude-code-shared:/tmp/claude-code-shared"
 
         # Mount the entire `~/devel` directory and set the current directory as

@@ -4,8 +4,10 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         # Enable TLS certificate verification for curl, git, etc.
         ca-certificates \
-        # Download installers.
+        # Download installers (Docker, Claude).
         curl \
+        # We use `npm` to install `agent-browser`.
+        npm \
         # Accurate times in Claude's `/resume`. Need to pass `TZ` into the
         # container.
         tzdata \
@@ -17,11 +19,16 @@ RUN apt-get update && \
         fzf \
         # For reading PRs.
         gh \
+        # `agent-browser` uses Chromium.
+        chromium \
         # JSON processing for status line.
         jq \
         # Arithmetic for status line.
         bc && \
     rm -rf /var/lib/apt/lists/*
+
+# Update `npm`.
+RUN npm install -g npm
 
 # Add Docker's official GPG key and repository.
 RUN install -m 0755 -d /etc/apt/keyrings && \
@@ -42,6 +49,10 @@ RUN apt-get update && \
         docker-ce-cli \
         docker-compose-plugin && \
     rm -rf /var/lib/apt/lists/*
+
+# Install `agent-browser`.
+RUN npm install -g agent-browser
+ENV AGENT_BROWSER_EXECUTABLE_PATH="/usr/bin/chromium"
 
 # Define user and what `HOME` will be for the runtime. Build the image as the
 # same user that will run it. This avoids permission problems with mounts.
