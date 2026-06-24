@@ -1,5 +1,16 @@
 local au = vim.api.nvim_create_autocmd
 
+-- Prevent ftplugins from re-enabling auto line-breaking. Many built-in
+-- ftplugins add 'c' (auto-wrap comments), 't' (auto-wrap text), and 'a'
+-- (auto-format paragraphs) back via `setlocal formatoptions+=...`, overriding
+-- the global setting in options.lua.
+au("FileType", {
+    pattern = "*",
+    callback = function()
+        vim.opt_local.formatoptions:remove({ "c", "t", "a" })
+    end,
+})
+
 -- Check for focus.
 vim.g.nvim_has_focus = true
 au("FocusGained", {

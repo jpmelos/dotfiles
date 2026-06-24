@@ -48,18 +48,18 @@ opt.colorcolumn = { "80" }
 opt.textwidth = 79
 -- Fine-tune formatting.
 -- -t: Automatically format text. Do not enable when working with code.
--- +c: Automatically format comments.
+-- -c: Automatically format comments. Disabled to prevent auto line-breaking.
 -- +r: Automatically add comment leader upon <Enter> in insert mode.
--- +o: Automatically insert comment leader if using "o" or "O" for new line in a
---     comment in normal mode.
--- +/: Only insert comment leader in next line if comment is the entire line. Do
---     not continue a comment that started after a statement in the preceding
---     line.
+-- +o: Automatically insert comment leader if using "o" or "O" for new line in
+--     a comment in normal mode.
+-- +/: Only insert comment leader in next line if comment is the entire line.
+--     Do not continue a comment that started after a statement in the
+--     preceding line.
 -- +q: Allow formatting with `gq`.
 -- -w: A trailing white space at the end of a line indicates the paragraph
 --     continues in the next line. In other words, it behaves like an empty
 --     line normally would.
--- +a: Automatically format paragraphs. If 'c' is used, this only happens for
+-- -a: Automatically format paragraphs. If 'c' is used, this only happens for
 --     recognized comments.
 -- +n: Consider lists, as they are defined in `formatlistpat`. Should not be
 --     used with '2'.
@@ -79,7 +79,7 @@ opt.textwidth = 79
 -- +j: Remove comment leader when joining lines.
 -- -p: Don't break lines at '.' followed by just one space. This is good for
 --     people who put two spaces after periods, which I don't.
-opt.formatoptions = "cro/qn]j"
+opt.formatoptions = "ro/qn]j"
 -- Use Vim's default formatter.
 opt.formatexpr = ""
 -- Use Vim's default formatter.
