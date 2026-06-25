@@ -15,6 +15,7 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 #/   --no-rebuild      Skip rebuilding image even if outdated
 #/   --allow-stale     If build fails, use existing image (fatal if none
 #/                     exists)
+#/   --verbose         Print the Docker command before running it
 #/   --help            Show this help
 #/
 #/ Arguments after `--` are passed directly to Claude Code.
@@ -87,6 +88,7 @@ force_rebuild=false
 no_build_cache=false
 no_rebuild=false
 allow_stale=false
+verbose=false
 show_help=false
 harness_print_mode=false
 harness_json_output=false
@@ -121,6 +123,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --allow-stale)
             allow_stale=true
+            shift
+            ;;
+        --verbose)
+            verbose=true
             shift
             ;;
         --help)
@@ -387,6 +393,11 @@ run_container() {
     )
 
     echo "Running container..." >&2
+
+    if [[ "$verbose" == "true" ]]; then
+        echo "Command:" >&2
+        printf '  %q\n' "${cmd[@]}" >&2
+    fi
 
     if [[ "$use_exec" == "true" ]]; then
         exec "${cmd[@]}"
