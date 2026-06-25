@@ -21,7 +21,7 @@ vim.g.formatters_by_ft = {
     javascript = { "prettier" },
     typescript = { "prettier" },
     -- Writing.
-    markdown = { "mdformat" },
+    markdown = { "mdformat", "injected" },
     -- Configuration.
     yaml = { "prettier" },
     toml = { "taplo" },
