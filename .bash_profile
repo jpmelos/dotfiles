@@ -19,6 +19,7 @@
 # here is the one with the highest priority.
 # Binaries installed by Homebrew.
 if [ "$(uname -s)" = "Darwin" ]; then
+    field_prepend PATH /opt/homebrew/sbin
     field_prepend PATH /opt/homebrew/bin
 fi
 # Binaries not managed via a package manager.
