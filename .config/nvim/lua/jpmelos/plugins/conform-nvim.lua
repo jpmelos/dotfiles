@@ -31,7 +31,7 @@
 
 vim.g.inside_format_cb = false
 
-local function do_format(conform, range)
+local function do_format(conform, range, opts)
     local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
     if #lines == 0 then
         return
@@ -152,12 +152,23 @@ local function do_format(conform, range)
         end
     end
 
-    local bufnr = vim.api.nvim_get_current_buf()
-    conform.format({
+    local format_opts = {
         async = true,
         lsp_format = "never",
         range = range,
-    }, function()
+    }
+
+    -- Use `mdformat_nowrap` instead of `mdformat` so paragraphs are joined
+    -- into a single line each, instead of being wrapped at the configured
+    -- line length. This is meant for text that will be pasted elsewhere,
+    -- like a browser input, where line breaks inside a paragraph aren't
+    -- wanted.
+    if opts and opts.no_wrap and vim.bo.filetype == "markdown" then
+        format_opts.formatters = { "mdformat_nowrap", "injected" }
+    end
+
+    local bufnr = vim.api.nvim_get_current_buf()
+    conform.format(format_opts, function()
         vim.api.nvim_buf_call(bufnr, function()
             cb()
         end)
@@ -199,6 +210,14 @@ return {
                 "--case-indent",
                 "--space-redirects",
             },
+        }
+        -- Same as `mdformat`, but with `--wrap no`, which overrides the
+        -- `wrap` setting from `.mdformat.toml` and joins each paragraph into
+        -- a single line, instead of wrapping it at the configured line
+        -- length.
+        conform.formatters.mdformat_nowrap = {
+            command = "mdformat",
+            args = { "--wrap", "no", "-" },
         }
 
         -- ButWritePost: After saving a buffer.
@@ -361,6 +380,22 @@ return {
             NormalMode()
         end, { desc = "Format" })
 
+        api.nvim_create_user_command("FormatMarkdownNoWrap", function()
+            local range = nil
+
+            local lines = GetVisualSelectionLines()
+            if lines ~= nil then
+                range = {
+                    start = { lines[1], 0 },
+                    ["end"] = { lines[2], 99999 },
+                }
+            end
+
+            do_format(conform, range, { no_wrap = true })
+
+            NormalMode()
+        end, { desc = "Format Markdown without wrapping lines" })
+
         api.nvim_create_user_command("FormatToggle", function(args)
             if args.bang then
                 if b.enable_autoformat then
@@ -408,6 +443,18 @@ return {
 
         K("n", "<leader>pf", "<cmd>Format<CR>", { desc = "Format file" })
         K("v", "<leader>pf", "<cmd>Format<CR>", { desc = "Format selection" })
+        K(
+            "n",
+            "<leader>pm",
+            "<cmd>FormatMarkdownNoWrap<CR>",
+            { desc = "Prettify Markdown file (no line wrapping)" }
+        )
+        K(
+            "v",
+            "<leader>pm",
+            "<cmd>FormatMarkdownNoWrap<CR>",
+            { desc = "Prettify Markdown selection (no line wrapping)" }
+        )
         K(
             { "n" },
             "<leader>pe",
