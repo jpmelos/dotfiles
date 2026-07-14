@@ -4,10 +4,8 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         # Enable TLS certificate verification for curl, git, etc.
         ca-certificates \
-        # Download installers (Docker, Claude).
+        # Download installers (Node.js, Docker, Claude).
         curl \
-        # We use `npm` to install `agent-browser`.
-        npm \
         # Accurate times in Claude's `/resume`. Need to pass `TZ` into the
         # container.
         tzdata \
@@ -27,8 +25,10 @@ RUN apt-get update && \
         bc && \
     rm -rf /var/lib/apt/lists/*
 
-# Update `npm`.
-RUN npm install -g npm
+# Install Node.js from Nodesource.
+RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash && \
+    apt-get install -y nodejs && \
+    rm -rf /var/lib/apt/lists/*
 
 # Add Docker's official GPG key and repository.
 RUN install -m 0755 -d /etc/apt/keyrings && \
@@ -78,8 +78,6 @@ RUN test -n "${BUILD_DATE}" && echo "Build date: ${BUILD_DATE}"
 # Install Claude Code.
 ARG CLAUDE_CODE_CHANNEL="latest"
 RUN test -n "${CLAUDE_CODE_CHANNEL}" && \
-    curl -fsSL https://claude.ai/install.sh -o claude-install.sh && \
-    bash claude-install.sh "${CLAUDE_CODE_CHANNEL}" && \
-    rm claude-install.sh
+    curl -fsSL https://claude.ai/install.sh | bash -s "${CLAUDE_CODE_CHANNEL}"
 
 ENTRYPOINT ["claude"]
