@@ -5,11 +5,8 @@
     "permissions": {
         "defaultMode": "dontAsk",
         "deny": [
-            "Write(~/.claude/settings.json)",
             "Edit(~/.claude/settings.json)",
-            "Write(~/.claude/scripts/**)",
             "Edit(~/.claude/scripts/**)",
-            "Write(/jpenv-bin/**)",
             "Edit(/jpenv-bin/**)",
             "EnterPlanMode",
             "Skill(/review)"
