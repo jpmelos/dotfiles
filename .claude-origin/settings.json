@@ -73,7 +73,9 @@
             "Bash(bash jpenv-bin/lint.bash)",
             "Bash(bash jpenv-bin/lint.bash *)",
             "Bash(bash jpenv-bin/tests.bash)",
-            "Bash(bash jpenv-bin/tests.bash *)"
+            "Bash(bash jpenv-bin/tests.bash *)",
+            "mcp__linear-server__get_issue",
+            "mcp__linear-server__list_comments"
         ]
     },
     "hooks": {
