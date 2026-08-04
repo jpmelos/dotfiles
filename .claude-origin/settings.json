@@ -162,6 +162,7 @@
         ]
     },
     "alwaysThinkingEnabled": true,
+    "disableBundledSkills": true,
     "disableBypassPermissionsMode": true,
     "includeGitInstructions": false,
     "spinnerTipsEnabled": false,
