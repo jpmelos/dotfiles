@@ -773,7 +773,8 @@ x() {
 
 # Docker aliases.
 alias d='docker'
-alias dps="docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
+alias dps="docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
+alias dpsa="docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
 alias drm="docker rm -f"
 alias drma='docker rm -f $(docker ps -aq)'
 alias dpause='docker pause $(docker ps -aq)'
@@ -781,7 +782,8 @@ alias dunpause='docker unpause $(docker ps -aq)'
 
 # Docker Compose aliases.
 alias dc='docker compose'
-alias dcps="docker compose ps -a --format 'table {{.Name}}\t{{.Service}}\t{{.Status}}\t{{.Ports}}'"
+alias dcps="docker compose ps --format 'table {{.Name}}\t{{.Service}}\t{{.Status}}\t{{.Ports}}'"
+alias dcpsa="docker compose ps -a --format 'table {{.Name}}\t{{.Service}}\t{{.Status}}\t{{.Ports}}'"
 alias dcls="docker compose ls"
 dcrm() { # Drop an active Docker Compose environment.
     docker compose -p "$1" down
