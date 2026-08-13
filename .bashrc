@@ -138,10 +138,12 @@ alias gnuke='g nuke'
 alias ga='g a'
 alias gan='g an'
 alias gaa='g aa'
+alias gana='g ana'
 alias gapa='g apa'
 __git_complete ga git_add
 __git_complete gan git_add
 __git_complete gaa git_add
+__git_complete gana git_add
 __git_complete gapa git_add
 
 alias gb='g b'

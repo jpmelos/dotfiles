@@ -110,7 +110,8 @@
     # a = add
     a = add
     an = add -N
-    aa = add -A :/
+    aa = add -A
+    ana = add -AN
     apa = add --patch
 
     # b = branch
