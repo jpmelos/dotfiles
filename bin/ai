@@ -302,7 +302,9 @@ run_container() {
         # Some binaries that my agents need.
         --volume "$devel_dir/dotfiles/bin/safe_mv:/usr/local/bin/safe_mv:ro"
         --volume "$devel_dir/dotfiles/bin/safe_rm:/usr/local/bin/safe_rm:ro"
-        --volume "$devel_dir/dotfiles/bin/ai_commit:/usr/local/bin/ai_commit:ro"
+        --volume "$devel_dir/dotfiles/bin/ai_git_add:/usr/local/bin/ai_git_add:ro"
+        --volume "$devel_dir/dotfiles/bin/ai_git_restore:/usr/local/bin/ai_git_restore:ro"
+        --volume "$devel_dir/dotfiles/bin/ai_git_commit:/usr/local/bin/ai_git_commit:ro"
         --volume "$devel_dir/dotfiles/bin/review:/usr/local/bin/review:ro"
         --volume "$devel_dir/dotfiles/bin/review_diff:/usr/local/bin/review_diff:ro"
 

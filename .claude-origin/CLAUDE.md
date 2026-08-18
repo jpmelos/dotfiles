@@ -53,12 +53,21 @@
     `safe_mv .bashrc.temp .bashrc`.
   - To edit: first `safe_mv .bashrc .bashrc.temp`, edit `.bashrc.temp`, then
     `safe_mv .bashrc.temp .bashrc`.
-- To commit, always run `ai_commit Commit message goes here`. Never call
-  `git commit` directly.
-  - Only run `ai_commit` when the user explicitly asks for a commit.
-  - Do not stage files (`git add`) or similar. Just call `ai_commit` and it
-    will include all changes.
-  - If the script doesn't exist, assume you are not allowed to create commits.
+- To manage the Git staging area and to commit, use these commands. Never
+  call `git add`, `git restore`, or `git commit` directly.
+  - To stage files, run `ai_git_add <path> ...`. It relays all arguments to
+    `git add`.
+  - To empty the staging area, run `ai_git_restore`. It takes no arguments.
+    If you stage the wrong files, run this command and stage them again from
+    zero.
+  - To commit, run `ai_git_commit Commit message goes here`. This commits
+    only the contents of the staging area.
+  - To stage all changes and commit them in one step, run
+    `ai_git_commit -a Commit message goes here`.
+  - Only run any of these commands when the user explicitly asks for a commit.
+  - *Never* delete a commit. Only a human can undo a commit.
+  - If one of these scripts doesn't exist, assume that you are not allowed to
+    do the related action.
 - Use the `gh` CLI to interact with GitHub URLs and repositories.
   - Use `gh --help` for help.
   - Use `git remote --verbose` to check if the repository is on GitHub.

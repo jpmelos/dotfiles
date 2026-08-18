@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# This is a commit command that AI agents can run safely.
+# Run it like `ai_git_commit This is the commit message.` to commit whatever is
+# in the staging area.
+# Pass `-a` as the first argument to stage every change before the commit, like
+# `ai_git_commit -a This is the commit message.`.
+
+stage_everything=false
+if [ "${1-}" = "-a" ]; then
+    stage_everything=true
+    shift
+fi
+
+if [ $# -eq 0 ]; then
+    echo "Error: Commit message is required" >&2
+    exit 1
+fi
+
+if [ "$stage_everything" = true ]; then
+    git add -A :/
+fi
+
+git commit --no-gpg-sign --allow-empty -m "$*"

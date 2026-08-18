@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# This empties the Git staging area, so that AI agents can manage it again from
+# zero. It takes no arguments.
+# Run it like `ai_git_restore`.
+
+if [ $# -ne 0 ]; then
+    echo "Error: This command takes no arguments" >&2
+    exit 1
+fi
+
+exec git restore --staged :/

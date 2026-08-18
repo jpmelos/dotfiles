@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# This lets AI agents add files to the Git staging area. Every argument goes to
+# `git add` without a change.
+# Run it like `ai_git_add src/main.rs`.
+
+if [ $# -eq 0 ]; then
+    echo "Error: At least one argument is required" >&2
+    exit 1
+fi
+
+exec git add "$@"
