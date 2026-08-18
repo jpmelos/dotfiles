@@ -36,7 +36,7 @@ END
         ;;
     pr)
         cat << 'END'
-Review the PR referenced at the end of this message.
+Review the PR referenced near the end of this message.
 
 The PR reference could be one of many things, act accordingly:
 - The branch name.
@@ -46,7 +46,7 @@ The PR reference could be one of many things, act accordingly:
 END
         ;;
     files)
-        echo "Review the files listed at the end of this message."
+        echo "Review the files listed near the end of this message."
         ;;
     head)
         cat << END
@@ -115,4 +115,35 @@ C1..Cn, W1..Wn, S1..Sn:
 Include specific examples of how to fix issues.
 
 Do not run compilers, linters, or tests.
+END
+
+echo
+
+case "${mode}" in
+    diff | head)
+        cat << 'END'
+This message ends with additional instructions from the user. The additional
+instructions can be empty.
+END
+        ;;
+    pr)
+        cat << 'END'
+This message ends with the PR reference. A "--" separator can come after the PR
+reference. If the separator is there, the text after it gives additional
+instructions from the user.
+END
+        ;;
+    files)
+        cat << 'END'
+This message ends with the list of files to review. A "--" separator can come
+after the list. If the separator is there, the text after it gives additional
+instructions from the user.
+END
+        ;;
+esac
+
+cat << 'END'
+If there are additional instructions, follow them. If the additional
+instructions conflict with the instructions above, the additional instructions
+have priority.
 END
