@@ -19,6 +19,10 @@
 
 # Code Style
 
+- Document only the code that exists *now*. *Never* write comments or
+  docstrings about planned work, future features, or concepts that are not in
+  the codebase yet. A reader who sees only the current code, and knows nothing
+  about the plan behind it, must understand the text fully.
 - Prefer descriptive variable names over shorter ones (e.g., `thread_id`
   instead of `tid`). The only exceptions are very short for-loops, Python
   comprehensions, or similar structures.
