@@ -49,6 +49,25 @@
   - If either script doesn't exist, report that you can't perform the action.
     *Always* use the exact commands above — never call `bash` with the full
     path to the script.
+- *Never* run an `ai_git_*` command unless the user explicitly asks for that
+  exact action. Staging and committing belong to the user alone. Leave your
+  work unstaged and report what you changed instead.
+- When the user asks you to stage or to commit, use these commands. *Never*
+  call `git add`, `git restore`, or `git commit` directly.
+  - To stage files, run `ai_git_add <path> ...`. It relays all arguments to
+    `git add`.
+  - To empty the staging area, run `ai_git_restore`. It takes no arguments.
+    If you stage the wrong files, run this command and stage them again from
+    zero.
+  - To commit, run `ai_git_commit Commit message goes here`. This commits
+    only the contents of the staging area.
+  - To stage all changes and commit them in one step, run
+    `ai_git_commit -a Commit message goes here`.
+  - *Never* delete a commit. Only a human can undo a commit.
+  - If one of these scripts doesn't exist, assume that you are not allowed to
+    do the related action.
+- Read-only Git commands need no permission. For example, use
+  `git remote --verbose` to check in which service the repository is hosted on.
 - To rename or delete files, use `safe_mv` and `safe_rm` instead of `mv` and
   `rm`. To delete directories, use `safe_rm -r` instead of `rmdir`. The API is
   otherwise identical.
@@ -61,23 +80,6 @@
     `safe_mv .bashrc.temp .bashrc`.
   - To edit: first `safe_mv .bashrc .bashrc.temp`, edit `.bashrc.temp`, then
     `safe_mv .bashrc.temp .bashrc`.
-- To manage the Git staging area and to commit, use these commands. Never
-  call `git add`, `git restore`, or `git commit` directly.
-  - To stage files, run `ai_git_add <path> ...`. It relays all arguments to
-    `git add`.
-  - To empty the staging area, run `ai_git_restore`. It takes no arguments.
-    If you stage the wrong files, run this command and stage them again from
-    zero.
-  - To commit, run `ai_git_commit Commit message goes here`. This commits
-    only the contents of the staging area.
-  - To stage all changes and commit them in one step, run
-    `ai_git_commit -a Commit message goes here`.
-  - Only run any of these commands when the user explicitly asks for a commit.
-  - *Never* delete a commit. Only a human can undo a commit.
-  - If one of these scripts doesn't exist, assume that you are not allowed to
-    do the related action.
-- Use `git remote --verbose` to check in which service the repository is hosted
-  on.
 - When a tool call or command is denied due to permissions, read
   `~/.claude/settings.json` to discover which alternatives are allowed.
 
