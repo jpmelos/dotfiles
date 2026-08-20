@@ -1,4 +1,4 @@
-# vim: set ft=sh :
+# vim: ft=sh
 
 __git_nuke() {
     git checkout -f "$(git main-branch)"
