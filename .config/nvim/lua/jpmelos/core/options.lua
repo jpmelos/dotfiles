@@ -1,5 +1,8 @@
 local opt = vim.opt
 
+-- Check first and last 100 lines for modelines.
+opt.modelines = 100
+
 -- Disable swapfiles.
 opt.swapfile = false
 
