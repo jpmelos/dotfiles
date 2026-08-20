@@ -1,872 +1,1656 @@
-#!/usr/bin/env bash
-set -euo pipefail
-trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
 
-#/ Run Claude Code inside a Docker container.
-#/
-#/ Usage: ai [options] [-- harness-args...]
-#/ Options:
-#/   --profile <name>  Specify profile for API key lookup (default: auto-detect
-#/                     from path, first component after `~/devel`)
-#/   --process-output  Capture and process output (requires `--print` and
-#/                     `--output-format json` in harness args)
-#/   --force-rebuild   Force rebuild of Docker image
-#/   --no-build-cache  Build from scratch without using cache
-#/   --no-rebuild      Skip rebuilding image even if outdated
-#/   --allow-stale     If build fails, use existing image (fatal if none
-#/                     exists)
-#/   --verbose         Print the Docker command before running it
-#/   --help            Show this help
-#/
-#/ Arguments after `--` are passed directly to Claude Code.
-#/
-#/ If run outside of ~/devel or from ~/devel itself (not in a project),
-#/ defaults to ~/devel/dotfiles as the working directory.
-#/
-#/ Configuration:
-#/   Expects a configuration file at `~/config.json` (requires `chmod 600`)
-#/   with API keys and other configuration.
-#/
-#/   Configuration format:
-#/   ```
-#/   {
-#/     "claude_code": {
-#/       "profiles": {
-#/         "username": {
-#/           "api_key": "sk-...",
-#/           "model": "opus",
-#/           "mcp_servers": {
-#/             "server-name": {"command": "...", "args": ["..."]}
-#/           }
-#/         },
-#/         "orgname": {
-#/           "api_key": "sk-..."
-#/         }
-#/       }
-#/     }
-#/   }
-#/   ```
-#/
-#/   The `mcp_servers` object of a profile replaces the `mcpServers` key in
-#/   that profile's `.claude.json`.
+# vim: ft=python
+
+# / Run Claude Code inside a Docker container.
+# /
+# / Usage: ai [options] [-- harness-args...]
+# / Options:
+# /   --profile <name>  Specify profile for API key lookup (default: auto-detect
+# /                     from path, first component after `~/devel`)
+# /   --channel <name>  Claude Code release channel to install in the image
+# /                     (default: `latest`). The channel is part of the image
+# /                     tag, so each channel gets its own image, and a switch
+# /                     to another channel builds that image.
+# /   --process-output  Capture and process output (requires `--print` and
+# /                     `--output-format json` in harness args)
+# /   --force-rebuild   Force rebuild of Docker image
+# /   --no-build-cache  Build from scratch without using cache
+# /   --no-rebuild      Skip rebuilding image even if outdated
+# /   --allow-stale     If build fails, use existing image (fatal if none
+# /                     exists)
+# /   --no-docker-socket
+# /                     Do not mount the host Docker socket into the container
+# /   --verbose         Print the Docker command before running it
+# /   --help            Show this help
+# /
+# / Arguments after `--` are passed directly to Claude Code.
+# /
+# / If run outside of ~/devel or from ~/devel itself (not in a project),
+# / defaults to ~/devel/dotfiles as the working directory.
+# /
+# / Security:
+# /   The container runs read-only, with an explicit list of mounts. This
+# /   limits mistakes. It is not a security boundary.
+# /
+# /   By default the host Docker socket is mounted and the container joins
+# /   group 0. Any process in the container can then start a privileged
+# /   container and take control of the host. Use `--no-docker-socket` for
+# /   repositories that you do not trust. Docker is then unavailable inside
+# /   the container.
+# /
+# /   Two host directories under `/tmp` carry state between the container and
+# /   the host. Any local user can read them. That is on purpose. Nothing
+# /   secret goes there.
+# /
+# / Project-local agent assets:
+# /   Tracked commands and skills under the project's `.claude` directory get a
+# /   `p-` prefix, so they do not shadow the user-level ones. The content of
+# /   each prefixed copy comes from `HEAD`. The originals get `--skip-worktree`
+# /   and the copies go into `.git/info/exclude`.
+# /
+# /   An untracked file under one of these directories stops the launcher. The
+# /   file is absent from `HEAD`, so there is no reviewed content to copy from,
+# /   and it would keep its own name and shadow a user-level command or skill.
+# /   Run `git add -N <path>` to put it in the index without its content. Then
+# /   review it and commit it.
+# /
+# /   This is one way on purpose. Nothing here restores the working tree. To
+# /   undo it by hand, run `git update-index --no-skip-worktree <path>` and
+# /   then `git checkout -- <path>`.
+# /
+# / Configuration:
+# /   Expects a configuration file at `~/config.json` (requires `chmod 600`)
+# /   with API keys and other configuration.
+# /
+# /   Configuration format:
+# /   ```
+# /   {
+# /     "claude_code": {
+# /       "profiles": {
+# /         "username": {
+# /           "api_key": "sk-...",
+# /           "model": "opus",
+# /           "mcp_servers": {
+# /             "server-name": {"command": "...", "args": ["..."]}
+# /           }
+# /         },
+# /         "orgname": {
+# /           "api_key": "sk-..."
+# /         }
+# /       }
+# /     }
+# /   }
+# /   ```
+# /
+# /   Every key is optional. Without `api_key`, Claude Code falls back to OAuth
+# /   credentials or asks the user to log in. Without `model`, the profile keeps
+# /   the model from its own `settings.json`. Without `mcp_servers`, the profile
+# /   keeps the `mcpServers` key that is already in its `.claude.json`.
+# /
+# /   The `mcp_servers` object of a profile replaces the `mcpServers` key in
+# /   that profile's `.claude.json`.
+
+import json
+import os
+import pwd
+import re
+import shlex
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+from dataclasses import dataclass, field
+from datetime import datetime
+from decimal import ROUND_CEILING, ROUND_DOWN, Decimal
+
+_MISSING = object()
+
+# The channel to install when the user names none. It is part of the image tag,
+# so it must be a concrete value and not an empty string.
+DEFAULT_CHANNEL = "latest"
+
+# ============================================================================
+# Small utilities
+# ============================================================================
+
+
+def echo_err(message):
+    """Print a message to standard error."""
+    print(message, file=sys.stderr, flush=True)
+
+
+def die(message, *, code=1):
+    """Print a message to standard error and exit."""
+    echo_err(message)
+    sys.exit(code)
+
+
+def strip_leading_path(path, prefix):
+    """Remove `prefix/` from the start of `path` if it is there."""
+    if path.startswith(prefix + "/"):
+        return path[len(prefix) + 1 :]
+    return path
+
+
+def read_text(path):
+    with open(path, encoding="utf-8") as handle:
+        return handle.read()
+
+
+def write_text_atomically(path, content):
+    """Write text through a temporary file in the same directory.
+
+    A write in place follows a symlink at `path` and changes the file that the
+    link points to. The rename replaces the link instead.
+
+    `tempfile.mkstemp` creates the temporary file with mode `0600`, so the
+    result carries that mode. Every caller here writes a file that only the
+    user must read.
+    """
+    directory = os.path.dirname(path) or "."
+    descriptor, temp_path = tempfile.mkstemp(dir=directory)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(content)
+        os.replace(temp_path, path)
+    except BaseException:
+        remove_file(temp_path)
+        raise
+
+
+def read_json_file(path):
+    with open(path, encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def write_json_file(path, data):
+    """Write JSON the way `jq` does, through a temporary file."""
+    write_text_atomically(path, json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+
+
+def remove_file(path):
+    """Remove a file or a symlink. Do nothing if it does not exist."""
+    try:
+        os.unlink(path)
+    except FileNotFoundError:
+        pass
+
+
+def remove_path(path):
+    """Remove a file, a symlink, or a directory tree."""
+    if os.path.isdir(path) and not os.path.islink(path):
+        shutil.rmtree(path)
+    else:
+        os.unlink(path)
+
+
+def profile_setting(config, profile, key):
+    """Read `.claude_code.profiles[profile][key]` from the configuration.
+
+    Return `_MISSING` when any step of the path is absent.
+    """
+    node = config
+    for step in ("claude_code", "profiles", profile):
+        node = node.get(step)
+        if not isinstance(node, dict):
+            return _MISSING
+    return node.get(key, _MISSING)
+
+
+def is_number(value):
+    """Check whether a JSON value is a number."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
 
 # ============================================================================
 # Initial checks and configuration
 # ============================================================================
 
-if [ -z "${BASH_VERSION:-}" ]; then
-    echo "Error: This script requires bash" >&2
-    exit 1
-fi
 
-if ! command -v docker &> /dev/null; then
-    echo "Error: Docker is not installed" >&2
-    exit 1
-fi
+def check_requirements():
+    if shutil.which("docker") is None:
+        die("Error: Docker is not installed")
 
-if ! docker info &> /dev/null; then
-    echo "Error: Docker daemon is not running" >&2
-    exit 1
-fi
+    # `docker version` reaches the daemon and returns much faster than
+    # `docker info`, which collects the full system report.
+    docker_probe = subprocess.run(
+        ["docker", "version", "--format", "{{.Server.Version}}"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if docker_probe.returncode != 0:
+        die("Error: Docker daemon is not running")
 
-if ! command -v bc &> /dev/null; then
-    echo "Error: bc is not installed" >&2
-    exit 1
-fi
 
-if ! command -v jq &> /dev/null; then
-    echo "Error: jq is not installed" >&2
-    exit 1
-fi
+@dataclass
+class Options:
+    profile: str = ""
+    channel: str = ""
+    process_output: bool = False
+    force_rebuild: bool = False
+    no_build_cache: bool = False
+    no_rebuild: bool = False
+    allow_stale: bool = False
+    no_docker_socket: bool = False
+    verbose: bool = False
+    show_help: bool = False
+    harness_print_mode: bool = False
+    harness_json_output: bool = False
+    harness_args: list = field(default_factory=list)
 
-if ! command -v realpath &> /dev/null; then
-    echo "Error: realpath is not installed" >&2
-    exit 1
-fi
 
-if ! command -v shuf &> /dev/null; then
-    echo "Error: shuf is not installed" >&2
-    exit 1
-fi
+def parse_options(argv):
+    options = Options()
 
-profile=""
-process_output=false
-force_rebuild=false
-no_build_cache=false
-no_rebuild=false
-allow_stale=false
-verbose=false
-show_help=false
-harness_print_mode=false
-harness_json_output=false
-harness_args=()
+    flags = {
+        "--process-output": "process_output",
+        "--force-rebuild": "force_rebuild",
+        "--no-build-cache": "no_build_cache",
+        "--no-rebuild": "no_rebuild",
+        "--allow-stale": "allow_stale",
+        "--no-docker-socket": "no_docker_socket",
+        "--verbose": "verbose",
+        "--help": "show_help",
+    }
 
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --profile)
-            shift
-            if [[ $# -eq 0 ]]; then
-                echo "Error: --profile requires an argument" >&2
-                exit 1
-            fi
-            profile="$1"
-            shift
-            ;;
-        --process-output)
-            process_output=true
-            shift
-            ;;
-        --force-rebuild)
-            force_rebuild=true
-            shift
-            ;;
-        --no-build-cache)
-            no_build_cache=true
-            shift
-            ;;
-        --no-rebuild)
-            no_rebuild=true
-            shift
-            ;;
-        --allow-stale)
-            allow_stale=true
-            shift
-            ;;
-        --verbose)
-            verbose=true
-            shift
-            ;;
-        --help)
-            show_help=true
-            shift
-            ;;
-        --)
-            shift
-            harness_args=("$@")
+    value_options = {
+        "--profile": "profile",
+        "--channel": "channel",
+    }
+
+    index = 0
+    while index < len(argv):
+        argument = argv[index]
+        if argument in value_options:
+            index += 1
+            if index >= len(argv):
+                die(f"Error: {argument} requires an argument")
+            setattr(options, value_options[argument], argv[index])
+            index += 1
+        elif argument in flags:
+            setattr(options, flags[argument], True)
+            index += 1
+        elif argument == "--":
+            options.harness_args = argv[index + 1 :]
             break
-            ;;
-        *)
-            echo "Error: Unknown option '$1'" >&2
-            exit 1
-            ;;
-    esac
-done
+        else:
+            die(f"Error: Unknown option '{argument}'")
 
-# Detect print mode and JSON output format in harness args.
-prev_arg=""
-for arg in "${harness_args[@]}"; do
-    if [[ "$arg" == "--print" ]]; then
-        harness_print_mode=true
-    fi
-    if [[ "$arg" == "--output-format=json" ]]; then
-        harness_json_output=true
-    elif [[ "$prev_arg" == "--output-format" && "$arg" == "json" ]]; then
-        harness_json_output=true
-    fi
-    prev_arg="$arg"
-done
+    # Detect print mode and JSON output format in harness args.
+    previous_argument = ""
+    for argument in options.harness_args:
+        if argument in ("--print", "-p"):
+            options.harness_print_mode = True
+        if argument == "--output-format=json":
+            options.harness_json_output = True
+        elif previous_argument == "--output-format" and argument == "json":
+            options.harness_json_output = True
+        previous_argument = argument
 
-# Validate that `--process-output` is only used with `--print --output-format
-# json`.
-if [[ "$process_output" == "true" ]]; then
-    if [[ "$harness_print_mode" != "true" ]] \
-        || [[ "$harness_json_output" != "true" ]]; then
-        echo "Error: \`--process-output\` requires \`--print\` and \`--output-format json\` in harness args" >&2
-        exit 1
-    fi
-fi
+    # Validate that `--process-output` is only used with
+    # `--print --output-format json`.
+    if options.process_output:
+        if not options.harness_print_mode or not options.harness_json_output:
+            die(
+                "Error: `--process-output` requires `--print` and "
+                "`--output-format json` in harness args"
+            )
 
-if [[ "$show_help" == "true" ]]; then
-    grep '^#/' "${BASH_SOURCE[0]}" | cut -c4-
-    exit 0
-fi
+    # The channel name reaches a shell during the image build, so keep it to a
+    # plain token. It is also the tag of the image, which Docker requires to
+    # start with an alphanumeric character and to hold at most 128 characters.
+    if options.channel and not re.fullmatch(
+        r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", options.channel
+    ):
+        die(f"Error: Invalid channel name '{options.channel}'")
+
+    return options
+
+
+def show_help():
+    for line in read_text(__file__).splitlines():
+        # A bare `# /` marks a blank line in the help text.
+        if line == "# /":
+            print("")
+        elif line.startswith("# / "):
+            print(line[4:])
+
 
 # ============================================================================
 # Helper functions
 # ============================================================================
 
-# Get formatted date in local time.
-get_date() {
-    if [ "$(uname -s)" == "Darwin" ]; then
-        date -r "$1" "+%Y-%m-%d"
-    else
-        date -d "@$1" "+%Y-%m-%d"
-    fi
-}
 
-# Transform a link into a hard copy.
-dereference() {
-    tmp=$(mktemp) || return
-    cp -L "$1" "$tmp" && mv "$tmp" "$1"
-}
+def get_date(timestamp):
+    """Get formatted date in local time."""
+    return datetime.fromtimestamp(int(timestamp)).strftime("%Y-%m-%d")
 
-# Process Claude Code output from print mode.
-process_print_output() {
-    local output="$1"
 
-    local result
-    local cost
-    local duration_ms
-    local duration
+def today_date():
+    return datetime.now().strftime("%Y-%m-%d")
 
-    result=$(jq -r '.result // ""' <<< "$output")
-    cost=$(jq -r '.total_cost_usd // 0' <<< "$output")
-    duration_ms=$(jq -r '.duration_ms // 0' <<< "$output")
-    duration=$(printf "%.3f" "$(bc <<< "scale=3; $duration_ms / 1000")")
 
-    echo "$result"
-    echo ""
-    echo "Cost: \$$(round_up_cents "$cost")"
-    echo "Duration: $(format_duration "$duration")"
-}
+def copy_tree_contents(source, destination):
+    """Copy the contents of `source` into `destination`, like `cp -a`.
 
-build_image() {
-    local use_cache="$1"
+    Symlinks are copied as symlinks. Entries already in `destination` are
+    replaced when their type does not match the source.
 
-    echo "Building Docker image..." >&2
+    The copy adds and overwrites, and it never deletes. An entry that the
+    source dropped stays in `destination`. This is intended. Claude Code writes
+    its own state into the same tree, and nothing here can tell that state
+    apart from the leftovers of an earlier copy. Remove a stale command or
+    skill from each profile by hand.
 
-    local build_args=(
-        --build-arg UID="$(id -u)"
-        --build-arg GID="$(id -g)"
-        --build-arg HOME="$HOME"
-        --build-arg BUILD_DATE="$(date +%Y-%m-%d)"
-    )
+    A symlink in `destination` is always removed before the copy. Both
+    `shutil.copyfile` and `shutil.copystat` follow symlinks, so a leftover link
+    into the dotfiles repository would receive the write.
+    """
+    os.makedirs(destination, exist_ok=True)
+    for entry in os.scandir(source):
+        target = os.path.join(destination, entry.name)
+        if entry.is_symlink():
+            if os.path.lexists(target):
+                remove_path(target)
+            os.symlink(os.readlink(entry.path), target)
+        elif entry.is_dir():
+            if os.path.islink(target) or (
+                os.path.lexists(target) and not os.path.isdir(target)
+            ):
+                remove_path(target)
+            copy_tree_contents(entry.path, target)
+            shutil.copystat(entry.path, target)
+        else:
+            if os.path.lexists(target):
+                remove_path(target)
+            shutil.copyfile(entry.path, target)
+            shutil.copystat(entry.path, target)
 
-    if [[ "$use_cache" == "false" ]]; then
-        echo "Building from scratch without cache..." >&2
-        build_args+=(--no-cache)
-    fi
 
-    build_args+=(--tag "$docker_image_name")
+def round_up_cents(value):
+    """Round cost up to the next cent for display."""
+    cents = (Decimal(str(value)) * 100).to_integral_value(rounding=ROUND_CEILING)
+    return f"{cents / 100:.2f}"
+
+
+def format_duration(total_seconds):
+    """Format duration as XhYmZ.WWWs.
+
+    The value is truncated to milliseconds first. Without that step the final
+    `.3f` can round the seconds up to `60.000s`.
+    """
+    total = Decimal(str(total_seconds)).quantize(Decimal("0.001"), rounding=ROUND_DOWN)
+
+    # Handle zero input.
+    if total == 0:
+        return "0.000s"
+
+    hours = int(total / 3600)
+    remainder = total - hours * 3600
+    minutes = int(remainder / 60)
+    seconds = remainder - minutes * 60
+
+    result = ""
+    if hours > 0:
+        result = f"{hours}h"
+    if minutes > 0 or hours > 0:
+        result = f"{result}{minutes}m"
+    return f"{result}{seconds:.3f}s"
+
+
+def process_print_output(output):
+    """Process Claude Code output from print mode."""
+
+    def die_with_output(message):
+        """Relay the captured output, then exit. Otherwise the output is lost."""
+        echo_err(output)
+        die(message)
+
+    try:
+        data = json.loads(output)
+    except json.JSONDecodeError as error:
+        die_with_output(f"Error: harness output is not valid JSON: {error}")
+    if not isinstance(data, dict):
+        die_with_output("Error: harness output is not a JSON object")
+
+    result = data.get("result")
+    if not isinstance(result, str):
+        die_with_output(f"Error: harness output has no text `result`: {result!r}")
+
+    cost = data.get("total_cost_usd")
+    if not is_number(cost):
+        die_with_output(
+            f"Error: harness output has no numeric `total_cost_usd`: {cost!r}"
+        )
+
+    duration_ms = data.get("duration_ms")
+    if not is_number(duration_ms):
+        die_with_output(
+            f"Error: harness output has no numeric `duration_ms`: {duration_ms!r}"
+        )
+
+    duration = Decimal(str(duration_ms)) / 1000
+
+    print(result)
+    print("")
+    print(f"Cost: ${round_up_cents(cost)}")
+    print(f"Duration: {format_duration(duration)}")
+
+
+def build_image(use_cache, docker_image_name, dockerfile_path, home, channel):
+    echo_err("Building Docker image...")
+
+    build_args = [
+        "--build-arg",
+        f"UID={os.getuid()}",
+        "--build-arg",
+        f"GID={os.getgid()}",
+        "--build-arg",
+        f"HOME={home}",
+        "--build-arg",
+        f"BUILD_DATE={today_date()}",
+    ]
+
+    echo_err(f"Installing Claude Code from channel '{channel}'...")
+    build_args += ["--build-arg", f"CLAUDE_CODE_CHANNEL={channel}"]
+
+    if not use_cache:
+        echo_err("Building from scratch without cache...")
+        build_args.append("--no-cache")
+
+    build_args += ["--tag", docker_image_name]
+
+    try:
+        dockerfile = open(dockerfile_path, "rb")
+    except OSError as error:
+        echo_err(f"Error: cannot read {dockerfile_path}: {error}")
+        return False
 
     # Pipe the Dockerfile via stdin (`-`) so no build context is sent.
-    docker build "${build_args[@]}" - < "$dockerfile_path" >&2
-}
+    with dockerfile:
+        sys.stderr.flush()
+        result = subprocess.run(
+            ["docker", "build", *build_args, "-"],
+            stdin=dockerfile,
+            stdout=sys.stderr,
+        )
+    return result.returncode == 0
 
-generate_container_name() {
-    local dir_basename
-    dir_basename=$(basename "$current_dir" | tr -cd 'a-zA-Z0-9_.-')
-    echo "claude_code_${dir_basename:0:44}_$(shuf -i 1-999999 -n 1)"
-}
 
-# Run Claude Code in a Docker container.
-# Usage: run_container [--exec] [args...]
-# --exec: Use exec to replace current process.
-run_container() {
-    local use_exec=false
+def generate_container_name(current_dir):
+    """Build a container name. The PID keeps it unique among live processes."""
+    basename = os.path.basename(current_dir)
+    dir_basename = re.sub(r"[^a-zA-Z0-9_.-]", "", basename)
+    return f"claude_code_{dir_basename[:44]}_{os.getpid()}"
 
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            --exec)
-                use_exec=true
-                shift
-                ;;
-            *)
-                break
-                ;;
-        esac
-    done
 
-    local cmd=(
-        docker run
+def build_image_name(username, channel):
+    """Build the Docker image name for the current user and channel.
+
+    Docker rejects a repository name that is not lowercase, and it requires the
+    first character to be alphanumeric.
+
+    The channel is the tag. Each channel therefore gets its own image, and a
+    switch to another channel names an image that does not exist yet. The
+    freshness check then builds it, instead of running the channel that the
+    last build happened to install.
+    """
+    sanitized = re.sub(r"[^a-z0-9._-]", "", username.lower()).lstrip("._-")[:64]
+    if not sanitized:
+        die(f"Error: cannot build an image name from user name '{username}'")
+    return f"{sanitized}-claude:{channel}"
+
+
+def get_timezone():
+    """Read the local timezone name, so sessions get the right timestamps."""
+    timezone = os.environ.get("TZ", "")
+    if timezone:
+        return timezone
+    try:
+        link = os.readlink("/etc/localtime")
+    except OSError:
+        return ""
+    # A link that does not go through a `zoneinfo` directory carries no zone
+    # name. Return nothing, so the caller leaves `TZ` unset.
+    match = re.search(r"/zoneinfo/(.+)$", link)
+    if not match:
+        return ""
+    return match.group(1)
+
+
+@dataclass
+class RunConfig:
+    home: str
+    devel_dir: str
+    current_dir: str
+    profile: str
+    project_name: str
+    api_key: str
+    aoe_instance_id: str
+    aoe_session_name: str
+    docker_image_name: str
+    process_output: bool
+    harness_print_mode: bool
+    no_docker_socket: bool
+
+
+def build_container_env(api_key):
+    """Build the environment for the `docker run` process.
+
+    The API key goes only to this process. It stays out of the environment of
+    the script and out of every other child process. It stays out of the
+    command line too, so it does not show up in `ps` or in verbose output.
+    """
+    env = dict(os.environ)
+    if api_key:
+        env["ANTHROPIC_API_KEY"] = api_key
+    else:
+        env.pop("ANTHROPIC_API_KEY", None)
+    return env
+
+
+# Host directories that the container writes to. Docker creates a missing
+# mount source as a directory owned by `root`. The container user cannot then
+# write to it, and nothing reports the failure.
+SHARED_HOST_DIRS = ("/tmp/claude-code-shared", "/tmp/aoe-hooks")
+
+# Scripts from `~/devel/dotfiles/bin` that the agent calls by name.
+AGENT_BINARIES = (
+    "safe_mv",
+    "safe_rm",
+    "ai_git_add",
+    "ai_git_restore",
+    "ai_git_commit",
+    "review",
+    "review_diff",
+)
+
+
+def prepare_shared_dirs():
+    """Create the host directories that the container writes to."""
+    for shared_dir in SHARED_HOST_DIRS:
+        try:
+            os.makedirs(shared_dir, exist_ok=True)
+        except OSError as error:
+            echo_err(f"Warning: cannot create {shared_dir}: {error}")
+            continue
+        if not os.access(shared_dir, os.W_OK | os.X_OK):
+            echo_err(f"Warning: {shared_dir} is not writable")
+
+
+def build_run_command(harness_args, config):
+    """Build the `docker run` command and the environment to run it with.
+
+    Return the pair. The caller decides whether to capture the output or to
+    replace the current process.
+    """
+    home = config.home
+    devel_dir = config.devel_dir
+
+    cmd = [
+        "docker",
+        "run",
 
         # Delete the container when it exits.
-        --rm
+        "--rm",
 
         # Run an init process that will properly manage signals and other OS
         # facilities.
-        --init
+        "--init",
 
         # Configure user.
-        --user "$(id -u):$(id -g)"
-        # This is needed to have access to the Docker socket.
-        --group-add 0
+        "--user", f"{os.getuid()}:{os.getgid()}",
 
         # Container name.
-        --name "$(generate_container_name)"
+        "--name", generate_container_name(config.current_dir),
 
         # So that the agent can reach services running on the host via
         # `host.docker.internal`.
-        --add-host "host.docker.internal:host-gateway"
+        "--add-host", "host.docker.internal:host-gateway",
 
         # Make the entire filesystem read-only.
-        --read-only
-        --tmpfs "/tmp"
-        --env XDG_RUNTIME_DIR="/tmp"
+        "--read-only",
+        "--tmpfs", "/tmp",
+        "--env", "XDG_RUNTIME_DIR=/tmp",
 
         # Path used to coordinate things that use Claude Code.
-        --volume "/tmp/claude-code-shared:/tmp/claude-code-shared"
+        "--volume", "/tmp/claude-code-shared:/tmp/claude-code-shared",
 
         # Mount the entire `~/devel` directory and set the current directory as
         # the working directory.
-        --volume "$devel_dir:$devel_dir"
-        --workdir "$current_dir"
-
-        # Mount git configuration so my aliases and other preferences are in
-        # effect.
-        --volume "$HOME/.config/git:$HOME/.config/git:ro"
-
-        # Some binaries that my agents need.
-        --volume "$devel_dir/dotfiles/bin/safe_mv:/usr/local/bin/safe_mv:ro"
-        --volume "$devel_dir/dotfiles/bin/safe_rm:/usr/local/bin/safe_rm:ro"
-        --volume "$devel_dir/dotfiles/bin/ai_git_add:/usr/local/bin/ai_git_add:ro"
-        --volume "$devel_dir/dotfiles/bin/ai_git_restore:/usr/local/bin/ai_git_restore:ro"
-        --volume "$devel_dir/dotfiles/bin/ai_git_commit:/usr/local/bin/ai_git_commit:ro"
-        --volume "$devel_dir/dotfiles/bin/review:/usr/local/bin/review:ro"
-        --volume "$devel_dir/dotfiles/bin/review_diff:/usr/local/bin/review_diff:ro"
+        "--volume", f"{devel_dir}:{devel_dir}",
+        "--workdir", config.current_dir,
 
         # Claude Code mounts.
-        --volume "$HOME/.claude-$profile:$HOME/.claude"
-        --volume "$HOME/.claude-$profile.json:$HOME/.claude.json"
+        "--volume", f"{home}/.claude-{config.profile}:{home}/.claude",
+        "--volume", f"{home}/.claude-{config.profile}.json:{home}/.claude.json",
 
-        # Anthropic's API key if available. If not defined, Claude Code will
-        # check for OAuth credentials. If not there too, it will ask the user
-        # how they want to login.
-        --env ANTHROPIC_API_KEY
-
-        # This enables sessions to show up with the right timestamps.
-        --env "TZ=${TZ:-$(readlink /etc/localtime 2> /dev/null | sed 's|.*/zoneinfo/||')}"
+        # Anthropic's API key if available. The name alone keeps the value out
+        # of the command line. If not defined, Claude Code will check for OAuth
+        # credentials. If not there too, it will ask the user how they want to
+        # login.
+        "--env", "ANTHROPIC_API_KEY",
 
         # This is used to show the active profile and project in the status
         # line.
-        --env "AGENT_PROFILE=$profile"
-        --env "PROJECT_NAME=$project_name"
+        "--env", f"AGENT_PROFILE={config.profile}",
+        "--env", f"PROJECT_NAME={config.project_name}",
 
         # Agent of Empires environment variables and mounts.
-        --env "AOE_INSTANCE_ID=$aoe_instance_id"
-        --env "AOE_SESSION_NAME=$aoe_session_name"
-        --volume "/tmp/aoe-hooks:/tmp/aoe-hooks"
+        "--env", f"AOE_INSTANCE_ID={config.aoe_instance_id}",
+        "--env", f"AOE_SESSION_NAME={config.aoe_session_name}",
+        "--volume", "/tmp/aoe-hooks:/tmp/aoe-hooks",
 
         # Claude Code uses this to know search for file suggestions on `@`.
-        --env RIPGREP_CONFIG_PATH
+        "--env", "RIPGREP_CONFIG_PATH",
 
         # Terminal configuration.
-        --env TERM
-        --env COLORTERM
-        --env FORCE_COLOR
-        --env NO_COLOR
-    )
+        "--env", "TERM",
+        "--env", "COLORTERM",
+        "--env", "FORCE_COLOR",
+        "--env", "NO_COLOR",
+    ]  # fmt: skip
 
-    # When processing output or in print mode, don't allocate a TTY or attach
-    # stdin interactively so we can capture the output cleanly. When stdin is
-    # not a TTY, also skip both flags.
-    if [[ "$process_output" != "true" ]] \
-        && [[ "$harness_print_mode" != "true" ]] \
-        && [ -t 0 ]; then
-        cmd+=(--interactive --tty)
-    fi
+    # Mount the scripts that the agent calls by name. Skip one when it is
+    # absent, so Docker does not create it on the host as a directory owned by
+    # `root`, inside the dotfiles working tree.
+    for binary in AGENT_BINARIES:
+        binary_path = f"{devel_dir}/dotfiles/bin/{binary}"
+        if not os.path.isfile(binary_path):
+            echo_err(f"Warning: {binary_path} does not exist, not mounting it")
+            continue
+        cmd += ["--volume", f"{binary_path}:/usr/local/bin/{binary}:ro"]
+
+    # This enables sessions to show up with the right timestamps. An empty
+    # value would mean UTC, so leave the variable unset instead and let the
+    # image decide.
+    timezone = get_timezone()
+    if timezone:
+        cmd += ["--env", f"TZ={timezone}"]
+
+    # Mount git configuration so my aliases and other preferences are in
+    # effect. Skip it when it is absent, so Docker does not create it on the
+    # host as a directory owned by `root`.
+    git_config_dir = f"{home}/.config/git"
+    if os.path.isdir(git_config_dir):
+        cmd += ["--volume", f"{git_config_dir}:{git_config_dir}:ro"]
+    else:
+        echo_err(
+            f"Warning: {git_config_dir} does not exist, Git configuration will "
+            "not be available inside the container"
+        )
+
+    # Keep stdin attached in every case. Without `--interactive` the container
+    # reads end of file at once, and a prompt that arrives through a pipe never
+    # reaches the harness.
+    cmd.append("--interactive")
+
+    # A TTY belongs to an interactive session only. In print mode it mixes
+    # terminal control codes into the output that the caller captures.
+    if not config.process_output and not config.harness_print_mode and stdin_is_tty():
+        cmd.append("--tty")
 
     # Relay additional environment variables from
     # `AGENTS_ADDITIONAL_ENV_VARS`.
-    if [ -n "${AGENTS_ADDITIONAL_ENV_VARS:-}" ]; then
-        IFS=':' read -ra ADDITIONAL_ENV_VARS <<< "$AGENTS_ADDITIONAL_ENV_VARS"
-        for additional_env_var in "${ADDITIONAL_ENV_VARS[@]}"; do
+    additional_env_vars = os.environ.get("AGENTS_ADDITIONAL_ENV_VARS", "")
+    if additional_env_vars:
+        for additional_env_var in additional_env_vars.split(":"):
             # Trim whitespace.
-            additional_env_var=$(sed 's/^[[:space:]]*//;s/[[:space:]]*$//' <<< "$additional_env_var")
-            if [ -n "$additional_env_var" ]; then
-                if [[ ! "$additional_env_var" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
-                    echo "Warning: Skipping invalid env var name: $additional_env_var" >&2
-                    continue
-                fi
-                echo "Additional environment variable: $additional_env_var" >&2
-                cmd+=(--env "$additional_env_var")
-            fi
-        done
-    fi
+            additional_env_var = additional_env_var.strip()
+            if not additional_env_var:
+                continue
+            if not re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", additional_env_var):
+                echo_err(
+                    f"Warning: Skipping invalid env var name: {additional_env_var}"
+                )
+                continue
+            echo_err(f"Additional environment variable: {additional_env_var}")
+            cmd += ["--env", additional_env_var]
 
-    # Set up Docker access from inside the container.
-    if [ -S "$HOME/.docker/run/docker.sock" ]; then
-        docker_socket="$HOME/.docker/run/docker.sock"
-    elif [ -S "/var/run/docker.sock" ]; then
-        docker_socket="/var/run/docker.sock"
-    else
-        echo "Warning: Docker socket not found, Docker will not be available inside the container" >&2
-        docker_socket=""
-    fi
-    if [ -n "$docker_socket" ]; then
-        cmd+=(
-            --volume "$docker_socket:/var/run/docker.sock"
-            --env "DOCKER_HOST=unix:///var/run/docker.sock"
-        )
-    fi
+    # Set up Docker access from inside the container. The socket gives the
+    # container control of the host, so `--no-docker-socket` turns it off.
+    if config.no_docker_socket:
+        echo_err("Docker socket not mounted (--no-docker-socket)")
+    else:
+        docker_socket = ""
+        candidates = (f"{home}/.docker/run/docker.sock", "/var/run/docker.sock")
+        for candidate in candidates:
+            if is_socket(candidate):
+                docker_socket = candidate
+                break
+        if not docker_socket:
+            echo_err(
+                "Warning: Docker socket not found, Docker will not be "
+                "available inside the container"
+            )
+        else:
+            cmd += [
+                # Group 0 is what grants access to the socket. Without the
+                # socket, the container has no reason to hold the privilege.
+                "--group-add", "0",
 
-    cmd+=(
+                "--volume", f"{docker_socket}:/var/run/docker.sock",
+                "--env", "DOCKER_HOST=unix:///var/run/docker.sock",
+            ]  # fmt: skip
+
+    cmd += [
         # The image we just built.
-        "$docker_image_name"
+        config.docker_image_name,
 
         # Whatever arguments we want to pass to the harness.
-        "$@"
+        *harness_args,
+    ]  # fmt: skip
+
+    return cmd, build_container_env(config.api_key)
+
+
+def is_socket(path):
+    try:
+        return stat.S_ISSOCK(os.stat(path).st_mode)
+    except OSError:
+        return False
+
+
+def stdin_is_tty():
+    try:
+        return sys.stdin is not None and sys.stdin.isatty()
+    except ValueError:
+        return False
+
+
+# ============================================================================
+# Project-local commands and skills
+# ============================================================================
+
+
+def git_run(current_dir, args, quiet=False):
+    """Run a Git command in `current_dir` and return the completed process.
+
+    `core.quotePath=false` keeps Git from wrapping a path that holds non-ASCII
+    bytes in quotes and escapes. The callers parse these paths.
+    """
+    return subprocess.run(
+        ["git", "-C", current_dir, "-c", "core.quotePath=false", *args],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL if quiet else None,
+        encoding="utf-8",
     )
 
-    echo "Running container..." >&2
 
-    if [[ "$verbose" == "true" ]]; then
-        echo "Command:" >&2
-        printf '  %q\n' "${cmd[@]}" >&2
-    fi
+def parse_tracked_paths(ls_files_output):
+    """List the paths in the output of `git ls-files -v -z`.
 
-    if [[ "$use_exec" == "true" ]]; then
-        exec "${cmd[@]}"
-    else
-        "${cmd[@]}"
-    fi
-}
+    `-z` ends every record with a NUL byte and stops Git from quoting a path
+    that holds a newline, a quote, or a backslash.
+    """
+    paths = []
+    for record in ls_files_output.split("\0"):
+        # Every record starts with a one-character status and a space.
+        if len(record) < 2 or record[1] != " ":
+            continue
+        paths.append(record[2:])
+    return paths
 
-# Function to round cost up to the next cent for display.
-round_up_cents() {
-    local value=$1
-    local rounded
-    rounded=$(
-        bc << EOF
-scale=0
-tmp = $value * 100
-tmp = tmp / 1
-if (tmp < $value * 100) tmp = tmp + 1
-scale=2
-tmp / 100
-EOF
+
+def paths_under(paths, prefix):
+    """Select the paths under `prefix`, with the prefix removed."""
+    return [path[len(prefix) :] for path in paths if path.startswith(prefix)]
+
+
+def untracked_paths_under(top_level, relpath):
+    """List the untracked files under `relpath`, relative to the repository root.
+
+    `--exclude-standard` applies the ignore rules, and those include
+    `.git/info/exclude`. The prefixed copies of an earlier run are listed there,
+    so they do not show up here.
+    """
+    result = git_run(
+        top_level,
+        ["ls-files", "-o", "-z", "--full-name", "--exclude-standard", "--", relpath],
+        quiet=True,
     )
-    printf "%.2f" "$rounded"
-}
+    return [path for path in result.stdout.split("\0") if path]
 
-# Function to format duration as XhYmZ.WWWs.
-format_duration() {
-    local total_seconds=$1
 
-    # Handle zero or empty input.
-    if [[ -z "$total_seconds" ]] || [[ $(bc <<< "$total_seconds == 0") -eq 1 ]]; then
-        echo "0.000s"
+def check_untracked_assets(top_level, relpaths):
+    """Stop the launcher when an agent asset directory holds untracked files.
+
+    An untracked file is absent from `HEAD`. There is no reviewed content to
+    copy from, so the file keeps its own name and shadows the user-level command
+    or skill of that name.
+    """
+    untracked = []
+    for relpath in relpaths:
+        untracked += untracked_paths_under(top_level, relpath)
+    if not untracked:
         return
-    fi
+    echo_err("Error: these agent assets are untracked, so HEAD does not have them:")
+    for path in sorted(untracked):
+        echo_err(f"  {path}")
+    die(
+        "Run `git add -N <path>` on each one to put it in the index without its "
+        "content. Then review it and commit it."
+    )
 
-    local hours
-    local remainder
-    local minutes
-    local seconds
 
-    hours=$(bc <<< "$total_seconds / 3600")
-    remainder=$(bc <<< "$total_seconds - ($hours * 3600)")
-    minutes=$(bc <<< "$remainder / 60")
-    seconds=$(bc <<< "$remainder - ($minutes * 60)")
+def append_to_exclude(exclude_file, entry):
+    """Add `entry` to the exclude file if it is not there yet.
 
-    local result=""
-    if [ "$hours" -gt 0 ]; then
-        result="${hours}h"
-    fi
-    if [ "$minutes" -gt 0 ] || [ "$hours" -gt 0 ]; then
-        result="${result}${minutes}m"
-    fi
-    result="${result}$(printf "%.3f" "$seconds")s"
-    echo "$result"
-}
+    A file that does not end with a newline would otherwise take the entry on
+    its last line, which breaks both patterns.
+    """
+    try:
+        content = read_text(exclude_file)
+    except (OSError, UnicodeDecodeError):
+        content = ""
+    if entry in content.splitlines():
+        return
+    separator = "" if not content or content.endswith("\n") else "\n"
+    with open(exclude_file, "a", encoding="utf-8") as handle:
+        handle.write(f"{separator}{entry}\n")
+
+
+def write_git_blob(top_level, revision, destination):
+    """Write the content of a Git object to a file.
+
+    `revision` uses the `HEAD:<path>` form, so `<path>` must be relative to
+    the repository root.
+
+    Return `False` when the object is absent. A path that sits in the index but
+    not in `HEAD` reaches this point, and a staged command that nobody
+    committed must not stop the launcher.
+    """
+    result = subprocess.run(
+        ["git", "-C", top_level, "show", revision],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+    )
+    if result.returncode != 0:
+        echo_err(f"Warning: `git show {revision}` failed, leaving the original alone")
+        return False
+    with open(destination, "wb") as handle:
+        handle.write(result.stdout)
+    return True
+
+
+def mark_skip_worktree(top_level, git_rel_path):
+    """Tell Git to ignore later changes to `git_rel_path`.
+
+    Return `False` when Git refuses, for example because another process holds
+    the index lock. The caller must then leave the file in place. Without the
+    flag, the removal of the file shows up as a deletion that the user can
+    commit by accident.
+    """
+    result = git_run(
+        top_level, ["update-index", "--skip-worktree", git_rel_path], quiet=True
+    )
+    if result.returncode != 0:
+        echo_err(
+            f"Warning: cannot set skip-worktree on {git_rel_path}, leaving it in place"
+        )
+        return False
+    return True
+
+
+def resolve_claude_subdir(top_level, current_dir, name):
+    """Resolve `.claude/<name>` to a path relative to the repository root.
+
+    Return an empty string when the directory is absent, or when it resolves
+    to a location outside the repository.
+    """
+    directory = os.path.join(current_dir, ".claude", name)
+    if not os.path.isdir(directory):
+        return ""
+    real_directory = os.path.realpath(directory)
+    if not real_directory.startswith(top_level + "/"):
+        return ""
+    return real_directory[len(top_level) + 1 :]
+
+
+@dataclass
+class AssetRebuild:
+    """One command or skill to replace with a copy of its `HEAD` content.
+
+    Every path is relative to the repository root. A command holds one pair in
+    `file_pairs`, and its `destination_root` is that one file. A skill holds one
+    pair per tracked file, and its `destination_root` is the directory.
+    """
+
+    # Pairs of the tracked path and the path of its prefixed copy.
+    file_pairs: list
+    # The path to clear before the copy, and to discard when a step fails.
+    destination_root: str
+    # The path of the original to remove once the copy is in place.
+    source_root: str
+    # The entry that keeps the copy out of Git.
+    exclude_entry: str
+
+
+def collect_command_assets(commands_relpath, tracked_paths):
+    """Plan the rename of project-local commands: `foo.md` becomes `p-foo.md`."""
+    assets = []
+    for local_relpath in paths_under(tracked_paths, f"{commands_relpath}/"):
+        git_rel_path = f"{commands_relpath}/{local_relpath}"
+        # A namespaced command lives in a subdirectory, so `local_relpath` can
+        # hold several components. The prefix goes on the first one.
+        new_rel_path = f"{commands_relpath}/p-{local_relpath}"
+        assets.append(
+            AssetRebuild(
+                file_pairs=[(git_rel_path, new_rel_path)],
+                destination_root=new_rel_path,
+                source_root=git_rel_path,
+                exclude_entry=new_rel_path,
+            )
+        )
+    return assets
+
+
+def collect_skill_assets(skills_relpath, tracked_paths):
+    """Plan the rename of project-local skills: `foo/` becomes `p-foo/`."""
+    tracked_skill_paths = paths_under(tracked_paths, f"{skills_relpath}/")
+
+    # A skill is a directory. A file directly under the skills directory is not
+    # one, and it cannot be renamed the same way, so report it and leave it.
+    for loose_path in sorted(path for path in tracked_skill_paths if "/" not in path):
+        echo_err(
+            f"Warning: {skills_relpath}/{loose_path} is not a skill directory, "
+            "leaving it in place"
+        )
+
+    # Extract unique top-level skill directory names from tracked paths.
+    tracked_skill_names = sorted(
+        {path.split("/")[0] for path in tracked_skill_paths if "/" in path}
+    )
+    assets = []
+    for skill_name in tracked_skill_names:
+        file_pairs = [
+            (f"{skills_relpath}/{path}", f"{skills_relpath}/p-{path}")
+            for path in tracked_skill_paths
+            if path.split("/")[0] == skill_name
+        ]
+        assets.append(
+            AssetRebuild(
+                file_pairs=file_pairs,
+                destination_root=f"{skills_relpath}/p-{skill_name}",
+                source_root=f"{skills_relpath}/{skill_name}",
+                exclude_entry=f"{skills_relpath}/p-{skill_name}/",
+            )
+        )
+    return assets
+
+
+def rebuild_asset_from_head(top_level, asset, exclude_file):
+    """Replace one command or skill with a copy of its `HEAD` content.
+
+    The copy comes first, then the `--skip-worktree` flags, then the removal of
+    the original. A step that fails discards the copy and returns, so the
+    original stays and keeps running. A half-built asset must never run, and a
+    path that `HEAD` does not have must never get the flag, because the flag
+    hides it from `git status`.
+    """
+    destination_root = os.path.join(top_level, asset.destination_root)
+
+    def discard_copy():
+        if os.path.lexists(destination_root):
+            remove_path(destination_root)
+
+    # Exclude the copy before it exists. An entry for a path that is not there
+    # costs nothing, while a copy that is not excluded reads as an untracked
+    # agent asset and stops the next run.
+    append_to_exclude(exclude_file, asset.exclude_entry)
+
+    # Always rebuild the p-prefixed copy from git. `git checkout` won't work
+    # here because skip-worktree makes it a no-op. A copy left over from an
+    # earlier run is excluded from git and invisible to `git status`, so it can
+    # hold content that nobody reviewed.
+    discard_copy()
+
+    for git_rel_path, destination_relpath in asset.file_pairs:
+        destination = os.path.join(top_level, destination_relpath)
+        os.makedirs(os.path.dirname(destination), exist_ok=True)
+        if not write_git_blob(top_level, f"HEAD:{git_rel_path}", destination):
+            discard_copy()
+            return
+
+    marked = [
+        mark_skip_worktree(top_level, git_rel_path)
+        for git_rel_path, _ in asset.file_pairs
+    ]
+    if not all(marked):
+        discard_copy()
+        return
+
+    source_root = os.path.join(top_level, asset.source_root)
+    if os.path.lexists(source_root):
+        remove_path(source_root)
+
+
+def prefix_project_claude_assets(current_dir):
+    """Rename project-local `.claude` commands and skills with a `p-` prefix.
+
+    The prefix stops them from shadowing user-level commands and skills.
+    Tracked files get `--skip-worktree` so Git ignores the renames, and the
+    new files go into `.git/info/exclude` so they are not committed.
+
+    The p-prefixed copy always comes from `HEAD`, and the original is then
+    deleted from the working tree. This discards uncommitted edits to a
+    command, and it discards untracked files inside a skill directory. That is
+    intended. A repository must never run agent instructions that are absent
+    from `HEAD`, because those are the instructions that nobody reviewed.
+
+    An untracked file under either directory stops the launcher, because it
+    would keep its own name and shadow a user-level command or skill.
+
+    A path that sits in the index but not in `HEAD` keeps its original, because
+    there is no reviewed content to copy.
+
+    Nothing here reverses the rename. To undo it by hand, run
+    `git update-index --no-skip-worktree <path>` and then
+    `git checkout -- <path>`.
+
+    Every path here is relative to the repository root. `git show HEAD:<path>`
+    resolves from the root, and patterns in `.git/info/exclude` anchor to the
+    root, so the working directory must not take part.
+    """
+    try:
+        probe = git_run(current_dir, ["rev-parse", "--show-toplevel"], quiet=True)
+    except OSError:
+        return
+    if probe.returncode != 0 or not probe.stdout.strip():
+        return
+    top_level = os.path.realpath(probe.stdout.strip())
+
+    # Resolve the real paths of the commands and skills directories (following
+    # symlinks) so `git ls-files` returns the tracked files within them, not
+    # just the symlink entries.
+    commands_relpath = resolve_claude_subdir(top_level, current_dir, "commands")
+    skills_relpath = resolve_claude_subdir(top_level, current_dir, "skills")
+
+    asset_relpaths = [path for path in (commands_relpath, skills_relpath) if path]
+    if not asset_relpaths:
+        return
+
+    check_untracked_assets(top_level, asset_relpaths)
+
+    git_dir_probe = git_run(top_level, ["rev-parse", "--git-common-dir"], quiet=True)
+    if git_dir_probe.returncode != 0:
+        return
+    # `git rev-parse --git-common-dir` returns `.git` at the root of a normal
+    # repository, and the main repository's Git directory for a worktree.
+    # `os.path.join` handles both. Git reads `info/exclude` from the common
+    # directory in either case, so the per-worktree Git directory is the wrong
+    # place to write.
+    git_common_dir = git_dir_probe.stdout.strip()
+    exclude_file = os.path.join(top_level, git_common_dir, "info", "exclude")
+    os.makedirs(os.path.dirname(exclude_file), exist_ok=True)
+
+    # Use `git ls-files` (with `-v` to include skip-worktree files) as the
+    # source of truth for tracked commands and skills.
+    tracked_paths = parse_tracked_paths(
+        git_run(
+            top_level,
+            ["ls-files", "-v", "-z", "--full-name", "--", *asset_relpaths],
+            quiet=True,
+        ).stdout
+    )
+    if not tracked_paths:
+        return
+
+    assets = []
+    if commands_relpath:
+        assets += collect_command_assets(commands_relpath, tracked_paths)
+    if skills_relpath:
+        assets += collect_skill_assets(skills_relpath, tracked_paths)
+
+    for asset in assets:
+        rebuild_asset_from_head(top_level, asset, exclude_file)
+
+
+# ============================================================================
+# Profile directory preparation
+# ============================================================================
+
+
+def list_project_dirs(devel_dir):
+    """List the project directories relative to `~/devel`."""
+    try:
+        result = subprocess.run(
+            [os.path.join(devel_dir, "dotfiles", "bin", "list_project_dirs")],
+            stdout=subprocess.PIPE,
+            encoding="utf-8",
+        )
+    except OSError as error:
+        die(f"Error: cannot run list_project_dirs: {error}")
+    if result.returncode != 0:
+        die("Error: list_project_dirs failed")
+    return result.stdout.splitlines()
+
+
+def load_user_config(config_path):
+    """Read the configuration file. Return `None` when the file is absent."""
+    if not os.path.isfile(config_path):
+        return None
+
+    # Verify the file is not readable by group or others.
+    file_perms = os.stat(config_path).st_mode & 0o7777
+    if file_perms & 0o077:
+        die(
+            f"Error: {config_path} has permissions {file_perms:o}, expected "
+            "no group or other access"
+        )
+    try:
+        config = read_json_file(config_path)
+    except json.JSONDecodeError as error:
+        die(f"Error: {config_path} is not valid JSON: {error}")
+    except OSError as error:
+        die(f"Error: cannot read {config_path}: {error}")
+    if not isinstance(config, dict):
+        die(f"Error: {config_path} is not a JSON object")
+
+    return config
+
+
+def apply_preferred_model(config, profile, home):
+    """Apply the preferred model for the profile from the configuration."""
+    if config is None:
+        return
+
+    preferred_model = profile_setting(config, profile, "model")
+    if preferred_model is _MISSING or preferred_model is None:
+        return
+    if not isinstance(preferred_model, str):
+        echo_err(
+            f"Warning: the `model` of profile '{profile}' is not text, model not set"
+        )
+        return
+
+    profile_settings = f"{home}/.claude-{profile}/settings.json"
+    try:
+        settings = read_json_file(profile_settings)
+        if not isinstance(settings, dict):
+            echo_err(f"Warning: {profile_settings} is not a JSON object, model not set")
+            return
+        settings["model"] = preferred_model
+        write_json_file(profile_settings, settings)
+    except (OSError, json.JSONDecodeError) as error:
+        echo_err(f"Warning: cannot set the model in {profile_settings}: {error}")
+        return
+    echo_err(f"Model set to '{preferred_model}' for profile '{profile}'")
+
+
+def apply_dependencies_list(claude_md_path, project_dirs):
+    """Replace the project list marker in CLAUDE.md with the project list."""
+    marker = "<!-- DEPENDENCIES_LIST -->"
+
+    try:
+        claude_md = read_text(claude_md_path)
+    except OSError:
+        return
+    except UnicodeDecodeError as error:
+        echo_err(f"Warning: cannot read {claude_md_path}: {error}")
+        return
+    if marker not in claude_md:
+        return
+
+    if not project_dirs:
+        echo_err(f"Warning: no projects found, {marker} stays in CLAUDE.md")
+        return
+
+    lines = []
+    for line in claude_md.splitlines():
+        if marker in line:
+            # Extract the indentation from the marker line.
+            indent = line.split(marker, 1)[0]
+            lines += [f"{indent}- {project_dir}" for project_dir in project_dirs]
+        else:
+            lines.append(line)
+    # The profile's CLAUDE.md can be a symlink into the dotfiles repository. An
+    # atomic write replaces the link instead of the file behind it.
+    write_text_atomically(claude_md_path, "".join(f"{line}\n" for line in lines))
+
+
+def create_profile_json(profile_json_path):
+    """Create the profile's `.claude.json` if it is not there yet.
+
+    The file keeps the tail of the API key and the account metadata, so tighten
+    the mode of a file that an earlier run or another tool left with wider
+    access. A new file gets `0600` from `write_text_atomically`.
+    """
+    if not os.path.isfile(profile_json_path):
+        write_text_atomically(profile_json_path, "{}\n")
+    try:
+        os.chmod(profile_json_path, 0o600)
+    except OSError as error:
+        echo_err(f"Warning: cannot set the mode of {profile_json_path}: {error}")
+
+
+def approve_api_key(profile_json_path, api_key):
+    """Pre-approve the API key in the profile's `.claude.json`.
+
+    Claude Code records the tail of a key that the user approved. Without the
+    entry it asks on every launch. A key of at most `tail_length` characters
+    gets no entry, because the tail would be the whole secret.
+    """
+    if not api_key:
+        return
+
+    tail_length = 20
+    if len(api_key) <= tail_length:
+        echo_err(
+            "Warning: the API key is too short to pre-approve, "
+            "Claude Code will ask about it"
+        )
+        return
+    approved_tail = api_key[-tail_length:]
+
+    try:
+        profile_json = read_json_file(profile_json_path)
+        if not isinstance(profile_json, dict):
+            echo_err(
+                f"Warning: {profile_json_path} is not a JSON object, "
+                "the API key is not pre-approved"
+            )
+            return
+        responses = profile_json.get("customApiKeyResponses")
+        if not isinstance(responses, dict):
+            responses = {}
+            profile_json["customApiKeyResponses"] = responses
+        approved = responses.get("approved")
+        if not isinstance(approved, list):
+            approved = []
+            responses["approved"] = approved
+        if approved_tail in approved:
+            return
+        approved.append(approved_tail)
+        write_json_file(profile_json_path, profile_json)
+    except (OSError, json.JSONDecodeError) as error:
+        echo_err(
+            f"Warning: cannot pre-approve the API key in {profile_json_path}: {error}"
+        )
+
+
+def apply_mcp_servers(config, profile_json_path, profile):
+    """Apply the MCP servers for the profile from the configuration.
+
+    This replaces any `mcpServers` key that is already in the profile's
+    `.claude.json`.
+    """
+    if config is None:
+        return
+
+    mcp_servers = profile_setting(config, profile, "mcp_servers")
+    if mcp_servers is _MISSING or mcp_servers is None:
+        return
+
+    try:
+        profile_json = read_json_file(profile_json_path)
+        if not isinstance(profile_json, dict):
+            echo_err(
+                f"Warning: {profile_json_path} is not a JSON object, "
+                "MCP servers not set"
+            )
+            return
+        profile_json["mcpServers"] = mcp_servers
+        write_json_file(profile_json_path, profile_json)
+    except (OSError, json.JSONDecodeError) as error:
+        echo_err(f"Warning: cannot set MCP servers in {profile_json_path}: {error}")
+        return
+    echo_err(f"MCP servers set for profile '{profile}'")
+
+
+# ============================================================================
+# Image freshness
+# ============================================================================
+
+
+def inspect_last_build(docker_image_name):
+    """Get the image's tag timestamp and the error output of the inspection."""
+    result = subprocess.run(
+        [
+            "docker",
+            "image",
+            "inspect",
+            docker_image_name,
+            "--format",
+            "{{.Metadata.LastTagTime.Unix}}",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        encoding="utf-8",
+    )
+    return result.stdout.rstrip("\n"), result.stderr.rstrip("\n")
+
+
+def get_last_build(docker_image_name):
+    """Get the image's tag timestamp, with a retry for a Docker bug."""
+    last_build_timestamp, inspect_stderr = inspect_last_build(docker_image_name)
+
+    # TODO: Remove this once it's not needed anymore. There is some bug in
+    # Docker in which sometimes `docker image inspect` can't find an image, but
+    # then you run `docker image ls` and then `docker image inspect` again, and
+    # it works... This is an attempt to automatically overcome it.
+    if "No such image" in inspect_stderr:
+        echo_err("WARNING: image not found, trying to fix it")
+        subprocess.run(
+            ["docker", "image", "ls", docker_image_name],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        last_build_timestamp, inspect_stderr = inspect_last_build(docker_image_name)
+        if "No such image" not in inspect_stderr:
+            echo_err("WARNING: 'docker image ls' fixed it")
+
+    return last_build_timestamp, inspect_stderr
+
+
+def get_rebuild_reason(
+    options, last_build_date, last_build_timestamp, dockerfile_mtime, today
+):
+    """Return the reason for a rebuild, or `None` if the image needs none.
+
+    The reason is a pair of a stable code and a message for the user. The caller
+    matches on the code, so a change to the message breaks nothing.
+    """
+    if options.no_build_cache:
+        return ("no-build-cache", "--no-build-cache specified")
+    if options.force_rebuild:
+        return ("force-rebuild", "--force-rebuild specified")
+    if not last_build_date:
+        return ("missing-image", "image does not exist")
+    if last_build_date != today:
+        return ("stale-date", f"image is from {last_build_date}, today is {today}")
+    if last_build_timestamp and dockerfile_mtime > int(last_build_timestamp):
+        return ("stale-dockerfile", "Dockerfile modified after last build")
+    return None
+
+
+def ensure_image(options, docker_image_name, dockerfile_path, home, channel):
+    today = today_date()
+
+    last_build_timestamp, inspect_stderr = get_last_build(docker_image_name)
+
+    # Derive the last build date in local time from the timestamp.
+    last_build_date = ""
+    if last_build_timestamp:
+        try:
+            last_build_date = get_date(last_build_timestamp)
+        except (ValueError, OSError, OverflowError):
+            die(
+                "Error: cannot read the build date of image "
+                f"'{docker_image_name}' from '{last_build_timestamp}'"
+            )
+
+    # Get the Dockerfile's modification time (seconds since epoch).
+    try:
+        dockerfile_mtime = int(os.stat(dockerfile_path).st_mtime)
+    except OSError:
+        dockerfile_mtime = 0
+
+    rebuild_reason = get_rebuild_reason(
+        options, last_build_date, last_build_timestamp, dockerfile_mtime, today
+    )
+    reason_code, reason_message = rebuild_reason or ("", "")
+    if reason_code == "missing-image" and inspect_stderr:
+        echo_err(f"docker image inspect: {inspect_stderr}")
+
+    if options.no_rebuild:
+        # Skip rebuild entirely - verify image exists.
+        if not last_build_date:
+            die(
+                f"Error: Docker image '{docker_image_name}' does not exist and "
+                "--no-rebuild was specified"
+            )
+        if rebuild_reason:
+            echo_err(
+                f"--no-rebuild specified, skipping rebuild despite: {reason_message}"
+            )
+        else:
+            echo_err("Skipping rebuild (--no-rebuild specified, image is up to date)")
+    elif rebuild_reason:
+        echo_err(f"Rebuilding image: {reason_message}")
+        use_cache = not options.no_build_cache
+        if not build_image(
+            use_cache, docker_image_name, dockerfile_path, home, channel
+        ):
+            if not options.allow_stale:
+                die("Error: Docker build failed")
+            if not last_build_date:
+                die(
+                    "Error: Docker build failed and no existing image "
+                    f"'{docker_image_name}' found"
+                )
+            echo_err("Build failed, using existing image (--allow-stale)")
+    else:
+        echo_err("Image is up to date, skipping rebuild.")
+
 
 # ============================================================================
 # Main Execution
 # ============================================================================
 
-username="$(whoami)"
 
-devel_dir="$(realpath "$HOME/devel")"
-if [[ ! -d "$devel_dir" ]]; then
-    echo "Error: $HOME/devel does not exist" >&2
-    exit 1
-fi
+def detect_profile(current_dir):
+    try:
+        result = subprocess.run(
+            ["project_profile_name"],
+            cwd=current_dir,
+            stdout=subprocess.PIPE,
+            encoding="utf-8",
+        )
+    except OSError:
+        die("Error: project_profile_name not found", code=127)
+    if result.returncode != 0:
+        sys.exit(result.returncode)
+    return result.stdout.rstrip("\n")
 
-current_dir="$(realpath "$(pwd)")"
-if [[ "$current_dir/" != "$devel_dir/"* ]] || [[ "$current_dir" == "$devel_dir" ]]; then
-    current_dir="$devel_dir/dotfiles"
-    echo "Not inside a ~/devel project, defaulting to $current_dir" >&2
-fi
 
-if [ -z "$profile" ]; then
-    profile="$(cd "$current_dir" && project_profile_name)"
-fi
-# Validate profile name to prevent command injection.
-# Max length: 64 characters, alphanumeric with dots, dashes, underscores.
-if [[ ! "$profile" =~ ^[a-zA-Z0-9_]([a-zA-Z0-9._-]{0,62}[a-zA-Z0-9_])?$ ]]; then
-    echo "Error: Invalid profile name '$profile'" >&2
-    exit 1
-fi
-
-# Compute the project name (path relative to ~/devel/).
-project_name="${current_dir#"$devel_dir/"}"
-
-# Get AoE session info if available.
-aoe_instance_id=""
-aoe_session_name=""
-if command -v aoe &> /dev/null; then
-    if aoe_session_json=$(aoe session current --json 2> /dev/null); then
-        aoe_instance_id=$(jq -r '.id // ""' <<< "$aoe_session_json")
-        aoe_session_name=$(jq -r '.session // ""' <<< "$aoe_session_json")
-    fi
-fi
-
-echo "Profile: $profile" >&2
-echo "Project: $project_name" >&2
-if [ -n "$aoe_instance_id" ]; then
-    echo "Agent of Empires detected: $aoe_instance_id (session: $aoe_session_name)" >&2
-fi
-
-# Fetch API key from config file if not already set. If no key is found,
-# proceed without one (Claude Code will fall back to OAuth or prompt the user).
-if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
-    config_file="$HOME/config.json"
-
-    if [[ -f "$config_file" ]]; then
-        # Verify the file is not readable by group or others.
-        file_perms=$(stat -c %a "$config_file" 2> /dev/null \
-            || stat -f %Lp "$config_file" 2> /dev/null)
-        if [[ "$file_perms" != "600" ]]; then
-            echo "Error: $config_file has permissions $file_perms, expected 600" >&2
-            exit 1
-        fi
-
-        CONFIG=$(< "$config_file")
-
-        # Validate that we got valid JSON.
-        if ! jq empty <<< "$CONFIG" 2> /dev/null; then
-            echo "Error: $config_file is not valid JSON" >&2
-            exit 1
-        fi
-
-        ANTHROPIC_API_KEY=$(jq -r --arg p "$profile" \
-            '.claude_code.profiles[$p].api_key // empty' \
-            <<< "$CONFIG")
-
-        if [[ -n "$ANTHROPIC_API_KEY" ]]; then
-            export ANTHROPIC_API_KEY
-        else
-            echo "No API key for profile '$profile', skipping" >&2
-        fi
-    fi
-fi
-
-today=$(date +%Y-%m-%d)
-
-docker_image_name="$username-claude:latest"
-dockerfile_path="$devel_dir/dotfiles/references/ai_containers/Dockerfile"
-
-# Get the image's creation timestamp (seconds since epoch, empty if image
-# doesn't exist).
-inspect_stderr_file=$(mktemp)
-last_build_timestamp=$(
-    docker image inspect "$docker_image_name" \
-        --format '{{.Metadata.LastTagTime.Unix}}' \
-        2> "$inspect_stderr_file" \
-        || true
-)
-inspect_stderr=$(< "$inspect_stderr_file")
-rm -f "$inspect_stderr_file"
-# TODO: Remove this once it's not needed anymore. There is some bug in Docker
-# in which sometimes `docker image inspect` can't find an image, but then you
-# run `docker image ls` and then `docker image inspect` again, and it works...
-# This is an attempt to automatically overcome it.
-if [[ "$inspect_stderr" == *"No such image"* ]]; then
-    echo "WARNING: image not found, trying to fix it" >&2
-    docker image ls "$docker_image_name" > /dev/null 2>&1
-    inspect_stderr_file=$(mktemp)
-    last_build_timestamp=$(
-        docker image inspect "$docker_image_name" \
-            --format '{{.Metadata.LastTagTime.Unix}}' \
-            2> "$inspect_stderr_file" \
-            || true
+def detect_aoe_session():
+    """Get AoE session info if available."""
+    if shutil.which("aoe") is None:
+        return "", ""
+    result = subprocess.run(
+        ["aoe", "session", "current", "--json"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        encoding="utf-8",
     )
-    inspect_stderr=$(< "$inspect_stderr_file")
-    rm -f "$inspect_stderr_file"
-    if [[ "$inspect_stderr" != *"No such image"* ]]; then
-        echo "WARNING: 'docker image ls' fixed it" >&2
-    fi
-fi
-
-# Derive the last build date in local time from the timestamp.
-if [[ -n "$last_build_timestamp" ]]; then
-    last_build_date=$(get_date "$last_build_timestamp")
-else
-    last_build_date=""
-fi
-
-# Get the Dockerfile's modification time (seconds since epoch).
-dockerfile_mtime=$(
-    stat -c %Y "$dockerfile_path" 2> /dev/null \
-        || stat -f %m "$dockerfile_path" 2> /dev/null \
-        || echo "0"
-)
-
-needs_rebuild=false
-rebuild_reason=""
-if [[ "$no_build_cache" == "true" ]]; then
-    needs_rebuild=true
-    rebuild_reason="--no-build-cache specified"
-elif [[ "$force_rebuild" == "true" ]]; then
-    needs_rebuild=true
-    rebuild_reason="--force-rebuild specified"
-elif [[ -z "$last_build_date" ]]; then
-    # Image doesn't exist at all.
-    needs_rebuild=true
-    rebuild_reason="image does not exist"
-    if [[ -n "$inspect_stderr" ]]; then
-        echo "docker image inspect: $inspect_stderr" >&2
-    fi
-elif [[ "$last_build_date" != "$today" ]]; then
-    needs_rebuild=true
-    rebuild_reason="image is from $last_build_date, today is $today"
-elif [[ -n "$last_build_timestamp" ]] \
-    && [[ "$dockerfile_mtime" -gt "$last_build_timestamp" ]]; then
-    needs_rebuild=true
-    rebuild_reason="Dockerfile modified after last build"
-fi
-
-if [[ "$no_rebuild" == "true" ]]; then
-    # Skip rebuild entirely - verify image exists.
-    if [[ -z "$last_build_date" ]]; then
-        echo "Error: Docker image '$docker_image_name' does not exist and --no-rebuild was specified" >&2
-        exit 1
-    fi
-    if [[ "$needs_rebuild" == "true" ]]; then
-        echo "Skipping rebuild despite: $rebuild_reason (--no-rebuild specified)" >&2
-    else
-        echo "Skipping rebuild (--no-rebuild specified, image is up to date)" >&2
-    fi
-elif [[ "$needs_rebuild" == "true" ]]; then
-    echo "Rebuilding image: $rebuild_reason" >&2
-    use_cache="true"
-    if [[ "$no_build_cache" == "true" ]]; then
-        use_cache="false"
-    fi
-    if ! build_image "$use_cache"; then
-        if [[ "$allow_stale" == "true" ]]; then
-            if [[ -z "$last_build_date" ]]; then
-                echo "Error: Docker build failed and no existing image '$docker_image_name' found" >&2
-                exit 1
-            fi
-            echo "Build failed, using existing image (--allow-stale)" >&2
-        else
-            echo "Error: Docker build failed" >&2
-            exit 1
-        fi
-    fi
-else
-    echo "Image is up to date, skipping rebuild." >&2
-fi
-
-# Different profiles have different projects, todos, chat histories, etc.
-mkdir -p "$HOME/.claude-$profile"
-cp -a "$HOME/.claude-origin/." "$HOME/.claude-$profile"
-
-# Make hard copies of symlinked files before modifying them.
-# This is dereferenced because Claude Code sometimes changes this file, and I
-# don't want those changes to affect my dotfiles. I also may change it
-# depending on profile settings below.
-dereference "$HOME/.claude-$profile/settings.json"
-# This is dereferenced because I make changes to it just below.
-dereference "$HOME/.claude-$profile/CLAUDE.md"
-
-# Apply the preferred model for the profile from ~/config.json if one is
-# defined.
-profile_config_path="$HOME/config.json"
-if [[ -f "$profile_config_path" ]]; then
-    preferred_model=$(jq -r --arg p "$profile" \
-        '.claude_code.profiles[$p].model // empty' \
-        "$profile_config_path" 2> /dev/null || true)
-    if [[ -n "$preferred_model" ]]; then
-        profile_settings="$HOME/.claude-$profile/settings.json"
-        profile_settings_tmp=$(mktemp)
-        if jq --arg model "$preferred_model" '.model = $model' \
-            "$profile_settings" > "$profile_settings_tmp"; then
-            mv "$profile_settings_tmp" "$profile_settings"
-            echo "Model set to '$preferred_model' for profile '$profile'" >&2
-        else
-            rm -f "$profile_settings_tmp"
-        fi
-    fi
-fi
-
-# Replace the project list marker in CLAUDE.md with the actual project list.
-claude_md_path="$HOME/.claude-$profile/CLAUDE.md"
-if grep -qF '<!-- DEPENDENCIES_LIST -->' "$claude_md_path" 2> /dev/null; then
-    raw_project_list_file=$(mktemp)
-    "$devel_dir/dotfiles/bin/list_project_dirs" > "$raw_project_list_file"
-    if [[ -s "$raw_project_list_file" ]]; then
-        claude_md_tmp=$(mktemp)
-        while IFS= read -r line; do
-            if [[ "$line" == *'<!-- DEPENDENCIES_LIST -->'* ]]; then
-                # Extract the indentation from the marker line.
-                indent="${line%%<!-- DEPENDENCIES_LIST -->*}"
-                sed "s/^/${indent}- /" "$raw_project_list_file"
-            else
-                printf '%s\n' "$line"
-            fi
-        done < "$claude_md_path" > "$claude_md_tmp" \
-            && mv "$claude_md_tmp" "$claude_md_path"
-    fi
-    rm -f "$raw_project_list_file"
-fi
-
-if [[ ! -f "$HOME/.claude-$profile.json" ]]; then
-    if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
-        # Pre-approve the API key so we don't have to.
-        approved="${ANTHROPIC_API_KEY: -20}"
-        echo "{\"customApiKeyResponses\": {\"approved\": [\"$approved\"]}}" > "$HOME/.claude-$profile.json"
-    else
-        echo "{}" > "$HOME/.claude-$profile.json"
-    fi
-fi
-
-# Apply the MCP servers for the profile from ~/config.json if any are defined.
-# This replaces any `mcpServers` key that is already in the profile's
-# `.claude.json`.
-if [[ -f "$profile_config_path" ]]; then
-    mcp_servers=$(jq -c --arg p "$profile" \
-        '.claude_code.profiles[$p].mcp_servers // empty' \
-        "$profile_config_path" 2> /dev/null || true)
-    if [[ -n "$mcp_servers" ]]; then
-        profile_json="$HOME/.claude-$profile.json"
-        profile_json_tmp=$(mktemp)
-        if jq --argjson servers "$mcp_servers" '.mcpServers = $servers' \
-            "$profile_json" > "$profile_json_tmp"; then
-            mv "$profile_json_tmp" "$profile_json"
-            echo "MCP servers set for profile '$profile'" >&2
-        else
-            rm -f "$profile_json_tmp"
-        fi
-    fi
-fi
-
-# Rename project-local `.claude` commands and skills with a `p-` prefix so they
-# don't shadow user-level commands and skills. Mark tracked files with
-# `--skip-worktree` so Git ignores the renames, and add the new files to
-# `.git/info/exclude` so they are not committed.
-if git -C "$current_dir" rev-parse --git-dir &> /dev/null; then
-    git_dir=$(git -C "$current_dir" rev-parse --git-dir)
-    exclude_file="$git_dir/info/exclude"
-    mkdir -p "$(dirname "$exclude_file")"
-
-    # Resolve the real paths of the commands and skills directories (following
-    # symlinks) so `git ls-files` returns the tracked files within them, not
-    # just the symlink entries.
-    commands_real_relpath=""
-    if [[ -d "$current_dir/.claude/commands" ]]; then
-        commands_real_relpath=$(
-            realpath "$current_dir/.claude/commands" \
-                | sed "s|^$current_dir/||"
+    if result.returncode != 0:
+        return "", ""
+    try:
+        session = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        echo_err(
+            "Warning: `aoe session current --json` did not return valid JSON, "
+            "running without session info"
         )
-    fi
-    skills_real_relpath=""
-    if [[ -d "$current_dir/.claude/skills" ]]; then
-        skills_real_relpath=$(
-            realpath "$current_dir/.claude/skills" \
-                | sed "s|^$current_dir/||"
+        return "", ""
+    if not isinstance(session, dict):
+        echo_err(
+            "Warning: `aoe session current --json` did not return a JSON object, "
+            "running without session info"
         )
-    fi
-
-    # Use `git ls-files` (with `-v` to include skip-worktree files) as the
-    # source of truth for tracked commands and skills.
-    ls_files_args=()
-    [[ -n "$commands_real_relpath" ]] \
-        && ls_files_args+=("$commands_real_relpath")
-    [[ -n "$skills_real_relpath" ]] && ls_files_args+=("$skills_real_relpath")
-
-    all_tracked_claude=""
-    if [[ ${#ls_files_args[@]} -gt 0 ]]; then
-        all_tracked_claude=$(
-            git -C "$current_dir" ls-files -v "${ls_files_args[@]}" \
-                2> /dev/null || true
+        return "", ""
+    instance_id = session.get("id")
+    session_name = session.get("session")
+    if not isinstance(instance_id, str) or not isinstance(session_name, str):
+        echo_err(
+            "Warning: `aoe session current --json` did not return text `id` and "
+            f"`session`: {instance_id!r}, {session_name!r}"
         )
-    fi
+        return "", ""
+    return instance_id, session_name
 
-    # Process commands: foo.md -> p-foo.md (under the resolved directory).
-    if [[ -n "$commands_real_relpath" ]] && [[ -n "$all_tracked_claude" ]]; then
-        tracked_commands=$(
-            sed -n "s|^. ${commands_real_relpath}/||p" \
-                <<< "$all_tracked_claude" || true
+
+def resolve_api_key(config, profile):
+    """Get the API key for the profile from the configuration.
+
+    An API key that is already in the environment wins. Return an empty string
+    when there is no key. Claude Code then falls back to OAuth, or it prompts
+    the user.
+    """
+    from_environment = os.environ.get("ANTHROPIC_API_KEY", "")
+    if from_environment:
+        return from_environment
+
+    api_key = _MISSING
+    if config is not None:
+        api_key = profile_setting(config, profile, "api_key")
+    if api_key is _MISSING or api_key is None:
+        echo_err(f"No API key for profile '{profile}'")
+        return ""
+    if not isinstance(api_key, str):
+        die(f"Error: the `api_key` of profile '{profile}' is not text")
+    return api_key
+
+
+def main():
+    options = parse_options(sys.argv[1:])
+
+    if options.show_help:
+        show_help()
+        return 0
+
+    # The help text must work on a host without Docker, so this check comes
+    # after the options.
+    check_requirements()
+
+    home = os.environ.get("HOME")
+    if not home:
+        die("Error: HOME is not set")
+    try:
+        username = pwd.getpwuid(os.geteuid()).pw_name
+    except KeyError:
+        die(f"Error: user ID {os.geteuid()} has no entry in the password database")
+
+    devel_dir = os.path.realpath(os.path.join(home, "devel"))
+    if not os.path.isdir(devel_dir):
+        die(f"Error: {home}/devel does not exist")
+
+    current_dir = os.path.realpath(os.getcwd())
+    if not current_dir.startswith(devel_dir + "/"):
+        current_dir = os.path.join(devel_dir, "dotfiles")
+        echo_err(f"Not inside a ~/devel project, defaulting to {current_dir}")
+
+    profile = options.profile
+    if not profile:
+        profile = detect_profile(current_dir)
+    # Validate profile name to prevent command injection.
+    # Max length: 64 characters, alphanumeric with dots, dashes, underscores.
+    if not re.fullmatch(r"[a-zA-Z0-9_]([a-zA-Z0-9._-]{0,62}[a-zA-Z0-9_])?", profile):
+        die(f"Error: Invalid profile name '{profile}'")
+
+    # Compute the project name (path relative to ~/devel/).
+    project_name = strip_leading_path(current_dir, devel_dir)
+
+    aoe_instance_id, aoe_session_name = detect_aoe_session()
+
+    echo_err(f"Profile: {profile}")
+    echo_err(f"Project: {project_name}")
+    if aoe_instance_id:
+        echo_err(
+            f"Agent of Empires detected: {aoe_instance_id} "
+            f"(session: {aoe_session_name})"
         )
-        if [[ -n "$tracked_commands" ]]; then
-            while IFS= read -r local_basename; do
-                git_rel_path="$commands_real_relpath/$local_basename"
-                git -C "$current_dir" update-index --skip-worktree \
-                    "$git_rel_path" 2> /dev/null || true
-                src="$current_dir/$git_rel_path"
-                dest="$current_dir/$commands_real_relpath/p-$local_basename"
-                # Ensure the p-prefixed copy exists. If it doesn't, extract
-                # the content directly from git. `git checkout` won't work
-                # here because skip-worktree makes it a no-op.
-                if [[ ! -f "$dest" ]]; then
-                    git -C "$current_dir" show "HEAD:$git_rel_path" > "$dest"
-                fi
-                # Remove the original if it's still around.
-                rm -f "$src"
-                # Ensure the p-prefixed file is in the exclude file.
-                new_rel_path="$commands_real_relpath/p-$local_basename"
-                if ! grep -qxF "$new_rel_path" "$exclude_file" \
-                    2> /dev/null; then
-                    echo "$new_rel_path" >> "$exclude_file"
-                fi
-            done <<< "$tracked_commands"
-        fi
-    fi
 
-    # Process skills: foo/ -> p-foo/ (under the resolved directory).
-    # Extract unique top-level skill directory names from tracked paths.
-    if [[ -n "$skills_real_relpath" ]] && [[ -n "$all_tracked_claude" ]]; then
-        tracked_skill_names=$(
-            sed -n "s|^. ${skills_real_relpath}/||p" <<< "$all_tracked_claude" \
-                | cut -d/ -f1 | sort -u || true
-        )
-        if [[ -n "$tracked_skill_names" ]]; then
-            while IFS= read -r skill_name; do
-                # Mark all tracked files in this skill with skip-worktree.
-                tracked_skill_files=$(
-                    sed -n "s/^. //p" <<< "$all_tracked_claude" \
-                        | grep "^${skills_real_relpath}/$skill_name/" || true
-                )
-                if [[ -n "$tracked_skill_files" ]]; then
-                    while IFS= read -r file; do
-                        git -C "$current_dir" update-index --skip-worktree \
-                            "$file" 2> /dev/null || true
-                    done <<< "$tracked_skill_files"
-                fi
-                src="$current_dir/$skills_real_relpath/$skill_name"
-                dest="$current_dir/$skills_real_relpath/p-$skill_name"
-                # Ensure the p-prefixed copy exists. If it doesn't, extract
-                # each file directly from git. `git checkout` won't work
-                # here because skip-worktree makes it a no-op.
-                if [[ ! -d "$dest" ]]; then
-                    if [[ -n "$tracked_skill_files" ]]; then
-                        while IFS= read -r file; do
-                            file_within_skill="${file#"$skills_real_relpath/$skill_name/"}"
-                            dest_file="$dest/$file_within_skill"
-                            mkdir -p "$(dirname "$dest_file")"
-                            git -C "$current_dir" show "HEAD:$file" \
-                                > "$dest_file"
-                        done <<< "$tracked_skill_files"
-                    fi
-                fi
-                # Remove the original if it's still around.
-                rm -rf "$src"
-                # Ensure the p-prefixed directory is in the exclude file.
-                new_rel_dir="$skills_real_relpath/p-$skill_name/"
-                if ! grep -qxF "$new_rel_dir" "$exclude_file" \
-                    2> /dev/null; then
-                    echo "$new_rel_dir" >> "$exclude_file"
-                fi
-            done <<< "$tracked_skill_names"
-        fi
-    fi
-fi
+    user_config_path = f"{home}/config.json"
+    user_config = load_user_config(user_config_path)
+    api_key = resolve_api_key(user_config, profile)
 
-# Always restrict setting sources to user and local.
-harness_args=(--setting-sources user,local "${harness_args[@]}")
+    channel = options.channel or DEFAULT_CHANNEL
+    docker_image_name = build_image_name(username, channel)
+    dockerfile_path = os.path.join(
+        devel_dir, "dotfiles", "references", "ai_containers", "Dockerfile"
+    )
 
-# Add all project directories to Claude's context.
-while IFS= read -r relative_project_dir; do
-    harness_args+=(--add-dir "$devel_dir/$relative_project_dir")
-done < <("$devel_dir/dotfiles/bin/list_project_dirs" 2> /dev/null || true)
+    ensure_image(options, docker_image_name, dockerfile_path, home, channel)
 
-if [[ "$process_output" == "true" ]]; then
-    # Capture output and process it.
-    output=$(run_container "${harness_args[@]}")
-    process_print_output "$output"
-else
-    # Pass all arguments directly to Claude Code.
-    run_container --exec "${harness_args[@]}"
-fi
+    # Different profiles have different projects, todos, chat histories, etc.
+    profile_dir = f"{home}/.claude-{profile}"
+    # The directory holds credentials and chat history. `makedirs` applies the
+    # mode only to a directory that it creates, so tighten an existing one too.
+    os.makedirs(profile_dir, mode=0o700, exist_ok=True)
+    try:
+        os.chmod(profile_dir, 0o700)
+    except OSError as error:
+        echo_err(f"Warning: cannot set the mode of {profile_dir}: {error}")
+    try:
+        copy_tree_contents(f"{home}/.claude-origin", profile_dir)
+    except OSError as error:
+        die(f"Error: cannot copy {home}/.claude-origin: {error}")
+
+    apply_preferred_model(user_config, profile, home)
+
+    project_dirs = list_project_dirs(devel_dir)
+    apply_dependencies_list(f"{profile_dir}/CLAUDE.md", project_dirs)
+
+    profile_json_path = f"{home}/.claude-{profile}.json"
+    create_profile_json(profile_json_path)
+    approve_api_key(profile_json_path, api_key)
+    apply_mcp_servers(user_config, profile_json_path, profile)
+
+    prefix_project_claude_assets(current_dir)
+
+    prepare_shared_dirs()
+
+    # Always restrict setting sources to user and local.
+    harness_args = ["--setting-sources", "user,local", *options.harness_args]
+
+    # Add the other project directories to Claude's context. The current
+    # project is already the working directory.
+    for relative_project_dir in project_dirs:
+        project_dir = os.path.join(devel_dir, relative_project_dir)
+        if project_dir == current_dir:
+            continue
+        harness_args += ["--add-dir", project_dir]
+
+    config = RunConfig(
+        home=home,
+        devel_dir=devel_dir,
+        current_dir=current_dir,
+        profile=profile,
+        project_name=project_name,
+        api_key=api_key,
+        aoe_instance_id=aoe_instance_id,
+        aoe_session_name=aoe_session_name,
+        docker_image_name=docker_image_name,
+        process_output=options.process_output,
+        harness_print_mode=options.harness_print_mode,
+        no_docker_socket=options.no_docker_socket,
+    )
+
+    cmd, env = build_run_command(harness_args, config)
+
+    if options.verbose:
+        echo_err(f"Command: {shlex.join(cmd)}")
+    echo_err("Running container...")
+    sys.stdout.flush()
+    sys.stderr.flush()
+
+    if options.process_output:
+        # Capture output and process it.
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, encoding="utf-8", env=env)
+        if result.returncode != 0:
+            # The output was captured, so relay it. Otherwise the failure is
+            # silent.
+            if result.stdout:
+                echo_err(result.stdout.rstrip("\n"))
+            return result.returncode
+        process_print_output(result.stdout.rstrip("\n"))
+        return 0
+
+    # Replace this process with the container. Claude Code then owns the
+    # terminal and its exit status becomes ours.
+    try:
+        os.execvpe(cmd[0], cmd, env)
+    except OSError as error:
+        die(f"Error: cannot run {cmd[0]}: {error}")
+
+
+if __name__ == "__main__":
+    sys.exit(main())
