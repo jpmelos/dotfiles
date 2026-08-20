@@ -851,7 +851,29 @@ jc() {
                 return 1
             fi
             op_content=$(jq -r '.value' <<< "$op_json")
-            printf '%s' "$op_content" > ~/config.json
+
+            if [ -f ~/config.json ]; then
+                local diff_output
+                diff_output=$(diff ~/config.json <(printf '%s\n' "$op_content"))
+                if [ -z "$diff_output" ]; then
+                    chmod 600 ~/config.json
+                    echo "No differences found. Local file is already up to date."
+                    return 0
+                fi
+
+                echo "Diff (local → 1Password):"
+                echo "$diff_output"
+                echo ""
+                read -r -n 1 -p "Overwrite ~/config.json with 1Password content? [y/N] "
+                echo
+                if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                    echo "Cancelled."
+                    return 0
+                fi
+            fi
+
+            printf '%s\n' "$op_content" > ~/config.json
+            chmod 600 ~/config.json
             echo "Saved to ~/config.json."
             ;;
         save)
