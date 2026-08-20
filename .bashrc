@@ -124,6 +124,10 @@ alias treea='\tree -alF -I .git'
 # Include headers and automatically follows redirects.
 alias curl='\curl -iL'
 
+alias py='python3'
+alias py3='python3'
+alias python='python3'
+
 #####################################
 #                                   #
 #    git aliases and completions    #
