@@ -33,7 +33,11 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 #/     "claude_code": {
 #/       "profiles": {
 #/         "username": {
-#/           "api_key": "sk-..."
+#/           "api_key": "sk-...",
+#/           "model": "opus",
+#/           "mcp_servers": {
+#/             "server-name": {"command": "...", "args": ["..."]}
+#/           }
 #/         },
 #/         "orgname": {
 #/           "api_key": "sk-..."
@@ -42,6 +46,9 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 #/     }
 #/   }
 #/   ```
+#/
+#/   The `mcp_servers` object of a profile replaces the `mcpServers` key in
+#/   that profile's `.claude.json`.
 
 # ============================================================================
 # Initial checks and configuration
@@ -659,11 +666,11 @@ dereference "$HOME/.claude-$profile/CLAUDE.md"
 
 # Apply the preferred model for the profile from ~/config.json if one is
 # defined.
-model_config_path="$HOME/config.json"
-if [[ -f "$model_config_path" ]]; then
+profile_config_path="$HOME/config.json"
+if [[ -f "$profile_config_path" ]]; then
     preferred_model=$(jq -r --arg p "$profile" \
         '.claude_code.profiles[$p].model // empty' \
-        "$model_config_path" 2> /dev/null || true)
+        "$profile_config_path" 2> /dev/null || true)
     if [[ -n "$preferred_model" ]]; then
         profile_settings="$HOME/.claude-$profile/settings.json"
         profile_settings_tmp=$(mktemp)
@@ -705,6 +712,26 @@ if [[ ! -f "$HOME/.claude-$profile.json" ]]; then
         echo "{\"customApiKeyResponses\": {\"approved\": [\"$approved\"]}}" > "$HOME/.claude-$profile.json"
     else
         echo "{}" > "$HOME/.claude-$profile.json"
+    fi
+fi
+
+# Apply the MCP servers for the profile from ~/config.json if any are defined.
+# This replaces any `mcpServers` key that is already in the profile's
+# `.claude.json`.
+if [[ -f "$profile_config_path" ]]; then
+    mcp_servers=$(jq -c --arg p "$profile" \
+        '.claude_code.profiles[$p].mcp_servers // empty' \
+        "$profile_config_path" 2> /dev/null || true)
+    if [[ -n "$mcp_servers" ]]; then
+        profile_json="$HOME/.claude-$profile.json"
+        profile_json_tmp=$(mktemp)
+        if jq --argjson servers "$mcp_servers" '.mcpServers = $servers' \
+            "$profile_json" > "$profile_json_tmp"; then
+            mv "$profile_json_tmp" "$profile_json"
+            echo "MCP servers set for profile '$profile'" >&2
+        else
+            rm -f "$profile_json_tmp"
+        fi
     fi
 fi
 
