@@ -23,6 +23,10 @@
   docstrings about planned work, future features, or concepts that are not in
   the codebase yet. A reader who sees only the current code, and knows nothing
   about the plan behind it, must understand the text fully.
+- Document only the unit you are writing. *Never* describe the behavior or the
+  implementation of another function, class, module, or layer in a comment or
+  docstring. Name it and let the reader go read it there. Copied descriptions
+  couple the layers and go stale.
 - Prefer descriptive variable names over shorter ones (e.g., `thread_id`
   instead of `tid`). The only exceptions are very short for-loops, Python
   comprehensions, or similar structures.
