@@ -15,8 +15,6 @@ RUN apt-get update && \
         ripgrep \
         # Fuzzy matching of file names in `@`.
         fzf \
-        # For reading PRs.
-        gh \
         # `agent-browser` uses Chromium.
         chromium \
         # JSON processing for status line.

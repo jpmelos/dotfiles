@@ -76,9 +76,8 @@
   - *Never* delete a commit. Only a human can undo a commit.
   - If one of these scripts doesn't exist, assume that you are not allowed to
     do the related action.
-- Use the `gh` CLI to interact with GitHub URLs and repositories.
-  - Use `gh --help` for help.
-  - Use `git remote --verbose` to check if the repository is on GitHub.
+- Use `git remote --verbose` to check in which service the repository is hosted
+  on.
 - When a tool call or command is denied due to permissions, read
   `~/.claude/settings.json` to discover which alternatives are allowed.
 

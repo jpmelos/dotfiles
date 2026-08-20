@@ -324,9 +324,6 @@ run_container() {
         # how they want to login.
         --env ANTHROPIC_API_KEY
 
-        # This is so the agent can use `gh`.
-        --env "GH_TOKEN=$(gh auth token)"
-
         # This enables sessions to show up with the right timestamps.
         --env "TZ=${TZ:-$(readlink /etc/localtime 2> /dev/null | sed 's|.*/zoneinfo/||')}"
 
