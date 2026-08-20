@@ -1,4 +1,4 @@
-# vim: set ft=sh :
+# vim: ft=sh
 
 if [ -n "$AUTOENV_DOTFILES" ]; then
     return
