@@ -66,8 +66,9 @@ RUN mkdir -p "${HOME}/.local/bin" && chown -R "${UID}:${GID}" "${HOME}" && \
 USER "${UID}:${GID}"
 WORKDIR "${HOME}"
 
-# Create mountpoints required by Claude Code.
-RUN mkdir -p ".claude" && echo '{}' > ".claude.json"
+# Create the mountpoint for the Claude Code configuration directory. `bin/ai`
+# points `CLAUDE_CONFIG_DIR` at it, so `.claude.json` lives inside it too.
+RUN mkdir -p ".claude"
 
 # Bust cache.
 ARG BUILD_DATE

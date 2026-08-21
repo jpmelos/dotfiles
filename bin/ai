@@ -627,9 +627,9 @@ def build_run_command(harness_args, config):
         "--volume", f"{devel_dir}:{devel_dir}",
         "--workdir", config.current_dir,
 
-        # Claude Code mounts.
+        # Claude Code files.
+        "--env", f"CLAUDE_CONFIG_DIR={home}/.claude",
         "--volume", f"{home}/.claude-{config.profile}:{home}/.claude",
-        "--volume", f"{home}/.claude-{config.profile}.json:{home}/.claude.json",
 
         # Anthropic's API key if available. The name alone keeps the value out
         # of the command line. If not defined, Claude Code will check for OAuth
@@ -1589,7 +1589,7 @@ def main():
     project_dirs = list_project_dirs(devel_dir)
     apply_dependencies_list(f"{profile_dir}/CLAUDE.md", project_dirs)
 
-    profile_json_path = f"{home}/.claude-{profile}.json"
+    profile_json_path = f"{profile_dir}/.claude.json"
     create_profile_json(profile_json_path)
     approve_api_key(profile_json_path, api_key)
     apply_mcp_servers(user_config, profile_json_path, profile)
