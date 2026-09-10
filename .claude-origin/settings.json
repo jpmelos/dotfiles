@@ -210,5 +210,6 @@
     "disableBypassPermissionsMode": true,
     "includeGitInstructions": false,
     "spinnerTipsEnabled": false,
-    "terminalProgressBarEnabled": false
+    "terminalProgressBarEnabled": false,
+    "theme": "light"
 }
