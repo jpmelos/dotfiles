@@ -32,21 +32,16 @@ end
 
 function module.apply_to_config(config)
     config.disable_default_key_bindings = true
+    config.disable_default_mouse_bindings = true
 
-    config.mouse_bindings = {
-        -- Require CTRL+CLICK for opening links.
-        {
-            event = { Up = { streak = 1, button = "Left" } },
-            mods = "CTRL",
-            action = wezterm.action.OpenLinkAtMouseCursor,
-        },
-        -- Stop CLICK from opening URLs (it still opens with CTRL).
-        {
-            event = { Up = { streak = 1, button = "Left" } },
-            mods = "NONE",
-            action = wezterm.action.DisableDefaultAssignment,
-        },
-    }
+    config.mouse_bindings = {}
+    config.swallow_mouse_click_on_window_focus = true
+    config.swallow_mouse_click_on_pane_focus = true
+    -- Do not turn wheel events into arrow keys on the alternate screen when
+    -- the application did not enable mouse reporting.
+    config.alternate_buffer_wheel_scroll_speed = 0
+    -- No pointer change on hover over URLs.
+    config.hyperlink_rules = {}
 
     config.leader = { key = "s", mods = "CTRL", timeout_milliseconds = 10000 }
     config.keys = {
