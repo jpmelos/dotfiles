@@ -17,6 +17,7 @@ config.check_for_updates = false
 -- already-existent instance instead of creating a new one.
 config.prefer_to_spawn_tabs = true
 
+config.hide_tab_bar_if_only_one_tab = true
 config.show_new_tab_button_in_tab_bar = false
 
 return config
