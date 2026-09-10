@@ -43,9 +43,16 @@
 # /   repositories that you do not trust. Docker is then unavailable inside
 # /   the container.
 # /
-# /   Two host directories under `/tmp` carry state between the container and
-# /   the host. Any local user can read them. That is on purpose. Nothing
-# /   secret goes there.
+# /   Host directories under `/tmp` carry state between the container and the
+# /   host. Any local user can read them. That is on purpose. Nothing secret
+# /   goes there.
+# /
+# / tmux:
+# /   When the launcher runs inside tmux, the container gets the `TMUX_PANE`
+# /   variable and a mount of `/tmp/jpmelos/tmux/pane-state`. The `running`,
+# /   `pending`, `ready`, and `default` scripts then mark the pane that runs
+# /   the agent. Outside tmux the container gets none of this, and these
+# /   scripts do nothing.
 # /
 # / Project-local agent assets:
 # /   Tracked commands and skills under the project's `.claude` directory get a
@@ -524,6 +531,10 @@ def get_timezone():
     return match.group(1)
 
 
+def in_tmux():
+    return bool(os.environ.get("TMUX_PANE"))
+
+
 @dataclass
 class RunConfig:
     home: str
@@ -560,6 +571,10 @@ def build_container_env(api_key):
 # write to it, and nothing reports the failure.
 SHARED_HOST_DIRS = ("/tmp/claude-code-shared", "/tmp/aoe-hooks")
 
+# The directory that the `pane-state` script writes to. The container gets it
+# only when the launcher runs inside tmux.
+PANE_STATE_DIR = "/tmp/jpmelos/tmux/pane-state"
+
 # Scripts from `~/devel/dotfiles/bin` that the agent calls by name.
 AGENT_BINARIES = (
     "safe_mv",
@@ -569,12 +584,20 @@ AGENT_BINARIES = (
     "ai_git_commit",
     "review",
     "review_diff",
+    "pane-state",
+    "running",
+    "pending",
+    "ready",
+    "default",
 )
 
 
 def prepare_shared_dirs():
     """Create the host directories that the container writes to."""
-    for shared_dir in SHARED_HOST_DIRS:
+    shared_dirs = list(SHARED_HOST_DIRS)
+    if in_tmux():
+        shared_dirs.append(PANE_STATE_DIR)
+    for shared_dir in shared_dirs:
         try:
             os.makedirs(shared_dir, exist_ok=True)
         except OSError as error:
@@ -596,66 +619,73 @@ def build_run_command(harness_args, config):
     cmd = [
         "docker",
         "run",
-
         # Delete the container when it exits.
         "--rm",
-
         # Run an init process that will properly manage signals and other OS
         # facilities.
         "--init",
-
         # Configure user.
-        "--user", f"{os.getuid()}:{os.getgid()}",
-
+        "--user",
+        f"{os.getuid()}:{os.getgid()}",
         # Container name.
-        "--name", generate_container_name(config.current_dir),
-
+        "--name",
+        generate_container_name(config.current_dir),
         # So that the agent can reach services running on the host via
         # `host.docker.internal`.
-        "--add-host", "host.docker.internal:host-gateway",
-
+        "--add-host",
+        "host.docker.internal:host-gateway",
         # Make the entire filesystem read-only.
         "--read-only",
-        "--tmpfs", "/tmp",
-        "--env", "XDG_RUNTIME_DIR=/tmp",
-
+        "--tmpfs",
+        "/tmp",
+        "--env",
+        "XDG_RUNTIME_DIR=/tmp",
         # Path used to coordinate things that use Claude Code.
-        "--volume", "/tmp/claude-code-shared:/tmp/claude-code-shared",
-
+        "--volume",
+        "/tmp/claude-code-shared:/tmp/claude-code-shared",
         # Mount the entire `~/devel` directory and set the current directory as
         # the working directory.
-        "--volume", f"{devel_dir}:{devel_dir}",
-        "--workdir", config.current_dir,
-
+        "--volume",
+        f"{devel_dir}:{devel_dir}",
+        "--workdir",
+        config.current_dir,
         # Claude Code files.
-        "--env", f"CLAUDE_CONFIG_DIR={home}/.claude",
-        "--volume", f"{home}/.claude-{config.profile}:{home}/.claude",
-
+        "--env",
+        f"CLAUDE_CONFIG_DIR={home}/.claude",
+        "--volume",
+        f"{home}/.claude-{config.profile}:{home}/.claude",
         # Anthropic's API key if available. The name alone keeps the value out
         # of the command line. If not defined, Claude Code will check for OAuth
         # credentials. If not there too, it will ask the user how they want to
         # login.
-        "--env", "ANTHROPIC_API_KEY",
-
+        "--env",
+        "ANTHROPIC_API_KEY",
         # This is used to show the active profile and project in the status
         # line.
-        "--env", f"AGENT_PROFILE={config.profile}",
-        "--env", f"PROJECT_NAME={config.project_name}",
-
+        "--env",
+        f"AGENT_PROFILE={config.profile}",
+        "--env",
+        f"PROJECT_NAME={config.project_name}",
         # Agent of Empires environment variables and mounts.
-        "--env", f"AOE_INSTANCE_ID={config.aoe_instance_id}",
-        "--env", f"AOE_SESSION_NAME={config.aoe_session_name}",
-        "--volume", "/tmp/aoe-hooks:/tmp/aoe-hooks",
-
+        "--env",
+        f"AOE_INSTANCE_ID={config.aoe_instance_id}",
+        "--env",
+        f"AOE_SESSION_NAME={config.aoe_session_name}",
+        "--volume",
+        "/tmp/aoe-hooks:/tmp/aoe-hooks",
         # Claude Code uses this to know search for file suggestions on `@`.
-        "--env", "RIPGREP_CONFIG_PATH",
-
+        "--env",
+        "RIPGREP_CONFIG_PATH",
         # Terminal configuration.
-        "--env", "TERM",
-        "--env", "COLORTERM",
-        "--env", "FORCE_COLOR",
-        "--env", "NO_COLOR",
-    ]  # fmt: skip
+        "--env",
+        "TERM",
+        "--env",
+        "COLORTERM",
+        "--env",
+        "FORCE_COLOR",
+        "--env",
+        "NO_COLOR",
+    ]
 
     # Mount the scripts that the agent calls by name. Skip one when it is
     # absent, so Docker does not create it on the host as a directory owned by
@@ -673,6 +703,18 @@ def build_run_command(harness_args, config):
     timezone = get_timezone()
     if timezone:
         cmd += ["--env", f"TZ={timezone}"]
+
+    # Let the `pane-state` script mark the pane that runs the agent. `TMUX_PANE`
+    # names the pane that runs the launcher. The directory carries the state
+    # files to the host, where tmux picks them up. `TMUX` stays out. Programs
+    # in the container would take it as a sign that they can talk to tmux.
+    if in_tmux():
+        cmd += [
+            "--volume",
+            f"{PANE_STATE_DIR}:{PANE_STATE_DIR}",
+            "--env",
+            "TMUX_PANE",
+        ]
 
     # Mount git configuration so my aliases and other preferences are in
     # effect. Skip it when it is absent, so Docker does not create it on the
@@ -733,19 +775,20 @@ def build_run_command(harness_args, config):
             cmd += [
                 # Group 0 is what grants access to the socket. Without the
                 # socket, the container has no reason to hold the privilege.
-                "--group-add", "0",
-
-                "--volume", f"{docker_socket}:/var/run/docker.sock",
-                "--env", "DOCKER_HOST=unix:///var/run/docker.sock",
-            ]  # fmt: skip
+                "--group-add",
+                "0",
+                "--volume",
+                f"{docker_socket}:/var/run/docker.sock",
+                "--env",
+                "DOCKER_HOST=unix:///var/run/docker.sock",
+            ]
 
     cmd += [
         # The image we just built.
         config.docker_image_name,
-
         # Whatever arguments we want to pass to the harness.
         *harness_args,
-    ]  # fmt: skip
+    ]
 
     return cmd, build_container_env(config.api_key)
 

@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# Mark the current tmux pane as default. Call this from inside a pane when the
+# process that reported its state ends, so the pane loses its color.
+#
+# Usage: default
+
+exec pane-state default

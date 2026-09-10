@@ -144,12 +144,73 @@
   "model": "sonnet",
   "disableBundledSkills": true,
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "ready",
+            "type": "command"
+          }
+        ],
+        "matcher": "startup|resume|clear|fork"
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "command": "default",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "command": "running",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "running",
+            "type": "command"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "hooks": [
           {
             "type": "command",
             "command": "bash -c 'INPUT=$(cat); if [ -f \"jpenv-bin/post_tool_use.sh\" ]; then echo \"$INPUT\" | bash \"jpenv-bin/post_tool_use.sh\"; fi'"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "command": "ready",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "command": "ready",
+            "type": "command"
           }
         ]
       }

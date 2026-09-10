@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# Apply the pane state files under /tmp/jpmelos/tmux/pane-state to tmux. Each
+# file is named after a pane target and holds one state. The script sets the
+# @state pane option of that pane to the state. The pane-state script writes
+# these files.
+#
+# The script leaves the files in place. It reads every file on every run and
+# sets the option again, even when the value did not change. That costs one
+# tmux call per file and needs no protocol between the writer and this reader.
+# A file for a pane that no longer exists stays behind, and this script skips
+# it. Another pane with the same target later picks the state up, so the
+# pane-state script must write `default` at the end of a session.
+#
+# .tmux.conf runs this script from the status line, so it prints nothing to
+# standard output. Anything printed there ends up in the status line.
+#
+# Usage: pane-state-sync
+
+state_dir="/tmp/jpmelos/tmux/pane-state"
+if [ ! -d "$state_dir" ]; then
+    exit 0
+fi
+
+for state_file in "$state_dir"/*; do
+    # The glob stays literal when the directory is empty.
+    if [ ! -f "$state_file" ]; then
+        continue
+    fi
+    pane="$(basename "$state_file")"
+    state="$(< "$state_file")"
+
+    case "$state" in
+        running | pending | ready | default) ;;
+        *)
+            echo "pane-state-sync: unknown state '$state' for pane '$pane'." >&2
+            continue
+            ;;
+    esac
+
+    # The pane can be gone. That is harmless.
+    tmux set-option -p -t "$pane" @state "$state" 2> /dev/null || true
+done

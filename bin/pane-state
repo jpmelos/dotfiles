@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# Record the state of a tmux pane. The state goes to a file named after the
+# pane under /tmp/jpmelos/tmux/pane-state. The pane-state-sync script reads
+# the file from there.
+#
+# The script does not talk to tmux itself. It also runs inside Docker
+# containers, and a tmux client in a container cannot reach the tmux server on
+# the host. A file in a shared directory works from both places.
+#
+# States:
+#   running  The process is busy.
+#   pending  The process waits for input from the user.
+#   ready    The process did its work and can receive more instructions, or it
+#            ran to completion.
+#   default  No process reports a state for the pane. Write this when the
+#            process ends. The file stays behind otherwise, and a later pane
+#            with the same target inherits the old state.
+#
+# Usage: pane-state <running|pending|ready|default> [pane]
+#
+# The pane argument accepts any tmux pane target, such as %3 or mysession:1.2.
+# It defaults to the pane that runs this script, which tmux names in
+# $TMUX_PANE. The target becomes the file name, so it must not hold a slash and
+# must not start with a dot.
+#
+# Without $TMUX_PANE the script does nothing and exits with success, so callers
+# do not need to check for tmux themselves. The check uses $TMUX_PANE and not
+# $TMUX on purpose. Other programs change their behavior when they see $TMUX,
+# so the ai launcher passes only $TMUX_PANE into its container.
+
+if [ -z "${TMUX_PANE:-}" ]; then
+    exit 0
+fi
+
+if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+    echo "usage: pane-state <running|pending|ready|default> [pane]" >&2
+    exit 1
+fi
+
+state="$1"
+case "$state" in
+    running | pending | ready | default) ;;
+    *)
+        echo "pane-state: unknown state '$state'. Use running, pending, ready, or default." >&2
+        exit 1
+        ;;
+esac
+
+pane="${2:-$TMUX_PANE}"
+case "$pane" in
+    */* | .*)
+        echo "pane-state: pane target '$pane' cannot be a file name." >&2
+        exit 1
+        ;;
+esac
+
+state_dir="/tmp/jpmelos/tmux/pane-state"
+mkdir -p "$state_dir"
+
+# Write through a temporary file, so a reader never sees a partial file. The
+# dot prefix keeps the temporary file out of the reader's view. The rename
+# replaces the previous state file, so only the latest state survives.
+temp_file="$state_dir/.$pane.$$"
+printf '%s\n' "$state" > "$temp_file"
+mv -f "$temp_file" "$state_dir/$pane"
