@@ -1,5 +1,3 @@
-# vim: ft=sh
-
 __git_nuke() {
     git checkout -f "$(git main-branch)"
     git reset --hard "origin/$(git main-branch)"

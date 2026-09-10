@@ -3,10 +3,11 @@ local strings = require("strings")
 
 local m = {}
 
+-- TODO: Drop this once we drop Claude.
+--
 -- Check if a Docker container name belongs to Claude Code.
 local function is_claude_code_container(container_name)
     return container_name:match("^claude_code_")
-        or container_name:match("^agentcontainer_")
 end
 
 -- Resolve the inner process name when `docker` is the foreground process on
@@ -28,7 +29,7 @@ local function resolve_docker_inner_process(args_line)
         return "claude"
     end
 
-    return nil
+    return container_name
 end
 
 -- Resolve the tmux pane TTY when `tmux` is active on the given TTY. Uses the

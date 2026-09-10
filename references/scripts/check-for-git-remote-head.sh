@@ -1,4 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 
 # Check if we are inside a Git repository.
 if ! git rev-parse --is-inside-work-tree &> /dev/null; then

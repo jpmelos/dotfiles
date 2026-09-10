@@ -742,9 +742,12 @@ run_until() {
     timeout "$seconds_left" "$@"
 }
 
+# Pretty-print the JSON in the clipboard. Prints the formatted JSON to stdout
+# and replaces the clipboard contents with it. If the clipboard does not hold
+# valid JSON, `jq` reports the error and the clipboard is left unchanged.
 pretty_json() {
     local pretty
-    pretty=$(pbpaste | jq '.')
+    pretty=$(pbpaste | jq '.') || return
     echo "$pretty"
     echo "$pretty" | pbcopy
 }

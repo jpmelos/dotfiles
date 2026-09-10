@@ -2,13 +2,14 @@
 
 - **SINGLE BACKTICKS ONLY.** Use `` `value` ``, *never* ``` ``value`` ```. This
   applies *everywhere* without exception: code comments, docstrings, chat
-  messages, commit messages, PR descriptions. Double backticks are reST syntax
-  and must *never* appear in any output you produce.
+  messages, commit messages, PR descriptions, and everything else. Double
+  backticks, like the ones used in reST syntax, must *NEVER* appear in any
+  output you produce.
 
 # General
 
-- *Never* use built-in tools like `AskUserQuestion` to ask questions. Instead,
-  ask directly in the chat and wait for a response.
+- *Never* use tools to ask questions. Instead, ask directly in the chat and
+  expect a response in the user's turn.
 - When unsure about the codebase, ask for clarification rather than guessing.
 - When planning (writing plans, specs, etc.), discuss the plan in the chat.
   *Never* write it to a file unless the user explicitly asks you to.
@@ -16,6 +17,8 @@
 - When citing code paths, *always* use paths *relative* to the project root,
   including the most relevant lines when applicable.
   - For example: src/main.rs, src/main.rs:45, or src/lib.rs:23-56.
+  - When referring to code outside the current working directory, use `..`
+    prefixes as needed.
 
 # Code Style
 
@@ -25,7 +28,7 @@
   about the plan behind it, must understand the text fully.
 - Document only the unit you are writing. *Never* describe the behavior or the
   implementation of another function, class, module, or layer in a comment or
-  docstring. Name it and let the reader go read it there. Copied descriptions
+  docstring. Name it and let the reader go read it there. Crossed descriptions
   couple the layers and go stale.
 - Prefer descriptive variable names over shorter ones (e.g., `thread_id`
   instead of `tid`). The only exceptions are very short for-loops, Python
@@ -47,41 +50,37 @@
   - To test: `bash jpenv-bin/tests.bash`. Read the script to learn its usage
     (e.g., passing specific test files).
   - If either script doesn't exist, report that you can't perform the action.
-    *Always* use the exact commands above — never call `bash` with the full
-    path to the script.
+  - *Always* use the exact commands above, and add arguments as needed.
 - *Never* run an `ai_git_*` command unless the user explicitly asks for that
   exact action. Staging and committing belong to the user alone. Leave your
-  work unstaged and report what you changed instead.
+  work unstaged and report what you changed instead, unless you've been
+  explicitly asked otherwise.
 - When the user asks you to stage or to commit, use these commands. *Never*
-  call `git add`, `git restore`, or `git commit` directly.
+  call `git` commands directly (`git add`, `git restore`, `git commit`, etc).
   - To stage files, run `ai_git_add <path> ...`. It relays all arguments to
     `git add`.
-  - To empty the staging area, run `ai_git_restore`. It takes no arguments.
-    If you stage the wrong files, run this command and stage them again from
-    zero.
-  - To commit, run `ai_git_commit Commit message goes here`. This commits
-    only the contents of the staging area.
+  - To empty the staging area, run `ai_git_restore`. It takes no arguments. If
+    you stage the wrong files, run this command and stage them again from zero.
+  - To commit, run `ai_git_commit Commit message goes here`. This commits only
+    the contents of the staging area.
   - To stage all changes and commit them in one step, run
     `ai_git_commit -a Commit message goes here`.
-  - *Never* delete a commit. Only a human can undo a commit.
-  - If one of these scripts doesn't exist, assume that you are not allowed to
+  - *Never* delete a commit.
+  - If one of these commands doesn't exist, assume that you are not allowed to
     do the related action.
-- Read-only Git commands need no permission. For example, use
-  `git remote --verbose` to check in which service the repository is hosted on.
 - To rename or delete files, use `safe_mv` and `safe_rm` instead of `mv` and
-  `rm`. To delete directories, use `safe_rm -r` instead of `rmdir`. The API is
-  otherwise identical.
+  `rm`. To delete directories, use `safe_rm -r` instead of `rmdir`. The CLI is
+  otherwise identical to that of `mv` and `rm` respectively.
 - To find files or directories by name, use `rg --files | rg <pattern>` or
-  `rg --files --glob '<pattern>'`. *Never* use `find` — you don't have
-  permission to run it.
-- If Write or Edit is denied on a file, *immediately* retry via a sibling path
-  and `safe_mv` — do *not* stop and ask the user:
+  `rg --files --glob '<pattern>'`. *Never* use `find`.
+- If `Write` or `Edit` is denied on a file, *immediately* retry via a sibling
+  path and `safe_mv` — do *not* stop and ask the user.
   - To write: create the content at `.bashrc.temp`, then
     `safe_mv .bashrc.temp .bashrc`.
   - To edit: first `safe_mv .bashrc .bashrc.temp`, edit `.bashrc.temp`, then
     `safe_mv .bashrc.temp .bashrc`.
 - When a tool call or command is denied due to permissions, read
-  `~/.claude/settings.json` to discover which alternatives are allowed.
+  `~/.claude/settings.json` to discover the alternatives allowed, if any.
 
 # Environment
 
@@ -97,9 +96,9 @@
 
 # Writing style
 
-- In your responses, or when you write technical text (documentation, READMEs,
-  runbooks, procedures, error messages, release notes, reports), obey these
-  rules from ASD-STE100 Simplified Technical English:
+- In your responses, or when you write technical text (comments, documentation,
+  READMEs, runbooks, procedures, error messages, release notes, reports), obey
+  these rules from ASD-STE100 Simplified Technical English:
   - CLASSIFY FIRST. Procedural text tells the reader what to do: imperative
     mood, maximum 20 words per sentence, one instruction per sentence.
     Descriptive text explains: simple tenses, maximum 25 words per sentence,
@@ -128,6 +127,6 @@
     error messages, product names. Each counts as one word toward sentence
     limits.
   - SELF-CHECK before returning: scan for contractions, "has been", "should",
-    ", making", semicolons. Count words in your three longest sentences and
-    split any over the limit. Collapse synonym rotation.
+    "making", semicolons. Count words in your three longest sentences and split
+    any over the limit. Collapse synonym rotation.
   - Do not apply these rules to marketing copy or brand writing.

@@ -62,11 +62,9 @@ fi
 PROFILE="${AGENT_PROFILE:-unknown}"
 PROJECT="${PROJECT_NAME:-}"
 BRANCH="$(git branch --show-current 2> /dev/null || true)"
-SESSION="${AOE_SESSION_NAME:-}"
 
 first_line="👤 $PROFILE 📌 $PROJECT"
 [ -n "$BRANCH" ] && first_line="$first_line 🌿 $BRANCH"
-[ -n "$SESSION" ] && first_line="$first_line 🎯 $SESSION"
 echo "$first_line"
 
 second_line="🤖 $MODEL 💰 \$$(round_up_cents "$COST") 🪟 $(printf "%.0f" "$USED_PERCENTAGE")% used"

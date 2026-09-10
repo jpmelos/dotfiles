@@ -10,11 +10,11 @@ $ARGUMENTS
 ```
 
 You do not need to use those exact words. If you think the thing to be learned
-and remembered can be better expressed using different words, or simply to get
-a shorter expression of the same thing, feel free to rewrite the text.
+can be better expressed using different words or in a shorter way, feel free to
+rewrite the text.
 
-Re-review the entire file with your addition and think to keep these rules:
+Re-review the entire file with your addition and edit to enforce these rules:
 
 - Keep the file organized in some logical way.
-- All content must be orthogonal to each other.
-- The more important some thing is, closer to the top it must appear.
+- Each piece of content must be orthogonal to every other.
+- The more important some thing is, the closer to the top it must appear.

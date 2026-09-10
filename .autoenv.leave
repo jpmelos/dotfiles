@@ -1,5 +1,9 @@
 # vim: ft=sh
 
+# Autoenv scripts cannot contain the typical header that I use for Bash
+# scripts. They stop the shell from initializing. Do not put that here, you'll
+# lock yourself out of the shell!
+
 if [ -z "$AUTOENV_DOTFILES" ]; then
     return
 fi

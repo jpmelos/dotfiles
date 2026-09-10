@@ -1,215 +1,174 @@
 {
-    "$schema": "https://json.schemastore.org/claude-code-settings.json",
-    "model": "sonnet",
-    "effortLevel": "high",
-    "permissions": {
-        "defaultMode": "dontAsk",
-        "deny": [
-            "Edit(~/.claude/settings.json)",
-            "Edit(~/.claude/scripts/**)",
-            "Edit(/jpenv-bin/**)",
-            "EnterPlanMode",
-            "Skill(/review)"
-        ],
-        "allow": [
-            "Glob",
-            "Grep",
-            "Read",
-            "Write",
-            "Edit",
-            "Agent",
-            "Skill",
-            "Bash(true)",
-            "Bash(false)",
-            "Bash(date)",
-            "Bash(date *)",
-            "Bash(echo)",
-            "Bash(echo *)",
-            "Bash(cd)",
-            "Bash(cd *)",
-            "Bash(ls)",
-            "Bash(ls *)",
-            "Bash(grep *)",
-            "Bash(rg *)",
-            "Bash(cat *)",
-            "Bash(wc *)",
-            "Bash(head *)",
-            "Bash(tail *)",
-            "Bash(cut *)",
-            "Bash(mkdir *)",
-            "Bash(safe_mv *)",
-            "Bash(safe_rm *)",
-            "Bash(git remote --verbose)",
-            "Bash(git branch --show-current)",
-            "Bash(git log)",
-            "Bash(git log *)",
-            "Bash(git show)",
-            "Bash(git show *)",
-            "Bash(git rev-list *)",
-            "Bash(git status)",
-            "Bash(git status *)",
-            "Bash(git diff)",
-            "Bash(git diff *)",
-            "Bash(whois *)",
-            "Bash(which *)",
-            "Bash(review *)",
-            "Bash(ai_git_add *)",
-            "Bash(ai_git_restore)",
-            "Bash(ai_git_commit *)",
-            "Bash(bash jpenv-bin/lint.bash)",
-            "Bash(bash jpenv-bin/lint.bash *)",
-            "Bash(bash jpenv-bin/tests.bash)",
-            "Bash(bash jpenv-bin/tests.bash *)",
-            "mcp__github__get_commit",
-            "mcp__github__get_file_contents",
-            "mcp__github__get_label",
-            "mcp__github__get_latest_release",
-            "mcp__github__get_me",
-            "mcp__github__get_release_by_tag",
-            "mcp__github__get_tag",
-            "mcp__github__get_team_members",
-            "mcp__github__get_teams",
-            "mcp__github__issue_read",
-            "mcp__github__list_branches",
-            "mcp__github__list_commits",
-            "mcp__github__list_issue_fields",
-            "mcp__github__list_issue_types",
-            "mcp__github__list_issues",
-            "mcp__github__list_pull_requests",
-            "mcp__github__list_releases",
-            "mcp__github__list_repository_collaborators",
-            "mcp__github__list_tags",
-            "mcp__github__pull_request_read",
-            "mcp__github__search_code",
-            "mcp__github__search_commits",
-            "mcp__github__search_issues",
-            "mcp__github__search_pull_requests",
-            "mcp__github__search_repositories",
-            "mcp__github__search_users",
-            "mcp__linear-server__extract_images",
-            "mcp__linear-server__get_attachment",
-            "mcp__linear-server__get_diff",
-            "mcp__linear-server__get_diff_threads",
-            "mcp__linear-server__get_document",
-            "mcp__linear-server__get_initiative",
-            "mcp__linear-server__get_issue",
-            "mcp__linear-server__get_issue_status",
-            "mcp__linear-server__get_milestone",
-            "mcp__linear-server__get_project",
-            "mcp__linear-server__get_release",
-            "mcp__linear-server__get_release_note",
-            "mcp__linear-server__get_status_updates",
-            "mcp__linear-server__get_team",
-            "mcp__linear-server__get_user",
-            "mcp__linear-server__get_workspace",
-            "mcp__linear-server__list_comments",
-            "mcp__linear-server__list_cycles",
-            "mcp__linear-server__list_diffs",
-            "mcp__linear-server__list_documents",
-            "mcp__linear-server__list_initiative_labels",
-            "mcp__linear-server__list_initiatives",
-            "mcp__linear-server__list_issue_labels",
-            "mcp__linear-server__list_issue_statuses",
-            "mcp__linear-server__list_issues",
-            "mcp__linear-server__list_milestones",
-            "mcp__linear-server__list_project_labels",
-            "mcp__linear-server__list_projects",
-            "mcp__linear-server__list_release_notes",
-            "mcp__linear-server__list_release_pipelines",
-            "mcp__linear-server__list_releases",
-            "mcp__linear-server__list_teams",
-            "mcp__linear-server__list_users",
-            "mcp__linear-server__search_documentation"
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "fileSuggestion": {
+    "type": "command",
+    "command": "~/.claude/scripts/file-suggestions.sh"
+  },
+  "env": {
+    "BASH_DEFAULT_TIMEOUT_MS": "300000",
+    "BASH_MAX_TIMEOUT_MS": "300000",
+    "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR": "1",
+    "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD": "0",
+    "CLAUDE_CODE_DISABLE_1M_CONTEXT": "1",
+    "CLAUDE_CODE_DISABLE_FAST_MODE": "1",
+    "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY": "1",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "false",
+    "CLAUDE_CODE_HIDE_ACCOUNT_INFO": "1",
+    "CLAUDE_CODE_NO_FLICKER": "1",
+    "CLAUDE_CODE_SCROLL_SPEED": "3",
+    "DISABLE_AUTOUPDATER": "1",
+    "USE_BUILTIN_RIPGREP": "0"
+  },
+  "includeGitInstructions": false,
+  "permissions": {
+    "allow": [
+      "Glob",
+      "Grep",
+      "Read",
+      "Write",
+      "Edit",
+      "Agent",
+      "Skill",
+      "Bash(true)",
+      "Bash(false)",
+      "Bash(date)",
+      "Bash(date *)",
+      "Bash(echo)",
+      "Bash(echo *)",
+      "Bash(cd)",
+      "Bash(cd *)",
+      "Bash(ls)",
+      "Bash(ls *)",
+      "Bash(grep *)",
+      "Bash(rg *)",
+      "Bash(cat *)",
+      "Bash(wc *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(cut *)",
+      "Bash(mkdir *)",
+      "Bash(safe_mv *)",
+      "Bash(safe_rm *)",
+      "Bash(git remote --verbose)",
+      "Bash(git branch --show-current)",
+      "Bash(git log)",
+      "Bash(git log *)",
+      "Bash(git show)",
+      "Bash(git show *)",
+      "Bash(git rev-list *)",
+      "Bash(git status)",
+      "Bash(git status *)",
+      "Bash(git diff)",
+      "Bash(git diff *)",
+      "Bash(whois *)",
+      "Bash(which *)",
+      "Bash(review *)",
+      "Bash(ai_git_add *)",
+      "Bash(ai_git_restore)",
+      "Bash(ai_git_commit *)",
+      "Bash(bash jpenv-bin/lint.bash)",
+      "Bash(bash jpenv-bin/lint.bash *)",
+      "Bash(bash jpenv-bin/tests.bash)",
+      "Bash(bash jpenv-bin/tests.bash *)",
+      "mcp__github__get_commit",
+      "mcp__github__get_file_contents",
+      "mcp__github__get_label",
+      "mcp__github__get_latest_release",
+      "mcp__github__get_me",
+      "mcp__github__get_release_by_tag",
+      "mcp__github__get_tag",
+      "mcp__github__get_team_members",
+      "mcp__github__get_teams",
+      "mcp__github__issue_read",
+      "mcp__github__list_branches",
+      "mcp__github__list_commits",
+      "mcp__github__list_issue_fields",
+      "mcp__github__list_issue_types",
+      "mcp__github__list_issues",
+      "mcp__github__list_pull_requests",
+      "mcp__github__list_releases",
+      "mcp__github__list_repository_collaborators",
+      "mcp__github__list_tags",
+      "mcp__github__pull_request_read",
+      "mcp__github__search_code",
+      "mcp__github__search_commits",
+      "mcp__github__search_issues",
+      "mcp__github__search_pull_requests",
+      "mcp__github__search_repositories",
+      "mcp__github__search_users",
+      "mcp__linear-server__extract_images",
+      "mcp__linear-server__get_attachment",
+      "mcp__linear-server__get_diff",
+      "mcp__linear-server__get_diff_threads",
+      "mcp__linear-server__get_document",
+      "mcp__linear-server__get_initiative",
+      "mcp__linear-server__get_issue",
+      "mcp__linear-server__get_issue_status",
+      "mcp__linear-server__get_milestone",
+      "mcp__linear-server__get_project",
+      "mcp__linear-server__get_release",
+      "mcp__linear-server__get_release_note",
+      "mcp__linear-server__get_status_updates",
+      "mcp__linear-server__get_team",
+      "mcp__linear-server__get_user",
+      "mcp__linear-server__get_workspace",
+      "mcp__linear-server__list_comments",
+      "mcp__linear-server__list_cycles",
+      "mcp__linear-server__list_diffs",
+      "mcp__linear-server__list_documents",
+      "mcp__linear-server__list_initiative_labels",
+      "mcp__linear-server__list_initiatives",
+      "mcp__linear-server__list_issue_labels",
+      "mcp__linear-server__list_issue_statuses",
+      "mcp__linear-server__list_issues",
+      "mcp__linear-server__list_milestones",
+      "mcp__linear-server__list_project_labels",
+      "mcp__linear-server__list_projects",
+      "mcp__linear-server__list_release_notes",
+      "mcp__linear-server__list_release_pipelines",
+      "mcp__linear-server__list_releases",
+      "mcp__linear-server__list_teams",
+      "mcp__linear-server__list_users",
+      "mcp__linear-server__search_documentation"
+    ],
+    "deny": [
+      "Edit(~/.claude/settings.json)",
+      "Edit(~/.claude/scripts/**)",
+      "Edit(/jpenv-bin/**)",
+      "EnterPlanMode",
+      "Skill(/review)"
+    ],
+    "defaultMode": "dontAsk"
+  },
+  "model": "sonnet",
+  "disableBundledSkills": true,
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'INPUT=$(cat); if [ -f \"jpenv-bin/post_tool_use.sh\" ]; then echo \"$INPUT\" | bash \"jpenv-bin/post_tool_use.sh\"; fi'"
+          }
         ]
-    },
-    "hooks": {
-        "Notification": [
-            {
-                "hooks": [
-                    {
-                        "command": "~/.claude/scripts/aoe-hook.sh waiting",
-                        "type": "command"
-                    }
-                ],
-                "matcher": "permission_prompt|elicitation_dialog"
-            }
-        ],
-        "PostToolUse": [
-            {
-                "hooks": [
-                    {
-                        "command": "bash -c 'INPUT=$(cat); if [ -f \"jpenv-bin/post_tool_use.sh\" ]; then echo \"$INPUT\" | bash \"jpenv-bin/post_tool_use.sh\"; fi'",
-                        "type": "command"
-                    }
-                ]
-            }
-        ],
-        "PreToolUse": [
-            {
-                "hooks": [
-                    {
-                        "command": "~/.claude/scripts/aoe-hook.sh running",
-                        "type": "command"
-                    }
-                ]
-            }
-        ],
-        "Stop": [
-            {
-                "hooks": [
-                    {
-                        "command": "~/.claude/scripts/aoe-hook.sh idle",
-                        "type": "command"
-                    }
-                ]
-            }
-        ],
-        "UserPromptSubmit": [
-            {
-                "hooks": [
-                    {
-                        "command": "~/.claude/scripts/aoe-hook.sh running",
-                        "type": "command"
-                    }
-                ]
-            }
-        ]
-    },
-    "env": {
-        "BASH_DEFAULT_TIMEOUT_MS": "300000",
-        "BASH_MAX_TIMEOUT_MS": "300000",
-        "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR": "1",
-        "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD": "0",
-        "CLAUDE_CODE_DISABLE_1M_CONTEXT": "1",
-        "CLAUDE_CODE_DISABLE_FAST_MODE": "1",
-        "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY": "1",
-        "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
-        "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "false",
-        "CLAUDE_CODE_HIDE_ACCOUNT_INFO": "1",
-        "CLAUDE_CODE_NO_FLICKER": "1",
-        "CLAUDE_CODE_SCROLL_SPEED": "3",
-        "DISABLE_AUTOUPDATER": "1",
-        "USE_BUILTIN_RIPGREP": "0"
-    },
-    "fileSuggestion": {
-        "type": "command",
-        "command": "~/.claude/scripts/file-suggestions.sh"
-    },
-    "statusLine": {
-        "type": "command",
-        "command": "~/.claude/scripts/statusline.sh"
-    },
-    "spinnerVerbs": {
-        "mode": "replace",
-        "verbs": [
-            "Thinking"
-        ]
-    },
-    "alwaysThinkingEnabled": true,
-    "disableBundledSkills": true,
-    "disableBypassPermissionsMode": true,
-    "includeGitInstructions": false,
-    "spinnerTipsEnabled": false,
-    "terminalProgressBarEnabled": false,
-    "theme": "light"
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/scripts/statusline.sh"
+  },
+  "spinnerTipsEnabled": false,
+  "spinnerVerbs": {
+    "mode": "replace",
+    "verbs": [
+      "Thinking"
+    ]
+  },
+  "alwaysThinkingEnabled": true,
+  "effortLevel": "high",
+  "theme": "light",
+  "terminalProgressBarEnabled": false,
+  "disableBypassPermissionsMode": true
 }

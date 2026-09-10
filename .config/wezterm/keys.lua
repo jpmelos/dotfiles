@@ -3,7 +3,6 @@ local action = wezterm.action
 local module = {}
 
 local process_integration = require("process_integration")
-local aoe_integration = require("aoe_integration")
 
 local function bind_if_else(mods, key, cond, if_action, else_action)
     local function callback(win, pane)
@@ -57,6 +56,8 @@ function module.apply_to_config(config)
             mods = "LEADER",
             action = action.ReloadConfiguration,
         },
+        -- TODO: Drop this once we drop Claude.
+        --
         -- Enter for new lines in Claude.
         -- SHIFT + Enter to send the prompt in Claude.
         bind_if_else_forward(
@@ -200,14 +201,6 @@ function module.apply_to_config(config)
             "l",
             process_integration.is_outside_vim_and_tmux,
             action.ActivatePaneDirection("Right")
-        ),
-        -- Agent of Empires: new session. When `aoe` is running, intercept `n`
-        -- to show a project picker and session name prompt.
-        bind_if_else_forward(
-            "",
-            "n",
-            process_integration.is_in_aoe,
-            aoe_integration.aoe_new_session_action()
         ),
         -- Debug overlay.
         { key = "l", mods = "SHIFT|CTRL", action = action.ShowDebugOverlay },
