@@ -49,10 +49,11 @@
 # /
 # / tmux:
 # /   When the launcher runs inside tmux, the container gets the `TMUX_PANE`
-# /   variable and a mount of `/tmp/jpmelos/tmux/pane-state`. The `running`,
-# /   `pending`, `ready`, and `default` scripts then mark the pane that runs
-# /   the agent. Outside tmux the container gets none of this, and these
-# /   scripts do nothing.
+# /   variable and a mount of `/tmp/jpmelos/tmux`. The `running`, `pending`,
+# /   `ready`, and `default` scripts then mark the pane that runs the agent,
+# /   and `pending` and `ready` request the notification chime. The
+# /   `pane-state-sync` script on the host picks both up. Outside tmux the
+# /   container gets none of this, and these scripts do nothing.
 # /
 # / Project-local agent assets:
 # /   Tracked commands and skills under the project's `.claude` directory get a
@@ -571,9 +572,10 @@ def build_container_env(api_key):
 # write to it, and nothing reports the failure.
 SHARED_HOST_DIRS = ("/tmp/claude-code-shared", "/tmp/aoe-hooks")
 
-# The directory that the `pane-state` script writes to. The container gets it
-# only when the launcher runs inside tmux.
-PANE_STATE_DIR = "/tmp/jpmelos/tmux/pane-state"
+# The directory that the `pane-state` and `chime` scripts write to, in their
+# own subdirectories. The container gets it only when the launcher runs inside
+# tmux.
+TMUX_SHARED_DIR = "/tmp/jpmelos/tmux"
 
 # Scripts from `~/devel/dotfiles/bin` that the agent calls by name.
 AGENT_BINARIES = (
@@ -585,6 +587,7 @@ AGENT_BINARIES = (
     "review",
     "review_diff",
     "pane-state",
+    "chime",
     "running",
     "pending",
     "ready",
@@ -596,7 +599,7 @@ def prepare_shared_dirs():
     """Create the host directories that the container writes to."""
     shared_dirs = list(SHARED_HOST_DIRS)
     if in_tmux():
-        shared_dirs.append(PANE_STATE_DIR)
+        shared_dirs.append(TMUX_SHARED_DIR)
     for shared_dir in shared_dirs:
         try:
             os.makedirs(shared_dir, exist_ok=True)
@@ -704,14 +707,16 @@ def build_run_command(harness_args, config):
     if timezone:
         cmd += ["--env", f"TZ={timezone}"]
 
-    # Let the `pane-state` script mark the pane that runs the agent. `TMUX_PANE`
-    # names the pane that runs the launcher. The directory carries the state
-    # files to the host, where tmux picks them up. `TMUX` stays out. Programs
-    # in the container would take it as a sign that they can talk to tmux.
+    # Let the `pane-state` script mark the pane that runs the agent, and let
+    # the `chime` script ring on the host. `TMUX_PANE` names the pane that runs
+    # the launcher. The directory carries the state files and the chime
+    # requests to the host, where tmux picks them up. `TMUX` stays out.
+    # Programs in the container would take it as a sign that they can talk to
+    # tmux.
     if in_tmux():
         cmd += [
             "--volume",
-            f"{PANE_STATE_DIR}:{PANE_STATE_DIR}",
+            f"{TMUX_SHARED_DIR}:{TMUX_SHARED_DIR}",
             "--env",
             "TMUX_PANE",
         ]

@@ -148,7 +148,7 @@
       {
         "hooks": [
           {
-            "command": "ready",
+            "command": "ready --no-chime",
             "type": "command"
           }
         ],

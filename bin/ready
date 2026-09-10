@@ -2,9 +2,27 @@
 set -euo pipefail
 trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 
-# Mark the current tmux pane as ready. Call this from inside a pane when the
-# process did its work and can receive more instructions.
+# Mark the current tmux pane as ready and play the notification chime. Call
+# this from inside a pane when the process did its work and can receive more
+# instructions.
 #
-# Usage: ready
+# Usage: ready [--no-chime]
+#
+# With `--no-chime` the script sets the state and skips the chime.
 
-exec pane-state ready
+no_chime=0
+for argument in "$@"; do
+    case "$argument" in
+        --no-chime) no_chime=1 ;;
+        *)
+            echo "usage: ready [--no-chime]" >&2
+            exit 1
+            ;;
+    esac
+done
+
+pane-state ready
+if [ "$no_chime" -eq 1 ]; then
+    exit 0
+fi
+exec chime
