@@ -509,7 +509,12 @@ pending_devel() {
             fi
 
             if [ "$should_pull" = true ]; then
-                git pull --quiet
+                local pull_output
+                if ! pull_output=$(git pull --quiet 2>&1); then
+                    pull_output=$(printf "%s" "$pull_output" | sed 's/^/    /')
+                    findings+=("$(printf "* \033[1m%s\033[0m\n    git pull failed:\n%s" \
+                        "$repo_path" "$pull_output")")
+                fi
             fi
         fi
     done
