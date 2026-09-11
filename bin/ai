@@ -11,7 +11,7 @@
 # / Usage: ai [options] [-- harness-args...]
 # / Options:
 # /   --profile <name>  Specify profile for API key lookup (default: auto-detect
-# /                     from path, first component after `~/devel`)
+# /                     from the project root, first component after `~/devel`)
 # /   --channel <name>  Claude Code release channel to install in the image
 # /                     (default: `latest`). The channel is part of the image
 # /                     tag, so each channel gets its own image, and a switch
@@ -30,8 +30,10 @@
 # /
 # / Arguments after `--` are passed directly to Claude Code.
 # /
-# / If run outside of ~/devel or from ~/devel itself (not in a project),
-# / defaults to ~/devel/dotfiles as the working directory.
+# / A project is a directory that `list_project_dirs` reports. The current
+# / directory can be the project root or any directory below it. The profile
+# / comes from the root in both cases. If run outside of every project, defaults
+# / to ~/devel/dotfiles as the working directory.
 # /
 # / Security:
 # /   The container runs read-only, with an explicit list of mounts. This
@@ -174,7 +176,7 @@ class Options:
     harness_args: list = field(default_factory=list)
 
 
-def parse_options(argv, current_dir, devel_dir):
+def parse_options(argv, project_root, devel_dir):
     options = Options()
 
     value_options = {
@@ -239,18 +241,20 @@ def parse_options(argv, current_dir, devel_dir):
         die(f"Error: Invalid channel name '{options.channel}'")
 
     if not options.profile:
-        options.profile = detect_profile(current_dir, devel_dir)
+        options.profile = detect_profile(project_root, devel_dir)
     if not re.fullmatch(r"[a-zA-Z0-9]{1,64}", options.profile):
         die(f"Error: Invalid profile name '{options.profile}'")
 
     return options
 
 
-def detect_profile(current_dir, devel_dir):
+def detect_profile(project_root, devel_dir):
+    # The script derives the profile from the path components under `~/devel`,
+    # so it must run from the project root and not from a subdirectory.
     try:
         result = subprocess.run(
             [os.path.join(devel_dir, "dotfiles", "bin", "project_profile_name")],
-            cwd=current_dir,
+            cwd=project_root,
             stdout=subprocess.PIPE,
             encoding="utf-8",
         )
@@ -266,6 +270,16 @@ def strip_leading_path(path, prefix):
     if path.startswith(prefix + "/"):
         return path[len(prefix) + 1 :]
     return path
+
+
+def find_project_root(current_dir, devel_dir, project_dirs):
+    # Longest match first, so a nested project wins over a parent directory
+    # that is a project too.
+    for relative_project_dir in sorted(project_dirs, key=len, reverse=True):
+        project_dir = os.path.join(devel_dir, relative_project_dir)
+        if current_dir == project_dir or current_dir.startswith(project_dir + "/"):
+            return project_dir
+    return None
 
 
 def load_user_config(config_path):
@@ -1012,12 +1026,15 @@ def main():
     if not os.path.isdir(devel_dir):
         die(f"Error: {home}/devel does not exist")
 
+    project_dirs = list_project_dirs(devel_dir)
+
     current_dir = os.path.realpath(os.getcwd())
-    if not current_dir.startswith(devel_dir + "/"):
-        current_dir = os.path.join(devel_dir, "dotfiles")
+    project_root = find_project_root(current_dir, devel_dir, project_dirs)
+    if project_root is None:
+        current_dir = project_root = os.path.join(devel_dir, "dotfiles")
         echo_err(f"Not inside a ~/devel project, defaulting to {current_dir}")
 
-    options = parse_options(sys.argv[1:], current_dir, devel_dir)
+    options = parse_options(sys.argv[1:], project_root, devel_dir)
     profile = options.profile
 
     # Compute the project name (path relative to ~/devel/).
@@ -1051,7 +1068,6 @@ def main():
 
     apply_preferred_model(user_config, profile, home)
 
-    project_dirs = list_project_dirs(devel_dir)
     apply_dependencies_list(f"{profile_dir}/CLAUDE.md", project_dirs)
 
     profile_json_path = f"{profile_dir}/.claude.json"
