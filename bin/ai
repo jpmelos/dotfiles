@@ -1019,7 +1019,6 @@ def main():
 
     user_config_path = f"{home}/config.json"
     user_config = load_user_config(user_config_path)
-    api_key = resolve_api_key(user_config, profile)
 
     channel = options.channel or DEFAULT_CLAUDE_CODE_CHANNEL
     docker_image_name = build_image_name(username, channel)
@@ -1048,6 +1047,7 @@ def main():
 
     profile_json_path = f"{profile_dir}/.claude.json"
     create_profile_json(profile_json_path)
+    api_key = resolve_api_key(user_config, profile)
     approve_api_key(profile_json_path, api_key)
     apply_mcp_servers(user_config, profile_json_path, profile)
 
