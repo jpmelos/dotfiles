@@ -87,6 +87,7 @@
 # /   The `mcp_servers` object of a profile replaces the `mcpServers` key in
 # /   that profile's `.claude.json`.
 
+import datetime
 import json
 import os
 import pwd
@@ -98,7 +99,6 @@ import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass, field
-from datetime import datetime
 from decimal import ROUND_CEILING, ROUND_DOWN, Decimal
 
 _MISSING = object()
@@ -125,7 +125,9 @@ AGENT_BINARIES = (
 def process_help_option(argv):
     for argument in argv:
         if argument == "--":
+            # Any `--help` is targeted for Claude Code instead of this script.
             return
+
         if argument == "--help":
             show_help()
             sys.exit(0)
@@ -133,10 +135,12 @@ def process_help_option(argv):
 
 def show_help():
     for line in read_text(__file__).splitlines():
-        # A bare `# /` marks a blank line in the help text.
         if line == "# /":
+            # A bare `# /` marks a blank line in the help text.
             print("")
-        elif line.startswith("# / "):
+            continue
+
+        if line.startswith("# / "):
             print(line[4:])
 
 
@@ -227,6 +231,9 @@ def parse_options(argv, current_dir):
                 "`--output-format json` in harness args"
             )
 
+    if options.no_rebuild and (options.force_rebuild or options.no_build_cache):
+        die("Error: --no-rebuild conflicts with --force-rebuild and --no-build-cache")
+
     if options.channel and not re.fullmatch(r"[A-Za-z0-9]{1,128}", options.channel):
         die(f"Error: Invalid channel name '{options.channel}'")
 
@@ -315,92 +322,85 @@ def build_image_name(username, channel):
 
 
 def ensure_image(options, docker_image_name, dockerfile_path, home, channel):
-    today = today_date()
+    today = datetime.datetime.now(datetime.timezone.utc).date()
 
-    last_build_timestamp, inspect_stderr = get_last_build(docker_image_name)
-
-    # Derive the last build date in local time from the timestamp.
-    last_build_date = ""
-    if last_build_timestamp:
-        try:
-            last_build_date = get_date(last_build_timestamp)
-        except (ValueError, OSError, OverflowError):
-            die(
-                "Error: cannot read the build date of image "
-                f"'{docker_image_name}' from '{last_build_timestamp}'"
-            )
-
-    # Get the Dockerfile's modification time (seconds since epoch).
+    last_build = get_last_build(docker_image_name)
     try:
-        dockerfile_mtime = int(os.stat(dockerfile_path).st_mtime)
+        dockerfile_mtime = os.stat(dockerfile_path).st_mtime
     except OSError:
         dockerfile_mtime = 0
-
-    rebuild_reason = get_rebuild_reason(
-        options, last_build_date, last_build_timestamp, dockerfile_mtime, today
-    )
-    reason_code, reason_message = rebuild_reason or ("", "")
-    if reason_code == "missing-image" and inspect_stderr:
-        echo_err(f"docker image inspect: {inspect_stderr}")
+    rebuild_reason = get_rebuild_reason(options, last_build, dockerfile_mtime, today)
 
     if options.no_rebuild:
-        # Skip rebuild entirely - verify image exists.
-        if not last_build_date:
+        if last_build is None:
             die(
                 f"Error: Docker image '{docker_image_name}' does not exist and "
                 "--no-rebuild was specified"
             )
         if rebuild_reason:
             echo_err(
-                f"--no-rebuild specified, skipping rebuild despite: {reason_message}"
+                f"--no-rebuild specified, skipping rebuild despite: {rebuild_reason}"
             )
         else:
             echo_err("Skipping rebuild (--no-rebuild specified, image is up to date)")
-    elif rebuild_reason:
-        echo_err(f"Rebuilding image: {reason_message}")
-        use_cache = not options.no_build_cache
-        if not build_image(
-            use_cache, docker_image_name, dockerfile_path, home, channel
-        ):
-            if not options.allow_stale:
-                die("Error: Docker build failed")
-            if not last_build_date:
-                die(
-                    "Error: Docker build failed and no existing image "
-                    f"'{docker_image_name}' found"
-                )
-            echo_err("Build failed, using existing image (--allow-stale)")
-    else:
+        return
+
+    if rebuild_reason is None:
         echo_err("Image is up to date, skipping rebuild.")
+        return
 
+    echo_err(f"Rebuilding image: {rebuild_reason}")
 
-def today_date():
-    return datetime.now().strftime("%Y-%m-%d")
+    use_cache = not options.no_build_cache
+    if build_image(use_cache, docker_image_name, dockerfile_path, home, channel, today):
+        return
+
+    if not options.allow_stale:
+        die("Error: Docker build failed")
+
+    if last_build is None:
+        die(
+            "Error: Docker build failed and no existing image "
+            f"'{docker_image_name}' found"
+        )
+
+    echo_err("Build failed, using existing image (--allow-stale)")
 
 
 def get_last_build(docker_image_name):
-    last_build_timestamp, inspect_stderr = inspect_last_build(docker_image_name)
+    stdout, stderr = inspect_last_build(docker_image_name)
 
     # TODO: Remove this once it's not needed anymore. There is some bug in
     # Docker in which sometimes `docker image inspect` can't find an image, but
     # then you run `docker image ls` and then `docker image inspect` again, and
     # it works... This is an attempt to automatically overcome it.
-    if "No such image" in inspect_stderr:
+    if "No such image" in stderr:
         echo_err("WARNING: image not found, trying to fix it")
         subprocess.run(
             ["docker", "image", "ls", docker_image_name],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        last_build_timestamp, inspect_stderr = inspect_last_build(docker_image_name)
-        if "No such image" not in inspect_stderr:
+        stdout, stderr = inspect_last_build(docker_image_name)
+        if "No such image" not in stderr:
             echo_err("WARNING: 'docker image ls' fixed it")
 
-    return last_build_timestamp, inspect_stderr
+    if not stdout:
+        # A missing image is the expected case. Anything else is worth a line.
+        if stderr and "No such image" not in stderr:
+            echo_err(f"docker image inspect: {stderr}")
+        return None
+
+    try:
+        return datetime.datetime.fromtimestamp(int(stdout))
+    except (ValueError, OSError, OverflowError):
+        die(
+            "Error: cannot read the build date of image "
+            f"'{docker_image_name}' from '{stdout}'"
+        )
 
 
 def inspect_last_build(docker_image_name):
-    """Get the image's tag timestamp and the error output of the inspection."""
     result = subprocess.run(
         [
             "docker",
@@ -417,27 +417,21 @@ def inspect_last_build(docker_image_name):
     return result.stdout.rstrip("\n"), result.stderr.rstrip("\n")
 
 
-def get_date(timestamp):
-    return datetime.fromtimestamp(int(timestamp)).strftime("%Y-%m-%d")
-
-
-def get_rebuild_reason(
-    options, last_build_date, last_build_timestamp, dockerfile_mtime, today
-):
+def get_rebuild_reason(options, last_build, dockerfile_mtime, today):
     if options.no_build_cache:
-        return ("no-build-cache", "--no-build-cache specified")
+        return "--no-build-cache specified"
     if options.force_rebuild:
-        return ("force-rebuild", "--force-rebuild specified")
-    if not last_build_date:
-        return ("missing-image", "image does not exist")
-    if last_build_date != today:
-        return ("stale-date", f"image is from {last_build_date}, today is {today}")
-    if last_build_timestamp and dockerfile_mtime > int(last_build_timestamp):
-        return ("stale-dockerfile", "Dockerfile modified after last build")
+        return "--force-rebuild specified"
+    if last_build is None:
+        return "image does not exist"
+    if last_build.date() != today:
+        return f"image is from {last_build:%Y-%m-%d}, today is {today:%Y-%m-%d}"
+    if dockerfile_mtime > last_build.timestamp():
+        return "Dockerfile modified after last build"
     return None
 
 
-def build_image(use_cache, docker_image_name, dockerfile_path, home, channel):
+def build_image(use_cache, docker_image_name, dockerfile_path, home, channel, today):
     echo_err("Building Docker image...")
 
     build_args = [
@@ -448,7 +442,7 @@ def build_image(use_cache, docker_image_name, dockerfile_path, home, channel):
         "--build-arg",
         f"HOME={home}",
         "--build-arg",
-        f"BUILD_DATE={today_date()}",
+        f"BUILD_DATE={today:%Y-%m-%d}",
     ]
 
     echo_err(f"Installing Claude Code from channel '{channel}'...")
@@ -468,7 +462,6 @@ def build_image(use_cache, docker_image_name, dockerfile_path, home, channel):
 
     # Pipe the Dockerfile via stdin (`-`) so no build context is sent.
     with dockerfile:
-        sys.stderr.flush()
         result = subprocess.run(
             ["docker", "build", *build_args, "-"],
             stdin=dockerfile,
@@ -499,18 +492,11 @@ def copy_tree_contents(source, destination):
             shutil.copystat(entry.path, target)
 
 
-# ============================================================================
-# Small utilities
-# ============================================================================
-
-
 def echo_err(message):
-    """Print a message to standard error."""
-    print(message, file=sys.stderr, flush=True)
+    print(message, file=sys.stderr)
 
 
 def die(message, *, code=1):
-    """Print a message to standard error and exit."""
     echo_err(message)
     sys.exit(code)
 
@@ -559,23 +545,12 @@ def is_number(value):
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
-# ============================================================================
-# Helper functions
-# ============================================================================
-
-
 def round_up_cents(value):
-    """Round cost up to the next cent for display."""
     cents = (Decimal(str(value)) * 100).to_integral_value(rounding=ROUND_CEILING)
     return f"{cents / 100:.2f}"
 
 
 def format_duration(total_seconds):
-    """Format duration as XhYmZ.WWWs.
-
-    The value is truncated to milliseconds first. Without that step the final
-    `.3f` can round the seconds up to `60.000s`.
-    """
     total = Decimal(str(total_seconds)).quantize(Decimal("0.001"), rounding=ROUND_DOWN)
 
     # Handle zero input.
@@ -596,10 +571,7 @@ def format_duration(total_seconds):
 
 
 def process_print_output(output):
-    """Process Claude Code output from print mode."""
-
     def die_with_output(message):
-        """Relay the captured output, then exit. Otherwise the output is lost."""
         echo_err(output)
         die(message)
 
@@ -641,7 +613,6 @@ def generate_container_name(current_dir):
 
 
 def get_timezone():
-    """Read the local timezone name, so sessions get the right timestamps."""
     timezone = os.environ.get("TZ", "")
     if timezone:
         return timezone
@@ -666,18 +637,11 @@ class RunConfig:
     project_name: str
     api_key: str
     docker_image_name: str
-    process_output: bool
     harness_print_mode: bool
     no_docker_socket: bool
 
 
 def build_container_env(api_key):
-    """Build the environment for the `docker run` process.
-
-    The API key goes only to this process. It stays out of the environment of
-    the script and out of every other child process. It stays out of the
-    command line too, so it does not show up in `ps` or in verbose output.
-    """
     env = dict(os.environ)
     if api_key:
         env["ANTHROPIC_API_KEY"] = api_key
@@ -731,7 +695,8 @@ def build_run_command(harness_args, config):
         f"{devel_dir}:{devel_dir}",
         "--workdir",
         config.current_dir,
-        # Claude Code files.
+        # Claude Code files. This makes it so that it looks for `.claude.json`
+        # inside `~/.claude` instead of inside `~`.
         "--env",
         f"CLAUDE_CONFIG_DIR={home}/.claude",
         "--volume",
@@ -751,9 +716,7 @@ def build_run_command(harness_args, config):
         # Let the `pane-state` script mark the pane that runs the agent, and
         # let the `chime` script ring on the host. `TMUX_PANE` names the pane
         # that runs the launcher. Docker leaves the variable out when the host
-        # does not set it, and the scripts then do nothing. `TMUX` stays out.
-        # Programs in the container would take it as a sign that they can talk
-        # to tmux.
+        # does not set it, and the scripts then do nothing.
         "--env",
         "TMUX_PANE",
         # Claude Code uses this to know search for file suggestions on `@`.
@@ -809,7 +772,7 @@ def build_run_command(harness_args, config):
 
     # A TTY belongs to an interactive session only. In print mode it mixes
     # terminal control codes into the output that the caller captures.
-    if not config.process_output and not config.harness_print_mode and stdin_is_tty():
+    if not config.harness_print_mode and stdin_is_tty():
         cmd.append("--tty")
 
     # Relay additional environment variables from
@@ -834,28 +797,26 @@ def build_run_command(harness_args, config):
     if config.no_docker_socket:
         echo_err("Docker socket not mounted (--no-docker-socket)")
     else:
-        docker_socket = ""
         candidates = (f"{home}/.docker/run/docker.sock", "/var/run/docker.sock")
         for candidate in candidates:
             if is_socket(candidate):
-                docker_socket = candidate
+                cmd += [
+                    # Group 0 is what grants access to the socket. Without the
+                    # socket, the container has no reason to hold the
+                    # privilege.
+                    "--group-add",
+                    "0",
+                    "--volume",
+                    f"{candidate}:/var/run/docker.sock",
+                    "--env",
+                    "DOCKER_HOST=unix:///var/run/docker.sock",
+                ]
                 break
-        if not docker_socket:
+        else:
             echo_err(
                 "Warning: Docker socket not found, Docker will not be "
                 "available inside the container"
             )
-        else:
-            cmd += [
-                # Group 0 is what grants access to the socket. Without the
-                # socket, the container has no reason to hold the privilege.
-                "--group-add",
-                "0",
-                "--volume",
-                f"{docker_socket}:/var/run/docker.sock",
-                "--env",
-                "DOCKER_HOST=unix:///var/run/docker.sock",
-            ]
 
     cmd += [
         # The image we just built.
@@ -879,11 +840,6 @@ def stdin_is_tty():
         return sys.stdin is not None and sys.stdin.isatty()
     except ValueError:
         return False
-
-
-# ============================================================================
-# Profile directory preparation
-# ============================================================================
 
 
 def list_project_dirs(devel_dir):
@@ -1029,16 +985,6 @@ def apply_mcp_servers(config, profile_json_path, profile):
     echo_err(f"MCP servers set for profile '{profile}'")
 
 
-# ============================================================================
-# Image freshness
-# ============================================================================
-
-
-# ============================================================================
-# Main Execution
-# ============================================================================
-
-
 def main():
     process_help_option(sys.argv[1:])
 
@@ -1080,10 +1026,8 @@ def main():
     dockerfile_path = os.path.join(
         devel_dir, "dotfiles", "references", "ai_containers", "Dockerfile"
     )
-
     ensure_image(options, docker_image_name, dockerfile_path, home, channel)
 
-    # Different profiles have different projects, todos, chat histories, etc.
     profile_dir = f"{home}/.claude-{profile}"
     # The directory holds credentials and chat history. `makedirs` applies the
     # mode only to a directory that it creates, so tighten an existing one too.
@@ -1128,7 +1072,6 @@ def main():
         project_name=project_name,
         api_key=api_key,
         docker_image_name=docker_image_name,
-        process_output=options.process_output,
         harness_print_mode=options.harness_print_mode,
         no_docker_socket=options.no_docker_socket,
     )
@@ -1138,8 +1081,6 @@ def main():
     if options.verbose:
         echo_err(f"Command: {shlex.join(cmd)}")
     echo_err("Running container...")
-    sys.stdout.flush()
-    sys.stderr.flush()
 
     if options.process_output:
         # Capture output and process it.
