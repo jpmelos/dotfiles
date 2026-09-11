@@ -3,8 +3,10 @@ set -euo pipefail
 trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 
 # Record the state of a tmux pane. The state goes to a file named after the
-# pane under /tmp/jpmelos/tmux/pane-state. The pane-state-sync script reads
-# the file from there.
+# pane under the pane-state directory of the shared tmux directory. That
+# directory is $AGENT_TMUX_DIR, or /tmp/$USER/tmux without it. The ai launcher
+# sets the variable inside its containers, where the user name differs from
+# the host's. The pane-state-sync script reads the file from there.
 #
 # The script does not talk to tmux itself. It also runs inside Docker
 # containers, and a tmux client in a container cannot reach the tmux server on
@@ -57,7 +59,8 @@ case "$pane" in
         ;;
 esac
 
-state_dir="/tmp/jpmelos/tmux/pane-state"
+tmux_dir="${AGENT_TMUX_DIR:-/tmp/${USER:-$(id -un)}/tmux}"
+state_dir="$tmux_dir/pane-state"
 mkdir -p "$state_dir"
 
 # Write through a temporary file, so a reader never sees a partial file. The

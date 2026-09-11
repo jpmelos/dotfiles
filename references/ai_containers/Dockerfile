@@ -1,5 +1,10 @@
 FROM debian:trixie-slim
 
+# The slim image ships with the POSIX locale, in which `bash` and the other
+# tools count bytes instead of characters. `C.UTF-8` is built into glibc, so
+# it needs no locale package.
+ENV LANG="C.UTF-8"
+
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         # Enable TLS certificate verification for curl, git, etc.

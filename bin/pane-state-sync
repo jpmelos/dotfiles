@@ -2,8 +2,10 @@
 set -euo pipefail
 trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 
-# Apply the pane state files under /tmp/jpmelos/tmux/pane-state to tmux, and
-# play the chime requests under /tmp/jpmelos/tmux/chime.
+# Apply the pane state files under the pane-state directory of the shared tmux
+# directory to tmux, and play the chime requests under its chime directory. The
+# shared tmux directory is $AGENT_TMUX_DIR, or /tmp/$USER/tmux without it. This
+# script runs on the host, so the fallback is the normal case here.
 #
 # Each state file is named after a pane target and holds one state. The script
 # sets the @state pane option of that pane to the state. The pane-state script
@@ -31,6 +33,7 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 chime_sound="$script_dir/../references/telegram-chime.mp3"
+tmux_dir="${AGENT_TMUX_DIR:-/tmp/${USER:-$(id -un)}/tmux}"
 
 # Play a sound file in the background. tmux waits for this script to close its
 # standard output, so the player must not inherit the standard streams. macOS
@@ -60,12 +63,12 @@ play_sound() {
 # gone. The `-f` flag would hide that, so it stays out. A failed `rm` does not
 # end the script: `set -e` and the ERR trap both ignore a command that runs as
 # the condition of an `if`.
-chime_request="/tmp/jpmelos/tmux/chime/request"
+chime_request="$tmux_dir/chime/request"
 if rm "$chime_request" 2> /dev/null; then
     play_sound "$chime_sound"
 fi
 
-state_dir="/tmp/jpmelos/tmux/pane-state"
+state_dir="$tmux_dir/pane-state"
 if [ ! -d "$state_dir" ]; then
     exit 0
 fi

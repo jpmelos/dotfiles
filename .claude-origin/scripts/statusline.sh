@@ -11,8 +11,6 @@ round_up_cents() {
 
 input=$(cat)
 
-echo "$input" > /tmp/claude-code-shared/statuslineinput.json
-
 MODEL=$(jq -r '.model.display_name' <<< "$input")
 COST=$(jq -r '.cost.total_cost_usd' <<< "$input")
 USED_PERCENTAGE=$(jq -r '.context_window.used_percentage // 0' <<< "$input")

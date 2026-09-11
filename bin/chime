@@ -2,9 +2,11 @@
 set -euo pipefail
 trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 
-# Request the notification chime. The request is an empty file under
-# /tmp/jpmelos/tmux/chime. The pane-state-sync script picks it up and plays the
-# sound on the host.
+# Request the notification chime. The request is an empty file under the chime
+# directory of the shared tmux directory. That directory is $AGENT_TMUX_DIR, or
+# /tmp/$USER/tmux without it. The ai launcher sets the variable inside its
+# containers, where the user name differs from the host's. The pane-state-sync
+# script picks the request up and plays the sound on the host.
 #
 # The script does not play the sound itself. It also runs inside Docker
 # containers, and a container has no audio device. A file in a shared directory
@@ -30,6 +32,7 @@ if [ "$#" -ne 0 ]; then
     exit 1
 fi
 
-chime_dir="/tmp/jpmelos/tmux/chime"
+tmux_dir="${AGENT_TMUX_DIR:-/tmp/${USER:-$(id -un)}/tmux}"
+chime_dir="$tmux_dir/chime"
 mkdir -p "$chime_dir"
 touch "$chime_dir/request"

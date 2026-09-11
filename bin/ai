@@ -10,12 +10,18 @@
 # /
 # / Usage: ai [options] [-- harness-args...]
 # / Options:
-# /   --profile <name>  Specify profile for API key lookup (default: auto-detect
-# /                     from the project root, first component after `~/devel`)
-# /   --channel <name>  Claude Code release channel to install in the image
-# /                     (default: `latest`). The channel is part of the image
-# /                     tag, so each channel gets its own image, and a switch
-# /                     to another channel builds that image.
+# /   --profile <name>  Specify profile for API key lookup (default: the
+# /                     organization directory of the project, such as
+# /                     `orgname` for `~/devel/orgname/project`, or the user
+# /                     name for a project directly under `~/devel`)
+# /   --channel <name>  Claude Code release channel or version to install in
+# /                     the image (default: `latest`). Accepts `latest`,
+# /                     `stable`, or a version such as `2.1.0`. The channel is
+# /                     part of the image tag, so each channel gets its own
+# /                     image, and a switch to another channel builds that
+# /                     image. The image of a channel is rebuilt once a day.
+# /                     The image of a version is not, because a version
+# /                     names one release.
 # /   --process-output  Capture and process output (requires `--print` and
 # /                     `--output-format json` in harness args)
 # /   --force-rebuild   Force rebuild of Docker image
@@ -26,14 +32,15 @@
 # /   --no-docker-socket
 # /                     Do not mount the host Docker socket into the container
 # /   --verbose         Print the Docker command before running it
-# /   --help            Show this help
+# /   --help, -h        Show this help
 # /
 # / Arguments after `--` are passed directly to Claude Code.
 # /
 # / A project is a directory that `list_project_dirs` reports. The current
-# / directory can be the project root or any directory below it. The profile
-# / comes from the root in both cases. If run outside of every project, defaults
-# / to ~/devel/dotfiles as the working directory.
+# / directory can be the project root or any directory below it. Both cases
+# / behave the same: the profile comes from the root, and the container starts
+# / in the root. If run outside of every project, defaults to ~/devel/dotfiles
+# / as the project.
 # /
 # / Security:
 # /   The container runs read-only, with an explicit list of mounts. This
@@ -45,21 +52,33 @@
 # /   repositories that you do not trust. Docker is then unavailable inside
 # /   the container.
 # /
-# /   Host directories under `/tmp` carry state between the container and the
-# /   host. Any local user can read them. That is on purpose. Nothing secret
-# /   goes there.
+# /   The dotfiles repository holds the scripts that the agent calls and the
+# /   `.claude-origin` directory that every run copies into the profile. When
+# /   the project is not the dotfiles repository, the container sees that
+# /   repository read-only, so the agent cannot change the origin. The copy
+# /   overwrites the files that the origin holds, and it mirrors the
+# /   directories that the origin holds, so a file that the agent adds to
+# /   `~/.claude/commands` does not survive the next run. The rest of the
+# /   profile directory is not touched. The `/learn` command writes to the
+# /   origin, so it works only from the dotfiles project.
+# /
+# /   Host directories under `/tmp/<user>` carry state between the container
+# /   and the host. Any local user can read them. That is on purpose. Nothing
+# /   secret goes there. The `AGENT_SHARED_DIR` variable names the directory
+# /   where the status line and hook scripts write.
 # /
 # / tmux:
-# /   The container always gets a mount of `/tmp/jpmelos/tmux`. When the
-# /   launcher runs inside tmux, it also gets the `TMUX_PANE` variable. The
-# /   `running`, `pending`, `ready`, and `default` scripts then mark the pane
-# /   that runs the agent, and `pending` and `ready` request the notification
-# /   chime. The `pane-state-sync` script on the host picks both up. Outside
-# /   tmux the variable is absent, and these scripts do nothing.
+# /   The container always gets a mount of `/tmp/<user>/tmux`, and the
+# /   `AGENT_TMUX_DIR` variable names it. When the launcher runs inside tmux,
+# /   the container also gets the `TMUX_PANE` variable. The `running`,
+# /   `pending`, `ready`, and `default` scripts then mark the pane that runs
+# /   the agent, and `pending` and `ready` request the notification chime. The
+# /   `pane-state-sync` script on the host picks both up. Outside tmux the
+# /   variable is absent, and these scripts do nothing.
 # /
 # / Configuration:
-# /   Expects a configuration file at `~/config.json` (requires `chmod 600`)
-# /   with API keys and other configuration.
+# /   Reads an optional configuration file at `~/config.json` (requires
+# /   `chmod 600`) with API keys and other configuration.
 # /
 # /   Configuration format:
 # /   ```
@@ -89,8 +108,13 @@
 # /
 # /   The `mcp_servers` object of a profile replaces the `mcpServers` key in
 # /   that profile's `.claude.json`.
+# /
+# /   An `ANTHROPIC_API_KEY` variable in the environment takes precedence over
+# /   the `api_key` of the profile. The launcher warns when both are present,
+# /   because the account of the environment key pays for the session.
 
 import datetime
+import filecmp
 import json
 import os
 import pwd
@@ -107,7 +131,6 @@ from decimal import ROUND_CEILING, ROUND_DOWN, Decimal
 _MISSING = object()
 
 DEFAULT_CLAUDE_CODE_CHANNEL = "latest"
-SHARED_HOST_DIRS = ("/tmp/claude-code-shared", "/tmp/jpmelos/tmux")
 AGENT_BINARIES = (
     "safe_mv",
     "safe_rm",
@@ -123,6 +146,33 @@ AGENT_BINARIES = (
     "ready",
     "default",
 )
+# Entries that Claude Code keeps under its configuration directory. The copy
+# of the origin overwrites every file that the origin holds and mirrors every
+# directory that the origin holds, so one of these in the origin would wipe the
+# state of every profile.
+CLAUDE_STATE_ENTRIES = frozenset(
+    {
+        ".claude.json",
+        ".credentials.json",
+        ".last-cleanup",
+        "backups",
+        "debug",
+        "file-history",
+        "history.jsonl",
+        "ide",
+        "mcp-needs-auth-cache.json",
+        "paste-cache",
+        "plugins",
+        "policy-limits.json",
+        "projects",
+        "remote-settings.json",
+        "session-env",
+        "sessions",
+        "shell-snapshots",
+        "statsig",
+        "todos",
+    }
+)
 
 
 def process_help_option(argv):
@@ -131,7 +181,7 @@ def process_help_option(argv):
             # Any `--help` is targeted for Claude Code instead of this script.
             return
 
-        if argument == "--help":
+        if argument in ("--help", "-h"):
             show_help()
             sys.exit(0)
 
@@ -176,7 +226,7 @@ class Options:
     harness_args: list = field(default_factory=list)
 
 
-def parse_options(argv, project_root, devel_dir):
+def parse_options(argv, project_name, username):
     options = Options()
 
     value_options = {
@@ -197,10 +247,17 @@ def parse_options(argv, project_root, devel_dir):
     index = 0
     while index < len(argv):
         argument = argv[index]
-        if argument in value_options:
+        # Accept both `--option value` and `--option=value`.
+        option_name, has_inline_value, inline_value = argument.partition("=")
+        if has_inline_value and option_name in value_options:
+            if not inline_value:
+                die(f"Error: {option_name} requires a non-empty argument")
+            setattr(options, value_options[option_name], inline_value)
             index += 1
-            if index >= len(argv):
-                die(f"Error: {argument} requires an argument")
+        elif argument in value_options:
+            index += 1
+            if index >= len(argv) or not argv[index] or argv[index].startswith("-"):
+                die(f"Error: {argument} requires a non-empty argument")
             setattr(options, value_options[argument], argv[index])
             index += 1
         elif argument in flags:
@@ -212,9 +269,15 @@ def parse_options(argv, project_root, devel_dir):
         else:
             die(f"Error: Unknown option '{argument}'")
 
-    # Detect print mode and JSON output format in harness args.
+    # Detect print mode and JSON output format in harness args. The scan reads
+    # the arguments the way that the harness does. A prompt that spells
+    # `--print` is a flag for the harness too, and everything after a `--` is
+    # positional for both.
     previous_argument = ""
     for argument in options.harness_args:
+        if argument == "--":
+            break
+
         if argument in ("--print", "-p"):
             options.harness_print_mode = True
 
@@ -237,33 +300,35 @@ def parse_options(argv, project_root, devel_dir):
     if options.no_rebuild and (options.force_rebuild or options.no_build_cache):
         die("Error: --no-rebuild conflicts with --force-rebuild and --no-build-cache")
 
-    if options.channel and not re.fullmatch(r"[A-Za-z0-9]{1,128}", options.channel):
+    # The channel becomes the image tag, so it must follow the Docker tag
+    # grammar. That grammar also covers version numbers such as `2.1.0`.
+    if options.channel and not re.fullmatch(
+        r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}", options.channel
+    ):
         die(f"Error: Invalid channel name '{options.channel}'")
 
-    if not options.profile:
-        options.profile = detect_profile(project_root, devel_dir)
-    if not re.fullmatch(r"[a-zA-Z0-9]{1,64}", options.profile):
+    profile_detected = not options.profile
+    if profile_detected:
+        options.profile = detect_profile(project_name, username)
+    # The profile becomes part of a directory name, so it must stay a single
+    # path component without a leading dot.
+    if not re.fullmatch(r"[a-zA-Z0-9_-][a-zA-Z0-9_.-]{0,63}", options.profile):
+        if profile_detected:
+            die(
+                f"Error: Invalid profile name '{options.profile}' detected from "
+                "the project. Use --profile to choose another one"
+            )
         die(f"Error: Invalid profile name '{options.profile}'")
 
     return options
 
 
-def detect_profile(project_root, devel_dir):
-    # The script derives the profile from the path components under `~/devel`,
-    # so it must run from the project root and not from a subdirectory.
-    try:
-        result = subprocess.run(
-            [os.path.join(devel_dir, "dotfiles", "bin", "project_profile_name")],
-            cwd=project_root,
-            stdout=subprocess.PIPE,
-            encoding="utf-8",
-        )
-    except OSError as error:
-        die(f"Error: cannot run project_profile_name: {error}")
-    if result.returncode != 0:
-        sys.exit(result.returncode)
-
-    return result.stdout.rstrip("\n")
+def detect_profile(project_name, username):
+    # A project inside an organization directory, such as `orgname/project`,
+    # takes the organization as its profile. A top-level project takes the
+    # user name.
+    first_component, separator, _ = project_name.partition("/")
+    return first_component if separator else username
 
 
 def strip_leading_path(path, prefix):
@@ -273,20 +338,52 @@ def strip_leading_path(path, prefix):
 
 
 def find_project_root(current_dir, devel_dir, project_dirs):
-    # Longest match first, so a nested project wins over a parent directory
-    # that is a project too.
-    for relative_project_dir in sorted(project_dirs, key=len, reverse=True):
+    # A project directory can be a symbolic link, and `current_dir` is already
+    # resolved, so resolve the project directory for the comparison. Return
+    # the unresolved path, because that is the path that the `~/devel` mount
+    # exposes inside the container.
+    #
+    # Longest resolved path first, so a nested project wins over a parent
+    # directory that is a project too. The comparison runs on resolved paths,
+    # so the order must come from them as well.
+    candidates = []
+    for relative_project_dir in project_dirs:
         project_dir = os.path.join(devel_dir, relative_project_dir)
-        if current_dir == project_dir or current_dir.startswith(project_dir + "/"):
+        candidates.append((os.path.realpath(project_dir), project_dir))
+    candidates.sort(key=lambda candidate: len(candidate[0]), reverse=True)
+
+    for resolved_project_dir, project_dir in candidates:
+        if current_dir == resolved_project_dir or current_dir.startswith(
+            resolved_project_dir + "/"
+        ):
+            # The `~/devel` mount exposes the link, but not a target outside
+            # of it. The container would then fail to enter the directory.
+            if not resolved_project_dir.startswith(devel_dir + "/"):
+                die(
+                    f"Error: {project_dir} resolves to {resolved_project_dir}, "
+                    f"which is outside {devel_dir} and is not visible inside "
+                    "the container"
+                )
             return project_dir
     return None
 
 
 def load_user_config(config_path):
-    if not os.path.isfile(config_path):
+    # The file holds API keys, so it must be a regular file that belongs to
+    # the user who runs the launcher, with no group or other access. `lstat`
+    # does not follow links, so a link fails the check.
+    try:
+        info = os.lstat(config_path)
+    except FileNotFoundError:
         return None
+    except OSError as error:
+        die(f"Error: cannot read {config_path}: {error}")
+    if not stat.S_ISREG(info.st_mode):
+        die(f"Error: {config_path} is not a regular file")
+    if info.st_uid != os.getuid():
+        die(f"Error: {config_path} is owned by user ID {info.st_uid}, not by you")
 
-    file_perms = os.stat(config_path).st_mode & 0o7777
+    file_perms = stat.S_IMODE(info.st_mode)
     if file_perms & 0o077:
         die(
             f"Error: {config_path} has permissions {file_perms:o}, expected "
@@ -294,7 +391,7 @@ def load_user_config(config_path):
         )
     try:
         config = read_json_file(config_path)
-    except json.JSONDecodeError as error:
+    except ValueError as error:
         die(f"Error: {config_path} is not valid JSON: {error}")
     except OSError as error:
         die(f"Error: cannot read {config_path}: {error}")
@@ -305,32 +402,52 @@ def load_user_config(config_path):
 
 
 def resolve_api_key(config, profile):
-    from_environment = os.environ.get("ANTHROPIC_API_KEY", "")
-    if from_environment:
-        return from_environment
-
     api_key = _MISSING
     if config is not None:
         api_key = profile_setting(config, profile, "api_key")
     if api_key is _MISSING or api_key is None:
-        echo_err(f"No API key for profile '{profile}'")
-        return ""
+        api_key = ""
     if not isinstance(api_key, str):
         die(f"Error: the `api_key` of profile '{profile}' is not text")
+
+    from_environment = os.environ.get("ANTHROPIC_API_KEY", "")
+    if from_environment:
+        if api_key:
+            echo_err(
+                "Warning: ANTHROPIC_API_KEY is set in the environment and takes "
+                f"precedence over the `api_key` of profile '{profile}'. The "
+                "account of the environment key pays for this session."
+            )
+        return from_environment
+
+    # An empty key is a supported configuration. Claude Code then uses OAuth
+    # credentials or asks the user to log in.
     return api_key
 
 
-def profile_setting(config, profile, key):
+def profile_node(config, profile):
+    # Returns the object of the profile, or `_MISSING` when there is none.
     node = config
     for step in ("claude_code", "profiles", profile):
         node = node.get(step)
         if not isinstance(node, dict):
             return _MISSING
+    return node
+
+
+def has_profile_entry(config, profile):
+    return profile_node(config, profile) is not _MISSING
+
+
+def profile_setting(config, profile, key):
+    node = profile_node(config, profile)
+    if node is _MISSING:
+        return _MISSING
     return node.get(key, _MISSING)
 
 
 def build_image_name(username, channel):
-    sanitized = re.sub(r"[^a-z0-9._-]", "", username.lower()).lstrip("._-")[:64]
+    sanitized = re.sub(r"[^a-z0-9._-]", "", username.lower()).strip("._-")[:64]
     if not sanitized:
         die(f"Error: cannot build an image name from user name '{username}'")
     return f"{sanitized}-claude:{channel}"
@@ -344,7 +461,9 @@ def ensure_image(options, docker_image_name, dockerfile_path, home, channel):
         dockerfile_mtime = os.stat(dockerfile_path).st_mtime
     except OSError:
         dockerfile_mtime = 0
-    rebuild_reason = get_rebuild_reason(options, last_build, dockerfile_mtime, today)
+    rebuild_reason = get_rebuild_reason(
+        options, last_build, dockerfile_mtime, today, channel
+    )
 
     if options.no_rebuild:
         if last_build is None:
@@ -401,20 +520,32 @@ def get_last_build(docker_image_name):
             echo_err("WARNING: 'docker image ls' fixed it")
 
     if not stdout:
-        # A missing image is the expected case. Anything else is worth a line.
+        # A missing image is the expected case. Any other failure must not
+        # pass as a missing image, because that would start a full build or
+        # make `--no-rebuild` report the wrong cause.
         if stderr and "No such image" not in stderr:
-            echo_err(f"docker image inspect: {stderr}")
+            die(f"Error: docker image inspect failed: {stderr}")
         return None
 
     try:
-        # The caller compares the build date with the UTC date of today, so the
-        # value must carry the same zone.
-        return datetime.datetime.fromtimestamp(int(stdout), tz=datetime.timezone.utc)
-    except (ValueError, OSError, OverflowError):
+        timestamp = int(stdout)
+    except ValueError:
         die(
             "Error: cannot read the build date of image "
             f"'{docker_image_name}' from '{stdout}'"
         )
+
+    # An image that no build of this script tagged, such as one that came in
+    # through `docker load`, has a zero tag time, which Docker reports as a
+    # date long before the epoch. Treat it as an image from the epoch, so the
+    # daily rebuild replaces it.
+    if timestamp <= 0:
+        echo_err(f"Warning: image '{docker_image_name}' has no build date")
+        timestamp = 0
+
+    # The caller compares the build date with the UTC date of today, so the
+    # value must carry the same zone.
+    return datetime.datetime.fromtimestamp(timestamp, tz=datetime.timezone.utc)
 
 
 def inspect_last_build(docker_image_name):
@@ -434,18 +565,25 @@ def inspect_last_build(docker_image_name):
     return result.stdout.rstrip("\n"), result.stderr.rstrip("\n")
 
 
-def get_rebuild_reason(options, last_build, dockerfile_mtime, today):
+def get_rebuild_reason(options, last_build, dockerfile_mtime, today, channel):
     if options.no_build_cache:
         return "--no-build-cache specified"
     if options.force_rebuild:
         return "--force-rebuild specified"
     if last_build is None:
         return "image does not exist"
-    if last_build.date() != today:
+    if last_build.date() != today and not is_pinned_version(channel):
         return f"image is from {last_build:%Y-%m-%d}, today is {today:%Y-%m-%d}"
     if dockerfile_mtime > last_build.timestamp():
         return "Dockerfile modified after last build"
     return None
+
+
+def is_pinned_version(channel):
+    # `latest` and `stable` move, so an image from another day can hold an
+    # older release. A version number names one release, and a rebuild would
+    # install the same binary again.
+    return re.fullmatch(r"\d+\.\d+\.\d+", channel) is not None
 
 
 def build_image(use_cache, docker_image_name, dockerfile_path, home, channel, today):
@@ -487,26 +625,73 @@ def build_image(use_cache, docker_image_name, dockerfile_path, home, channel, to
     return result.returncode == 0
 
 
-def copy_tree_contents(source, destination):
+def copy_tree_contents(source, destination, *, mirror, skip=()):
+    # With `mirror`, the destination ends up with the same entries as the
+    # source, and entries that the source does not have are removed. Without
+    # it, the destination keeps its other entries. Top-level entries named in
+    # `skip` are not copied, and the destination keeps its own version.
     os.makedirs(destination, exist_ok=True)
+    source_names = set()
     for entry in os.scandir(source):
+        source_names.add(entry.name)
+        if entry.name in skip:
+            continue
         target = os.path.join(destination, entry.name)
         if entry.is_symlink():
+            # A link that already points to the same place is left alone, so
+            # that a reader that watches the directory sees no change.
+            link_target = os.readlink(entry.path)
+            if os.path.islink(target) and os.readlink(target) == link_target:
+                continue
             if os.path.lexists(target):
                 remove_path(target)
-            os.symlink(os.readlink(entry.path), target)
+            os.symlink(link_target, target)
         elif entry.is_dir():
             if os.path.islink(target) or (
                 os.path.lexists(target) and not os.path.isdir(target)
             ):
                 remove_path(target)
-            copy_tree_contents(entry.path, target)
+            copy_tree_contents(entry.path, target, mirror=True)
             shutil.copystat(entry.path, target)
         else:
-            if os.path.lexists(target):
-                remove_path(target)
-            shutil.copyfile(entry.path, target)
-            shutil.copystat(entry.path, target)
+            copy_file_atomically(entry.path, target)
+
+    if mirror:
+        # Collect the entries first. Removal during the scan is undefined.
+        for entry in list(os.scandir(destination)):
+            if entry.name not in source_names:
+                remove_path(entry.path)
+
+
+def copy_file_atomically(source, target):
+    # Another session of the same profile can read the target at any moment,
+    # so it must never see a partial file. A target with the same content is
+    # left in place, so that a reader that watches the file sees no change.
+    if os.path.isfile(target) and not os.path.islink(target):
+        if filecmp.cmp(source, target, shallow=False):
+            # `copystat` changes the modification time, and a watcher sees
+            # that as an event, so skip it when the metadata matches too.
+            source_stat = os.stat(source)
+            target_stat = os.stat(target)
+            same_mtime = source_stat.st_mtime_ns == target_stat.st_mtime_ns
+            same_mode = stat.S_IMODE(source_stat.st_mode) == stat.S_IMODE(
+                target_stat.st_mode
+            )
+            if not (same_mtime and same_mode):
+                shutil.copystat(source, target)
+            return
+    elif os.path.lexists(target):
+        remove_path(target)
+
+    descriptor, temp_path = tempfile.mkstemp(dir=os.path.dirname(target))
+    os.close(descriptor)
+    try:
+        shutil.copyfile(source, temp_path)
+        shutil.copystat(source, temp_path)
+        os.replace(temp_path, target)
+    except BaseException:
+        remove_file(temp_path)
+        raise
 
 
 def echo_err(message):
@@ -583,44 +768,64 @@ def format_duration(total_seconds):
     return f"{result}{seconds:.3f}s"
 
 
-def process_print_output(output):
-    def die_with_output(message):
-        echo_err(output)
-        die(message)
+@dataclass
+class PrintSummary:
+    result: str
+    cost: Decimal
+    duration: Decimal
+    is_error: bool
 
+
+def parse_print_output(output):
+    # Raises `ValueError` when the output is not the JSON body of a print run.
     try:
         data = json.loads(output)
     except json.JSONDecodeError as error:
-        die_with_output(f"Error: harness output is not valid JSON: {error}")
+        raise ValueError(f"harness output is not valid JSON: {error}") from error
     if not isinstance(data, dict):
-        die_with_output("Error: harness output is not a JSON object")
+        raise ValueError("harness output is not a JSON object")
 
+    is_error = data.get("is_error") is True
+
+    # A failed run, such as one that hit the turn limit, has no `result` text.
+    # It names the failure in `subtype` and lists the messages in `errors`.
     result = data.get("result")
+    if result is None and is_error:
+        errors = data.get("errors")
+        if isinstance(errors, list) and errors:
+            result = "\n".join(str(error) for error in errors)
+        else:
+            result = f"The harness failed: {data.get('subtype', 'unknown error')}"
     if not isinstance(result, str):
-        die_with_output(f"Error: harness output has no text `result`: {result!r}")
+        raise ValueError(f"harness output has no text `result`: {result!r}")
 
     cost = data.get("total_cost_usd")
     if not is_number(cost):
-        die_with_output(
-            f"Error: harness output has no numeric `total_cost_usd`: {cost!r}"
-        )
+        raise ValueError(f"harness output has no numeric `total_cost_usd`: {cost!r}")
 
     duration_ms = data.get("duration_ms")
     if not is_number(duration_ms):
-        die_with_output(
-            f"Error: harness output has no numeric `duration_ms`: {duration_ms!r}"
+        raise ValueError(
+            f"harness output has no numeric `duration_ms`: {duration_ms!r}"
         )
 
-    duration = Decimal(str(duration_ms)) / 1000
+    return PrintSummary(
+        result=result,
+        cost=Decimal(str(cost)),
+        duration=Decimal(str(duration_ms)) / 1000,
+        is_error=is_error,
+    )
 
-    print(result)
+
+def print_summary(summary):
+    print(summary.result)
     print("")
-    print(f"Cost: ${round_up_cents(cost)}")
-    print(f"Duration: {format_duration(duration)}")
+    print(f"Cost: ${round_up_cents(summary.cost)}")
+    print(f"Duration: {format_duration(summary.duration)}")
 
 
-def generate_container_name(current_dir):
-    basename = os.path.basename(current_dir)
+def generate_container_name(project_root):
+    basename = os.path.basename(project_root)
     dir_basename = re.sub(r"[^a-zA-Z0-9_.-]", "", basename)
     return f"claude_code_{dir_basename[:44]}_{os.getpid()}"
 
@@ -645,11 +850,15 @@ def get_timezone():
 class RunConfig:
     home: str
     devel_dir: str
-    current_dir: str
+    dotfiles_dir: str
+    project_root: str
     profile: str
     project_name: str
     api_key: str
     docker_image_name: str
+    container_name: str
+    shared_dir: str
+    tmux_dir: str
     harness_print_mode: bool
     no_docker_socket: bool
 
@@ -663,20 +872,35 @@ def build_container_env(api_key):
     return env
 
 
-def prepare_shared_dirs():
-    for shared_dir in SHARED_HOST_DIRS:
+def prepare_shared_dirs(shared_root, shared_dirs):
+    # `/tmp` is world-writable, so another local user can create these paths
+    # first, as directories or as symbolic links into a directory that the
+    # user owns. The container mounts them and host scripts read them, so each
+    # one must be a real directory that belongs to the user who runs the
+    # launcher. `lstat` does not follow links, so a link fails the check.
+    #
+    # A path that cannot be created is fatal. Docker would create the missing
+    # mount source on the host as a directory owned by `root`.
+    for path in (shared_root, *shared_dirs):
         try:
-            os.makedirs(shared_dir, exist_ok=True)
+            os.mkdir(path)
+        except FileExistsError:
+            pass
         except OSError as error:
-            echo_err(f"Warning: cannot create {shared_dir}: {error}")
-            continue
-        if not os.access(shared_dir, os.W_OK | os.X_OK):
-            echo_err(f"Warning: {shared_dir} is not writable")
+            die(f"Error: cannot create {path}: {error}")
+        info = os.lstat(path)
+        if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
+            die(f"Error: {path} is not a directory")
+        if info.st_uid != os.getuid():
+            die(f"Error: {path} is owned by user ID {info.st_uid}, not by you")
+        if not os.access(path, os.W_OK | os.X_OK):
+            die(f"Error: {path} is not writable")
 
 
 def build_run_command(harness_args, run_config):
     home = run_config.home
     devel_dir = run_config.devel_dir
+    dotfiles_dir = run_config.dotfiles_dir
 
     cmd = [
         "docker",
@@ -691,23 +915,27 @@ def build_run_command(harness_args, run_config):
         f"{os.getuid()}:{os.getgid()}",
         # Container name.
         "--name",
-        generate_container_name(run_config.current_dir),
+        run_config.container_name,
         # So that the agent can reach services running on the host via
         # `host.docker.internal`.
         "--add-host",
         "host.docker.internal:host-gateway",
-        # Make the entire filesystem read-only.
+        # Make the entire filesystem read-only. `/tmp` is the only writable
+        # place outside of the mounts, so the runtime and cache directories
+        # that Chromium and Node tools write to must live under it.
         "--read-only",
         "--tmpfs",
         "/tmp",
         "--env",
         "XDG_RUNTIME_DIR=/tmp",
-        # Mount the entire `~/devel` directory and set the current directory as
-        # the working directory.
+        "--env",
+        "XDG_CACHE_HOME=/tmp/cache",
+        # Mount the entire `~/devel` directory and set the project root as the
+        # working directory.
         "--volume",
         f"{devel_dir}:{devel_dir}",
         "--workdir",
-        run_config.current_dir,
+        run_config.project_root,
         # Claude Code files. This makes it so that it looks for `.claude.json`
         # inside `~/.claude` instead of inside `~`.
         "--env",
@@ -729,10 +957,18 @@ def build_run_command(harness_args, run_config):
         # Let the `pane-state` script mark the pane that runs the agent, and
         # let the `chime` script ring on the host. `TMUX_PANE` names the pane
         # that runs the launcher. Docker leaves the variable out when the host
-        # does not set it, and the scripts then do nothing.
+        # does not set it, and the scripts then do nothing. `AGENT_TMUX_DIR`
+        # names the shared directory where these scripts write. The container
+        # cannot derive it, because its user name differs from the host's.
         "--env",
         "TMUX_PANE",
-        # Claude Code uses this to know search for file suggestions on `@`.
+        "--env",
+        f"AGENT_TMUX_DIR={run_config.tmux_dir}",
+        # The status line and hook scripts write their debug output here. The
+        # container cannot derive the path, for the same reason as above.
+        "--env",
+        f"AGENT_SHARED_DIR={run_config.shared_dir}",
+        # Claude Code reads this to search for file suggestions on `@`.
         "--env",
         "RIPGREP_CONFIG_PATH",
         # Terminal configuration.
@@ -746,14 +982,22 @@ def build_run_command(harness_args, run_config):
         "NO_COLOR",
     ]
 
-    for shared_dir in SHARED_HOST_DIRS:
+    for shared_dir in (run_config.shared_dir, run_config.tmux_dir):
         cmd += ["--volume", f"{shared_dir}:{shared_dir}"]
+
+    # The dotfiles repository is the source of the agent scripts and of the
+    # `.claude-origin` directory that every run copies into the profile. Mount
+    # it read-only over the `~/devel` mount when it is not the project, so the
+    # agent cannot change what the next run installs. Docker applies the
+    # deeper mount last, so the read-only one wins.
+    if run_config.project_root != dotfiles_dir:
+        cmd += ["--volume", f"{dotfiles_dir}:{dotfiles_dir}:ro"]
 
     # Mount the scripts that the agent calls by name. Skip one when it is
     # absent, so Docker does not create it on the host as a directory owned by
     # `root`, inside the dotfiles working tree.
     for binary in AGENT_BINARIES:
-        binary_path = f"{devel_dir}/dotfiles/bin/{binary}"
+        binary_path = f"{dotfiles_dir}/bin/{binary}"
         if not os.path.isfile(binary_path):
             echo_err(f"Warning: {binary_path} does not exist, not mounting it")
             continue
@@ -859,10 +1103,10 @@ def stdin_is_tty():
         return False
 
 
-def list_project_dirs(devel_dir):
+def list_project_dirs(dotfiles_dir):
     try:
         result = subprocess.run(
-            [os.path.join(devel_dir, "dotfiles", "bin", "list_project_dirs")],
+            [os.path.join(dotfiles_dir, "bin", "list_project_dirs")],
             stdout=subprocess.PIPE,
             encoding="utf-8",
         )
@@ -870,53 +1114,99 @@ def list_project_dirs(devel_dir):
         die(f"Error: cannot run list_project_dirs: {error}")
     if result.returncode != 0:
         die("Error: list_project_dirs failed")
-    return result.stdout.splitlines()
+    # An empty line would join to `~/devel` itself, and that path contains
+    # every directory that the launcher compares against it.
+    return [line for line in result.stdout.splitlines() if line]
 
 
-def apply_preferred_model(config, profile, home):
-    if config is None:
+def apply_settings(config, profile, origin_dir, profile_dir):
+    # The profile `settings.json` is the origin file with the `model` of the
+    # profile applied. The result is computed first and written at most once.
+    # A running session of the same profile watches this file, so it must not
+    # see the origin content and then the final content on every launch.
+    origin_settings = f"{origin_dir}/settings.json"
+    profile_settings = f"{profile_dir}/settings.json"
+
+    try:
+        settings = read_json_file(origin_settings)
+    except FileNotFoundError:
+        return
+    except (OSError, ValueError) as error:
+        echo_err(f"Warning: cannot read {origin_settings}: {error}")
         return
 
+    preferred_model = resolve_preferred_model(config, profile)
+    if preferred_model is not None:
+        if isinstance(settings, dict):
+            settings["model"] = preferred_model
+            echo_err(f"Model set to '{preferred_model}' for profile '{profile}'")
+        else:
+            echo_err(f"Warning: {origin_settings} is not a JSON object, model not set")
+
+    try:
+        current_settings = read_json_file(profile_settings)
+    except (OSError, ValueError):
+        current_settings = _MISSING
+
+    if current_settings == settings:
+        return
+    try:
+        write_json_file(profile_settings, settings)
+    except OSError as error:
+        echo_err(f"Warning: cannot write {profile_settings}: {error}")
+
+
+def resolve_preferred_model(config, profile):
+    # Returns the `model` of the profile, or `None` when there is none.
+    if config is None:
+        return None
     preferred_model = profile_setting(config, profile, "model")
     if preferred_model is _MISSING or preferred_model is None:
-        return
+        return None
     if not isinstance(preferred_model, str):
         echo_err(
             f"Warning: the `model` of profile '{profile}' is not text, model not set"
         )
-        return
-
-    profile_settings = f"{home}/.claude-{profile}/settings.json"
-    try:
-        settings = read_json_file(profile_settings)
-        if not isinstance(settings, dict):
-            echo_err(f"Warning: {profile_settings} is not a JSON object, model not set")
-            return
-        settings["model"] = preferred_model
-        write_json_file(profile_settings, settings)
-    except (OSError, json.JSONDecodeError) as error:
-        echo_err(f"Warning: cannot set the model in {profile_settings}: {error}")
-        return
-    echo_err(f"Model set to '{preferred_model}' for profile '{profile}'")
+        return None
+    return preferred_model
 
 
-def apply_dependencies_list(claude_md_path, project_dirs):
+def apply_dependencies_list(origin_claude_md, profile_claude_md, project_dirs):
+    # The profile `CLAUDE.md` is the origin file with the dependencies marker
+    # replaced by the list of projects. The result is computed first and
+    # written at most once. A running session of the same profile reads this
+    # file, so it must not see the origin content and then the final content
+    # on every launch.
     marker = "<!-- DEPENDENCIES_LIST -->"
 
     try:
-        claude_md = read_text(claude_md_path)
-    except OSError:
+        claude_md = read_text(origin_claude_md)
+    except FileNotFoundError:
         return
-    except UnicodeDecodeError as error:
-        echo_err(f"Warning: cannot read {claude_md_path}: {error}")
-        return
-    if marker not in claude_md:
+    except (OSError, UnicodeDecodeError) as error:
+        echo_err(f"Warning: cannot read {origin_claude_md}: {error}")
         return
 
-    if not project_dirs:
-        echo_err(f"Warning: no projects found, {marker} stays in CLAUDE.md")
-        return
+    if marker in claude_md:
+        if project_dirs:
+            claude_md = expand_dependencies_marker(claude_md, marker, project_dirs)
+        else:
+            echo_err(f"Warning: no projects found, {marker} stays in CLAUDE.md")
 
+    try:
+        current_claude_md = read_text(profile_claude_md)
+    except (OSError, UnicodeDecodeError):
+        current_claude_md = _MISSING
+
+    if current_claude_md == claude_md:
+        return
+    try:
+        write_text_atomically(profile_claude_md, claude_md)
+    except OSError as error:
+        echo_err(f"Warning: cannot write {profile_claude_md}: {error}")
+
+
+def expand_dependencies_marker(claude_md, marker, project_dirs):
     lines = []
     for line in claude_md.splitlines():
         if marker in line:
@@ -925,23 +1215,57 @@ def apply_dependencies_list(claude_md_path, project_dirs):
             lines += [f"{indent}- {project_dir}" for project_dir in project_dirs]
         else:
             lines.append(line)
-    # The profile's CLAUDE.md can be a symlink into the dotfiles repository. An
-    # atomic write replaces the link instead of the file behind it.
-    write_text_atomically(claude_md_path, "".join(f"{line}\n" for line in lines))
+    return "".join(f"{line}\n" for line in lines)
 
 
 def create_profile_json(profile_json_path):
+    # Claude Code cannot start without this file, so a failure here is fatal.
     if not os.path.isfile(profile_json_path):
-        write_text_atomically(profile_json_path, "{}\n")
+        try:
+            write_text_atomically(profile_json_path, "{}\n")
+        except OSError as error:
+            die(f"Error: cannot create {profile_json_path}: {error}")
     try:
         os.chmod(profile_json_path, 0o600)
     except OSError as error:
         echo_err(f"Warning: cannot set the mode of {profile_json_path}: {error}")
 
 
-def approve_api_key(profile_json_path, api_key):
-    if not api_key:
+def update_profile_json(profile_json_path, api_key, config, profile):
+    # The file is read once, every edit is applied to the parsed content, and
+    # the result is written at most once. A running session of the same
+    # profile writes this file too, so each launch must touch it as little as
+    # possible.
+    mcp_servers = resolve_mcp_servers(config, profile)
+    if not api_key and mcp_servers is None:
         return
+
+    try:
+        profile_json = read_json_file(profile_json_path)
+    except (OSError, ValueError) as error:
+        echo_err(f"Warning: cannot read {profile_json_path}: {error}")
+        return
+    if not isinstance(profile_json, dict):
+        echo_err(f"Warning: {profile_json_path} is not a JSON object, not updated")
+        return
+
+    changed = approve_api_key(profile_json, api_key)
+    if mcp_servers is not None and apply_mcp_servers(profile_json, mcp_servers):
+        echo_err(f"MCP servers set for profile '{profile}'")
+        changed = True
+    if not changed:
+        return
+
+    try:
+        write_json_file(profile_json_path, profile_json)
+    except OSError as error:
+        echo_err(f"Warning: cannot write {profile_json_path}: {error}")
+
+
+def approve_api_key(profile_json, api_key):
+    # Returns whether `profile_json` changed.
+    if not api_key:
+        return False
 
     tail_length = 20
     if len(api_key) <= tail_length:
@@ -949,63 +1273,55 @@ def approve_api_key(profile_json_path, api_key):
             "Warning: the API key is too short to pre-approve, "
             "Claude Code will ask about it"
         )
-        return
+        return False
     approved_tail = api_key[-tail_length:]
 
-    try:
-        profile_json = read_json_file(profile_json_path)
-        if not isinstance(profile_json, dict):
-            echo_err(
-                f"Warning: {profile_json_path} is not a JSON object, "
-                "the API key is not pre-approved"
-            )
-            return
-        responses = profile_json.get("customApiKeyResponses")
-        if not isinstance(responses, dict):
-            responses = {}
-            profile_json["customApiKeyResponses"] = responses
-        approved = responses.get("approved")
-        if not isinstance(approved, list):
-            approved = []
-            responses["approved"] = approved
-        if approved_tail in approved:
-            return
-        approved.append(approved_tail)
-        write_json_file(profile_json_path, profile_json)
-    except (OSError, json.JSONDecodeError) as error:
-        echo_err(
-            f"Warning: cannot pre-approve the API key in {profile_json_path}: {error}"
-        )
+    responses = profile_json.get("customApiKeyResponses")
+    if not isinstance(responses, dict):
+        responses = {}
+        profile_json["customApiKeyResponses"] = responses
+    approved = responses.get("approved")
+    if not isinstance(approved, list):
+        approved = []
+        responses["approved"] = approved
+    if approved_tail in approved:
+        return False
+    approved.append(approved_tail)
+    return True
 
 
-def apply_mcp_servers(config, profile_json_path, profile):
+def resolve_mcp_servers(config, profile):
+    # Returns the `mcp_servers` of the profile, or `None` when there is none.
     if config is None:
-        return
-
+        return None
     mcp_servers = profile_setting(config, profile, "mcp_servers")
     if mcp_servers is _MISSING or mcp_servers is None:
-        return
+        return None
     if not isinstance(mcp_servers, dict):
         echo_err(
             f"Warning: the `mcp_servers` of profile '{profile}' is not an object, "
             "MCP servers not set"
         )
-        return
+        return None
+    return mcp_servers
 
-    try:
-        profile_json = read_json_file(profile_json_path)
-        if not isinstance(profile_json, dict):
-            echo_err(
-                f"Warning: {profile_json_path} is not a JSON object, "
-                "MCP servers not set"
+
+def apply_mcp_servers(profile_json, mcp_servers):
+    # Returns whether `profile_json` changed.
+    if profile_json.get("mcpServers") == mcp_servers:
+        return False
+    profile_json["mcpServers"] = mcp_servers
+    return True
+
+
+def check_origin_entries(origin_dir):
+    for entry in os.scandir(origin_dir):
+        if entry.name in CLAUDE_STATE_ENTRIES:
+            die(
+                f"Error: {origin_dir} holds '{entry.name}', which Claude Code "
+                "uses for state. The copy into the profile would overwrite "
+                "that state."
             )
-            return
-        profile_json["mcpServers"] = mcp_servers
-        write_json_file(profile_json_path, profile_json)
-    except (OSError, json.JSONDecodeError) as error:
-        echo_err(f"Warning: cannot set MCP servers in {profile_json_path}: {error}")
-        return
-    echo_err(f"MCP servers set for profile '{profile}'")
 
 
 def main():
@@ -1018,85 +1334,146 @@ def main():
         die("Error: HOME is not set")
 
     try:
-        username = pwd.getpwuid(os.geteuid()).pw_name
+        username = pwd.getpwuid(os.getuid()).pw_name
     except KeyError:
-        die(f"Error: user ID {os.geteuid()} has no entry in the password database")
+        die(f"Error: user ID {os.getuid()} has no entry in the password database")
 
     devel_dir = os.path.realpath(os.path.join(home, "devel"))
     if not os.path.isdir(devel_dir):
         die(f"Error: {home}/devel does not exist")
 
-    project_dirs = list_project_dirs(devel_dir)
+    # The dotfiles repository holds the helper scripts, the Dockerfile, and
+    # the origin of the profile directories. It is also the default project.
+    dotfiles_dir = os.path.join(devel_dir, "dotfiles")
 
+    project_dirs = list_project_dirs(dotfiles_dir)
+
+    # Everything below works on the project root. A run from a subdirectory
+    # of the project must behave like a run from the root.
     current_dir = os.path.realpath(os.getcwd())
     project_root = find_project_root(current_dir, devel_dir, project_dirs)
     if project_root is None:
-        current_dir = project_root = os.path.join(devel_dir, "dotfiles")
-        echo_err(f"Not inside a ~/devel project, defaulting to {current_dir}")
-
-    options = parse_options(sys.argv[1:], project_root, devel_dir)
-    profile = options.profile
+        project_root = dotfiles_dir
+        echo_err(f"Not inside a ~/devel project, defaulting to {project_root}")
 
     # Compute the project name (path relative to ~/devel/).
-    project_name = strip_leading_path(current_dir, devel_dir)
+    project_name = strip_leading_path(project_root, devel_dir)
+
+    options = parse_options(sys.argv[1:], project_name, username)
+    profile = options.profile
+
+    origin_dir = f"{home}/.claude-origin"
+    profile_dir = f"{home}/.claude-{profile}"
+    if not os.path.isdir(origin_dir):
+        die(f"Error: {origin_dir} does not exist or is not a directory")
+    # The origin is copied into the profile directory. A profile that resolves
+    # to the origin itself would rewrite the origin in place.
+    if os.path.realpath(profile_dir) == os.path.realpath(origin_dir):
+        die(f"Error: profile '{profile}' resolves to the origin directory")
 
     echo_err(f"Profile: {profile}")
     echo_err(f"Project: {project_name}")
 
     user_config_path = f"{home}/config.json"
     user_config = load_user_config(user_config_path)
+    if user_config is not None and not has_profile_entry(user_config, profile):
+        # A typo in `--profile` lands here. The launch goes on, because a
+        # profile without an entry is a supported configuration.
+        echo_err(
+            f"Warning: {user_config_path} has no entry for profile '{profile}'"
+        )
+    api_key = resolve_api_key(user_config, profile)
 
     channel = options.channel or DEFAULT_CLAUDE_CODE_CHANNEL
     docker_image_name = build_image_name(username, channel)
     dockerfile_path = os.path.join(
-        devel_dir, "dotfiles", "references", "ai_containers", "Dockerfile"
+        dotfiles_dir, "references", "ai_containers", "Dockerfile"
     )
     ensure_image(options, docker_image_name, dockerfile_path, home, channel)
 
-    profile_dir = f"{home}/.claude-{profile}"
     # The directory holds credentials and chat history. `makedirs` applies the
     # mode only to a directory that it creates, so tighten an existing one too.
-    os.makedirs(profile_dir, mode=0o700, exist_ok=True)
+    try:
+        os.makedirs(profile_dir, mode=0o700, exist_ok=True)
+    except OSError as error:
+        die(f"Error: cannot create {profile_dir}: {error}")
     try:
         os.chmod(profile_dir, 0o700)
     except OSError as error:
         echo_err(f"Warning: cannot set the mode of {profile_dir}: {error}")
+    # The profile directory also holds history and credentials, so only the
+    # directories that the origin has are mirrored. The top level is not.
+    # `settings.json` gets the profile model merged in, so `apply_settings`
+    # copies it instead.
+    # `CLAUDE.md` gets the dependencies list expanded, so
+    # `apply_dependencies_list` copies it instead.
     try:
-        copy_tree_contents(f"{home}/.claude-origin", profile_dir)
+        check_origin_entries(origin_dir)
+        copy_tree_contents(
+            origin_dir, profile_dir, mirror=False, skip=("settings.json", "CLAUDE.md")
+        )
     except OSError as error:
-        die(f"Error: cannot copy {home}/.claude-origin: {error}")
+        die(f"Error: cannot copy {origin_dir}: {error}")
 
-    apply_preferred_model(user_config, profile, home)
+    apply_settings(user_config, profile, origin_dir, profile_dir)
 
-    apply_dependencies_list(f"{profile_dir}/CLAUDE.md", project_dirs)
+    apply_dependencies_list(
+        f"{origin_dir}/CLAUDE.md", f"{profile_dir}/CLAUDE.md", project_dirs
+    )
 
     profile_json_path = f"{profile_dir}/.claude.json"
     create_profile_json(profile_json_path)
-    api_key = resolve_api_key(user_config, profile)
-    approve_api_key(profile_json_path, api_key)
-    apply_mcp_servers(user_config, profile_json_path, profile)
+    update_profile_json(profile_json_path, api_key, user_config, profile)
 
-    prepare_shared_dirs()
+    shared_root = f"/tmp/{username}"
+    shared_dir = f"{shared_root}/claude-code-shared"
+    tmux_dir = f"{shared_root}/tmux"
+    prepare_shared_dirs(shared_root, (shared_dir, tmux_dir))
 
-    # Always restrict setting sources to user and local.
-    harness_args = ["--setting-sources", "user,local", *options.harness_args]
+    # Restrict setting sources to user and local by default. A
+    # `--setting-sources` in the harness arguments comes later on the command
+    # line and wins. That is on purpose: an explicit value from the user is
+    # respected.
+    #
+    # Every option here uses the `--option=value` form. The harness declares
+    # `--add-dir` as variadic, and its parser appends every following
+    # non-option argument to a variadic option given as two tokens. A
+    # positional prompt from the user would then become a directory. The `=`
+    # form does not start that collection.
+    harness_args = ["--setting-sources=user,local"]
 
     # Add the other project directories to Claude's context. The current
-    # project is already the working directory.
+    # project is already the working directory. A project that resolves to a
+    # path outside of `~/devel` is not visible inside the container, and the
+    # harness refuses to start on a directory that does not exist.
     for relative_project_dir in project_dirs:
         project_dir = os.path.join(devel_dir, relative_project_dir)
-        if project_dir == current_dir:
+        if project_dir == project_root:
             continue
-        harness_args += ["--add-dir", project_dir]
+        if not os.path.realpath(project_dir).startswith(devel_dir + "/"):
+            echo_err(
+                f"Warning: {project_dir} resolves outside {devel_dir}, not added "
+                "to the context"
+            )
+            continue
+        harness_args.append(f"--add-dir={project_dir}")
+
+    # The arguments of the user come last. A `--` among them ends the options
+    # for the harness, so nothing of ours can follow it.
+    harness_args += options.harness_args
 
     run_config = RunConfig(
         home=home,
         devel_dir=devel_dir,
-        current_dir=current_dir,
+        dotfiles_dir=dotfiles_dir,
+        project_root=project_root,
         profile=profile,
         project_name=project_name,
         api_key=api_key,
         docker_image_name=docker_image_name,
+        container_name=generate_container_name(project_root),
+        shared_dir=shared_dir,
+        tmux_dir=tmux_dir,
         harness_print_mode=options.harness_print_mode,
         no_docker_socket=options.no_docker_socket,
     )
@@ -1109,14 +1486,47 @@ def main():
 
     if options.process_output:
         # Capture output and process it.
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, encoding="utf-8", env=env)
-        if result.returncode != 0:
-            # The output was captured, so relay it. Otherwise the failure is
-            # silent.
-            if result.stdout:
-                echo_err(result.stdout.rstrip("\n"))
+        try:
+            result = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                encoding="utf-8",
+                errors="replace",
+                env=env,
+            )
+        except KeyboardInterrupt:
+            # The interrupt kills the Docker client. The container can outlive
+            # it and keep spending tokens, so stop it by name.
+            subprocess.run(
+                ["docker", "stop", "--time", "5", run_config.container_name],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            raise
+        output = result.stdout.rstrip("\n")
+
+        # The harness exits with an error code and still prints a JSON body
+        # when the run fails. Format that body like a successful one. Output
+        # that is not that body is relayed as is, so the failure is not
+        # silent, and the exit code of the harness is kept.
+        try:
+            summary = parse_print_output(output)
+        except ValueError as error:
+            if output:
+                echo_err(output)
+            if result.returncode == 0:
+                die(f"Error: {error}")
             return result.returncode
-        process_print_output(result.stdout.rstrip("\n"))
+
+        print_summary(summary)
+        if result.returncode != 0:
+            return result.returncode
+
+        # The harness can exit with success and still report a failed run. The
+        # `result` text then holds the error message, which is already printed.
+        if summary.is_error:
+            echo_err("Error: the harness reported an error")
+            return 1
         return 0
 
     # Replace this process with the container. Claude Code then owns the
