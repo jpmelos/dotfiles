@@ -182,10 +182,12 @@
 
     # rs = reset
     rs = reset
-    rsu = reset HEAD~1
     rso = reset --hard @{upstream}
     rsm = ! git reset --hard $(git main-branch)
-    rsom = ! git reset --hard $(git main-branch-remote)
+    rsu = reset HEAD~1
+    # Merge the main branch first, so that the reset leaves only this branch's
+    # own changes in the working tree, not the reversal of newer main commits.
+    rsum = "! f() { main_branch=$(git main-branch) && git merge --no-ff --no-commit \"$main_branch\" && git reset \"$main_branch\"; }; f"
 
     # sh = show
     sh = "! f() { if [[ \"$1\" =~ ^- ]]; then HEADN=\"${1#-}\"; shift; git show \"HEAD~$HEADN\" $@; else git show \"$@\"; fi; }; f"
