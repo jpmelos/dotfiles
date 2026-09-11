@@ -48,12 +48,12 @@
 # /   goes there.
 # /
 # / tmux:
-# /   When the launcher runs inside tmux, the container gets the `TMUX_PANE`
-# /   variable and a mount of `/tmp/jpmelos/tmux`. The `running`, `pending`,
-# /   `ready`, and `default` scripts then mark the pane that runs the agent,
-# /   and `pending` and `ready` request the notification chime. The
-# /   `pane-state-sync` script on the host picks both up. Outside tmux the
-# /   container gets none of this, and these scripts do nothing.
+# /   The container always gets a mount of `/tmp/jpmelos/tmux`. When the
+# /   launcher runs inside tmux, it also gets the `TMUX_PANE` variable. The
+# /   `running`, `pending`, `ready`, and `default` scripts then mark the pane
+# /   that runs the agent, and `pending` and `ready` request the notification
+# /   chime. The `pane-state-sync` script on the host picks both up. Outside
+# /   tmux the variable is absent, and these scripts do nothing.
 # /
 # / Configuration:
 # /   Expects a configuration file at `~/config.json` (requires `chmod 600`)
@@ -103,114 +103,47 @@ from decimal import ROUND_CEILING, ROUND_DOWN, Decimal
 
 _MISSING = object()
 
-# The channel to install when the user names none. It is part of the image tag,
-# so it must be a concrete value and not an empty string.
-DEFAULT_CHANNEL = "latest"
-
-# ============================================================================
-# Small utilities
-# ============================================================================
-
-
-def echo_err(message):
-    """Print a message to standard error."""
-    print(message, file=sys.stderr, flush=True)
-
-
-def die(message, *, code=1):
-    """Print a message to standard error and exit."""
-    echo_err(message)
-    sys.exit(code)
-
-
-def strip_leading_path(path, prefix):
-    """Remove `prefix/` from the start of `path` if it is there."""
-    if path.startswith(prefix + "/"):
-        return path[len(prefix) + 1 :]
-    return path
+DEFAULT_CLAUDE_CODE_CHANNEL = "latest"
+SHARED_HOST_DIRS = ("/tmp/claude-code-shared", "/tmp/jpmelos/tmux")
+AGENT_BINARIES = (
+    "safe_mv",
+    "safe_rm",
+    "ai_git_add",
+    "ai_git_restore",
+    "ai_git_commit",
+    "review",
+    "review_diff",
+    "pane-state",
+    "chime",
+    "running",
+    "pending",
+    "ready",
+    "default",
+)
 
 
-def read_text(path):
-    with open(path, encoding="utf-8") as handle:
-        return handle.read()
+def process_help_option(argv):
+    for argument in argv:
+        if argument == "--":
+            return
+        if argument == "--help":
+            show_help()
+            sys.exit(0)
 
 
-def write_text_atomically(path, content):
-    """Write text through a temporary file in the same directory.
-
-    A write in place follows a symlink at `path` and changes the file that the
-    link points to. The rename replaces the link instead.
-
-    `tempfile.mkstemp` creates the temporary file with mode `0600`, so the
-    result carries that mode. Every caller here writes a file that only the
-    user must read.
-    """
-    directory = os.path.dirname(path) or "."
-    descriptor, temp_path = tempfile.mkstemp(dir=directory)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            handle.write(content)
-        os.replace(temp_path, path)
-    except BaseException:
-        remove_file(temp_path)
-        raise
+def show_help():
+    for line in read_text(__file__).splitlines():
+        # A bare `# /` marks a blank line in the help text.
+        if line == "# /":
+            print("")
+        elif line.startswith("# / "):
+            print(line[4:])
 
 
-def read_json_file(path):
-    with open(path, encoding="utf-8") as handle:
-        return json.load(handle)
-
-
-def write_json_file(path, data):
-    """Write JSON the way `jq` does, through a temporary file."""
-    write_text_atomically(path, json.dumps(data, indent=2, ensure_ascii=False) + "\n")
-
-
-def remove_file(path):
-    """Remove a file or a symlink. Do nothing if it does not exist."""
-    try:
-        os.unlink(path)
-    except FileNotFoundError:
-        pass
-
-
-def remove_path(path):
-    """Remove a file, a symlink, or a directory tree."""
-    if os.path.isdir(path) and not os.path.islink(path):
-        shutil.rmtree(path)
-    else:
-        os.unlink(path)
-
-
-def profile_setting(config, profile, key):
-    """Read `.claude_code.profiles[profile][key]` from the configuration.
-
-    Return `_MISSING` when any step of the path is absent.
-    """
-    node = config
-    for step in ("claude_code", "profiles", profile):
-        node = node.get(step)
-        if not isinstance(node, dict):
-            return _MISSING
-    return node.get(key, _MISSING)
-
-
-def is_number(value):
-    """Check whether a JSON value is a number."""
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
-
-
-# ============================================================================
-# Initial checks and configuration
-# ============================================================================
-
-
-def check_requirements():
+def check_docker_is_running():
     if shutil.which("docker") is None:
         die("Error: Docker is not installed")
 
-    # `docker version` reaches the daemon and returns much faster than
-    # `docker info`, which collects the full system report.
     docker_probe = subprocess.run(
         ["docker", "version", "--format", "{{.Server.Version}}"],
         stdout=subprocess.DEVNULL,
@@ -231,14 +164,18 @@ class Options:
     allow_stale: bool = False
     no_docker_socket: bool = False
     verbose: bool = False
-    show_help: bool = False
     harness_print_mode: bool = False
     harness_json_output: bool = False
     harness_args: list = field(default_factory=list)
 
 
-def parse_options(argv):
+def parse_options(argv, current_dir):
     options = Options()
+
+    value_options = {
+        "--profile": "profile",
+        "--channel": "channel",
+    }
 
     flags = {
         "--process-output": "process_output",
@@ -248,12 +185,6 @@ def parse_options(argv):
         "--allow-stale": "allow_stale",
         "--no-docker-socket": "no_docker_socket",
         "--verbose": "verbose",
-        "--help": "show_help",
-    }
-
-    value_options = {
-        "--profile": "profile",
-        "--channel": "channel",
     }
 
     index = 0
@@ -279,10 +210,12 @@ def parse_options(argv):
     for argument in options.harness_args:
         if argument in ("--print", "-p"):
             options.harness_print_mode = True
-        if argument == "--output-format=json":
+
+        if argument == "--output-format=json" or (
+            previous_argument == "--output-format" and argument == "json"
+        ):
             options.harness_json_output = True
-        elif previous_argument == "--output-format" and argument == "json":
-            options.harness_json_output = True
+
         previous_argument = argument
 
     # Validate that `--process-output` is only used with
@@ -294,56 +227,257 @@ def parse_options(argv):
                 "`--output-format json` in harness args"
             )
 
-    # The channel name reaches a shell during the image build, so keep it to a
-    # plain token. It is also the tag of the image, which Docker requires to
-    # start with an alphanumeric character and to hold at most 128 characters.
-    if options.channel and not re.fullmatch(
-        r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", options.channel
-    ):
+    if options.channel and not re.fullmatch(r"[A-Za-z0-9]{1,128}", options.channel):
         die(f"Error: Invalid channel name '{options.channel}'")
+
+    if not options.profile:
+        options.profile = detect_profile(current_dir)
+    if not re.fullmatch(r"[a-zA-Z0-9]{1,64}", options.profile):
+        die(f"Error: Invalid profile name '{options.profile}'")
 
     return options
 
 
-def show_help():
-    for line in read_text(__file__).splitlines():
-        # A bare `# /` marks a blank line in the help text.
-        if line == "# /":
-            print("")
-        elif line.startswith("# / "):
-            print(line[4:])
+def detect_profile(current_dir):
+    try:
+        result = subprocess.run(
+            ["project_profile_name"],
+            cwd=current_dir,
+            stdout=subprocess.PIPE,
+            encoding="utf-8",
+        )
+    except OSError:
+        die("Error: project_profile_name not found", code=127)
+    if result.returncode != 0:
+        sys.exit(result.returncode)
+
+    return result.stdout.rstrip("\n")
 
 
-# ============================================================================
-# Helper functions
-# ============================================================================
+def strip_leading_path(path, prefix):
+    if path.startswith(prefix + "/"):
+        return path[len(prefix) + 1 :]
+    return path
 
 
-def get_date(timestamp):
-    """Get formatted date in local time."""
-    return datetime.fromtimestamp(int(timestamp)).strftime("%Y-%m-%d")
+def load_user_config(config_path):
+    if not os.path.isfile(config_path):
+        return None
+
+    file_perms = os.stat(config_path).st_mode & 0o7777
+    if file_perms & 0o077:
+        die(
+            f"Error: {config_path} has permissions {file_perms:o}, expected "
+            "no group or other access"
+        )
+    try:
+        config = read_json_file(config_path)
+    except json.JSONDecodeError as error:
+        die(f"Error: {config_path} is not valid JSON: {error}")
+    except OSError as error:
+        die(f"Error: cannot read {config_path}: {error}")
+    if not isinstance(config, dict):
+        die(f"Error: {config_path} is not a JSON object")
+
+    return config
+
+
+def resolve_api_key(config, profile):
+    from_environment = os.environ.get("ANTHROPIC_API_KEY", "")
+    if from_environment:
+        return from_environment
+
+    api_key = _MISSING
+    if config is not None:
+        api_key = profile_setting(config, profile, "api_key")
+    if api_key is _MISSING or api_key is None:
+        echo_err(f"No API key for profile '{profile}'")
+        return ""
+    if not isinstance(api_key, str):
+        die(f"Error: the `api_key` of profile '{profile}' is not text")
+    return api_key
+
+
+def profile_setting(config, profile, key):
+    node = config
+    for step in ("claude_code", "profiles", profile):
+        node = node.get(step)
+        if not isinstance(node, dict):
+            return _MISSING
+    return node.get(key, _MISSING)
+
+
+def build_image_name(username, channel):
+    sanitized = re.sub(r"[^a-z0-9._-]", "", username.lower()).lstrip("._-")[:64]
+    if not sanitized:
+        die(f"Error: cannot build an image name from user name '{username}'")
+    return f"{sanitized}-claude:{channel}"
+
+
+def ensure_image(options, docker_image_name, dockerfile_path, home, channel):
+    today = today_date()
+
+    last_build_timestamp, inspect_stderr = get_last_build(docker_image_name)
+
+    # Derive the last build date in local time from the timestamp.
+    last_build_date = ""
+    if last_build_timestamp:
+        try:
+            last_build_date = get_date(last_build_timestamp)
+        except (ValueError, OSError, OverflowError):
+            die(
+                "Error: cannot read the build date of image "
+                f"'{docker_image_name}' from '{last_build_timestamp}'"
+            )
+
+    # Get the Dockerfile's modification time (seconds since epoch).
+    try:
+        dockerfile_mtime = int(os.stat(dockerfile_path).st_mtime)
+    except OSError:
+        dockerfile_mtime = 0
+
+    rebuild_reason = get_rebuild_reason(
+        options, last_build_date, last_build_timestamp, dockerfile_mtime, today
+    )
+    reason_code, reason_message = rebuild_reason or ("", "")
+    if reason_code == "missing-image" and inspect_stderr:
+        echo_err(f"docker image inspect: {inspect_stderr}")
+
+    if options.no_rebuild:
+        # Skip rebuild entirely - verify image exists.
+        if not last_build_date:
+            die(
+                f"Error: Docker image '{docker_image_name}' does not exist and "
+                "--no-rebuild was specified"
+            )
+        if rebuild_reason:
+            echo_err(
+                f"--no-rebuild specified, skipping rebuild despite: {reason_message}"
+            )
+        else:
+            echo_err("Skipping rebuild (--no-rebuild specified, image is up to date)")
+    elif rebuild_reason:
+        echo_err(f"Rebuilding image: {reason_message}")
+        use_cache = not options.no_build_cache
+        if not build_image(
+            use_cache, docker_image_name, dockerfile_path, home, channel
+        ):
+            if not options.allow_stale:
+                die("Error: Docker build failed")
+            if not last_build_date:
+                die(
+                    "Error: Docker build failed and no existing image "
+                    f"'{docker_image_name}' found"
+                )
+            echo_err("Build failed, using existing image (--allow-stale)")
+    else:
+        echo_err("Image is up to date, skipping rebuild.")
 
 
 def today_date():
     return datetime.now().strftime("%Y-%m-%d")
 
 
+def get_last_build(docker_image_name):
+    last_build_timestamp, inspect_stderr = inspect_last_build(docker_image_name)
+
+    # TODO: Remove this once it's not needed anymore. There is some bug in
+    # Docker in which sometimes `docker image inspect` can't find an image, but
+    # then you run `docker image ls` and then `docker image inspect` again, and
+    # it works... This is an attempt to automatically overcome it.
+    if "No such image" in inspect_stderr:
+        echo_err("WARNING: image not found, trying to fix it")
+        subprocess.run(
+            ["docker", "image", "ls", docker_image_name],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        last_build_timestamp, inspect_stderr = inspect_last_build(docker_image_name)
+        if "No such image" not in inspect_stderr:
+            echo_err("WARNING: 'docker image ls' fixed it")
+
+    return last_build_timestamp, inspect_stderr
+
+
+def inspect_last_build(docker_image_name):
+    """Get the image's tag timestamp and the error output of the inspection."""
+    result = subprocess.run(
+        [
+            "docker",
+            "image",
+            "inspect",
+            docker_image_name,
+            "--format",
+            "{{.Metadata.LastTagTime.Unix}}",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        encoding="utf-8",
+    )
+    return result.stdout.rstrip("\n"), result.stderr.rstrip("\n")
+
+
+def get_date(timestamp):
+    return datetime.fromtimestamp(int(timestamp)).strftime("%Y-%m-%d")
+
+
+def get_rebuild_reason(
+    options, last_build_date, last_build_timestamp, dockerfile_mtime, today
+):
+    if options.no_build_cache:
+        return ("no-build-cache", "--no-build-cache specified")
+    if options.force_rebuild:
+        return ("force-rebuild", "--force-rebuild specified")
+    if not last_build_date:
+        return ("missing-image", "image does not exist")
+    if last_build_date != today:
+        return ("stale-date", f"image is from {last_build_date}, today is {today}")
+    if last_build_timestamp and dockerfile_mtime > int(last_build_timestamp):
+        return ("stale-dockerfile", "Dockerfile modified after last build")
+    return None
+
+
+def build_image(use_cache, docker_image_name, dockerfile_path, home, channel):
+    echo_err("Building Docker image...")
+
+    build_args = [
+        "--build-arg",
+        f"UID={os.getuid()}",
+        "--build-arg",
+        f"GID={os.getgid()}",
+        "--build-arg",
+        f"HOME={home}",
+        "--build-arg",
+        f"BUILD_DATE={today_date()}",
+    ]
+
+    echo_err(f"Installing Claude Code from channel '{channel}'...")
+    build_args += ["--build-arg", f"CLAUDE_CODE_CHANNEL={channel}"]
+
+    if not use_cache:
+        echo_err("Building from scratch without cache...")
+        build_args.append("--no-cache")
+
+    build_args += ["--tag", docker_image_name]
+
+    try:
+        dockerfile = open(dockerfile_path, "rb")
+    except OSError as error:
+        echo_err(f"Error: cannot read {dockerfile_path}: {error}")
+        return False
+
+    # Pipe the Dockerfile via stdin (`-`) so no build context is sent.
+    with dockerfile:
+        sys.stderr.flush()
+        result = subprocess.run(
+            ["docker", "build", *build_args, "-"],
+            stdin=dockerfile,
+            stdout=sys.stderr,
+        )
+    return result.returncode == 0
+
+
 def copy_tree_contents(source, destination):
-    """Copy the contents of `source` into `destination`, like `cp -a`.
-
-    Symlinks are copied as symlinks. Entries already in `destination` are
-    replaced when their type does not match the source.
-
-    The copy adds and overwrites, and it never deletes. An entry that the
-    source dropped stays in `destination`. This is intended. Claude Code writes
-    its own state into the same tree, and nothing here can tell that state
-    apart from the leftovers of an earlier copy. Remove a stale command or
-    skill from each profile by hand.
-
-    A symlink in `destination` is always removed before the copy. Both
-    `shutil.copyfile` and `shutil.copystat` follow symlinks, so a leftover link
-    into the dotfiles repository would receive the write.
-    """
     os.makedirs(destination, exist_ok=True)
     for entry in os.scandir(source):
         target = os.path.join(destination, entry.name)
@@ -363,6 +497,71 @@ def copy_tree_contents(source, destination):
                 remove_path(target)
             shutil.copyfile(entry.path, target)
             shutil.copystat(entry.path, target)
+
+
+# ============================================================================
+# Small utilities
+# ============================================================================
+
+
+def echo_err(message):
+    """Print a message to standard error."""
+    print(message, file=sys.stderr, flush=True)
+
+
+def die(message, *, code=1):
+    """Print a message to standard error and exit."""
+    echo_err(message)
+    sys.exit(code)
+
+
+def read_text(path):
+    with open(path, encoding="utf-8") as handle:
+        return handle.read()
+
+
+def write_text_atomically(path, content):
+    directory = os.path.dirname(path) or "."
+    descriptor, temp_path = tempfile.mkstemp(dir=directory)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(content)
+        os.replace(temp_path, path)
+    except BaseException:
+        remove_file(temp_path)
+        raise
+
+
+def read_json_file(path):
+    with open(path, encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def write_json_file(path, data):
+    write_text_atomically(path, json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+
+
+def remove_file(path):
+    try:
+        os.unlink(path)
+    except FileNotFoundError:
+        pass
+
+
+def remove_path(path):
+    if os.path.isdir(path) and not os.path.islink(path):
+        shutil.rmtree(path)
+    else:
+        os.unlink(path)
+
+
+def is_number(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+# ============================================================================
+# Helper functions
+# ============================================================================
 
 
 def round_up_cents(value):
@@ -435,68 +634,10 @@ def process_print_output(output):
     print(f"Duration: {format_duration(duration)}")
 
 
-def build_image(use_cache, docker_image_name, dockerfile_path, home, channel):
-    echo_err("Building Docker image...")
-
-    build_args = [
-        "--build-arg",
-        f"UID={os.getuid()}",
-        "--build-arg",
-        f"GID={os.getgid()}",
-        "--build-arg",
-        f"HOME={home}",
-        "--build-arg",
-        f"BUILD_DATE={today_date()}",
-    ]
-
-    echo_err(f"Installing Claude Code from channel '{channel}'...")
-    build_args += ["--build-arg", f"CLAUDE_CODE_CHANNEL={channel}"]
-
-    if not use_cache:
-        echo_err("Building from scratch without cache...")
-        build_args.append("--no-cache")
-
-    build_args += ["--tag", docker_image_name]
-
-    try:
-        dockerfile = open(dockerfile_path, "rb")
-    except OSError as error:
-        echo_err(f"Error: cannot read {dockerfile_path}: {error}")
-        return False
-
-    # Pipe the Dockerfile via stdin (`-`) so no build context is sent.
-    with dockerfile:
-        sys.stderr.flush()
-        result = subprocess.run(
-            ["docker", "build", *build_args, "-"],
-            stdin=dockerfile,
-            stdout=sys.stderr,
-        )
-    return result.returncode == 0
-
-
 def generate_container_name(current_dir):
-    """Build a container name. The PID keeps it unique among live processes."""
     basename = os.path.basename(current_dir)
     dir_basename = re.sub(r"[^a-zA-Z0-9_.-]", "", basename)
     return f"claude_code_{dir_basename[:44]}_{os.getpid()}"
-
-
-def build_image_name(username, channel):
-    """Build the Docker image name for the current user and channel.
-
-    Docker rejects a repository name that is not lowercase, and it requires the
-    first character to be alphanumeric.
-
-    The channel is the tag. Each channel therefore gets its own image, and a
-    switch to another channel names an image that does not exist yet. The
-    freshness check then builds it, instead of running the channel that the
-    last build happened to install.
-    """
-    sanitized = re.sub(r"[^a-z0-9._-]", "", username.lower()).lstrip("._-")[:64]
-    if not sanitized:
-        die(f"Error: cannot build an image name from user name '{username}'")
-    return f"{sanitized}-claude:{channel}"
 
 
 def get_timezone():
@@ -516,10 +657,6 @@ def get_timezone():
     return match.group(1)
 
 
-def in_tmux():
-    return bool(os.environ.get("TMUX_PANE"))
-
-
 @dataclass
 class RunConfig:
     home: str
@@ -528,8 +665,6 @@ class RunConfig:
     profile: str
     project_name: str
     api_key: str
-    aoe_instance_id: str
-    aoe_session_name: str
     docker_image_name: str
     process_output: bool
     harness_print_mode: bool
@@ -551,40 +686,8 @@ def build_container_env(api_key):
     return env
 
 
-# Host directories that the container writes to. Docker creates a missing
-# mount source as a directory owned by `root`. The container user cannot then
-# write to it, and nothing reports the failure.
-SHARED_HOST_DIRS = ("/tmp/claude-code-shared", "/tmp/aoe-hooks")
-
-# The directory that the `pane-state` and `chime` scripts write to, in their
-# own subdirectories. The container gets it only when the launcher runs inside
-# tmux.
-TMUX_SHARED_DIR = "/tmp/jpmelos/tmux"
-
-# Scripts from `~/devel/dotfiles/bin` that the agent calls by name.
-AGENT_BINARIES = (
-    "safe_mv",
-    "safe_rm",
-    "ai_git_add",
-    "ai_git_restore",
-    "ai_git_commit",
-    "review",
-    "review_diff",
-    "pane-state",
-    "chime",
-    "running",
-    "pending",
-    "ready",
-    "default",
-)
-
-
 def prepare_shared_dirs():
-    """Create the host directories that the container writes to."""
-    shared_dirs = list(SHARED_HOST_DIRS)
-    if in_tmux():
-        shared_dirs.append(TMUX_SHARED_DIR)
-    for shared_dir in shared_dirs:
+    for shared_dir in SHARED_HOST_DIRS:
         try:
             os.makedirs(shared_dir, exist_ok=True)
         except OSError as error:
@@ -595,11 +698,6 @@ def prepare_shared_dirs():
 
 
 def build_run_command(harness_args, config):
-    """Build the `docker run` command and the environment to run it with.
-
-    Return the pair. The caller decides whether to capture the output or to
-    replace the current process.
-    """
     home = config.home
     devel_dir = config.devel_dir
 
@@ -627,9 +725,6 @@ def build_run_command(harness_args, config):
         "/tmp",
         "--env",
         "XDG_RUNTIME_DIR=/tmp",
-        # Path used to coordinate things that use Claude Code.
-        "--volume",
-        "/tmp/claude-code-shared:/tmp/claude-code-shared",
         # Mount the entire `~/devel` directory and set the current directory as
         # the working directory.
         "--volume",
@@ -653,13 +748,14 @@ def build_run_command(harness_args, config):
         f"AGENT_PROFILE={config.profile}",
         "--env",
         f"PROJECT_NAME={config.project_name}",
-        # Agent of Empires environment variables and mounts.
+        # Let the `pane-state` script mark the pane that runs the agent, and
+        # let the `chime` script ring on the host. `TMUX_PANE` names the pane
+        # that runs the launcher. Docker leaves the variable out when the host
+        # does not set it, and the scripts then do nothing. `TMUX` stays out.
+        # Programs in the container would take it as a sign that they can talk
+        # to tmux.
         "--env",
-        f"AOE_INSTANCE_ID={config.aoe_instance_id}",
-        "--env",
-        f"AOE_SESSION_NAME={config.aoe_session_name}",
-        "--volume",
-        "/tmp/aoe-hooks:/tmp/aoe-hooks",
+        "TMUX_PANE",
         # Claude Code uses this to know search for file suggestions on `@`.
         "--env",
         "RIPGREP_CONFIG_PATH",
@@ -673,6 +769,9 @@ def build_run_command(harness_args, config):
         "--env",
         "NO_COLOR",
     ]
+
+    for shared_dir in SHARED_HOST_DIRS:
+        cmd += ["--volume", f"{shared_dir}:{shared_dir}"]
 
     # Mount the scripts that the agent calls by name. Skip one when it is
     # absent, so Docker does not create it on the host as a directory owned by
@@ -690,20 +789,6 @@ def build_run_command(harness_args, config):
     timezone = get_timezone()
     if timezone:
         cmd += ["--env", f"TZ={timezone}"]
-
-    # Let the `pane-state` script mark the pane that runs the agent, and let
-    # the `chime` script ring on the host. `TMUX_PANE` names the pane that runs
-    # the launcher. The directory carries the state files and the chime
-    # requests to the host, where tmux picks them up. `TMUX` stays out.
-    # Programs in the container would take it as a sign that they can talk to
-    # tmux.
-    if in_tmux():
-        cmd += [
-            "--volume",
-            f"{TMUX_SHARED_DIR}:{TMUX_SHARED_DIR}",
-            "--env",
-            "TMUX_PANE",
-        ]
 
     # Mount git configuration so my aliases and other preferences are in
     # effect. Skip it when it is absent, so Docker does not create it on the
@@ -802,7 +887,6 @@ def stdin_is_tty():
 
 
 def list_project_dirs(devel_dir):
-    """List the project directories relative to `~/devel`."""
     try:
         result = subprocess.run(
             [os.path.join(devel_dir, "dotfiles", "bin", "list_project_dirs")],
@@ -816,32 +900,7 @@ def list_project_dirs(devel_dir):
     return result.stdout.splitlines()
 
 
-def load_user_config(config_path):
-    """Read the configuration file. Return `None` when the file is absent."""
-    if not os.path.isfile(config_path):
-        return None
-
-    # Verify the file is not readable by group or others.
-    file_perms = os.stat(config_path).st_mode & 0o7777
-    if file_perms & 0o077:
-        die(
-            f"Error: {config_path} has permissions {file_perms:o}, expected "
-            "no group or other access"
-        )
-    try:
-        config = read_json_file(config_path)
-    except json.JSONDecodeError as error:
-        die(f"Error: {config_path} is not valid JSON: {error}")
-    except OSError as error:
-        die(f"Error: cannot read {config_path}: {error}")
-    if not isinstance(config, dict):
-        die(f"Error: {config_path} is not a JSON object")
-
-    return config
-
-
 def apply_preferred_model(config, profile, home):
-    """Apply the preferred model for the profile from the configuration."""
     if config is None:
         return
 
@@ -869,7 +928,6 @@ def apply_preferred_model(config, profile, home):
 
 
 def apply_dependencies_list(claude_md_path, project_dirs):
-    """Replace the project list marker in CLAUDE.md with the project list."""
     marker = "<!-- DEPENDENCIES_LIST -->"
 
     try:
@@ -900,12 +958,6 @@ def apply_dependencies_list(claude_md_path, project_dirs):
 
 
 def create_profile_json(profile_json_path):
-    """Create the profile's `.claude.json` if it is not there yet.
-
-    The file keeps the tail of the API key and the account metadata, so tighten
-    the mode of a file that an earlier run or another tool left with wider
-    access. A new file gets `0600` from `write_text_atomically`.
-    """
     if not os.path.isfile(profile_json_path):
         write_text_atomically(profile_json_path, "{}\n")
     try:
@@ -915,12 +967,6 @@ def create_profile_json(profile_json_path):
 
 
 def approve_api_key(profile_json_path, api_key):
-    """Pre-approve the API key in the profile's `.claude.json`.
-
-    Claude Code records the tail of a key that the user approved. Without the
-    entry it asks on every launch. A key of at most `tail_length` characters
-    gets no entry, because the tail would be the whole secret.
-    """
     if not api_key:
         return
 
@@ -960,11 +1006,6 @@ def approve_api_key(profile_json_path, api_key):
 
 
 def apply_mcp_servers(config, profile_json_path, profile):
-    """Apply the MCP servers for the profile from the configuration.
-
-    This replaces any `mcpServers` key that is already in the profile's
-    `.claude.json`.
-    """
     if config is None:
         return
 
@@ -993,220 +1034,20 @@ def apply_mcp_servers(config, profile_json_path, profile):
 # ============================================================================
 
 
-def inspect_last_build(docker_image_name):
-    """Get the image's tag timestamp and the error output of the inspection."""
-    result = subprocess.run(
-        [
-            "docker",
-            "image",
-            "inspect",
-            docker_image_name,
-            "--format",
-            "{{.Metadata.LastTagTime.Unix}}",
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        encoding="utf-8",
-    )
-    return result.stdout.rstrip("\n"), result.stderr.rstrip("\n")
-
-
-def get_last_build(docker_image_name):
-    """Get the image's tag timestamp, with a retry for a Docker bug."""
-    last_build_timestamp, inspect_stderr = inspect_last_build(docker_image_name)
-
-    # TODO: Remove this once it's not needed anymore. There is some bug in
-    # Docker in which sometimes `docker image inspect` can't find an image, but
-    # then you run `docker image ls` and then `docker image inspect` again, and
-    # it works... This is an attempt to automatically overcome it.
-    if "No such image" in inspect_stderr:
-        echo_err("WARNING: image not found, trying to fix it")
-        subprocess.run(
-            ["docker", "image", "ls", docker_image_name],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        last_build_timestamp, inspect_stderr = inspect_last_build(docker_image_name)
-        if "No such image" not in inspect_stderr:
-            echo_err("WARNING: 'docker image ls' fixed it")
-
-    return last_build_timestamp, inspect_stderr
-
-
-def get_rebuild_reason(
-    options, last_build_date, last_build_timestamp, dockerfile_mtime, today
-):
-    """Return the reason for a rebuild, or `None` if the image needs none.
-
-    The reason is a pair of a stable code and a message for the user. The caller
-    matches on the code, so a change to the message breaks nothing.
-    """
-    if options.no_build_cache:
-        return ("no-build-cache", "--no-build-cache specified")
-    if options.force_rebuild:
-        return ("force-rebuild", "--force-rebuild specified")
-    if not last_build_date:
-        return ("missing-image", "image does not exist")
-    if last_build_date != today:
-        return ("stale-date", f"image is from {last_build_date}, today is {today}")
-    if last_build_timestamp and dockerfile_mtime > int(last_build_timestamp):
-        return ("stale-dockerfile", "Dockerfile modified after last build")
-    return None
-
-
-def ensure_image(options, docker_image_name, dockerfile_path, home, channel):
-    today = today_date()
-
-    last_build_timestamp, inspect_stderr = get_last_build(docker_image_name)
-
-    # Derive the last build date in local time from the timestamp.
-    last_build_date = ""
-    if last_build_timestamp:
-        try:
-            last_build_date = get_date(last_build_timestamp)
-        except (ValueError, OSError, OverflowError):
-            die(
-                "Error: cannot read the build date of image "
-                f"'{docker_image_name}' from '{last_build_timestamp}'"
-            )
-
-    # Get the Dockerfile's modification time (seconds since epoch).
-    try:
-        dockerfile_mtime = int(os.stat(dockerfile_path).st_mtime)
-    except OSError:
-        dockerfile_mtime = 0
-
-    rebuild_reason = get_rebuild_reason(
-        options, last_build_date, last_build_timestamp, dockerfile_mtime, today
-    )
-    reason_code, reason_message = rebuild_reason or ("", "")
-    if reason_code == "missing-image" and inspect_stderr:
-        echo_err(f"docker image inspect: {inspect_stderr}")
-
-    if options.no_rebuild:
-        # Skip rebuild entirely - verify image exists.
-        if not last_build_date:
-            die(
-                f"Error: Docker image '{docker_image_name}' does not exist and "
-                "--no-rebuild was specified"
-            )
-        if rebuild_reason:
-            echo_err(
-                f"--no-rebuild specified, skipping rebuild despite: {reason_message}"
-            )
-        else:
-            echo_err("Skipping rebuild (--no-rebuild specified, image is up to date)")
-    elif rebuild_reason:
-        echo_err(f"Rebuilding image: {reason_message}")
-        use_cache = not options.no_build_cache
-        if not build_image(
-            use_cache, docker_image_name, dockerfile_path, home, channel
-        ):
-            if not options.allow_stale:
-                die("Error: Docker build failed")
-            if not last_build_date:
-                die(
-                    "Error: Docker build failed and no existing image "
-                    f"'{docker_image_name}' found"
-                )
-            echo_err("Build failed, using existing image (--allow-stale)")
-    else:
-        echo_err("Image is up to date, skipping rebuild.")
-
-
 # ============================================================================
 # Main Execution
 # ============================================================================
 
 
-def detect_profile(current_dir):
-    try:
-        result = subprocess.run(
-            ["project_profile_name"],
-            cwd=current_dir,
-            stdout=subprocess.PIPE,
-            encoding="utf-8",
-        )
-    except OSError:
-        die("Error: project_profile_name not found", code=127)
-    if result.returncode != 0:
-        sys.exit(result.returncode)
-    return result.stdout.rstrip("\n")
-
-
-def detect_aoe_session():
-    """Get AoE session info if available."""
-    if shutil.which("aoe") is None:
-        return "", ""
-    result = subprocess.run(
-        ["aoe", "session", "current", "--json"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-        encoding="utf-8",
-    )
-    if result.returncode != 0:
-        return "", ""
-    try:
-        session = json.loads(result.stdout)
-    except json.JSONDecodeError:
-        echo_err(
-            "Warning: `aoe session current --json` did not return valid JSON, "
-            "running without session info"
-        )
-        return "", ""
-    if not isinstance(session, dict):
-        echo_err(
-            "Warning: `aoe session current --json` did not return a JSON object, "
-            "running without session info"
-        )
-        return "", ""
-    instance_id = session.get("id")
-    session_name = session.get("session")
-    if not isinstance(instance_id, str) or not isinstance(session_name, str):
-        echo_err(
-            "Warning: `aoe session current --json` did not return text `id` and "
-            f"`session`: {instance_id!r}, {session_name!r}"
-        )
-        return "", ""
-    return instance_id, session_name
-
-
-def resolve_api_key(config, profile):
-    """Get the API key for the profile from the configuration.
-
-    An API key that is already in the environment wins. Return an empty string
-    when there is no key. Claude Code then falls back to OAuth, or it prompts
-    the user.
-    """
-    from_environment = os.environ.get("ANTHROPIC_API_KEY", "")
-    if from_environment:
-        return from_environment
-
-    api_key = _MISSING
-    if config is not None:
-        api_key = profile_setting(config, profile, "api_key")
-    if api_key is _MISSING or api_key is None:
-        echo_err(f"No API key for profile '{profile}'")
-        return ""
-    if not isinstance(api_key, str):
-        die(f"Error: the `api_key` of profile '{profile}' is not text")
-    return api_key
-
-
 def main():
-    options = parse_options(sys.argv[1:])
+    process_help_option(sys.argv[1:])
 
-    if options.show_help:
-        show_help()
-        return 0
-
-    # The help text must work on a host without Docker, so this check comes
-    # after the options.
-    check_requirements()
+    check_docker_is_running()
 
     home = os.environ.get("HOME")
     if not home:
         die("Error: HOME is not set")
+
     try:
         username = pwd.getpwuid(os.geteuid()).pw_name
     except KeyError:
@@ -1221,32 +1062,20 @@ def main():
         current_dir = os.path.join(devel_dir, "dotfiles")
         echo_err(f"Not inside a ~/devel project, defaulting to {current_dir}")
 
+    options = parse_options(sys.argv[1:], current_dir)
     profile = options.profile
-    if not profile:
-        profile = detect_profile(current_dir)
-    # Validate profile name to prevent command injection.
-    # Max length: 64 characters, alphanumeric with dots, dashes, underscores.
-    if not re.fullmatch(r"[a-zA-Z0-9_]([a-zA-Z0-9._-]{0,62}[a-zA-Z0-9_])?", profile):
-        die(f"Error: Invalid profile name '{profile}'")
 
     # Compute the project name (path relative to ~/devel/).
     project_name = strip_leading_path(current_dir, devel_dir)
 
-    aoe_instance_id, aoe_session_name = detect_aoe_session()
-
     echo_err(f"Profile: {profile}")
     echo_err(f"Project: {project_name}")
-    if aoe_instance_id:
-        echo_err(
-            f"Agent of Empires detected: {aoe_instance_id} "
-            f"(session: {aoe_session_name})"
-        )
 
     user_config_path = f"{home}/config.json"
     user_config = load_user_config(user_config_path)
     api_key = resolve_api_key(user_config, profile)
 
-    channel = options.channel or DEFAULT_CHANNEL
+    channel = options.channel or DEFAULT_CLAUDE_CODE_CHANNEL
     docker_image_name = build_image_name(username, channel)
     dockerfile_path = os.path.join(
         devel_dir, "dotfiles", "references", "ai_containers", "Dockerfile"
@@ -1298,8 +1127,6 @@ def main():
         profile=profile,
         project_name=project_name,
         api_key=api_key,
-        aoe_instance_id=aoe_instance_id,
-        aoe_session_name=aoe_session_name,
         docker_image_name=docker_image_name,
         process_output=options.process_output,
         harness_print_mode=options.harness_print_mode,
