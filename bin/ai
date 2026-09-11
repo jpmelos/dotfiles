@@ -764,10 +764,14 @@ def build_run_command(harness_args, run_config):
             "not be available inside the container"
         )
 
-    # Keep stdin attached in every case. Without `--interactive` the container
-    # reads end of file at once, and a prompt that arrives through a pipe never
-    # reaches the harness.
-    cmd.append("--interactive")
+    # An interactive session needs stdin for the keyboard, and a prompt that
+    # arrives through a pipe needs stdin to reach the harness. Print mode from
+    # a terminal is the exception. The container sees the attached terminal as
+    # a pipe, and the harness then waits for end of file that the user never
+    # sends. Leave stdin detached there, so the harness reads end of file at
+    # once.
+    if not run_config.harness_print_mode or not stdin_is_tty():
+        cmd.append("--interactive")
 
     # A TTY belongs to an interactive session only. In print mode it mixes
     # terminal control codes into the output that the caller captures.
