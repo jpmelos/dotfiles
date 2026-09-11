@@ -80,9 +80,10 @@
 # /   ```
 # /
 # /   Every key is optional. Without `api_key`, Claude Code falls back to OAuth
-# /   credentials or asks the user to log in. Without `model`, the profile keeps
-# /   the model from its own `settings.json`. Without `mcp_servers`, the profile
-# /   keeps the `mcpServers` key that is already in its `.claude.json`.
+# /   credentials or asks the user to log in. Without `model`, the profile uses
+# /   the model from `~/.claude-origin/settings.json`, which every run copies
+# /   into the profile. Without `mcp_servers`, the profile keeps the
+# /   `mcpServers` key that is already in its `.claude.json`.
 # /
 # /   The `mcp_servers` object of a profile replaces the `mcpServers` key in
 # /   that profile's `.claude.json`.
@@ -173,7 +174,7 @@ class Options:
     harness_args: list = field(default_factory=list)
 
 
-def parse_options(argv, current_dir):
+def parse_options(argv, current_dir, devel_dir):
     options = Options()
 
     value_options = {
@@ -238,23 +239,23 @@ def parse_options(argv, current_dir):
         die(f"Error: Invalid channel name '{options.channel}'")
 
     if not options.profile:
-        options.profile = detect_profile(current_dir)
+        options.profile = detect_profile(current_dir, devel_dir)
     if not re.fullmatch(r"[a-zA-Z0-9]{1,64}", options.profile):
         die(f"Error: Invalid profile name '{options.profile}'")
 
     return options
 
 
-def detect_profile(current_dir):
+def detect_profile(current_dir, devel_dir):
     try:
         result = subprocess.run(
-            ["project_profile_name"],
+            [os.path.join(devel_dir, "dotfiles", "bin", "project_profile_name")],
             cwd=current_dir,
             stdout=subprocess.PIPE,
             encoding="utf-8",
         )
-    except OSError:
-        die("Error: project_profile_name not found", code=127)
+    except OSError as error:
+        die(f"Error: cannot run project_profile_name: {error}")
     if result.returncode != 0:
         sys.exit(result.returncode)
 
@@ -392,7 +393,9 @@ def get_last_build(docker_image_name):
         return None
 
     try:
-        return datetime.datetime.fromtimestamp(int(stdout))
+        # The caller compares the build date with the UTC date of today, so the
+        # value must carry the same zone.
+        return datetime.datetime.fromtimestamp(int(stdout), tz=datetime.timezone.utc)
     except (ValueError, OSError, OverflowError):
         die(
             "Error: cannot read the build date of image "
@@ -553,10 +556,6 @@ def round_up_cents(value):
 def format_duration(total_seconds):
     total = Decimal(str(total_seconds)).quantize(Decimal("0.001"), rounding=ROUND_DOWN)
 
-    # Handle zero input.
-    if total == 0:
-        return "0.000s"
-
     hours = int(total / 3600)
     remainder = total - hours * 3600
     minutes = int(remainder / 60)
@@ -661,9 +660,9 @@ def prepare_shared_dirs():
             echo_err(f"Warning: {shared_dir} is not writable")
 
 
-def build_run_command(harness_args, config):
-    home = config.home
-    devel_dir = config.devel_dir
+def build_run_command(harness_args, run_config):
+    home = run_config.home
+    devel_dir = run_config.devel_dir
 
     cmd = [
         "docker",
@@ -678,7 +677,7 @@ def build_run_command(harness_args, config):
         f"{os.getuid()}:{os.getgid()}",
         # Container name.
         "--name",
-        generate_container_name(config.current_dir),
+        generate_container_name(run_config.current_dir),
         # So that the agent can reach services running on the host via
         # `host.docker.internal`.
         "--add-host",
@@ -694,13 +693,13 @@ def build_run_command(harness_args, config):
         "--volume",
         f"{devel_dir}:{devel_dir}",
         "--workdir",
-        config.current_dir,
+        run_config.current_dir,
         # Claude Code files. This makes it so that it looks for `.claude.json`
         # inside `~/.claude` instead of inside `~`.
         "--env",
         f"CLAUDE_CONFIG_DIR={home}/.claude",
         "--volume",
-        f"{home}/.claude-{config.profile}:{home}/.claude",
+        f"{home}/.claude-{run_config.profile}:{home}/.claude",
         # Anthropic's API key if available. The name alone keeps the value out
         # of the command line. If not defined, Claude Code will check for OAuth
         # credentials. If not there too, it will ask the user how they want to
@@ -710,9 +709,9 @@ def build_run_command(harness_args, config):
         # This is used to show the active profile and project in the status
         # line.
         "--env",
-        f"AGENT_PROFILE={config.profile}",
+        f"AGENT_PROFILE={run_config.profile}",
         "--env",
-        f"PROJECT_NAME={config.project_name}",
+        f"PROJECT_NAME={run_config.project_name}",
         # Let the `pane-state` script mark the pane that runs the agent, and
         # let the `chime` script ring on the host. `TMUX_PANE` names the pane
         # that runs the launcher. Docker leaves the variable out when the host
@@ -772,7 +771,7 @@ def build_run_command(harness_args, config):
 
     # A TTY belongs to an interactive session only. In print mode it mixes
     # terminal control codes into the output that the caller captures.
-    if not config.harness_print_mode and stdin_is_tty():
+    if not run_config.harness_print_mode and stdin_is_tty():
         cmd.append("--tty")
 
     # Relay additional environment variables from
@@ -794,7 +793,7 @@ def build_run_command(harness_args, config):
 
     # Set up Docker access from inside the container. The socket gives the
     # container control of the host, so `--no-docker-socket` turns it off.
-    if config.no_docker_socket:
+    if run_config.no_docker_socket:
         echo_err("Docker socket not mounted (--no-docker-socket)")
     else:
         candidates = (f"{home}/.docker/run/docker.sock", "/var/run/docker.sock")
@@ -820,12 +819,12 @@ def build_run_command(harness_args, config):
 
     cmd += [
         # The image we just built.
-        config.docker_image_name,
+        run_config.docker_image_name,
         # Whatever arguments we want to pass to the harness.
         *harness_args,
     ]
 
-    return cmd, build_container_env(config.api_key)
+    return cmd, build_container_env(run_config.api_key)
 
 
 def is_socket(path):
@@ -968,6 +967,12 @@ def apply_mcp_servers(config, profile_json_path, profile):
     mcp_servers = profile_setting(config, profile, "mcp_servers")
     if mcp_servers is _MISSING or mcp_servers is None:
         return
+    if not isinstance(mcp_servers, dict):
+        echo_err(
+            f"Warning: the `mcp_servers` of profile '{profile}' is not an object, "
+            "MCP servers not set"
+        )
+        return
 
     try:
         profile_json = read_json_file(profile_json_path)
@@ -1008,7 +1013,7 @@ def main():
         current_dir = os.path.join(devel_dir, "dotfiles")
         echo_err(f"Not inside a ~/devel project, defaulting to {current_dir}")
 
-    options = parse_options(sys.argv[1:], current_dir)
+    options = parse_options(sys.argv[1:], current_dir, devel_dir)
     profile = options.profile
 
     # Compute the project name (path relative to ~/devel/).
@@ -1064,7 +1069,7 @@ def main():
             continue
         harness_args += ["--add-dir", project_dir]
 
-    config = RunConfig(
+    run_config = RunConfig(
         home=home,
         devel_dir=devel_dir,
         current_dir=current_dir,
@@ -1076,7 +1081,7 @@ def main():
         no_docker_socket=options.no_docker_socket,
     )
 
-    cmd, env = build_run_command(harness_args, config)
+    cmd, env = build_run_command(harness_args, run_config)
 
     if options.verbose:
         echo_err(f"Command: {shlex.join(cmd)}")
@@ -1103,4 +1108,9 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        # Ctrl-C during the build or a captured run. The shell convention for a
+        # death by SIGINT is 128 + 2.
+        sys.exit(130)
