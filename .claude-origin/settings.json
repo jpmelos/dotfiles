@@ -146,21 +146,21 @@
   "hooks": {
     "SessionStart": [
       {
+        "matcher": "startup|resume|clear|fork",
         "hooks": [
           {
-            "command": "ready --no-chime",
-            "type": "command"
+            "type": "command",
+            "command": "ready --no-chime"
           }
-        ],
-        "matcher": "startup|resume|clear|fork"
+        ]
       }
     ],
     "SessionEnd": [
       {
         "hooks": [
           {
-            "command": "default",
-            "type": "command"
+            "type": "command",
+            "command": "default"
           }
         ]
       }
@@ -169,8 +169,8 @@
       {
         "hooks": [
           {
-            "command": "running",
-            "type": "command"
+            "type": "command",
+            "command": "running"
           }
         ]
       }
@@ -179,8 +179,8 @@
       {
         "hooks": [
           {
-            "command": "running",
-            "type": "command"
+            "type": "command",
+            "command": "running"
           }
         ]
       }
@@ -199,8 +199,8 @@
       {
         "hooks": [
           {
-            "command": "ready",
-            "type": "command"
+            "type": "command",
+            "command": "ready"
           }
         ]
       }
@@ -209,8 +209,8 @@
       {
         "hooks": [
           {
-            "command": "ready",
-            "type": "command"
+            "type": "command",
+            "command": "ready"
           }
         ]
       }
