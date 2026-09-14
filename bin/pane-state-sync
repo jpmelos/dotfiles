@@ -2,42 +2,44 @@
 set -euo pipefail
 trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 
-# Apply the pane state files under the pane-state directory of the shared tmux
+# Apply the pane state files under the pane state directory of the shared tmux
 # directory to tmux, and play the chime requests under its chime directory. The
-# shared tmux directory is $AGENT_TMUX_DIR, or /tmp/$USER/tmux without it. This
-# script runs on the host, so the fallback is the normal case here.
+# shared tmux directory is `/tmp/tmux-pane-states`. The AI launcher mounts that
+# directory into every container at the same path, so one directory serves
+# every profile and every pane has one state file.
 #
 # Each state file is named after a pane target and holds one state. The script
-# sets the @state pane option of that pane to the state. The pane-state script
-# writes these files.
+# sets the `@state` pane option of that pane to the state. The `pane-state`
+# script writes these files.
 #
 # The script leaves the state files in place. It reads every file on every run
 # and sets the option again, even when the value did not change. That costs one
 # tmux call per file and needs no protocol between the writer and this reader.
 # A file for a pane that no longer exists stays behind, and this script skips
 # it. Another pane with the same target later picks the state up, so the
-# pane-state script must write `default` at the end of a session.
+# pane state script must write `default` at the end of a session.
 #
 # The chime request is one fixed file. The chime script touches it, so every
 # request before this script runs collapses into that one file. This script
 # removes the file and plays the sound once. Two panes that report at the same
-# time would otherwise play two copies of the same sound on top of each other.
+# time would otherwise play two copies of the same sound on top of each other,
+# which carries no additional information.
 #
 # The sound plays on this machine, the host. The scripts that request it can
 # run inside a Docker container, and a container has no audio device.
 #
-# .tmux.conf runs this script from the status line, so it prints nothing to
+# `.tmux.conf` runs this script from the status line, so it prints nothing to
 # standard output. Anything printed there ends up in the status line.
 #
 # Usage: pane-state-sync
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 chime_sound="$script_dir/../references/telegram-chime.mp3"
-tmux_dir="${AGENT_TMUX_DIR:-/tmp/${USER:-$(id -un)}/tmux}"
+tmux_dir="/tmp/tmux-pane-states"
 
 # Play a sound file in the background. tmux waits for this script to close its
 # standard output, so the player must not inherit the standard streams. macOS
-# ships afplay. The others are for a Linux host.
+# ships `afplay`. The others are for a Linux host.
 play_sound() {
     local sound_file="$1"
     if [ ! -f "$sound_file" ]; then
@@ -60,9 +62,7 @@ play_sound() {
 #
 # tmux can run this script once per attached client, so two runs can see the
 # same request. Only one `rm` succeeds, because the second one finds the file
-# gone. The `-f` flag would hide that, so it stays out. A failed `rm` does not
-# end the script: `set -e` and the ERR trap both ignore a command that runs as
-# the condition of an `if`.
+# gone. The `-f` flag would hide that, so it stays out.
 chime_request="$tmux_dir/chime/request"
 if rm "$chime_request" 2> /dev/null; then
     play_sound "$chime_sound"

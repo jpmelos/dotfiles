@@ -3,25 +3,23 @@ set -euo pipefail
 trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 
 # Request the notification chime. The request is an empty file under the chime
-# directory of the shared tmux directory. That directory is $AGENT_TMUX_DIR, or
-# /tmp/$USER/tmux without it. The ai launcher sets the variable inside its
-# containers, where the user name differs from the host's. The pane-state-sync
-# script picks the request up and plays the sound on the host.
+# directory of the shared tmux directory, /tmp/tmux-pane-states. The AI
+# launcher mounts that directory into its containers at the same path. The
+# pane-state-sync script picks the request up and plays the sound on the host.
 #
 # The script does not play the sound itself. It also runs inside Docker
 # containers, and a container has no audio device. A file in a shared directory
 # reaches the host, and the host has the speakers.
 #
-# Usage: chime
-#
 # Every call touches the same file. Several calls before the reader runs, from
 # any pane or client, collapse into one request and one sound. That is on
 # purpose. Two sounds on top of each other carry no more information than one.
 #
-# Without $TMUX_PANE the script does nothing and exits with success. The
-# pane-state-sync script runs from the tmux status line, so without tmux nothing
-# would ever pick the request up. The check uses $TMUX_PANE and not $TMUX for
-# the same reason as in pane-state.
+# Without `$TMUX_PANE` the script does nothing and exits with success. The
+# pane-state-sync script runs from the tmux status line, so without tmux
+# nothing would ever pick the request up.
+#
+# Usage: chime
 
 if [ -z "${TMUX_PANE:-}" ]; then
     exit 0
@@ -32,7 +30,7 @@ if [ "$#" -ne 0 ]; then
     exit 1
 fi
 
-tmux_dir="${AGENT_TMUX_DIR:-/tmp/${USER:-$(id -un)}/tmux}"
+tmux_dir="/tmp/tmux-pane-states"
 chime_dir="$tmux_dir/chime"
 mkdir -p "$chime_dir"
 touch "$chime_dir/request"

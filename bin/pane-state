@@ -3,35 +3,32 @@ set -euo pipefail
 trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 
 # Record the state of a tmux pane. The state goes to a file named after the
-# pane under the pane-state directory of the shared tmux directory. That
-# directory is $AGENT_TMUX_DIR, or /tmp/$USER/tmux without it. The ai launcher
-# sets the variable inside its containers, where the user name differs from
-# the host's. The pane-state-sync script reads the file from there.
+# pane under the pane state directory of the shared tmux directory,
+# `/tmp/tmux-pane-states`. The AI launcher mounts that directory into its
+# containers at the same path. The `pane-state-sync` script reads the file from
+# there.
 #
 # The script does not talk to tmux itself. It also runs inside Docker
 # containers, and a tmux client in a container cannot reach the tmux server on
 # the host. A file in a shared directory works from both places.
 #
-# States:
-#   running  The process is busy.
-#   pending  The process waits for input from the user.
-#   ready    The process did its work and can receive more instructions, or it
-#            ran to completion.
-#   default  No process reports a state for the pane. Write this when the
-#            process ends. The file stays behind otherwise, and a later pane
-#            with the same target inherits the old state.
+# States: running  The process is busy. pending  The process waits for input
+# from the user. ready    The process did its work and can receive more
+# instructions, or it ran to completion. default  No process reports a state
+# for the pane. Write this when the process ends. The file stays behind
+# otherwise, and a later pane with the same target inherits the old state.
+#
+# The pane argument accepts any tmux pane target, such as `%3` or
+# `mysession:1.2`. It defaults to the pane that runs this script, which tmux
+# names in `$TMUX_PANE`. The target becomes the file name, so it must not hold
+# a slash and must not start with a dot.
+#
+# Without `$TMUX_PANE` the script does nothing and exits with success, so
+# callers do not need to check for tmux themselves. The check uses `$TMUX_PANE`
+# and not `$TMUX` on purpose. Other programs change their behavior when they
+# see `$TMUX`, so the AI launcher passes only `$TMUX_PANE` into its container.
 #
 # Usage: pane-state <running|pending|ready|default> [pane]
-#
-# The pane argument accepts any tmux pane target, such as %3 or mysession:1.2.
-# It defaults to the pane that runs this script, which tmux names in
-# $TMUX_PANE. The target becomes the file name, so it must not hold a slash and
-# must not start with a dot.
-#
-# Without $TMUX_PANE the script does nothing and exits with success, so callers
-# do not need to check for tmux themselves. The check uses $TMUX_PANE and not
-# $TMUX on purpose. Other programs change their behavior when they see $TMUX,
-# so the ai launcher passes only $TMUX_PANE into its container.
 
 if [ -z "${TMUX_PANE:-}" ]; then
     exit 0
@@ -59,7 +56,7 @@ case "$pane" in
         ;;
 esac
 
-tmux_dir="${AGENT_TMUX_DIR:-/tmp/${USER:-$(id -un)}/tmux}"
+tmux_dir="/tmp/tmux-pane-states"
 state_dir="$tmux_dir/pane-state"
 mkdir -p "$state_dir"
 
