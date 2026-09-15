@@ -34,6 +34,43 @@ au({ "VimEnter", "FocusGained" }, {
     callback = UpdateGitBranch,
 })
 
+-- Open `path/to/file:174` at line 174, just like `path/to/file +174`. Neovim
+-- treats the whole argument as a file name, so it lands in `BufNewFile` for a
+-- file that does not exist. Replace the buffer with the part before the colon
+-- and jump to the line. If that file does not exist either, this opens a new
+-- buffer for it, the same as `+174` does.
+au("BufNewFile", {
+    pattern = "*:[0-9]*",
+    -- Let the `:edit` below fire the usual `BufRead`, `FileType`, and related
+    -- events for the real file.
+    nested = true,
+    callback = function(ev)
+        local path, line_text = ev.file:match("^(.+):(%d+)$")
+        local line = tonumber(line_text)
+        if not path or not line then
+            return
+        end
+
+        local placeholder_buf = ev.buf
+        vim.cmd.edit(vim.fn.fnameescape(path))
+
+        -- Defer the rest until every other `BufNewFile` handler for the
+        -- placeholder buffer ran, so that none of them sees a deleted
+        -- buffer. This also lets plugins that restore the cursor position
+        -- on load run first, so that the requested line wins.
+        vim.schedule(function()
+            if vim.api.nvim_buf_is_valid(placeholder_buf) then
+                vim.api.nvim_buf_delete(placeholder_buf, { force = true })
+            end
+
+            local line_count = vim.api.nvim_buf_line_count(0)
+            local target = math.min(line, line_count)
+            vim.api.nvim_win_set_cursor(0, { math.max(target, 1), 0 })
+            vim.cmd("normal! zz")
+        end)
+    end,
+})
+
 -- When a file changes on disk (even if the buffer has unsaved changes), always
 -- reload from disk, discarding the in-memory edits.
 au("FileChangedShell", {
