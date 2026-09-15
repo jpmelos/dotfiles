@@ -266,7 +266,9 @@ def main():
     username = resolve_username()
 
     project_dirs = resolve_project_dirs(
-        list_project_dirs(paths.dotfiles_dir), paths.devel_dir
+        list_project_dirs(paths.dotfiles_dir),
+        paths.devel_dir,
+        paths.resolved_devel_dir,
     )
     project_root = resolve_current_project_root(paths, project_dirs)
     visible_project_dirs = filter_visible_project_dirs(project_dirs, paths)
@@ -310,10 +312,10 @@ def main():
     docker_image_name = build_image_name(username, channel)
     # The lock is per user, like the image, so two profiles that launch on a
     # new day at the same time take turns, and the second one finds the image
-    # that the first one built. `/tmp` is world-writable, so another local
-    # user can create the file first. `file_lock` refuses a file that is not
-    # owned by the user who runs the launcher.
-    image_lock_path = f"/tmp/claude-code-img-{username}-lock"
+    # that the first one built. The file sits in the directory of the user
+    # under `/tmp`, which `prepare_tmp_dirs` verified, so no other local user
+    # can create it first.
+    image_lock_path = f"{profile_paths.user_tmp_dir}/claude-code-img-lock"
     ensure_image(
         options,
         docker_image_name,
@@ -520,19 +522,43 @@ class ProjectDir:
         # The `~/devel` mount exposes a link, but not a target outside of it.
         return self.resolved_path.startswith(resolved_devel_dir + "/")
 
-
-def resolve_project_dirs(relative_project_dirs, devel_dir):
-    project_dirs = []
-    for relative_project_dir in relative_project_dirs:
-        project_dir = os.path.join(devel_dir, relative_project_dir)
-        project_dirs.append(
-            ProjectDir(
-                relative_path=relative_project_dir,
-                path=project_dir,
-                resolved_path=os.path.realpath(project_dir),
-            )
+    def is_real_path(self, resolved_devel_dir):
+        # Whether the name is the directory itself, and not a link to it.
+        return self.resolved_path == os.path.join(
+            resolved_devel_dir, self.relative_path
         )
-    return project_dirs
+
+
+def resolve_project_dirs(relative_project_dirs, devel_dir, resolved_devel_dir):
+    # A link inside `~/devel` that points at another project makes
+    # `list_project_dirs` report both names for one directory. One name must
+    # win, because the name decides the profile, and the `--add-dir` list must
+    # hold the directory once. The real path wins over a link. Between two
+    # links, the first one wins.
+    project_dirs_by_resolved_path = {}
+    for relative_project_dir in relative_project_dirs:
+        path = os.path.join(devel_dir, relative_project_dir)
+        project_dir = ProjectDir(
+            relative_path=relative_project_dir,
+            path=path,
+            resolved_path=os.path.realpath(path),
+        )
+        current = project_dirs_by_resolved_path.get(project_dir.resolved_path)
+        if current is None:
+            project_dirs_by_resolved_path[project_dir.resolved_path] = project_dir
+            continue
+        if project_dir.is_real_path(resolved_devel_dir) and not current.is_real_path(
+            resolved_devel_dir
+        ):
+            project_dirs_by_resolved_path[project_dir.resolved_path] = project_dir
+            kept, dropped = project_dir, current
+        else:
+            kept, dropped = current, project_dir
+        log(
+            f"Warning: {dropped.path} and {kept.path} are the same directory, "
+            f"keeping {kept.path}"
+        )
+    return list(project_dirs_by_resolved_path.values())
 
 
 def resolve_current_project_root(paths, project_dirs):
@@ -707,15 +733,16 @@ def parse_options(argv, project_name, username):
         die(f"Error: Invalid channel name '{options.channel}'")
 
     options.profile_detected = not options.profile
+    profile_source = ""
     if options.profile_detected:
-        options.profile = detect_profile(project_name, username)
+        options.profile, profile_source = detect_profile(project_name, username)
     # The profile becomes part of a directory name, so it must stay a single
     # path component without a leading dot or hyphen.
     if not re.fullmatch(r"[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,63}", options.profile):
         if options.profile_detected:
             die(
                 f"Error: Invalid profile name '{options.profile}' detected from "
-                "the project. Use --profile to choose another one"
+                f"{profile_source}. Use --profile to choose another one"
             )
         die(f"Error: Invalid profile name '{options.profile}'")
 
@@ -723,11 +750,14 @@ def parse_options(argv, project_name, username):
 
 
 def detect_profile(project_name, username):
-    # A project inside an organization directory, such as `orgname/project`,
-    # takes the organization as its profile. A top-level project takes the
-    # user name.
+    # Returns the profile and a description of where it came from, for
+    # messages. A project inside an organization directory, such as
+    # `orgname/project`, takes the organization as its profile. A top-level
+    # project takes the user name.
     first_component, separator, _ = project_name.partition("/")
-    return first_component if separator else username
+    if separator:
+        return first_component, "the project"
+    return username, "the user name"
 
 
 # --------------------------------------------------------------------------------------
@@ -1379,15 +1409,23 @@ def apply_settings(config, profile, origin_dir, profile_dir):
     origin_settings = f"{origin_dir}/settings.json"
     profile_settings = f"{profile_dir}/settings.json"
 
+    preferred_model = resolve_preferred_model(config, profile)
+
     try:
         settings = read_json_file(origin_settings)
     except FileNotFoundError:
+        # The model goes into a copy of the origin file, so without the file
+        # there is nothing to put it in.
+        if preferred_model is not None:
+            log(
+                f"Warning: {origin_settings} does not exist, model of profile "
+                f"'{profile}' not set"
+            )
         return
     except (OSError, ValueError) as error:
         log(f"Warning: cannot read {origin_settings}: {error}")
         return
 
-    preferred_model = resolve_preferred_model(config, profile)
     if preferred_model is not None:
         if isinstance(settings, dict):
             settings["model"] = preferred_model
@@ -1651,6 +1689,7 @@ def build_run_command(harness_args, run_config):
     devel_dir = paths.devel_dir
     dotfiles_dir = paths.dotfiles_dir
     tmp_dir = profile_paths.tmp_dir
+    runtime_dir = f"/run/user/{os.getuid()}"
 
     cmd = [
         "docker",
@@ -1670,15 +1709,20 @@ def build_run_command(harness_args, run_config):
         # `host.docker.internal`.
         "--add-host",
         "host.docker.internal:host-gateway",
-        # Make the entire filesystem read-only. `/tmp` is the only writable
-        # place outside of the mounts. The runtime directory stays on that
-        # tmpfs, because a runtime directory belongs to one session, and two
-        # containers of a profile must not share sockets and locks.
+        # Make the entire filesystem read-only. `/tmp` and the runtime
+        # directory are the only writable places outside of the mounts. Both
+        # are a tmpfs of the container, because a runtime directory belongs to
+        # one session, and two containers of a profile must not share sockets
+        # and locks. The runtime directory gets its own tmpfs, because the XDG
+        # specification asks for a directory with mode 700 that the user owns,
+        # and `/tmp` is world-writable.
         "--read-only",
         "--tmpfs",
         "/tmp",
+        "--tmpfs",
+        f"{runtime_dir}:mode=700,uid={os.getuid()},gid={os.getgid()}",
         "--env",
-        "XDG_RUNTIME_DIR=/tmp",
+        f"XDG_RUNTIME_DIR={runtime_dir}",
         # The directory that every container of the profile shares. It sits
         # under the `/tmp` tmpfs, and Docker applies the deeper mount last.
         # The cache directories that Chromium and Node tools write to are
@@ -1710,11 +1754,12 @@ def build_run_command(harness_args, run_config):
         "--workdir",
         run_config.project_root,
         # Claude Code files. This makes it so that it looks for `.claude.json`
-        # inside `~/.claude` instead of inside `~`.
+        # inside `~/.claude` instead of inside `~`. The source is the resolved
+        # path, for the same reason as the `~/devel` mount above.
         "--env",
         f"CLAUDE_CONFIG_DIR={home}/.claude",
         "--volume",
-        f"{profile_paths.profile_dir}:{home}/.claude",
+        f"{os.path.realpath(profile_paths.profile_dir)}:{home}/.claude",
         # Anthropic's API key if available. The name alone keeps the value out
         # of the command line. If not defined, Claude Code will check for OAuth
         # credentials. If not there too, it will ask the user how they want to
@@ -1780,10 +1825,11 @@ def build_run_command(harness_args, run_config):
 
     # Mount git configuration so my aliases and other preferences are in
     # effect. Skip it when it is absent, so Docker does not create it on the
-    # host as a directory owned by `root`.
+    # host as a directory owned by `root`. The source is the resolved path,
+    # for the same reason as the `~/devel` mount above.
     git_config_dir = f"{home}/.config/git"
     if os.path.isdir(git_config_dir):
-        cmd += ["--volume", f"{git_config_dir}:{git_config_dir}:ro"]
+        cmd += ["--volume", f"{os.path.realpath(git_config_dir)}:{git_config_dir}:ro"]
     else:
         log(
             f"Warning: {git_config_dir} does not exist, Git configuration will "
