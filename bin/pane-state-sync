@@ -2,11 +2,19 @@
 set -euo pipefail
 trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 
-# Apply the pane state files under the pane state directory of the shared tmux
-# directory to tmux, and play the chime requests under its chime directory. The
-# shared tmux directory is `/tmp/tmux-pane-states`. The AI launcher mounts that
-# directory into every container at the same path, so one directory serves
-# every profile and every pane has one state file.
+# Apply the pane state files under the pane state directory of the tmux
+# directory of the user to tmux, and play the chime requests under its chime
+# directory. That directory is `$TMUX_PANE_STATES_DIR` when set, and otherwise
+# `/tmp/tmux-pane-states-<user>`, named after the user. The AI launcher mounts
+# the directory of the host user into every container at the same path, so one
+# directory serves every profile and every pane has one state file.
+#
+# Each user has a directory of their own. Pane targets such as `%3` repeat
+# across tmux servers, and every user runs a server, so this script must only
+# see the files of the user who runs it. The directory sits right below
+# `/tmp`, whose owner is `root`, and not in a shared directory that a user
+# created. The owner of a directory can rename or replace the entries of other
+# users in it, sticky bit or not.
 #
 # Each state file is named after a pane target and holds one state. The script
 # sets the `@state` pane option of that pane to the state. The `pane-state`
@@ -35,7 +43,7 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 chime_sound="$script_dir/../references/telegram-chime.mp3"
-tmux_dir="/tmp/tmux-pane-states"
+tmux_dir="${TMUX_PANE_STATES_DIR:-/tmp/tmux-pane-states-$(id -un)}"
 
 # Play a sound file in the background. tmux waits for this script to close its
 # standard output, so the player must not inherit the standard streams. macOS

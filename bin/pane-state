@@ -3,14 +3,23 @@ set -euo pipefail
 trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 
 # Record the state of a tmux pane. The state goes to a file named after the
-# pane under the pane state directory of the shared tmux directory,
-# `/tmp/tmux-pane-states`. The AI launcher mounts that directory into its
-# containers at the same path. The `pane-state-sync` script reads the file from
-# there.
+# pane under the pane state directory of the tmux directory of the user. That
+# directory is `$TMUX_PANE_STATES_DIR` when set, and otherwise
+# `/tmp/tmux-pane-states-<user>`, named after the user. The AI launcher mounts
+# the directory of the host user into its containers at the same path and sets
+# the variable, because the container user has another name. The
+# `pane-state-sync` script reads the file from there.
+#
+# Each user has a directory of their own. Pane targets such as `%3` repeat
+# across tmux servers, and every user runs a server, so a shared directory
+# would send the state of one user to the panes of another. The directory sits
+# right below `/tmp`, whose owner is `root`, and not in a shared directory that
+# a user created. The owner of a directory can rename or replace the entries
+# of other users in it, sticky bit or not.
 #
 # The script does not talk to tmux itself. It also runs inside Docker
 # containers, and a tmux client in a container cannot reach the tmux server on
-# the host. A file in a shared directory works from both places.
+# the host. A file in a directory that both sides see works from both places.
 #
 # States: running  The process is busy. pending  The process waits for input
 # from the user. ready    The process did its work and can receive more
@@ -56,8 +65,13 @@ case "$pane" in
         ;;
 esac
 
-tmux_dir="/tmp/tmux-pane-states"
+tmux_dir="${TMUX_PANE_STATES_DIR:-/tmp/tmux-pane-states-$(id -un)}"
 state_dir="$tmux_dir/pane-state"
+# The directory of the user must stay private, and `mkdir -p` alone would
+# give it the mode of the umask, which can let the group write to it. The mode
+# applies only to a directory that this call creates, so an existing one keeps
+# its mode.
+mkdir -p -m 700 "$tmux_dir"
 mkdir -p "$state_dir"
 
 # Write through a temporary file, so a reader never sees a partial file. The

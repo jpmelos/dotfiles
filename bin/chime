@@ -3,13 +3,23 @@ set -euo pipefail
 trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 
 # Request the notification chime. The request is an empty file under the chime
-# directory of the shared tmux directory, /tmp/tmux-pane-states. The AI
-# launcher mounts that directory into its containers at the same path. The
-# pane-state-sync script picks the request up and plays the sound on the host.
+# directory of the tmux directory of the user. That directory is
+# `$TMUX_PANE_STATES_DIR` when set, and otherwise
+# `/tmp/tmux-pane-states-<user>`, named after the user. The AI launcher mounts
+# the directory of the host user into its containers at the same path and sets
+# the variable, because the container user has another name. The
+# `pane-state-sync` script picks the request up and plays the sound on the
+# host.
+#
+# Each user has a directory of their own, so a request of one user never plays
+# on the tmux server of another. The directory sits right below `/tmp`, whose
+# owner is `root`, and not in a shared directory that a user created. The
+# owner of a directory can rename or replace the entries of other users in it,
+# sticky bit or not.
 #
 # The script does not play the sound itself. It also runs inside Docker
-# containers, and a container has no audio device. A file in a shared directory
-# reaches the host, and the host has the speakers.
+# containers, and a container has no audio device. A file in a directory that
+# both sides see reaches the host, and the host has the speakers.
 #
 # Every call touches the same file. Several calls before the reader runs, from
 # any pane or client, collapse into one request and one sound. That is on
@@ -30,7 +40,12 @@ if [ "$#" -ne 0 ]; then
     exit 1
 fi
 
-tmux_dir="/tmp/tmux-pane-states"
+tmux_dir="${TMUX_PANE_STATES_DIR:-/tmp/tmux-pane-states-$(id -un)}"
 chime_dir="$tmux_dir/chime"
+# The directory of the user must stay private, and `mkdir -p` alone would
+# give it the mode of the umask, which can let the group write to it. The mode
+# applies only to a directory that this call creates, so an existing one keeps
+# its mode.
+mkdir -p -m 700 "$tmux_dir"
 mkdir -p "$chime_dir"
 touch "$chime_dir/request"
