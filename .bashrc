@@ -47,8 +47,98 @@ reset_terminal_title() {
     echo -ne "\033]0;$BASH_TERMINAL_TITLE\007"
 }
 
+# Print the name of the project that holds the current directory, as
+# `list_project_dirs` reports it. In a linked git worktree, print the name of
+# the main repository, a colon, and the checked-out branch instead. Print
+# nothing when the current directory is inside no project.
+current_project_name() {
+    local devel_dir
+    devel_dir="$(realpath "$HOME/devel" 2> /dev/null)" || return 0
+    local current_dir
+    current_dir="$(pwd -P 2> /dev/null)" || return 0
+    [[ "$current_dir" == "$devel_dir"/* ]] || return 0
+
+    # Walk down from `~/devel`. The first directory with a `.git` entry and no
+    # `.list_project_dirs_ignore` file is the project. Both paths above are
+    # resolved, so no component on the way is a link.
+    local -a components
+    IFS='/' read -r -a components <<< "${current_dir#"$devel_dir"/}"
+    local project_dir=""
+    local candidate="$devel_dir"
+    local component
+    for component in "${components[@]}"; do
+        candidate="$candidate/$component"
+        if [ -e "$candidate/.git" ] && [ ! -e "$candidate/.list_project_dirs_ignore" ]; then
+            project_dir="$candidate"
+            break
+        fi
+    done
+    [ -n "$project_dir" ] || return 0
+
+    local name="${project_dir#"$devel_dir"/}"
+
+    # In a linked worktree, `.git` is a file, and the git directory differs
+    # from the common directory of the main repository. A submodule has a
+    # `.git` file too, but there the two directories are the same.
+    if [ -f "$project_dir/.git" ]; then
+        local -a git_dirs
+        mapfile -t git_dirs < <(
+            git -C "$project_dir" rev-parse --path-format=absolute \
+                --git-dir --git-common-dir 2> /dev/null
+        )
+        if [ "${#git_dirs[@]}" -eq 2 ] && [ "${git_dirs[0]}" != "${git_dirs[1]}" ]; then
+            local main_repo_dir
+            main_repo_dir="$(realpath "${git_dirs[1]}")"
+            main_repo_dir="${main_repo_dir%/.git}"
+            local main_repo_name
+            if [[ "$main_repo_dir" == "$devel_dir"/* ]]; then
+                main_repo_name="${main_repo_dir#"$devel_dir"/}"
+            else
+                main_repo_name="$(basename "$main_repo_dir")"
+            fi
+
+            local branch
+            branch="$(git -C "$project_dir" branch --show-current 2> /dev/null)"
+            if [ -z "$branch" ]; then
+                # Detached HEAD. Show the commit instead.
+                branch="$(git -C "$project_dir" rev-parse --short HEAD 2> /dev/null)"
+            fi
+
+            name="$main_repo_name: $branch"
+        fi
+    fi
+
+    echo "$name"
+}
+
+# The project name that this shell last wrote to its tmux window. Empty when
+# the shell was never in a project, or when it left the last one.
+TMUX_WINDOW_PROJECT=""
+
+# Name the tmux window of this shell after the project of the current
+# directory. Act only when the project changes from the last prompt, so that a
+# shell that stays in place, or that was never in a project, does not touch a
+# name that another pane or the user set. On the way into a project, rename
+# the window, which also turns `automatic-rename` off for it. On the way out,
+# unset `automatic-rename` for the window, so that the global default applies
+# again and tmux names the window by its own scheme.
+set_tmux_window_project() {
+    { [ -n "$TMUX" ] && [ -n "$TMUX_PANE" ]; } || return 0
+
+    local project_name
+    project_name="$(current_project_name)"
+    [ "$project_name" != "$TMUX_WINDOW_PROJECT" ] || return 0
+    TMUX_WINDOW_PROJECT="$project_name"
+
+    if [ -n "$project_name" ]; then
+        tmux rename-window -t "$TMUX_PANE" "$project_name" 2> /dev/null
+    else
+        tmux set-option -w -u -t "$TMUX_PANE" automatic-rename 2> /dev/null
+    fi
+}
+
 if [[ "$PROMPT_COMMAND" != *"reset_terminal_title"* ]]; then
-    export PROMPT_COMMAND="history -a; history -n; reset_terminal_title; ${PROMPT_COMMAND}"
+    export PROMPT_COMMAND="history -a; history -n; reset_terminal_title; set_tmux_window_project; ${PROMPT_COMMAND}"
 fi
 
 eval "$(starship init bash)"
