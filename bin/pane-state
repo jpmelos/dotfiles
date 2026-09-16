@@ -21,7 +21,7 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 # containers, and a tmux client in a container cannot reach the tmux server on
 # the host. A file in a directory that both sides see works from both places.
 #
-# States: running  The process is busy. pending  The process waits for input
+# States: running  The process is busy. waiting  The process waits for input
 # from the user. ready    The process did its work and can receive more
 # instructions, or it ran to completion. default  No process reports a state
 # for the pane. Write this when the process ends. The file stays behind
@@ -37,22 +37,22 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 # and not `$TMUX` on purpose. Other programs change their behavior when they
 # see `$TMUX`, so the AI launcher passes only `$TMUX_PANE` into its container.
 #
-# Usage: pane-state <running|pending|ready|default> [pane]
+# Usage: pane-state <running|waiting|ready|default> [pane]
 
 if [ -z "${TMUX_PANE:-}" ]; then
     exit 0
 fi
 
 if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
-    echo "usage: pane-state <running|pending|ready|default> [pane]" >&2
+    echo "usage: pane-state <running|waiting|ready|default> [pane]" >&2
     exit 1
 fi
 
 state="$1"
 case "$state" in
-    running | pending | ready | default) ;;
+    running | waiting | ready | default) ;;
     *)
-        echo "pane-state: unknown state '$state'. Use running, pending, ready, or default." >&2
+        echo "pane-state: unknown state '$state'. Use running, waiting, ready, or default." >&2
         exit 1
         ;;
 esac

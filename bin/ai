@@ -200,8 +200,8 @@
 # /   directory of the user at the same path, and the `TMUX_PANE_STATES_DIR`
 # /   variable names it. Every profile uses that one directory, so a pane has
 # /   one state file. When the launcher runs inside tmux, the container also
-# /   gets the `TMUX_PANE` variable. The `running`, `pending`, `ready`, and
-# /   `default` scripts then mark the pane that runs the agent, and `pending`
+# /   gets the `TMUX_PANE` variable. The `running`, `waiting`, `ready`, and
+# /   `default` scripts then mark the pane that runs the agent, and `waiting`
 # /   and `ready` request the notification chime. The `pane-state-sync` script
 # /   on the host picks both up. Outside tmux the variable is absent, and these
 # /   scripts do nothing.
@@ -290,7 +290,7 @@ AGENT_BINARIES = (
     "pane-state",
     "chime",
     "running",
-    "pending",
+    "waiting",
     "ready",
     "default",
 )

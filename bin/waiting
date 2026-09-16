@@ -2,10 +2,10 @@
 set -euo pipefail
 trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 
-# Mark the current tmux pane as pending and play the notification chime. Call
+# Mark the current tmux pane as waiting and play the notification chime. Call
 # this from inside a pane when the process waits for input from the user.
 #
-# Usage: pending [--no-chime]
+# Usage: waiting [--no-chime]
 #
 # With `--no-chime` the script sets the state and skips the chime.
 
@@ -14,13 +14,13 @@ for argument in "$@"; do
     case "$argument" in
         --no-chime) no_chime=1 ;;
         *)
-            echo "usage: pending [--no-chime]" >&2
+            echo "usage: waiting [--no-chime]" >&2
             exit 1
             ;;
     esac
 done
 
-pane-state pending
+pane-state waiting
 if [ "$no_chime" -eq 1 ]; then
     exit 0
 fi

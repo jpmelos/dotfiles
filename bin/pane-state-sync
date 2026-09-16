@@ -90,7 +90,7 @@ for state_file in "$state_dir"/*; do
     state="$(< "$state_file")"
 
     case "$state" in
-        running | pending | ready | default) ;;
+        running | waiting | ready | default) ;;
         *)
             echo "pane-state-sync: unknown state '$state' for pane '$pane'." >&2
             continue
