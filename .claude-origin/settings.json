@@ -190,7 +190,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash -c 'INPUT=$(cat); if [ -f \"jpenv-bin/post_tool_use.sh\" ]; then echo \"$INPUT\" | bash \"jpenv-bin/post_tool_use.sh\"; fi'"
+            "command": "bash -c 'INPUT=$(cat); if [ -f \"jpenv-bin/post_tool_use\" ]; then echo \"$INPUT\" | ./jpenv-bin/post_tool_use; fi'"
           }
         ]
       }

@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+input=$(cat)
+
+# The ai launcher names the shared directory in $AGENT_SHARED_DIR. Outside its
+# containers, fall back to the same path under the user's /tmp directory.
+shared_dir="${AGENT_SHARED_DIR:-/tmp/${USER:-$(id -un)}/claude-code-shared}"
+mkdir -p "$shared_dir"
+{
+    echo '============='
+    date '+%Y-%m-%d %H:%M:%S %Z'
+    echo '============='
+    echo "$input"
+} >> "$shared_dir/post-tool-use.json"

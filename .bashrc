@@ -619,54 +619,79 @@ pending_devel() {
     cd "$current_dir"
 }
 
-# Scripts that `j` falls back to when the project has no `jpenv-bin` script
+# Commands that `j` falls back to when the project has no `jpenv-bin` command
 # with the requested name.
 JPENV_BIN_DEFAULT_DIR="$HOME/devel/dotfiles/jpenv-bin-default"
 
+# Print the name of each regular file in the directory, followed by the
+# documentation block that its `#/` lines hold. Skip files whose names are in
+# the remaining arguments.
+_j_list_commands() {
+    local bin_dir="$1"
+    local suffix="$2"
+    shift 2
+    local -a skipped_names=("$@")
+
+    local command_path
+    for command_path in "$bin_dir"/*; do
+        [ -f "$command_path" ] || continue
+        local command_name
+        command_name="$(basename "$command_path")"
+        local skipped_name
+        for skipped_name in "${skipped_names[@]}"; do
+            [ "$command_name" = "$skipped_name" ] && continue 2
+        done
+        echo "${command_name}:${suffix}"
+        awk '/^#\//{print substr($0,3); found=1; next} found{exit}' "$command_path" \
+            | sed 's/^/  /'
+    done
+}
+
+# Run a `jpenv-bin` command of the project, or a default one when the project
+# has none with that name. The command is executed directly, so it must be
+# executable. With no arguments, list the available commands.
 j() {
     local local_bin_dir="./jpenv-bin"
     local default_bin_dir="$JPENV_BIN_DEFAULT_DIR"
 
     if [ $# -eq 0 ]; then
-        local has_scripts=false
-        local script
-        for script in "$local_bin_dir"/*.bash; do
-            [ -f "$script" ] || continue
-            has_scripts=true
-            echo "$(basename "$script" .bash):"
-            awk '/^#\//{print substr($0,3); found=1; next} found{exit}' "$script" \
-                | sed 's/^/  /'
-        done
-        # A local script with the same name shadows the default one.
-        for script in "$default_bin_dir"/*.bash; do
-            [ -f "$script" ] || continue
-            [ -f "$local_bin_dir/$(basename "$script")" ] && continue
-            has_scripts=true
-            echo "$(basename "$script" .bash): (default)"
-            awk '/^#\//{print substr($0,3); found=1; next} found{exit}' "$script" \
-                | sed 's/^/  /'
-        done
-        if [ "$has_scripts" = false ]; then
-            echo "No .bash scripts found in $local_bin_dir or $default_bin_dir" >&2
+        local -a local_names=()
+        if [ -d "$local_bin_dir" ]; then
+            mapfile -t local_names < <(
+                find -L "$local_bin_dir" -mindepth 1 -maxdepth 1 -type f -exec \
+                    basename {} \
+                    \;
+            )
+        fi
+
+        local listing
+        listing="$(
+            _j_list_commands "$local_bin_dir" ""
+            # A local command with the same name shadows the default one.
+            _j_list_commands "$default_bin_dir" " (default)" "${local_names[@]}"
+        )"
+        if [ -z "$listing" ]; then
+            echo "No commands found in $local_bin_dir or $default_bin_dir" >&2
             return 1
         fi
+        echo "$listing"
         return
     fi
 
-    local script_name="$1"
+    local command_name="$1"
     shift
 
-    local script_path="$local_bin_dir/${script_name}.bash"
-    if [ ! -f "$script_path" ]; then
-        script_path="$default_bin_dir/${script_name}.bash"
+    local command_path="$local_bin_dir/$command_name"
+    if [ ! -f "$command_path" ]; then
+        command_path="$default_bin_dir/$command_name"
     fi
 
-    if [ ! -f "$script_path" ]; then
-        echo "Error: Script '${script_name}' not found in $local_bin_dir or $default_bin_dir" >&2
+    if [ ! -f "$command_path" ]; then
+        echo "Error: Command '${command_name}' not found in $local_bin_dir or $default_bin_dir" >&2
         return 1
     fi
 
-    if grep -qxF "#: j-execute" "$script_path"; then
+    if grep -qxF "#: j-execute" "$command_path"; then
         local should_source=false
         local source_content=""
 
@@ -677,7 +702,7 @@ j() {
             elif [ "$should_source" = true ]; then
                 source_content+="$line"$'\n'
             fi
-        done < <(bash "$script_path" "$@")
+        done < <("$command_path" "$@")
 
         if [ "$should_source" = true ] && [ -n "$source_content" ]; then
             echo ""
@@ -689,8 +714,7 @@ j() {
         return
     fi
 
-    bash "$script_path" "$@"
-
+    "$command_path" "$@"
 }
 
 je() {
@@ -701,36 +725,30 @@ je() {
     fi
 
     if [ $# -eq 0 ]; then
-        local has_scripts=false
-        for script in "$local_bin_dir"/*.bash; do
-            if [ -f "$script" ]; then
-                has_scripts=true
-                echo "$(basename "$script" .bash):"
-                awk '/^#\//{print substr($0,3); found=1; next} found{exit}' "$script" \
-                    | sed 's/^/  /'
-            fi
-        done
-        if [ "$has_scripts" = false ]; then
-            echo "No .bash scripts found in $local_bin_dir" >&2
+        local listing
+        listing="$(_j_list_commands "$local_bin_dir" "")"
+        if [ -z "$listing" ]; then
+            echo "No commands found in $local_bin_dir" >&2
             return 1
         fi
+        echo "$listing"
         return
     fi
 
-    script_name="$1"
+    local command_name="$1"
     shift
 
-    script_path="./jpenv-bin/${script_name}.bash"
+    local command_path="$local_bin_dir/$command_name"
 
-    if [ ! -f "$script_path" ]; then
-        echo "Script '${script_name}' not found."
-        read -p "Create new script from template? [y/N] " -n 1 -r
+    if [ ! -f "$command_path" ]; then
+        echo "Command '${command_name}' not found."
+        read -p "Create new command from template? [y/N] " -n 1 -r
         echo
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
             return 1
         fi
         echo "Creating from template..."
-        cat > "$script_path" << 'EOF'
+        cat > "$command_path" << 'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND"' ERR
@@ -746,37 +764,37 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 echo "Hello, world!"
 EOF
-        chmod +x "$script_path"
-        echo "Created $script_path"
+        chmod +x "$command_path"
+        echo "Created $command_path"
     fi
 
-    $EDITOR "$script_path" "$@"
+    $EDITOR "$command_path" "$@"
 }
 
 _j_completion() {
     local cur="${COMP_WORDS[COMP_CWORD]}"
     local jpenv_bin_dir="./jpenv-bin"
 
-    local -a script_dirs=("$jpenv_bin_dir")
-    # Only `j` falls back to the default scripts.
+    local -a command_dirs=("$jpenv_bin_dir")
+    # Only `j` falls back to the default commands.
     if [ "$1" = "j" ]; then
-        script_dirs+=("$JPENV_BIN_DEFAULT_DIR")
+        command_dirs+=("$JPENV_BIN_DEFAULT_DIR")
     fi
 
-    local -a scripts=()
+    local -a commands=()
     if [ "${COMP_CWORD}" -eq 1 ]; then
-        mapfile -t scripts < <(
-            for script_dir in "${script_dirs[@]}"; do
-                [ -d "$script_dir" ] || continue
-                find -L "$script_dir" -name "*.bash" -type f -exec \
-                    basename {} .bash \
+        mapfile -t commands < <(
+            for command_dir in "${command_dirs[@]}"; do
+                [ -d "$command_dir" ] || continue
+                find -L "$command_dir" -mindepth 1 -maxdepth 1 -type f -exec \
+                    basename {} \
                     \;
             done | sort -u
         )
     fi
 
-    if [ "${#scripts[@]}" -gt 0 ]; then
-        mapfile -t COMPREPLY < <(compgen -W "${scripts[*]}" -- "$cur")
+    if [ "${#commands[@]}" -gt 0 ]; then
+        mapfile -t COMPREPLY < <(compgen -W "${commands[*]}" -- "$cur")
     else
         COMPREPLY=()
         compopt -o filenames
