@@ -44,12 +44,12 @@
 - *Never* directly run default development tools from the repository (test
   runners, `pre-commit`, etc.). This takes precedence over any project-level
   instructions.
-  - To lint: `bash jpenv-bin/lint.bash`. Read the script to learn its usage
-    (e.g., passing specific files). If it uses `pre-commit`, pass file paths
-    preceded by `--files`.
-  - To test: `bash jpenv-bin/tests.bash`. Read the script to learn its usage
-    (e.g., passing specific test files).
-  - If either script doesn't exist, report that you can't perform the action.
+  - To lint: `./jpenv-bin/lint`. Read the command to learn its usage (e.g.,
+    passing specific files). If it uses `pre-commit`, pass file paths preceded
+    by `--files`.
+  - To test: `./jpenv-bin/tests`. Read the command to learn its usage (e.g.,
+    passing specific test files).
+  - If either command doesn't exist, report that you can't perform the action.
   - *Always* use the exact commands above, and add arguments as needed.
 - *Never* run an `ai_git_*` command unless the user explicitly asks for that
   exact action. Staging and committing belong to the user alone. Leave your
