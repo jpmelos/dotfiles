@@ -619,37 +619,50 @@ pending_devel() {
     cd "$current_dir"
 }
 
+# Scripts that `j` falls back to when the project has no `jpenv-bin` script
+# with the requested name.
+JPENV_BIN_DEFAULT_DIR="$HOME/devel/dotfiles/jpenv-bin-default"
+
 j() {
     local local_bin_dir="./jpenv-bin"
-    if [ ! -d "$local_bin_dir" ]; then
-        echo "Local binaries directory not found" >&2
-        return 1
-    fi
+    local default_bin_dir="$JPENV_BIN_DEFAULT_DIR"
 
     if [ $# -eq 0 ]; then
         local has_scripts=false
+        local script
         for script in "$local_bin_dir"/*.bash; do
-            if [ -f "$script" ]; then
-                has_scripts=true
-                echo "$(basename "$script" .bash):"
-                awk '/^#\//{print substr($0,3); found=1; next} found{exit}' "$script" \
-                    | sed 's/^/  /'
-            fi
+            [ -f "$script" ] || continue
+            has_scripts=true
+            echo "$(basename "$script" .bash):"
+            awk '/^#\//{print substr($0,3); found=1; next} found{exit}' "$script" \
+                | sed 's/^/  /'
+        done
+        # A local script with the same name shadows the default one.
+        for script in "$default_bin_dir"/*.bash; do
+            [ -f "$script" ] || continue
+            [ -f "$local_bin_dir/$(basename "$script")" ] && continue
+            has_scripts=true
+            echo "$(basename "$script" .bash): (default)"
+            awk '/^#\//{print substr($0,3); found=1; next} found{exit}' "$script" \
+                | sed 's/^/  /'
         done
         if [ "$has_scripts" = false ]; then
-            echo "No .bash scripts found in $local_bin_dir" >&2
+            echo "No .bash scripts found in $local_bin_dir or $default_bin_dir" >&2
             return 1
         fi
         return
     fi
 
-    script_name="$1"
+    local script_name="$1"
     shift
 
-    script_path="./jpenv-bin/${script_name}.bash"
+    local script_path="$local_bin_dir/${script_name}.bash"
+    if [ ! -f "$script_path" ]; then
+        script_path="$default_bin_dir/${script_name}.bash"
+    fi
 
     if [ ! -f "$script_path" ]; then
-        echo "Error: Script '${script_name}' not found in ./jpenv-bin/" >&2
+        echo "Error: Script '${script_name}' not found in $local_bin_dir or $default_bin_dir" >&2
         return 1
     fi
 
@@ -744,13 +757,25 @@ _j_completion() {
     local cur="${COMP_WORDS[COMP_CWORD]}"
     local jpenv_bin_dir="./jpenv-bin"
 
-    if [ "${COMP_CWORD}" -eq 1 ] && [ -d "$jpenv_bin_dir" ]; then
-        local scripts
+    local -a script_dirs=("$jpenv_bin_dir")
+    # Only `j` falls back to the default scripts.
+    if [ "$1" = "j" ]; then
+        script_dirs+=("$JPENV_BIN_DEFAULT_DIR")
+    fi
+
+    local -a scripts=()
+    if [ "${COMP_CWORD}" -eq 1 ]; then
         mapfile -t scripts < <(
-            find -L "$jpenv_bin_dir" -name "*.bash" -type f -exec \
-                basename {} .bash \
-                \;
+            for script_dir in "${script_dirs[@]}"; do
+                [ -d "$script_dir" ] || continue
+                find -L "$script_dir" -name "*.bash" -type f -exec \
+                    basename {} .bash \
+                    \;
+            done | sort -u
         )
+    fi
+
+    if [ "${#scripts[@]}" -gt 0 ]; then
         mapfile -t COMPREPLY < <(compgen -W "${scripts[*]}" -- "$cur")
     else
         COMPREPLY=()
