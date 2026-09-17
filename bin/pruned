@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# Delete every empty directory inside the current directory, recursively, and
+# print the path of each one. Directories are visited children first, so a
+# directory that holds only empty directories is deleted too. Directories named
+# `.git` and their contents are left alone, because git expects some of its
+# internal directories to exist even when they are empty.
+
+find . -mindepth 1 -depth -type d -empty \
+    -not -name .git -not -path '*/.git/*' \
+    -print -delete
