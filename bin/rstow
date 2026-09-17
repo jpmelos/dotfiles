@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# Unstow and stow again the stow project in the current directory. The unstow
+# step also removes the links in the target that point into this project but
+# whose files no longer exist, so that renamed or deleted files leave no
+# orphaned links behind. Extra arguments go to `stow`.
+
+if [ ! -f .stowrc ]; then
+    echo "Error: no .stowrc in $(pwd). Run this from the root of a stow project." >&2
+    exit 1
+fi
+
+stow -R . "$@"
