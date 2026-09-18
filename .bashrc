@@ -648,15 +648,23 @@ _j_list_commands() {
 }
 
 # Run a `jpenv-bin` command of the project, or a default one when the project
-# has none with that name. The command is executed directly, so it must be
-# executable. With no arguments, list the available commands.
+# has none with that name. With `--default` before the command name, skip the
+# project and run the default command even when the project has one with that
+# name. The command is executed directly, so it must be executable. With no
+# command name, list the available commands.
 j() {
     local local_bin_dir="./jpenv-bin"
     local default_bin_dir="$JPENV_BIN_DEFAULT_DIR"
 
+    local default_only=false
+    if [ "${1:-}" = "--default" ]; then
+        default_only=true
+        shift
+    fi
+
     if [ $# -eq 0 ]; then
         local -a local_names=()
-        if [ -d "$local_bin_dir" ]; then
+        if [ "$default_only" = false ] && [ -d "$local_bin_dir" ]; then
             mapfile -t local_names < <(
                 find -L "$local_bin_dir" -mindepth 1 -maxdepth 1 -type f -exec \
                     basename {} \
@@ -666,12 +674,18 @@ j() {
 
         local listing
         listing="$(
-            _j_list_commands "$local_bin_dir" ""
+            if [ "$default_only" = false ]; then
+                _j_list_commands "$local_bin_dir" ""
+            fi
             # A local command with the same name shadows the default one.
             _j_list_commands "$default_bin_dir" " (default)" "${local_names[@]}"
         )"
         if [ -z "$listing" ]; then
-            echo "No commands found in $local_bin_dir or $default_bin_dir" >&2
+            if [ "$default_only" = true ]; then
+                echo "No commands found in $default_bin_dir" >&2
+            else
+                echo "No commands found in $local_bin_dir or $default_bin_dir" >&2
+            fi
             return 1
         fi
         echo "$listing"
@@ -682,12 +696,16 @@ j() {
     shift
 
     local command_path="$local_bin_dir/$command_name"
-    if [ ! -f "$command_path" ]; then
+    if [ "$default_only" = true ] || [ ! -f "$command_path" ]; then
         command_path="$default_bin_dir/$command_name"
     fi
 
     if [ ! -f "$command_path" ]; then
-        echo "Error: Command '${command_name}' not found in $local_bin_dir or $default_bin_dir" >&2
+        if [ "$default_only" = true ]; then
+            echo "Error: Command '${command_name}' not found in $default_bin_dir" >&2
+        else
+            echo "Error: Command '${command_name}' not found in $local_bin_dir or $default_bin_dir" >&2
+        fi
         return 1
     fi
 
@@ -781,8 +799,21 @@ _j_completion() {
         command_dirs+=("$JPENV_BIN_DEFAULT_DIR")
     fi
 
+    # The position of the command name. With `j --default`, the flag takes
+    # the first position and only the default commands apply.
+    local command_position=1
+    local -a extra_words=()
+    if [ "$1" = "j" ]; then
+        if [ "${COMP_WORDS[1]:-}" = "--default" ]; then
+            command_position=2
+            command_dirs=("$JPENV_BIN_DEFAULT_DIR")
+        else
+            extra_words=("--default")
+        fi
+    fi
+
     local -a commands=()
-    if [ "${COMP_CWORD}" -eq 1 ]; then
+    if [ "${COMP_CWORD}" -eq "$command_position" ]; then
         mapfile -t commands < <(
             for command_dir in "${command_dirs[@]}"; do
                 [ -d "$command_dir" ] || continue
@@ -791,6 +822,7 @@ _j_completion() {
                     \;
             done | sort -u
         )
+        commands+=("${extra_words[@]}")
     fi
 
     if [ "${#commands[@]}" -gt 0 ]; then
