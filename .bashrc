@@ -558,6 +558,17 @@ pending_devel() {
 
         cd "$devel_dir/$repo_path"
 
+        # Skip linked worktrees. There, the git directory differs from the
+        # common directory of the main repository. The main repository holds
+        # the same state, so the worktree adds nothing to the report.
+        local -a git_dirs
+        mapfile -t git_dirs < <(
+            git rev-parse --path-format=absolute --git-dir --git-common-dir 2> /dev/null
+        )
+        if [ "${#git_dirs[@]}" -eq 2 ] && [ "${git_dirs[0]}" != "${git_dirs[1]}" ]; then
+            continue
+        fi
+
         local main_branch
         main_branch=$(git main-branch)
 
