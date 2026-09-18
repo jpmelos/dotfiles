@@ -735,6 +735,10 @@ j() {
     "$command_path" "$@"
 }
 
+# Run a default `jpenv-bin` command, even when the project has one with the
+# same name.
+alias jd='j --default'
+
 je() {
     local local_bin_dir="./jpenv-bin"
     if [ ! -d "$local_bin_dir" ]; then
@@ -800,10 +804,13 @@ _j_completion() {
     fi
 
     # The position of the command name. With `j --default`, the flag takes
-    # the first position and only the default commands apply.
+    # the first position and only the default commands apply. `jd` stands for
+    # `j --default`, so only the default commands apply there too.
     local command_position=1
     local -a extra_words=()
-    if [ "$1" = "j" ]; then
+    if [ "$1" = "jd" ]; then
+        command_dirs=("$JPENV_BIN_DEFAULT_DIR")
+    elif [ "$1" = "j" ]; then
         if [ "${COMP_WORDS[1]:-}" = "--default" ]; then
             command_position=2
             command_dirs=("$JPENV_BIN_DEFAULT_DIR")
@@ -835,6 +842,7 @@ _j_completion() {
 }
 
 complete -F _j_completion j
+complete -F _j_completion jd
 complete -F _j_completion je
 
 loop() {
