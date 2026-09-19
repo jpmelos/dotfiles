@@ -15,10 +15,10 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 #/                       When the branch does not exist, create it from the
 #/                       main branch. When the worktree already exists, only
 #/                       move into it.
-#/   rm [<branch>]       Remove the worktree and its branch (the current
-#/                       worktree when no argument is given), even when it
-#/                       has uncommitted changes, then move into the main
-#/                       repository.
+#/   rm [<branch>]       Remove the worktree (the current worktree when no
+#/                       argument is given), even when it has uncommitted
+#/                       changes, then move into the main repository. The
+#/                       branch is kept.
 #/   ls                  List all existing worktrees.
 
 # The directory that the caller ran `j` from. Resolve it before any subcommand
@@ -148,9 +148,6 @@ case "$subcommand" in
 
         echo "Removing worktree: $worktree_path"
         git worktree remove --force "$worktree_path"
-        if [ -n "$branch_name" ]; then
-            git branch -D "$branch_name"
-        fi
 
         echo "/j-execute"
         if [[ "$caller_dir" == "$worktree_real_path" || "$caller_dir" == "$worktree_real_path"/* ]]; then
