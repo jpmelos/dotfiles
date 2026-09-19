@@ -25,7 +25,11 @@ RUN apt-get update && \
         # JSON processing for status line.
         jq \
         # Arithmetic for status line.
-        bc && \
+        bc \
+        # Full terminfo database.
+        ncurses-term \
+        # Git pager, called by `references/scripts/git-pager.sh`.
+        git-delta && \
     rm -rf /var/lib/apt/lists/*
 
 # Debian points `/bin/sh` at dash, which lacks bash features such as
