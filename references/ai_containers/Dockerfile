@@ -28,6 +28,13 @@ RUN apt-get update && \
         bc && \
     rm -rf /var/lib/apt/lists/*
 
+# Debian points `/bin/sh` at dash, which lacks bash features such as
+# `trap ... ERR`. Divert dash's `/usr/bin/sh` with a local diversion, so that
+# dpkg keeps its hands off the path on upgrades, and point it at bash instead.
+RUN dpkg-divert --local --no-rename --divert /usr/bin/sh.distrib \
+        --add /usr/bin/sh && \
+    ln -sfT bash /usr/bin/sh
+
 # Install Node.js from Nodesource.
 RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash && \
     apt-get install -y nodejs && \
