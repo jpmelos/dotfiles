@@ -36,7 +36,7 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 # The sound plays on this machine, the host. The scripts that request it can
 # run inside a Docker container, and a container has no audio device.
 #
-# `.tmux.conf` runs this script from the status line, so it prints nothing to
+# `tmux.conf` runs this script from the status line, so it prints nothing to
 # standard output. Anything printed there ends up in the status line.
 #
 # Usage: pane-state-sync
