@@ -9,7 +9,8 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 if [ -n "${AGENT_PROFILE:-}" ]; then
     exec sh -c "${PAGER:-less}"
 fi
-if [ "$(tput cols)" -gt 160 ]; then
+# 174 = 80 columns for each version, 6 for each gutter, 2 for spacing
+if [ "$(tput cols)" -gt 174 ]; then
     exec delta --side-by-side
 fi
 exec delta
