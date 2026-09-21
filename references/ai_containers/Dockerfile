@@ -30,6 +30,8 @@ RUN apt-get update && \
         bc \
         # Full terminfo database.
         ncurses-term \
+        # For `ai_git_commit`.
+        pre-commit \
         && \
     rm -rf /var/lib/apt/lists/*
 
