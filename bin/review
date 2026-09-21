@@ -15,9 +15,11 @@ shift
 if [[ "${mode}" == "files" ]]; then
     checklist_subject="Files are"
     test_coverage_note=" (Tests may be in other files.)"
+    review_subject="work on these files"
 else
     checklist_subject="Change is"
     test_coverage_note=""
+    review_subject="change"
 fi
 
 if [[ "${mode}" != "files" ]]; then
@@ -79,6 +81,17 @@ review. Think very hard.
 END
 fi
 
+cat << END
+
+If you know that the ${review_subject} corresponds to an issue in a tracker
+(GitHub, Linear, etc), read the issue. Also read the project, the milestones,
+the parent and related issues, linked documents, and any other artifacts
+attached to it. Use them to understand the larger context in which the
+${review_subject} happens, and review against that context. Look for the
+tracker reference in the branch name, the commit messages, the PR title and
+description, and the additional instructions.
+END
+
 if [[ "${mode}" != "files" ]]; then
     cat << END
 
@@ -121,6 +134,12 @@ C1..Cn, W1..Wn, S1..Sn:
 - Suggestions (consider improving).
 
 Include specific examples of how to fix issues.
+
+If a problem you find is already scheduled to be fixed by future work in the
+tracker (a follow-up issue, a later milestone, a later step in the project),
+still report it, but tag it as such. Add "[Scheduled: <reference>]" after the
+item number, where <reference> identifies the issue or milestone that covers
+the fix.
 
 Do not run compilers, linters, or tests.
 END
