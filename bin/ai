@@ -12,8 +12,9 @@
 # / Options:
 # /   --profile <name>  Profile to run as. Selects the `~/.claude-<name>`
 # /                     directory, with its own login, history, and
-# /                     credentials, and the `api_key`, `model`, and
-# /                     `mcp_servers` of that profile in `~/config.json`
+# /                     credentials, and the `api_key`, `model`,
+# /                     `effortLevel`, and `mcp_servers` of that profile in
+# /                     `~/config.json`
 # /                     (default: the organization directory of the project,
 # /                     such as `orgname` for `~/devel/orgname/project`, or
 # /                     the user name for a project directly under `~/devel`)
@@ -74,6 +75,7 @@
 # /         "username": {
 # /           "api_key": "sk-...",
 # /           "model": "opus",
+# /           "effortLevel": "xhigh",
 # /           "mcp_servers": {
 # /             "server-name": {"command": "...", "args": ["..."]}
 # /           }
@@ -96,7 +98,10 @@
 # /   Without `api_key`, Claude Code falls back to OAuth credentials or asks
 # /   the user to log in. Without `model`, the profile uses the model from
 # /   `~/.claude-origin/settings.json`, which every run copies into the
-# /   profile. Without `mcp_servers`, the profile keeps the `mcpServers` key
+# /   profile. `effortLevel` works the same way: with it, the launcher sets
+# /   the global `effortLevel` of the profile `settings.json`. Without it, the
+# /   profile uses the `effortLevel` of the origin file, if any. Without
+# /   `mcp_servers`, the profile keeps the `mcpServers` key
 # /   that is already in its `.claude.json`.
 # /
 # /   The `mcp_servers` object of a profile replaces the `mcpServers` key in
@@ -1845,30 +1850,41 @@ def sync_derived_file(origin_path, profile_path, read, write, transform):
 
 
 def apply_settings(config, profile, origin_dir, profile_dir):
-    # The profile `settings.json` is the origin file with the `model` of the
-    # profile applied. Returns whether the origin file exists.
+    # The profile `settings.json` is the origin file with the `model` and the
+    # `effortLevel` of the profile applied. Returns whether the origin file
+    # exists.
     origin_settings = f"{origin_dir}/settings.json"
     profile_settings = f"{profile_dir}/settings.json"
 
-    preferred_model = resolve_preferred_model(config, profile)
+    overrides = {}
+    for key in ("model", "effortLevel"):
+        value = resolve_profile_text_setting(config, profile, key)
+        if value is not None:
+            overrides[key] = value
 
-    def set_model(settings):
-        if preferred_model is None:
+    def set_overrides(settings):
+        if not overrides:
             return settings
         if not isinstance(settings, dict):
-            log(f"Warning: {origin_settings} is not a JSON object, model not set")
+            names = ", ".join(f"`{key}`" for key in overrides)
+            log(f"Warning: {origin_settings} is not a JSON object, {names} not set")
             return settings
-        settings["model"] = preferred_model
+        settings.update(overrides)
         return settings
 
     origin_exists = sync_derived_file(
-        origin_settings, profile_settings, read_json_file, write_json_file, set_model
+        origin_settings,
+        profile_settings,
+        read_json_file,
+        write_json_file,
+        set_overrides,
     )
-    # The model goes into a copy of the origin file, so without the file there
-    # is nothing to put it in.
-    if not origin_exists and preferred_model is not None:
+    # The overrides go into a copy of the origin file, so without the file
+    # there is nothing to put them in.
+    if not origin_exists and overrides:
+        names = ", ".join(f"`{key}`" for key in overrides)
         log(
-            f"Warning: {origin_settings} does not exist, model of profile "
+            f"Warning: {origin_settings} does not exist, {names} of profile "
             f"'{profile}' not set"
         )
     return origin_exists
@@ -1890,18 +1906,21 @@ def remove_stale_profile_entry(path):
     return True
 
 
-def resolve_preferred_model(config, profile):
-    # Returns the `model` of the profile, or `None` when there is none. An
-    # empty string counts as none, like an empty `api_key`.
-    preferred_model = profile_setting(config, profile, "model")
-    if preferred_model is None:
+def resolve_profile_text_setting(config, profile, key):
+    # Returns the text value of `key` in the profile, or `None` when there is
+    # none. An empty string counts as none, like an empty `api_key`.
+    value = profile_setting(config, profile, key)
+    if value is None:
         return None
-    if not isinstance(preferred_model, str):
-        log(f"Warning: the `model` of profile '{profile}' is not text, model not set")
+    if not isinstance(value, str):
+        log(
+            f"Warning: the `{key}` of profile '{profile}' is not text, "
+            f"`{key}` not set"
+        )
         return None
-    if not preferred_model:
+    if not value:
         return None
-    return preferred_model
+    return value
 
 
 def apply_dependencies_list(origin_claude_md, profile_claude_md, dependency_names):

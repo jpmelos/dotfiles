@@ -228,7 +228,7 @@
     ]
   },
   "alwaysThinkingEnabled": true,
-  "effortLevel": "high",
+  "effortLevel": "xhigh",
   "theme": "light",
   "terminalProgressBarEnabled": false,
   "disableBypassPermissionsMode": true
