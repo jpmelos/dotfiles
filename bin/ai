@@ -41,9 +41,13 @@
 # /
 # / Harness arguments:
 # /   Arguments after `--` are passed directly to Claude Code. The launcher
-# /   puts `--setting-sources=user` and one `--add-dir` per visible project
-# /   before them. A `--setting-sources` that you pass wins. An `--add-dir`
-# /   that you pass adds to the list.
+# /   puts these arguments before them:
+# /   - `--setting-sources=user`.
+# /   - `--model` with the `model` of the profile, if any.
+# /   - `--effort` with the `effortLevel` of the profile, if any.
+# /   - One `--add-dir` per visible project.
+# /   A `--setting-sources`, `--model`, or `--effort` that you pass wins. An
+# /   `--add-dir` that you pass adds to the list.
 # /
 # / Projects:
 # /   A project is a directory that `list_project_dirs` reports. The current
@@ -96,13 +100,12 @@
 # /   without an entry, create the directory first.
 # /
 # /   Without `api_key`, Claude Code falls back to OAuth credentials or asks
-# /   the user to log in. Without `model`, the profile uses the model from
-# /   `~/.claude-origin/settings.json`, which every run copies into the
-# /   profile. `effortLevel` works the same way: with it, the launcher sets
-# /   the global `effortLevel` of the profile `settings.json`. Without it, the
-# /   profile uses the `effortLevel` of the origin file, if any. Without
-# /   `mcp_servers`, the profile keeps the `mcpServers` key
-# /   that is already in its `.claude.json`.
+# /   the user to log in. With `model`, the launcher passes it to Claude Code
+# /   with `--model`. Without it, the session uses the `model` of
+# /   `~/.claude-origin/settings.json`, if any. Every run copies that file
+# /   into the profile. `effortLevel` works the same way, with `--effort`.
+# /   Without `mcp_servers`, the profile keeps the `mcpServers` key that is
+# /   already in its `.claude.json`.
 # /
 # /   The `mcp_servers` object of a profile replaces the `mcpServers` key in
 # /   that profile's `.claude.json`.
@@ -381,6 +384,8 @@ def main():
             paths.user_config_path,
         )
     api_key = resolve_api_key(user_config, profile)
+    model = resolve_profile_text_setting(user_config, profile, "model")
+    effort = resolve_profile_text_setting(user_config, profile, "effortLevel")
 
     # Every directory of the user is private. The names of the profile
     # directories are the names of the organizations, the shared directory
@@ -433,7 +438,9 @@ def main():
         )
     )
 
-    harness_args = build_harness_args(options.harness_args, dependency_dirs)
+    harness_args = build_harness_args(
+        options.harness_args, dependency_dirs, model, effort
+    )
 
     run_config = RunConfig(
         paths=paths,
@@ -1059,6 +1066,23 @@ def resolve_api_key(config, profile):
     return api_key
 
 
+def resolve_profile_text_setting(config, profile, key):
+    # Returns the text value of `key` in the profile, or `None` when there is
+    # none. An empty string counts as none, like an empty `api_key`.
+    value = profile_setting(config, profile, key)
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        log(
+            f"Warning: the `{key}` of profile '{profile}' is not text, "
+            f"`{key}` not set"
+        )
+        return None
+    if not value:
+        return None
+    return value
+
+
 def profile_setting(config, profile, key, default=None):
     # Returns the value of `key` in the object of the profile. Returns
     # `default` when there is no configuration file, no object for the
@@ -1473,14 +1497,14 @@ def prepare_profile_dir(profile_prep):
 
         # The profile directory also holds history and credentials, so only
         # the directories that the origin has are mirrored. The top level is
-        # not. `settings.json` and `CLAUDE.md` are derived files, so the copy
-        # skips them. See `apply_settings` and `apply_dependencies_list`.
+        # not. `CLAUDE.md` is a derived file, so the copy skips it. See
+        # `apply_dependencies_list`.
         try:
             copied_names = copy_tree_contents(
                 profile_prep.origin_dir,
                 profile_dir,
                 mirror=False,
-                skip=("settings.json", "CLAUDE.md"),
+                skip=("CLAUDE.md",),
             )
         except OSError as error:
             die(f"cannot copy {profile_prep.origin_dir}: {error}")
@@ -1489,14 +1513,6 @@ def prepare_profile_dir(profile_prep):
         # manifest treats it like a copied entry, and one rule removes every
         # top-level entry that the origin dropped.
         installed_names = set(copied_names)
-
-        if apply_settings(
-            profile_prep.user_config,
-            profile_prep.profile,
-            profile_prep.origin_dir,
-            profile_dir,
-        ):
-            installed_names.add("settings.json")
 
         if apply_dependencies_list(
             f"{profile_prep.origin_dir}/CLAUDE.md",
@@ -1849,47 +1865,6 @@ def sync_derived_file(origin_path, profile_path, read, write, transform):
     return True
 
 
-def apply_settings(config, profile, origin_dir, profile_dir):
-    # The profile `settings.json` is the origin file with the `model` and the
-    # `effortLevel` of the profile applied. Returns whether the origin file
-    # exists.
-    origin_settings = f"{origin_dir}/settings.json"
-    profile_settings = f"{profile_dir}/settings.json"
-
-    overrides = {}
-    for key in ("model", "effortLevel"):
-        value = resolve_profile_text_setting(config, profile, key)
-        if value is not None:
-            overrides[key] = value
-
-    def set_overrides(settings):
-        if not overrides:
-            return settings
-        if not isinstance(settings, dict):
-            names = ", ".join(f"`{key}`" for key in overrides)
-            log(f"Warning: {origin_settings} is not a JSON object, {names} not set")
-            return settings
-        settings.update(overrides)
-        return settings
-
-    origin_exists = sync_derived_file(
-        origin_settings,
-        profile_settings,
-        read_json_file,
-        write_json_file,
-        set_overrides,
-    )
-    # The overrides go into a copy of the origin file, so without the file
-    # there is nothing to put them in.
-    if not origin_exists and overrides:
-        names = ", ".join(f"`{key}`" for key in overrides)
-        log(
-            f"Warning: {origin_settings} does not exist, {names} of profile "
-            f"'{profile}' not set"
-        )
-    return origin_exists
-
-
 def remove_stale_profile_entry(path):
     # Removes the profile copy of an origin entry that no longer exists. The
     # top level of the profile directory is not mirrored, so the entries there
@@ -1904,23 +1879,6 @@ def remove_stale_profile_entry(path):
         return False
     log(f"Removed {path}, the origin does not have it")
     return True
-
-
-def resolve_profile_text_setting(config, profile, key):
-    # Returns the text value of `key` in the profile, or `None` when there is
-    # none. An empty string counts as none, like an empty `api_key`.
-    value = profile_setting(config, profile, key)
-    if value is None:
-        return None
-    if not isinstance(value, str):
-        log(
-            f"Warning: the `{key}` of profile '{profile}' is not text, "
-            f"`{key}` not set"
-        )
-        return None
-    if not value:
-        return None
-    return value
 
 
 def apply_dependencies_list(origin_claude_md, profile_claude_md, dependency_names):
@@ -2120,7 +2078,7 @@ def apply_mcp_servers(profile_json, mcp_servers):
 # --------------------------------------------------------------------------------------
 
 
-def build_harness_args(user_harness_args, dependency_dirs):
+def build_harness_args(user_harness_args, dependency_dirs, model, effort):
     # Read settings from the profile only. The `project` and `local` sources
     # are files under `.claude` in the repository, and a cloned repository can
     # commit either one with hooks in it. The profile is the one place that
@@ -2134,6 +2092,14 @@ def build_harness_args(user_harness_args, dependency_dirs):
     # positional prompt from the user would then become a directory. The `=`
     # form does not start that collection.
     harness_args = ["--setting-sources=user"]
+
+    # The `model` and the `effortLevel` of the profile, if any. A `--model` or
+    # an `--effort` in the harness arguments comes later and wins, like a
+    # `--setting-sources`.
+    if model is not None:
+        harness_args.append(f"--model={model}")
+    if effort is not None:
+        harness_args.append(f"--effort={effort}")
 
     # Add the dependency directories to Claude's context. The current project
     # is already the working directory, and the caller leaves it out. The
@@ -2990,12 +2956,6 @@ def write_text_atomically(path, content, mode_source=None):
     except BaseException:
         remove_file(temp_path)
         raise
-
-
-def read_json_file(path, *, follow_links=True):
-    # Without `follow_links`, a link at `path` fails the read. See
-    # `open_regular_file`.
-    return json.loads(read_text(path, follow_links=follow_links))
 
 
 def write_json_file(path, data, mode_source=None):
