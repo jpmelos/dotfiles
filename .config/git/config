@@ -121,6 +121,7 @@
     bn = checkout -b  # n = new
     bd = branch -D  # d = delete
     bdd = "! f() { git branch | grep -v '^*' | xargs git branch -D; }; f"
+    bs = branch --show-current
 
     # c = commit
     c = commit
