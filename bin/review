@@ -83,12 +83,12 @@ fi
 
 cat << END
 
-If you know that the ${review_subject} corresponds to an issue in a tracker
-(GitHub, Linear, etc), read the issue. Also read the project, the milestones,
-the parent and related issues, linked documents, and any other artifacts
-attached to it. Use them to understand the larger context in which the
-${review_subject} happens, and review against that context. Look for the
-tracker reference in the branch name, the commit messages, the PR title and
+If you know that the ${review_subject} corresponds to an issue or a PR in a
+tracker (GitHub, Linear, etc), read the issue or PR. Also read the project, the
+milestones, the parent and related issues and PRs, linked documents, and any
+other artifacts attached to it. Use them to understand the larger context in
+which the ${review_subject} happens, and review against that context. Look for
+the tracker reference in the branch name, the commit messages, the PR title and
 description, and the additional instructions.
 END
 
