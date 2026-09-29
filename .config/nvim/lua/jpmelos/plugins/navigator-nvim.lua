@@ -8,6 +8,12 @@ local function create_tmux_wezterm_mux()
     local socket = tmux_env:match("^(.-),")
 
     local tmux_direction = { h = "L", j = "D", k = "U", l = "R", p = "l" }
+    local tmux_at_edge_format = {
+        h = "#{pane_at_left}",
+        j = "#{pane_at_bottom}",
+        k = "#{pane_at_top}",
+        l = "#{pane_at_right}",
+    }
     local wezterm_direction = {
         h = "Left",
         j = "Down",
@@ -22,6 +28,27 @@ local function create_tmux_wezterm_mux()
             :gsub("%s+$", "")
     end
 
+    -- Expand a tmux format for the tmux pane of this Nvim instance.
+    local function tmux_pane_format(format)
+        return tmux_exec(
+            string.format(
+                "display-message -p -t '%s' '%s'",
+                tmux_pane,
+                format
+            )
+        )
+    end
+
+    local function tmux_select_pane(direction)
+        tmux_exec(
+            string.format(
+                "select-pane -t '%s' -%s",
+                tmux_pane,
+                tmux_direction[direction]
+            )
+        )
+    end
+
     local mux = {}
     mux.__index = mux
 
@@ -30,26 +57,43 @@ local function create_tmux_wezterm_mux()
     end
 
     function mux:navigate(direction)
-        local old_pane = tmux_exec("display-message -p '#{pane_id}'")
+        local at_edge
+        if direction == "p" then
+            -- `select-pane -l` does nothing when the window has no last pane.
+            -- The pane of this Nvim instance then stays active.
+            tmux_select_pane(direction)
+            at_edge = tmux_pane_format("#{pane_active}") == "1"
+        else
+            -- `select-pane` wraps around at the edge of the window. Check
+            -- the edge before the move to prevent the wrap.
+            at_edge = tmux_pane_format(tmux_at_edge_format[direction]) == "1"
+            if not at_edge then
+                tmux_select_pane(direction)
+            end
+        end
 
-        tmux_exec(
-            string.format(
-                "select-pane -t '%s' -%s",
-                tmux_pane,
-                tmux_direction[direction]
-            )
-        )
-
-        local new_pane = tmux_exec("display-message -p '#{pane_id}'")
-
-        if old_pane == new_pane then
+        if at_edge then
             -- At the tmux edge. Fall through to WezTerm.
-            vim.fn.system(
-                string.format(
-                    "wezterm cli activate-pane-direction %s",
-                    wezterm_direction[direction]
-                )
-            )
+            --
+            -- Inside tmux, `WEZTERM_PANE` and `WEZTERM_UNIX_SOCKET` keep the
+            -- values from the shell that started the tmux server. These
+            -- values can point to a closed pane, a pane in another tab, or an
+            -- old WezTerm process. Without them, `wezterm cli` finds the
+            -- running WezTerm process and uses its focused pane. With
+            -- `--no-auto-start`, `wezterm cli` does not start a mux server if
+            -- no WezTerm process runs.
+            vim.fn.system({
+                "env",
+                "-u",
+                "WEZTERM_PANE",
+                "-u",
+                "WEZTERM_UNIX_SOCKET",
+                "wezterm",
+                "cli",
+                "--no-auto-start",
+                "activate-pane-direction",
+                wezterm_direction[direction],
+            })
         end
     end
 
