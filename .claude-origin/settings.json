@@ -130,7 +130,11 @@
       "mcp__linear-server__list_releases",
       "mcp__linear-server__list_teams",
       "mcp__linear-server__list_users",
-      "mcp__linear-server__search_documentation"
+      "mcp__linear-server__search_documentation",
+      "mcp__grafana__query_loki_logs",
+      "mcp__grafana__query_loki_stats",
+      "mcp__grafana__list_loki_label_values",
+      "mcp__grafana__list_datasources"
     ],
     "deny": [
       "Edit(~/.claude/settings.json)",
