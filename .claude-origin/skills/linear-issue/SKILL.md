@@ -3,7 +3,7 @@ name: linear-issue
 description: Create a Linear issue with a concise title, an implementation-ready description, blocking relations, and a milestone.
 argument-hint: what the issue is about [-- team, project, or other hints]
 disable-model-invocation: true
-allowed-tools: mcp__linear-server__save_issue
+allowed-tools: mcp__linear__save_issue
 ---
 
 Create a Linear issue for this request:
