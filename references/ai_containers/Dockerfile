@@ -32,6 +32,8 @@ RUN apt-get update && \
         ncurses-term \
         # For `ai_git_commit`.
         pre-commit \
+        # For the `jpenv-container.sh` script of the project.
+        sudo \
         && \
     rm -rf /var/lib/apt/lists/*
 
@@ -101,5 +103,26 @@ RUN test -n "${BUILD_DATE}" && echo "Build date: ${BUILD_DATE}"
 ARG CLAUDE_CODE_CHANNEL="latest"
 RUN test -n "${CLAUDE_CODE_CHANNEL}" && \
     curl -fsSL https://claude.ai/install.sh | bash -s "${CLAUDE_CODE_CHANNEL}"
+
+# Let the user run `sudo` without a password, so that the script below runs
+# without interaction.
+USER root:root
+RUN printf '#%s ALL=(ALL:ALL) NOPASSWD: ALL\n' "${UID}" \
+        > /etc/sudoers.d/jpenv-container && \
+    chmod 0440 /etc/sudoers.d/jpenv-container
+USER "${UID}:${GID}"
+
+# Run the `jpenv-container.sh` script of the project, as the container user.
+# The build context holds the script, or an empty file when the project has
+# none. See `bin/ai`. The bind mount keeps the script out of the layers of the
+# image.
+RUN --mount=type=bind,source=jpenv-container.sh,target=/tmp/jpenv-container.sh \
+    if [ -s /tmp/jpenv-container.sh ]; then /tmp/jpenv-container.sh; fi
+
+# Take `sudo` away from the user again, so that only the script above can use
+# it.
+USER root:root
+RUN rm /etc/sudoers.d/jpenv-container
+USER "${UID}:${GID}"
 
 ENTRYPOINT ["claude"]

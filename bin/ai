@@ -64,6 +64,23 @@
 # /   does not resolve inside it. The launcher refuses to start when it finds
 # /   one.
 # /
+# / Project script:
+# /   When the project root holds a `jpenv-container.sh` file, the image build
+# /   runs it at the end. The script runs as the container user, in the home
+# /   directory of the image. The project is not visible to it. The script can
+# /   run `sudo` without a password. The build removes that permission after
+# /   the script, so the image does not allow `sudo`.
+# /
+# /   A project with a script gets its own image, named after the project. A
+# /   change to the script rebuilds that image, and the daily rebuild of the
+# /   channel applies to it as well.
+# /
+# /   The file can be a link, such as one into another repository under
+# /   `~/devel`. The target must be a regular file under `~/devel` that you
+# /   own. The image holds the content of the target, and the container must
+# /   not see a file of the host that no mount exposes. The launcher refuses
+# /   to start when the file breaks one of these rules.
+# /
 # / Configuration:
 # /   Reads an optional configuration file at `~/config.json` with API keys
 # /   and other configuration. The file must be a regular file, not a link,
@@ -189,6 +206,13 @@
 # /   `.list_project_dirs_ignore` file to keep it out of the `--add-dir` list.
 # /   The mount still exposes an ignored repository.
 # /
+# /   The image build runs the `jpenv-container.sh` file of the project. A
+# /   cloned repository can commit one, and the agent can write one into any
+# /   project under `~/devel`. The script cannot reach the host, but it
+# /   controls the image that the agent of that project runs in.
+# /   `--no-docker-socket` does not change that. Read the file before you
+# /   launch on a repository that you do not trust.
+# /
 # /   The host directory `/tmp/ai-<user>/<profile>` is mounted at the same path
 # /   in every container of the profile, so these containers share it. It holds
 # /   the cache directories of the tools in the image, which the
@@ -253,7 +277,11 @@ FLAG_OPTIONS = {
 }
 DEFAULT_CLAUDE_CODE_CHANNEL = "latest"
 DOCKERFILE_DIGEST_LABEL = "dockerfile_sha256"
+CONTAINER_SCRIPT_DIGEST_LABEL = "container_script_sha256"
 BUILD_DATE_LABEL = "build_date"
+# Name of the file in the project root that the image build runs. The
+# Dockerfile reads it from the build context under the same name.
+CONTAINER_SCRIPT_NAME = "jpenv-container.sh"
 # Prefix of the host directory, right below `/tmp`, where the `pane-state` and
 # `chime` scripts write and `pane-state-sync` reads. The user name follows the
 # prefix. See the `tmux` section of the help for why the directory is there.
@@ -326,9 +354,11 @@ APPROVED_KEY_TAIL_LENGTH = 20
 # How many times a launch reads, edits, and writes `.claude.json` before it
 # gives up on a file that another session keeps changing.
 PROFILE_JSON_WRITE_ATTEMPTS = 3
-# A Docker repository name holds at most 255 characters, and the image name
-# has a fixed suffix, so the user name part is cut to this length.
+# A Docker repository name holds at most 255 characters. The image name has
+# fixed parts, so the user name part and the project name part are cut to
+# these lengths.
 IMAGE_NAME_USER_LENGTH = 64
+IMAGE_NAME_PROJECT_LENGTH = 128
 # The container name has a fixed prefix and a process ID suffix, so the
 # project name part is cut to this length.
 CONTAINER_NAME_PROJECT_LENGTH = 44
@@ -374,6 +404,8 @@ def main():
     log(f"Profile: {profile}")
     log(f"Project: {project_name}")
 
+    container_script = read_container_script(project_root, paths)
+
     user_config = load_user_config(paths.user_config_path)
     if user_config is None or not has_profile_entry(user_config, profile):
         check_profile_without_entry(
@@ -405,18 +437,26 @@ def main():
     )
 
     channel = options.channel
-    # The lock is per user and channel, like the image, so two profiles that
-    # launch on a new day at the same time take turns, and the second one
-    # finds the image that the first one built. Two channels build in
-    # parallel, because they build different images. The file sits in the
-    # directory of the user under `/tmp`, so no other local user can create
-    # it first. See `prepare_tmp_dirs` for the checks on that directory.
+    # The lock is per user and channel, so two launches that build an image
+    # of one channel take turns. Two profiles that launch on a new day at the
+    # same time need the same image, and the second one finds the image that
+    # the first one built. Two projects with a script need two images, and
+    # the second build takes the layers that both share from the cache. Two
+    # channels build in parallel, because each one installs another release.
+    # The file sits in the directory of the user under `/tmp`, so no other
+    # local user can create it first. See `prepare_tmp_dirs` for the checks
+    # on that directory.
     image_spec = ImageSpec(
-        name=build_image_name(username, channel),
+        name=build_image_name(
+            username,
+            channel,
+            project_name if container_script is not None else None,
+        ),
         channel=channel,
         dockerfile_path=paths.dockerfile_path,
         home=paths.home,
         lock_path=f"{profile_paths.user_tmp_dir}/claude-code-img-lock-{channel}",
+        container_script=container_script,
     )
     ensure_image(options, image_spec)
 
@@ -508,7 +548,7 @@ def show_help():
     for line in read_text(__file__).splitlines():
         if line == "# /":
             # A bare `# /` marks a blank line in the help text.
-            print("")
+            print()
             continue
 
         if line.startswith("# / "):
@@ -1073,10 +1113,7 @@ def resolve_profile_text_setting(config, profile, key):
     if value is None:
         return None
     if not isinstance(value, str):
-        log(
-            f"Warning: the `{key}` of profile '{profile}' is not text, "
-            f"`{key}` not set"
-        )
+        log(f"Warning: the `{key}` of profile '{profile}' is not text, `{key}` not set")
         return None
     if not value:
         return None
@@ -1166,19 +1203,82 @@ def prepare_tmp_dirs(tmp_dirs):
 # --------------------------------------------------------------------------------------
 
 
-def build_image_name(username, channel):
-    # A Docker repository name allows one separator between two runs of
-    # letters and digits, so collapse every run of separators into one.
-    sanitized = re.sub(r"[^a-z0-9._-]", "", username.lower())
-    # Truncate before the strip, so the result never ends in a separator.
-    sanitized = re.sub(r"[._-]{2,}", "-", sanitized)[:IMAGE_NAME_USER_LENGTH]
-    sanitized = sanitized.strip("._-")
-    if not sanitized:
+def build_image_name(username, channel, project_name):
+    # `project_name` is `None` for the image that every project without a
+    # `jpenv-container.sh` file shares. A project with one gets an image of its
+    # own, because the image holds what the script did.
+    user_part = sanitize_repository_part(username, IMAGE_NAME_USER_LENGTH)
+    if not user_part:
         die(f"cannot build an image name from user name '{username}'")
     # Two user names can come out of the sanitization as the same string, and
     # the image bakes in the user ID and the home directory of one user, so the
     # user ID is part of the name. Two users then never share an image.
-    return f"{sanitized}-{os.getuid()}-claude:{channel}"
+    repository = f"{user_part}-{os.getuid()}-claude"
+
+    if project_name is not None:
+        # Two project names can come out of the sanitization as the same
+        # string, such as `org/app` and `org-app`. They then share the image
+        # name, and `get_rebuild_reason` tells their scripts apart.
+        project_part = sanitize_repository_part(
+            project_name.replace("/", "-"), IMAGE_NAME_PROJECT_LENGTH
+        )
+        if not project_part:
+            die(f"cannot build an image name from project name '{project_name}'")
+        repository = f"{repository}-{project_part}"
+
+    return f"{repository}:{channel}"
+
+
+def sanitize_repository_part(text, max_length):
+    # Returns `text` as a part of a Docker repository name, at most
+    # `max_length` characters long. The result is empty when `text` holds no
+    # letter or digit. A Docker repository name allows one separator between
+    # two runs of letters and digits, so collapse every run of separators into
+    # one.
+    sanitized = re.sub(r"[^a-z0-9._-]", "", text.lower())
+    # Truncate before the strip, so the result never ends in a separator.
+    sanitized = re.sub(r"[._-]{2,}", "-", sanitized)[:max_length]
+    return sanitized.strip("._-")
+
+
+@dataclass
+class ContainerScript:
+    content: bytes
+    digest: str
+
+
+def read_container_script(project_root, paths):
+    # Returns the `jpenv-container.sh` file of the project, or `None` when the
+    # project has none.
+    script_path = os.path.join(project_root, CONTAINER_SCRIPT_NAME)
+    if not os.path.lexists(script_path):
+        return None
+
+    # The file can be a link into another repository. The image holds the
+    # content of the target, and the agent can read the image, so a target
+    # outside of `~/devel` would show the agent a file of the host that no
+    # mount exposes. The check limits mistakes. It is not a security boundary,
+    # see the `Security` section of the help.
+    resolved_path = os.path.realpath(script_path)
+    if not is_below(resolved_path, paths.resolved_devel_dir):
+        die(
+            f"{script_path} resolves to {resolved_path}, which is outside "
+            f"{paths.devel_dir}. The image would hold a file that the container "
+            "does not see otherwise"
+        )
+    # See `open_owned_regular_file` for the checks on the target.
+    try:
+        descriptor, _ = open_owned_regular_file(resolved_path, os.O_RDONLY)
+    except FileNotFoundError:
+        die(f"{script_path} is a link to {resolved_path}, which does not exist")
+    try:
+        with os.fdopen(descriptor, "rb") as handle:
+            content = handle.read()
+    except OSError as error:
+        die(f"cannot read {script_path}: {error}")
+
+    log(f"Project script: {script_path}")
+    return ContainerScript(content=content, digest=hashlib.sha256(content).hexdigest())
 
 
 @dataclass
@@ -1193,6 +1293,9 @@ class ImageSpec:
     home: str
     # The file that the launches which build this image lock.
     lock_path: str
+    # The `jpenv-container.sh` file of the project, or `None` when the project
+    # has none.
+    container_script: ContainerScript | None
 
 
 def ensure_image(options, image_spec):
@@ -1223,7 +1326,12 @@ def ensure_image_locked(options, image_spec):
         # No build runs, so the Dockerfile is not read, and a change to it is
         # not among the reasons that this branch reports.
         rebuild_reason = get_rebuild_reason(
-            options, image_info, None, today, image_spec.channel
+            options,
+            image_info,
+            None,
+            image_spec.container_script,
+            today,
+            image_spec.channel,
         )
         if rebuild_reason:
             log(f"--no-rebuild specified, skipping rebuild despite: {rebuild_reason}")
@@ -1233,7 +1341,12 @@ def ensure_image_locked(options, image_spec):
 
     dockerfile = read_dockerfile(image_spec.dockerfile_path)
     rebuild_reason = get_rebuild_reason(
-        options, image_info, dockerfile, today, image_spec.channel
+        options,
+        image_info,
+        dockerfile,
+        image_spec.container_script,
+        today,
+        image_spec.channel,
     )
 
     if rebuild_reason is None:
@@ -1266,7 +1379,9 @@ def ensure_image_locked(options, image_spec):
     log(f"Using existing image (--allow-stale): {failure}")
 
 
-def get_rebuild_reason(options, image_info, dockerfile, today, channel):
+def get_rebuild_reason(
+    options, image_info, dockerfile, container_script, today, channel
+):
     if options.force_rebuild:
         return "--force-rebuild specified"
     if image_info is None:
@@ -1279,6 +1394,11 @@ def get_rebuild_reason(options, image_info, dockerfile, today, channel):
         return f"image is from {image_info.build_date}, today is {today:%Y-%m-%d}"
     if dockerfile is not None and image_info.dockerfile_digest != dockerfile.digest:
         return "Dockerfile changed since last build"
+    # An image that no script went into has no digest label, and the field
+    # is then empty, like the expected digest of a project without a script.
+    script_digest = "" if container_script is None else container_script.digest
+    if image_info.container_script_digest != script_digest:
+        return f"{CONTAINER_SCRIPT_NAME} changed since last build"
     return None
 
 
@@ -1309,12 +1429,14 @@ def read_dockerfile(dockerfile_path):
 
 @dataclass
 class ImageInfo:
-    # Both fields come from labels that `build_image` stamps, and both are
-    # empty for an image that no build of this script labeled, such as one
+    # Every field comes from a label that `build_image` stamps, and every one
+    # is empty for an image that no build of this script labeled, such as one
     # that came in through `docker load`. The build date is a `YYYY-MM-DD`
-    # string, so that it compares with the date of today without a zone.
+    # string, so that it compares with the date of today without a zone. The
+    # digest of the script is empty for an image without a script, too.
     build_date: str
     dockerfile_digest: str
+    container_script_digest: str
 
 
 def get_image_info(docker_image_name):
@@ -1337,15 +1459,21 @@ def get_image_info(docker_image_name):
             docker_image_name,
             "--format",
             f'{{{{index .Config.Labels "{BUILD_DATE_LABEL}"}}}}\t'
-            f'{{{{index .Config.Labels "{DOCKERFILE_DIGEST_LABEL}"}}}}',
+            f'{{{{index .Config.Labels "{DOCKERFILE_DIGEST_LABEL}"}}}}\t'
+            f'{{{{index .Config.Labels "{CONTAINER_SCRIPT_DIGEST_LABEL}"}}}}',
         ],
         "docker image inspect failed",
     )
 
     # The template prints an empty string for a label that the image does not
-    # have, so both fields come out empty in that case.
-    build_date, _, dockerfile_digest = output.rstrip("\n").partition("\t")
-    return ImageInfo(build_date=build_date, dockerfile_digest=dockerfile_digest)
+    # have, so a field comes out empty in that case.
+    build_date, _, digests = output.rstrip("\n").partition("\t")
+    dockerfile_digest, _, container_script_digest = digests.partition("\t")
+    return ImageInfo(
+        build_date=build_date,
+        dockerfile_digest=dockerfile_digest,
+        container_script_digest=container_script_digest,
+    )
 
 
 def image_exists(docker_image_name):
@@ -1379,6 +1507,14 @@ def build_image(image_spec, dockerfile, today, *, use_cache):
     log(f"Installing Claude Code from channel '{image_spec.channel}'...")
     build_args += ["--build-arg", f"CLAUDE_CODE_CHANNEL={image_spec.channel}"]
 
+    container_script = image_spec.container_script
+    if container_script is not None:
+        log(f"Running {CONTAINER_SCRIPT_NAME} of the project...")
+        build_args += [
+            "--label",
+            f"{CONTAINER_SCRIPT_DIGEST_LABEL}={container_script.digest}",
+        ]
+
     # A cache-less build must not keep a stale base image either, so it pulls
     # the base image again as well.
     if not use_cache:
@@ -1390,13 +1526,47 @@ def build_image(image_spec, dockerfile, today, *, use_cache):
 
     build_args += ["--tag", image_spec.name]
 
-    # Pipe the Dockerfile via stdin (`-`) so no build context is sent.
-    result = run_docker(
-        ["build", *build_args, "-"],
-        input=dockerfile.content,
-        stdout=sys.stderr,
-    )
+    # The Dockerfile comes through stdin (`--file -`). The build context is a
+    # private directory that holds the script and nothing else, so no other
+    # file of the host reaches the build. The Dockerfile expects the script
+    # there, so the file is empty when the project has none.
+    try:
+        context_dir = tempfile.mkdtemp(prefix="ai-build-context-")
+    except OSError as error:
+        log(f"Warning: cannot create the build context: {error}")
+        return False
+    try:
+        try:
+            write_context_script(context_dir, container_script)
+        except OSError as error:
+            log(f"Warning: cannot write the build context: {error}")
+            return False
+        result = run_docker(
+            ["build", *build_args, "--file", "-", context_dir],
+            input=dockerfile.content,
+            stdout=sys.stderr,
+        )
+    finally:
+        shutil.rmtree(context_dir, ignore_errors=True)
     return result.returncode == 0
+
+
+def write_context_script(context_dir, container_script):
+    # Writes the script into the build context in `context_dir`. The file is
+    # empty when `container_script` is `None`.
+    content = b"" if container_script is None else container_script.content
+    descriptor = os.open(
+        os.path.join(context_dir, CONTAINER_SCRIPT_NAME),
+        os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+        0o700,
+    )
+    with os.fdopen(descriptor, "wb") as handle:
+        handle.write(content)
+        # The build gives every file of the context to `root`, and the image
+        # user runs the script, so every user must be able to read and run it.
+        # The umask trims the mode of the open, so the mode goes to the
+        # descriptor. The directory stays private on the host.
+        os.fchmod(handle.fileno(), 0o755)
 
 
 # --------------------------------------------------------------------------------------
@@ -2876,9 +3046,7 @@ def open_without_following(path, *, dir_fd=None):
     # that names the link. Every failure is an `OSError`, like any other
     # failure of a read.
     try:
-        return os.open(
-            path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dir_fd
-        )
+        return os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dir_fd)
     except OSError as error:
         if error.errno == errno.ELOOP:
             raise OSError(
