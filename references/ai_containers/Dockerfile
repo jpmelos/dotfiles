@@ -82,6 +82,10 @@ ENV PATH="${HOME}/.local/bin:${PATH}"
 RUN mkdir -p "${HOME}/.local/bin" && chown -R "${UID}:${GID}" "${HOME}" && \
     (getent group "${GID}" || groupadd -g "${GID}" usergroup) && \
     (getent passwd "${UID}" || useradd -u "${UID}" -g "${GID}" -d "${HOME}" user)
+
+# Mark all Git projects inside `devel` as safe.
+RUN git config --system --add safe.directory "${HOME}/devel/*"
+
 USER "${UID}:${GID}"
 WORKDIR "${HOME}"
 
