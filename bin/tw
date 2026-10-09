@@ -29,39 +29,28 @@ if [ $# -gt 0 ]; then
     HAS_COMMAND=true
 fi
 
-# Fetch Telegram credentials from ~/config.json.
-config_file="$HOME/config.json"
-if [[ ! -f "$config_file" ]]; then
-    echo "Error: Config file not found at $config_file" >&2
-    exit 1
-fi
+# Print the value at `path` in the configuration as text. Return 1 when
+# `jc get` fails, or when the value is missing, empty, `null`, or `false`.
+config_text() {
+    local path="$1"
 
-# Verify the file is not readable by group or others.
-file_perms=$(stat -c %a "$config_file" 2> /dev/null \
-    || stat -f %Lp "$config_file" 2> /dev/null)
-if [[ "$file_perms" != "600" ]]; then
-    echo "Error: $config_file has permissions $file_perms, expected 600" >&2
-    exit 1
-fi
+    local json_value
+    json_value=$(jc get "$path") || return 1
 
-CONFIG=$(< "$config_file")
+    # `// empty` turns `null` and `false` into no output. `-r` prints a string
+    # without its quotes.
+    local value
+    value=$(jq -r '. // empty' <<< "$json_value") || return 1
+    if [[ -z "$value" ]]; then
+        echo "Error: $path not found in ~/config.json" >&2
+        return 1
+    fi
+    printf '%s\n' "$value"
+}
 
-if ! jq empty <<< "$CONFIG" 2> /dev/null; then
-    echo "Error: $config_file is not valid JSON" >&2
-    exit 1
-fi
-
-TELEGRAM_BOT_TOKEN=$(jq -r '.telegram_bot.bot_token // empty' <<< "$CONFIG")
-if [[ -z "$TELEGRAM_BOT_TOKEN" ]]; then
-    echo "Error: telegram_bot.bot_token not found in $config_file" >&2
-    exit 1
-fi
-
-TELEGRAM_CHAT_ID=$(jq -r '.telegram_bot.chat_id // empty' <<< "$CONFIG")
-if [[ -z "$TELEGRAM_CHAT_ID" ]]; then
-    echo "Error: telegram_bot.chat_id not found in $config_file" >&2
-    exit 1
-fi
+# Read the Telegram credentials from the configuration.
+TELEGRAM_BOT_TOKEN=$(config_text telegram_bot.bot_token) || exit 1
+TELEGRAM_CHAT_ID=$(config_text telegram_bot.chat_id) || exit 1
 
 # Capture metadata.
 HOSTNAME=$(hostname)
