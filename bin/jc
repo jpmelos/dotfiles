@@ -6,31 +6,62 @@
 
 # vim: ft=python
 
-# / Sync the "Local Configuration" note of 1Password with `~/config.json`.
+# / Manage `~/config.json`, the local configuration, and its copy in the
+# / "Local Configuration" note of 1Password.
 # /
-# / Usage: jc <get|save>
+# / Usage: jc <fetch|save>
+# /        jc get <path>
 # / Subcommands:
-# /   get         Copy the note to `~/config.json`. When the file exists and
+# /   fetch       Copy the note to `~/config.json`. When the file exists and
 # /               is different, show the diff and ask before the overwrite.
 # /               The file always ends with mode `600`.
 # /   save        Copy `~/config.json` to the note. When the note is
 # /               different, show the diff and ask before the update. The
 # /               file must exist.
+# /   get <path>  Print the value at `path` in `~/config.json`. See `Values`.
 # / Options:
 # /   --help, -h  Show this help
 # /
 # / A question takes one key, without Enter. Only `y` or `Y` accepts it.
 # /
+# / Values:
+# /   `path` is a list of keys with a dot between each two, such as
+# /   `claude_code.profiles`. `get` prints the value in JSON syntax:
+# /   - A string in double quotes, with JSON escapes.
+# /   - A number, `true`, `false`, or `null` as it is.
+# /   - A list or an object with an indent of two spaces.
+# /
+# /   A key that does not exist prints `null`. A `null` on the way counts as a
+# /   key that does not exist. Any other value on the way that is not an
+# /   object is an error, because the file does not have the expected shape.
+# /   A key with a dot in its name cannot be part of `path`. Get the object
+# /   that holds the key, and read the key from that object.
+# /
+# / Configuration file:
+# /   `get` reads `~/config.json` only when it is a regular file, not a link,
+# /   owned by you, with no group or other permissions, as with `chmod 600`.
+# /   The file must hold a JSON object.
+# /
+# / Exit status:
+# /   0  Success. For `get`, the value is on stdout.
+# /   1  Error. The message is on stderr.
+# /   2  `get` only: `~/config.json` does not exist. A caller that treats the
+# /      file as optional can tell this case apart from an error.
+# /
 # / Requirements:
-# /   The 1Password CLI, `op`, with an active session, and `diff`.
+# /   `fetch` and `save` need the 1Password CLI, `op`, with an active
+# /   session, and `diff`.
 
+import errno
 import json
 import os
+import stat
 import subprocess
 import sys
 import termios
 import tty
 
+USAGE = "Usage: jc <fetch|save>\n       jc get <path>"
 # The 1Password item that holds the configuration, and the field of the item
 # with the text.
 ITEM_NAME = "Local Configuration"
@@ -40,6 +71,8 @@ CONFIG_PATH = os.path.expanduser("~/config.json")
 CONFIG_DISPLAY_PATH = "~/config.json"
 # The file holds secrets, such as API keys, so only its owner can read it.
 CONFIG_MODE = 0o600
+# The exit status of `get` when the configuration file does not exist.
+MISSING_CONFIG_STATUS = 2
 
 
 # --------------------------------------------------------------------------------------
@@ -48,20 +81,25 @@ CONFIG_MODE = 0o600
 
 
 def main():
-    subcommand = sys.argv[1] if len(sys.argv) > 1 else ""
+    arguments = sys.argv[1:]
+    subcommand = arguments[0] if arguments else ""
 
     if not subcommand:
-        print("Usage: jc <get|save>")
+        print(USAGE)
         return 1
 
     if subcommand in ("--help", "-h"):
         show_help()
         return 0
-    if subcommand == "get":
-        return get_config()
+    if subcommand == "fetch":
+        return fetch_config()
     if subcommand == "save":
         return save_config()
-    die(f"Unknown subcommand '{subcommand}'. Use 'get' or 'save'.")
+    if subcommand == "get":
+        if len(arguments) != 2:
+            die("`get` takes one path, such as `jc get claude_code.profiles`.")
+        return get_value(arguments[1])
+    die(f"Unknown subcommand '{subcommand}'. Use 'fetch', 'save', or 'get'.")
 
 
 def show_help():
@@ -82,7 +120,7 @@ def show_help():
 # --------------------------------------------------------------------------------------
 
 
-def get_config():
+def fetch_config():
     note_text = read_note()
 
     if os.path.isfile(CONFIG_PATH):
@@ -125,6 +163,30 @@ def save_config():
 
     write_note(read_config())
     print("Updated 1Password successfully.")
+    return 0
+
+
+def get_value(path):
+    keys = path.split(".")
+    if not all(keys):
+        die(f"Invalid path '{path}'. Put one dot between each two keys.")
+
+    # JSON `null` and a missing key are both `None` here, and a `None` stays
+    # `None` to the end of the path.
+    value = load_config()
+    walked_keys = []
+    for key in keys:
+        if value is None:
+            break
+        if not isinstance(value, dict):
+            die(
+                f"`{'.'.join(walked_keys)}` in {CONFIG_DISPLAY_PATH} is not a "
+                "JSON object"
+            )
+        walked_keys.append(key)
+        value = value.get(key)
+
+    print_json(value)
     return 0
 
 
@@ -196,6 +258,57 @@ def write_note(config_text):
 # --------------------------------------------------------------------------------------
 
 
+def load_config():
+    # Returns the parsed configuration file, a `dict`. Exits with
+    # `MISSING_CONFIG_STATUS` when the file does not exist.
+    #
+    # The file holds secrets, so it must be a regular file that belongs to the
+    # user who runs this script, with no group or other access. The checks run
+    # on the open descriptor, so the file that passes them is the file that
+    # the parser reads. `O_NOFOLLOW` makes a link fail the open. `O_NONBLOCK`
+    # makes the open of a FIFO return at once instead of waiting for a writer,
+    # so the type check can reject it. A regular file ignores the flag. The
+    # open of a directory succeeds, so the type check runs on the descriptor
+    # before `fdopen`, which refuses a directory with a less clear message.
+    try:
+        descriptor = os.open(CONFIG_PATH, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except FileNotFoundError:
+        die(
+            f"{CONFIG_DISPLAY_PATH} does not exist. Run `jc fetch` to create it.",
+            MISSING_CONFIG_STATUS,
+        )
+    except OSError as error:
+        if error.errno == errno.ELOOP:
+            die(f"{CONFIG_DISPLAY_PATH} is a link, expected a regular file")
+        die(f"Cannot open {CONFIG_DISPLAY_PATH}: {error}")
+
+    try:
+        info = os.fstat(descriptor)
+    except OSError as error:
+        die(f"Cannot read {CONFIG_DISPLAY_PATH}: {error}")
+    if not stat.S_ISREG(info.st_mode):
+        die(f"{CONFIG_DISPLAY_PATH} is not a regular file")
+    if info.st_uid != os.getuid():
+        die(f"{CONFIG_DISPLAY_PATH} is owned by user ID {info.st_uid}, not by you")
+    file_mode = stat.S_IMODE(info.st_mode)
+    if file_mode & 0o077:
+        die(
+            f"{CONFIG_DISPLAY_PATH} has permissions {file_mode:o}, expected no "
+            f"group or other access, as with `chmod {CONFIG_MODE:o}`"
+        )
+
+    try:
+        with os.fdopen(descriptor, "rb") as handle:
+            config = json.load(handle)
+    except ValueError as error:
+        die(f"{CONFIG_DISPLAY_PATH} is not valid JSON: {error}")
+    except OSError as error:
+        die(f"Cannot read {CONFIG_DISPLAY_PATH}: {error}")
+    if not isinstance(config, dict):
+        die(f"{CONFIG_DISPLAY_PATH} is not a JSON object")
+    return config
+
+
 def read_config():
     # `newline=""` keeps the line endings of the file as they are.
     try:
@@ -232,11 +345,24 @@ def set_config_mode():
 # --------------------------------------------------------------------------------------
 
 
-def die(message):
+def die(message, status=1):
     # Prints `message` with the `Error: ` prefix to stderr and exits with
-    # status 1.
+    # `status`.
     print(f"Error: {message}", file=sys.stderr)
-    sys.exit(1)
+    sys.exit(status)
+
+
+def print_json(value):
+    # A JSON file can spell a lone surrogate as an escape, and the parser
+    # turns that into a character that UTF-8 cannot encode. Such a value
+    # falls back to escapes for every character outside of ASCII. The bytes
+    # go to stdout as they are, so the locale does not change them.
+    text = json.dumps(value, indent=2, ensure_ascii=False)
+    try:
+        encoded = text.encode("utf-8")
+    except UnicodeEncodeError:
+        encoded = json.dumps(value, indent=2, ensure_ascii=True).encode("utf-8")
+    sys.stdout.buffer.write(encoded + b"\n")
 
 
 def diff_with_text(arguments, text):
