@@ -8,7 +8,7 @@
 
 # / Run Claude Code inside a Docker container.
 # /
-# / Usage: ai [options] [-- harness-args...]
+# / Usage: cl [options] [-- harness-args...]
 # / Options:
 # /   --profile <name>  Profile to run as. Selects the `~/.claude-<name>`
 # /                     directory, with its own login, history, and
@@ -177,7 +177,7 @@
 # /   `~/.claude/commands` does not survive the next run. A top-level entry
 # /   that an earlier run installed and that the origin no longer holds is
 # /   removed. The list of installed entries lives in
-# /   `~/.ai-launcher/<profile>/manifest`, which no mount exposes, so the
+# /   `~/.cl-launcher/<profile>/manifest`, which no mount exposes, so the
 # /   agent cannot make a run remove another entry. The lock that makes two
 # /   launches of a profile take turns lives next to it, so the agent cannot
 # /   stall a launch from inside the container. The rest of the profile
@@ -194,7 +194,7 @@
 # /   `skills`. Every run then removes what Claude Code stored there.
 # /
 # /   When the project is the dotfiles repository, the agent can edit the
-# /   scripts that run on the host, such as `bin/ai`, `bin/jc`,
+# /   scripts that run on the host, such as `bin/cl`, `bin/jc`,
 # /   `bin/list_project_dirs`, and `bin/pane-state-sync`. The next launch runs
 # /   that code as you.
 # /   `--no-docker-socket` does not close this path. Run an agent on the
@@ -214,7 +214,7 @@
 # /   `--no-docker-socket` does not change that. Read the file before you
 # /   launch on a repository that you do not trust.
 # /
-# /   The host directory `/tmp/ai-<user>/<profile>` is mounted at the same path
+# /   The host directory `/tmp/cl-<user>/<profile>` is mounted at the same path
 # /   in every container of the profile, so these containers share it. It holds
 # /   the cache directories of the tools in the image, which the
 # /   `XDG_CACHE_HOME` and `npm_config_cache` variables name, and the directory
@@ -343,7 +343,7 @@ CONTENT_CHUNK_SIZE = 64 * 1024
 # launcher, with one directory per profile inside it. No mount exposes it, so
 # the agent cannot edit what is there. Profile directories are named
 # `.claude-<profile>`, so this name never collides with one of them.
-LAUNCHER_STATE_DIR_NAME = ".ai-launcher"
+LAUNCHER_STATE_DIR_NAME = ".cl-launcher"
 # Name of the file in the state directory of a profile that lists the
 # top-level entries that the last launch installed from the origin, one per
 # line. The copied entries and the derived files both count.
@@ -962,10 +962,10 @@ class ProfilePaths:
 
 
 def resolve_profile_paths(home, username, profile):
-    # The directory carries the `ai-` prefix, so it never overlaps with a
+    # The directory carries the `cl-` prefix, so it never overlaps with a
     # `/tmp/<user>` directory that another tool keeps, whose mode the launcher
     # would otherwise tighten.
-    user_tmp_dir = f"/tmp/ai-{username}"
+    user_tmp_dir = f"/tmp/cl-{username}"
     profile_tmp_dir = f"{user_tmp_dir}/{profile}"
     return ProfilePaths(
         profile_dir=f"{home}/.claude-{profile}",
@@ -1514,7 +1514,7 @@ def build_image(image_spec, dockerfile, today, *, use_cache):
     # file of the host reaches the build. The Dockerfile expects the script
     # there, so the file is empty when the project has none.
     try:
-        context_dir = tempfile.mkdtemp(prefix="ai-build-context-")
+        context_dir = tempfile.mkdtemp(prefix="cl-build-context-")
     except OSError as error:
         log(f"Warning: cannot create the build context: {error}")
         return False
@@ -3146,7 +3146,7 @@ if __name__ == "__main__":
         # death by SIGINT is 128 + 2.
         sys.exit(130)
     except BrokenPipeError:
-        # The reader of stdout went away, as with `ai ... | head`. Python
+        # The reader of stdout went away, as with `cl ... | head`. Python
         # flushes stdout once more at exit, and that flush would fail again
         # and print a second error, so stdout is pointed at the null device
         # first. The shell convention for a death by SIGPIPE is 128 + 13.

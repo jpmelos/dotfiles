@@ -91,7 +91,7 @@ RUN git config --system --add safe.directory "${HOME}/devel/*"
 USER "${UID}:${GID}"
 WORKDIR "${HOME}"
 
-# Create the mountpoint for the Claude Code configuration directory. `bin/ai`
+# Create the mountpoint for the Claude Code configuration directory. `bin/cl`
 # points `CLAUDE_CONFIG_DIR` at it, so `.claude.json` lives inside it too.
 RUN mkdir -p ".claude"
 
@@ -114,7 +114,7 @@ USER "${UID}:${GID}"
 
 # Run the `jpenv-container.sh` script of the project, as the container user.
 # The build context holds the script, or an empty file when the project has
-# none. See `bin/ai`. The bind mount keeps the script out of the layers of the
+# none. See `bin/cl`. The bind mount keeps the script out of the layers of the
 # image.
 RUN --mount=type=bind,source=jpenv-container.sh,target=/tmp/jpenv-container.sh \
     if [ -s /tmp/jpenv-container.sh ]; then /tmp/jpenv-container.sh; fi
