@@ -21,6 +21,8 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.parse
+import uuid
 from dataclasses import dataclass
 
 import click
@@ -88,20 +90,24 @@ PAYEE_COLUMNS = ("Original Payee Name", "New Payee Name")
     "--no-download",
     is_flag=True,
     help=(
-        "Do not log in to the bank. Read the statements that the last run "
-        "downloaded."
+        "Do not log in to the bank, and do not read Questrade. Read the "
+        "statements that the last run downloaded."
     ),
 )
 @click.option(
     "--no-upload",
     is_flag=True,
-    help="Do not change YNAB. Show the transactions that the script would add.",
+    help=(
+        "Do not change YNAB. Show the transactions and the reconciliation that "
+        "the script would add."
+    ),
 )
 def main(from_date, no_download, no_upload):
     """Download the recent transactions of the BMO chequing account and of
     the BMO MasterCard as CSV files, through `agent-browser`. Then name the
     payee of each transaction, print all the transactions, and add to YNAB
-    the ones that it does not have.
+    the ones that it does not have. Last, bring the balance of the YNAB
+    account of Questrade up to date.
 
     The script logs in with the `bmo.username` and `bmo.password` values that
     `jc get` reads. When the bank asks for a verification code, the script
@@ -158,6 +164,11 @@ def main(from_date, no_download, no_upload):
       with the same date, payee, and amount. Otherwise, the script adds the
       transaction of the bank too.
 
+      A statement holds only cleared transactions. So when a YNAB
+      transaction matches a statement transaction but is not cleared, the
+      script clears it. The script changes nothing else in it, such as its
+      approval. The cleared YNAB transactions take the matches first.
+
       A payee such as `Transfer: Wallet` marks a transfer to the YNAB account
       that it names. A negative amount leaves the account of the statement,
       and a positive amount comes into it. When YNAB gets one side of a
@@ -173,8 +184,11 @@ def main(from_date, no_download, no_upload):
         transaction already, such as from a direct import, the transaction
         will be there twice.
 
-      The script only adds transactions. It never edits or deletes one. It
-      stops before any change when:
+      Every transaction that the script adds is cleared and not approved.
+      YNAB gives the other side of a transfer a status of its own, so the
+      script then makes that side cleared and not approved too. Apart from
+      these sides and the transactions that it clears, the script edits no
+      transaction. It deletes none. It stops before any change when:
 
     \b
       - A transfer to add between "BMO Chequing" and "BMO MasterCard" is in
@@ -184,9 +198,46 @@ def main(from_date, no_download, no_upload):
       - The payee of a transaction to add is new to YNAB, but differs from a
         YNAB payee only in case. YNAB can give the transaction that payee.
 
-      Before it adds transactions, the script shows them and asks you. After
-      it adds them, it compares YNAB with the statements again. With
-      `--no-upload`, the script shows them and stops.
+      Before it adds or clears transactions, the script shows them and asks
+      you. After the changes, it compares YNAB with the statements again.
+      With `--no-upload`, the script shows the changes, but does not make
+      them.
+
+      Then the script compares the balance of each account at the bank with
+      the cleared balance of its YNAB account, and warns about each
+      difference. With `--no-download`, the script has no balances from the
+      bank, so it skips this comparison.
+
+    Questrade:
+
+      The script reads the balances of your Questrade accounts first, so
+      that a problem with Questrade stops it before the bank asks for a
+      code. For each account, Questrade converts the cash and the securities
+      in all currencies to Canadian dollars. The Questrade balance is the
+      total of these amounts. With `--no-download`, the script does not read
+      Questrade, and does not reconcile it in YNAB.
+
+      The Questrade API takes a refresh token. The script uses the token
+      that the last run saved. When there is no saved token, or Questrade
+      rejects it, the script uses the token that `jc get questrade.api_key`
+      reads. Questrade accepts each token only once, and gives a new token
+      each time. The script saves the new token before it calls Questrade
+      again. A token expires three days after Questrade gives it. When
+      Questrade rejects the two tokens, generate a new token for manual
+      authorization in the API Centre of Questrade. Then save it as
+      `questrade.api_key`.
+
+      After YNAB matches the statements, the script compares the balance of
+      the YNAB account "Questrade" with the Questrade balance.
+      That account must be in the same plan as the BMO accounts. Its
+      balance includes the transactions that are not cleared, and the sides
+      of the transfers from the statements. When the two balances differ,
+      the script shows the difference and asks you. Then it adds a
+      transaction for the difference to "Questrade", with the date of today.
+      The transaction has the payee "Balance Reconciliation" and the memo
+      "Balance reconciliation". It is cleared and not approved. With
+      `--no-upload`, or when you cancel the changes from the statements, the
+      script only shows the difference.
 
     Files:
 
@@ -198,6 +249,8 @@ def main(from_date, no_download, no_upload):
       - `chequing.csv` and `credit_card.csv`, the statements.
       - `bmo_session.json`, the cookies of the last session. The next run
         loads them.
+      - `questrade_refresh_token.txt`, the Questrade token that the last
+        run saved. The next run uses it.
       - `payees.csv`, the payee map, with the columns `Original Payee Name`
         and `New Payee Name`. You can edit it. Keep the header row.
       - `browser-error.png`, a screenshot of the browser after a failed
@@ -215,8 +268,8 @@ def main(from_date, no_download, no_upload):
 def run(from_date, no_download, no_upload):
     # Returns the exit status of the script.
     #
-    # A problem with the YNAB key stops the script before the bank asks for a
-    # code.
+    # A problem with the YNAB key or with Questrade stops the script before
+    # the bank asks for a code.
     ynab_api_key = read_config_text("ynab.api_key")
 
     paths = resolve_session_paths()
@@ -224,7 +277,12 @@ def run(from_date, no_download, no_upload):
     if no_download:
         use_last_statements(paths)
         balances = None
+        questrade_balance = None
     else:
+        step(f"Reading the Questrade balances in {QUESTRADE_CURRENCY}")
+        questrade_balances = read_questrade_balances(paths.questrade_token_file)
+        questrade_balance = sum(questrade_balances.values())
+        print_questrade_balances(questrade_balances, questrade_balance)
         balances = run_download(paths)
     print(f"Chequing account: {paths.chequing_file}")
     print(f"Credit card: {paths.credit_card_file}")
@@ -264,7 +322,14 @@ def run(from_date, no_download, no_upload):
             print_balances(balances)
 
         step("Checking YNAB")
-        save_to_ynab(transactions, start_date, ynab_api_key, upload=not no_upload)
+        save_to_ynab(
+            transactions,
+            start_date,
+            balances,
+            questrade_balance,
+            ynab_api_key,
+            upload=not no_upload,
+        )
     except StepError as error:
         log(f"Error: {error}")
         return error.exit_status
@@ -322,6 +387,8 @@ class SessionPaths:
     # The map from the payee names of the bank to the names of the user.
     payees_file: str
     screenshot_file: str
+    # The refresh token for the Questrade API that the last run saved.
+    questrade_token_file: str
 
 
 def resolve_session_paths():
@@ -337,6 +404,7 @@ def resolve_session_paths():
         download_file=os.path.join(session_dir, DOWNLOAD_NAME),
         payees_file=os.path.join(session_dir, "payees.csv"),
         screenshot_file=os.path.join(session_dir, "browser-error.png"),
+        questrade_token_file=os.path.join(session_dir, "questrade_refresh_token.txt"),
     )
 
 
@@ -931,6 +999,15 @@ def print_balances(balances):
         print(f"{label:<{label_width}}  {balance_text:>12}")
 
 
+def print_questrade_balances(balances, total):
+    # `balances` maps the label of each Questrade account to its balance, and
+    # `total` is the sum of the balances.
+    rows = [*balances.items(), ("Total", total)]
+    label_width = max(len(label) for label, _ in rows)
+    for label, balance in rows:
+        print(f"{label:<{label_width}}  {format_amount(balance):>12}")
+
+
 def report_order(transaction):
     # By date, then by amount, then by payee, then by account. The payee
     # comparison ignores case, and the exact name breaks a tie.
@@ -954,6 +1031,246 @@ def format_details(date, amount, *texts):
 
 
 # --------------------------------------------------------------------------------------
+# Questrade.
+# --------------------------------------------------------------------------------------
+
+QUESTRADE_TOKEN_URL = "https://login.questrade.com/oauth2/token"
+# The token endpoint answers with one of these statuses when it rejects a
+# refresh token, such as one that expired or that a run used already.
+QUESTRADE_REJECTED_STATUSES = (400, 401)
+# The combined balance of an account in this currency converts all the
+# holdings of the account, in all currencies, to this currency.
+QUESTRADE_CURRENCY = "CAD"
+QUESTRADE_TIMEOUT_SECONDS = 30
+CENT = decimal.Decimal("0.01")
+
+
+@dataclass
+class QuestradeSession:
+    access_token: str
+    # The URL of the API server that Questrade gave with the access token.
+    api_server: str
+
+
+def read_questrade_balances(token_path):
+    # Returns the balance of each Questrade account in `QUESTRADE_CURRENCY`,
+    # rounded to cents, by the type and the number of the account.
+    session = start_questrade_session(token_path)
+    accounts = questrade_get(session, "accounts", "read the Questrade accounts")
+    accounts = accounts.get("accounts")
+    if not isinstance(accounts, list) or not accounts:
+        die("Questrade returned no accounts")
+
+    balances = {}
+    for account in accounts:
+        number = account.get("number") if isinstance(account, dict) else None
+        # The number goes into the URL of the next call.
+        if not isinstance(number, str) or not number.isdigit():
+            die(f"Questrade returned an account with the number {number!r}")
+        account_balances = questrade_get(
+            session,
+            f"accounts/{number}/balances",
+            f"read the balances of the Questrade account {number}",
+        )
+        label = f"{account.get('type')} {number}"
+        balances[label] = find_combined_balance(account_balances, number)
+    return balances
+
+
+def find_combined_balance(account_balances, account_number):
+    # Returns the total equity in `QUESTRADE_CURRENCY` from the combined
+    # balances in `account_balances`, rounded to cents.
+    records = account_balances.get("combinedBalances")
+    if not isinstance(records, list):
+        records = []
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        if record.get("currency") != QUESTRADE_CURRENCY:
+            continue
+        total_equity = record.get("totalEquity")
+        # The JSON parser gives each number as an `int` or a `decimal.Decimal`.
+        # `bool` is a subclass of `int`, so it needs a check of its own.
+        if isinstance(total_equity, bool) or not isinstance(
+            total_equity, (int, decimal.Decimal)
+        ):
+            die(
+                f"Questrade returned the total equity {total_equity!r} for the "
+                f"account {account_number}"
+            )
+        return decimal.Decimal(total_equity).quantize(CENT)
+    die(
+        f"Questrade returned no combined balance in {QUESTRADE_CURRENCY} for the "
+        f"account {account_number}"
+    )
+
+
+def start_questrade_session(token_path):
+    # Returns a session with a new access token. Questrade accepts each
+    # refresh token once, and returns a new one with the access token. The
+    # new refresh token goes to `token_path` before any other call, so that
+    # the next run can use it. The refresh token that `jc` reads serves only
+    # when `token_path` holds no token, or when Questrade rejects that token.
+    response = None
+    saved_token = read_questrade_token(token_path)
+    if saved_token is None:
+        print(
+            f"No refresh token in {token_path}. The script uses the one from "
+            "`jc get questrade.api_key`."
+        )
+    else:
+        response = redeem_questrade_token(saved_token)
+        if response is None:
+            log(
+                f"Warning: Questrade rejected the refresh token in {token_path}. "
+                "The script uses the one from `jc get questrade.api_key`."
+            )
+    if response is None:
+        response = redeem_questrade_token(read_config_text("questrade.api_key"))
+        if response is None:
+            die(
+                "Questrade rejected the refresh token from `jc get "
+                "questrade.api_key`. Generate a new token for manual authorization "
+                "in the API Centre of Questrade, and save it as questrade.api_key "
+                "in ~/config.json"
+            )
+
+    refresh_token = response.get("refresh_token")
+    if not isinstance(refresh_token, str) or not refresh_token:
+        die("Questrade returned no refresh token")
+    save_questrade_token(token_path, refresh_token)
+
+    access_token = response.get("access_token")
+    if not isinstance(access_token, str) or not access_token:
+        die("Questrade returned no access token")
+    # The access token goes to this server, so the connection must be secure.
+    api_server = response.get("api_server")
+    if not isinstance(api_server, str) or not api_server.startswith("https://"):
+        die(f"Questrade returned the API server {api_server!r}, expected HTTPS")
+    return QuestradeSession(access_token=access_token, api_server=api_server)
+
+
+def read_questrade_token(path):
+    # Returns the refresh token in the file at `path`, or `None` when the file
+    # does not exist or holds no token.
+    try:
+        with open(path, encoding="utf-8") as handle:
+            token = handle.read().strip()
+    except FileNotFoundError:
+        return None
+    except (OSError, UnicodeDecodeError) as error:
+        die(f"cannot read {path}: {error}")
+    return token or None
+
+
+def save_questrade_token(path, token):
+    # The new file replaces the old one in one rename, so an interruption
+    # cannot leave a partial token. `mkstemp` creates the file with mode
+    # `600`, so only the user can read the token.
+    try:
+        descriptor, temp_path = tempfile.mkstemp(
+            dir=os.path.dirname(path), prefix=".questrade-", suffix=".txt"
+        )
+    except OSError as error:
+        die(f"cannot save {path}: {error}")
+
+    replaced = False
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(token + "\n")
+        os.replace(temp_path, path)
+        replaced = True
+    except OSError as error:
+        die(f"cannot save {path}: {error}")
+    finally:
+        if not replaced:
+            with contextlib.suppress(OSError):
+                os.remove(temp_path)
+
+
+def redeem_questrade_token(refresh_token):
+    # Returns the JSON object that the token endpoint returns for
+    # `refresh_token`, or `None` when the endpoint rejects the token. The
+    # token goes in the body of the request, not in the URL, so that no error
+    # message shows it.
+    action = "redeem the Questrade refresh token"
+    response = send_questrade_request(
+        action,
+        "POST",
+        QUESTRADE_TOKEN_URL,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        body=urllib.parse.urlencode(
+            {"grant_type": "refresh_token", "refresh_token": refresh_token}
+        ),
+    )
+    if response.status in QUESTRADE_REJECTED_STATUSES:
+        return None
+    if response.status != 200:
+        die(f"cannot {action}: {describe_questrade_failure(response)}")
+    return parse_questrade_response(action, response)
+
+
+def questrade_get(session, path, action):
+    # Returns the JSON object that the API server of `session` returns for
+    # `path`, such as `accounts`. Dies with `action` in the message when the
+    # call fails.
+    response = send_questrade_request(
+        action,
+        "GET",
+        questrade_url(session.api_server, path),
+        headers={"Authorization": f"Bearer {session.access_token}"},
+    )
+    if response.status != 200:
+        die(f"cannot {action}: {describe_questrade_failure(response)}")
+    return parse_questrade_response(action, response)
+
+
+def questrade_url(api_server, path):
+    # The URL of the API server usually ends in a slash, but the
+    # documentation of Questrade also shows one that ends in `/v1`. Both
+    # forms give the same URL.
+    base_url = api_server.rstrip("/").removesuffix("/v1")
+    return f"{base_url}/v1/{path}"
+
+
+def send_questrade_request(action, method, url, **keyword_arguments):
+    # Sends one request to Questrade, and returns the response. Dies with
+    # `action` in the message when no response arrives.
+    try:
+        return urllib3.request(
+            method, url, timeout=QUESTRADE_TIMEOUT_SECONDS, **keyword_arguments
+        )
+    except urllib3.exceptions.HTTPError as error:
+        die(f"cannot {action}: {error}")
+
+
+def parse_questrade_response(action, response):
+    # Returns the JSON object in the body of `response`. A number with a
+    # fraction becomes a `decimal.Decimal`, so an amount keeps its exact
+    # value.
+    try:
+        value = json.loads(response.data, parse_float=decimal.Decimal)
+    except ValueError as error:
+        die(f"cannot {action}: Questrade returned invalid JSON: {error}")
+    if not isinstance(value, dict):
+        die(f"cannot {action}: Questrade returned no JSON object")
+    return value
+
+
+def describe_questrade_failure(response):
+    # Returns the HTTP status of `response`, with the message of the error
+    # when the body holds one, such as `Access token is invalid`.
+    description = f"HTTP {response.status}"
+    try:
+        body = json.loads(response.data)
+    except ValueError:
+        return description
+    if isinstance(body, dict) and isinstance(body.get("message"), str):
+        return f"{description}, {body['message']}"
+    return description
+
+
+# --------------------------------------------------------------------------------------
 # YNAB.
 # --------------------------------------------------------------------------------------
 
@@ -963,6 +1280,11 @@ YNAB_ACCOUNT_NAMES = {
     Account.CREDIT_CARD: "BMO MasterCard",
 }
 ACCOUNTS_BY_YNAB_NAME = {name: account for account, name in YNAB_ACCOUNT_NAMES.items()}
+# The YNAB account of all the Questrade accounts.
+QUESTRADE_YNAB_ACCOUNT_NAME = "Questrade"
+# The payee and the memo of the transaction of a reconciliation.
+RECONCILIATION_PAYEE = "Balance Reconciliation"
+RECONCILIATION_MEMO = "Balance reconciliation"
 # YNAB amounts are in milliunits, thousandths of the unit of the currency.
 MILLIUNITS_PER_UNIT = 1000
 # YNAB takes payee names of at most this many characters.
@@ -987,6 +1309,8 @@ class YnabPlan:
     plan_id: str
     # The ID of the YNAB account of each statement.
     account_ids: dict
+    # The ID of the YNAB account of Questrade.
+    questrade_account_id: uuid.UUID
     # The ID of the transfer payee of each open account of the plan, by the
     # name of the account. A transaction with that payee is a transfer to that
     # account. A name that more than one open account has is not here.
@@ -1004,31 +1328,66 @@ class YnabComparison:
     # For each account, the keys of the YNAB transactions that its statement
     # does not have. See `ynab_key` for the keys.
     extra_keys_by_account: dict
+    # The YNAB transactions that match a statement transaction, but are not
+    # cleared.
+    uncleared_transactions: list
 
 
-def save_to_ynab(transactions, start_date, api_key, upload):
-    # Adds to YNAB the statement transactions that it does not have, and
-    # leaves the YNAB transactions that the statements do not have as they
-    # are. Every read and check happens before the first change, and a
-    # problem stops the script before any change. Without `upload`, the
-    # script reads YNAB and shows the transactions to add, but changes
-    # nothing.
+def save_to_ynab(
+    transactions, start_date, bank_balances, questrade_balance, api_key, upload
+):
+    # Brings YNAB up to date with the statements. Then compares the cleared
+    # balances in YNAB with `bank_balances`, and brings the balance of the
+    # YNAB account of Questrade to `questrade_balance`. Because of
+    # `--no-download`, `bank_balances` and `questrade_balance` can be `None`,
+    # and the step of each one does not run. Without `upload`, the script
+    # reads YNAB and shows the changes, but changes nothing.
     with ynab.ApiClient(ynab.Configuration(access_token=api_key)) as api_client:
         plan = load_ynab_plan(api_client)
-        comparison = compare_with_ynab(plan, transactions, start_date)
-        report_ignored_transactions(comparison)
-        transactions_to_send, problems = plan_additions(
-            plan, comparison.missing_transactions
+        ynab_matches_statements = update_from_statements(
+            plan, transactions, start_date, upload
         )
-        for problem in problems:
-            log(f"Problem: {problem}")
-        if problems:
-            die("YNAB did not change. Fix the problems above, and run again.")
+        step("Comparing the bank balances with YNAB")
+        if bank_balances is None:
+            print("Skipped, because of --no-download.")
+        else:
+            compare_bank_balances(plan, bank_balances, ynab_matches_statements)
+        step("Reconciling Questrade in YNAB")
+        if questrade_balance is None:
+            print("Skipped, because of --no-download.")
+        else:
+            reconcile_questrade(
+                plan, questrade_balance, ynab_matches_statements, upload
+            )
 
-        if not comparison.missing_transactions:
-            print("YNAB has every transaction of the statements already.")
-            return
 
+def update_from_statements(plan, transactions, start_date, upload):
+    # Adds to YNAB the statement transactions that it does not have, and
+    # clears the YNAB transactions that match a statement transaction but are
+    # not cleared. Leaves the YNAB transactions that the statements do not
+    # have as they are. Every read and check happens before the first change,
+    # and a problem stops the script before any change. Without `upload`, the
+    # script reads YNAB and shows the changes, but changes nothing. Returns
+    # whether YNAB matches the statements at the end.
+    comparison = compare_with_ynab(plan, transactions, start_date)
+    report_ignored_transactions(comparison)
+    transactions_to_send, problems = plan_additions(
+        plan, comparison.missing_transactions
+    )
+    for problem in problems:
+        log(f"Problem: {problem}")
+    if problems:
+        die("YNAB did not change. Fix the problems above, and run again.")
+
+    missing_count = len(comparison.missing_transactions)
+    uncleared_count = len(comparison.uncleared_transactions)
+    if not missing_count and not uncleared_count:
+        print("YNAB has every transaction of the statements already, as cleared.")
+        return True
+
+    changes = []
+    if missing_count:
+        changes.append(f"add {missing_count} transactions")
         step("Transactions to add to YNAB")
         print_report(comparison.missing_transactions)
         transfers = [
@@ -1038,37 +1397,159 @@ def save_to_ynab(transactions, start_date, api_key, upload):
         ]
         if transfers:
             print(
-                f"Transfers: {len(transfers)}. For each one, YNAB adds the side in "
-                "the other account by itself."
+                f"Transfers: {len(transfers)}. For each one, YNAB adds the side "
+                "in the other account by itself."
             )
         report_other_sides(transfers)
-        transaction_count = len(comparison.missing_transactions)
-        if not upload:
-            print("YNAB did not change, because of --no-upload.")
-            return
-        answer = ask(f"Add {transaction_count} transactions to YNAB? [y/N] ")
-        if answer.casefold() not in ("y", "yes"):
-            print("Cancelled. YNAB did not change.")
-            return
-
-        send_transactions(plan, transactions_to_send)
-
-        # The second comparison also covers the sides of the transfers that
-        # YNAB added by itself. After the additions, YNAB must have every
-        # statement transaction, and no new transaction that the statements do
-        # not have.
-        result = compare_with_ynab(plan, transactions, start_date)
-        if (
-            result.missing_transactions
-            or result.extra_keys_by_account != comparison.extra_keys_by_account
+    if uncleared_count:
+        changes.append(f"clear {uncleared_count} transactions")
+        step("Transactions to clear in YNAB")
+        for ynab_transaction in sorted(
+            comparison.uncleared_transactions,
+            key=lambda ynab_transaction: (
+                ynab_transaction.var_date,
+                ynab_transaction.account_name,
+            ),
         ):
-            report_ynab_differences(result)
-            die(
-                "YNAB does not match the statements after the additions. Check "
-                "the accounts in YNAB. This script does not edit or delete "
-                "transactions."
+            print(describe_ynab_transaction(ynab_transaction))
+    if not upload:
+        print("YNAB did not change, because of --no-upload.")
+        return False
+    answer = ask(f"In YNAB, {' and '.join(changes)}? [y/N] ")
+    if answer.casefold() not in ("y", "yes"):
+        print("Cancelled. YNAB did not change.")
+        return False
+
+    if missing_count:
+        send_transactions(plan, transactions_to_send)
+    if uncleared_count:
+        clear_ynab_transactions(plan, comparison.uncleared_transactions)
+
+    # The second comparison also covers the sides of the transfers that YNAB
+    # added by itself. After the changes, YNAB must have every statement
+    # transaction as cleared, and no new transaction that the statements do
+    # not have.
+    result = compare_with_ynab(plan, transactions, start_date)
+    if (
+        result.missing_transactions
+        or result.uncleared_transactions
+        or result.extra_keys_by_account != comparison.extra_keys_by_account
+    ):
+        report_ynab_differences(result)
+        die(
+            "YNAB does not match the statements after the changes. Check the "
+            "accounts in YNAB. This script does not fix the differences."
+        )
+    if missing_count:
+        print(f"Added transactions to YNAB: {missing_count}")
+    if uncleared_count:
+        print(f"Cleared transactions in YNAB: {uncleared_count}")
+    return True
+
+
+def compare_bank_balances(plan, bank_balances, ynab_matches_statements):
+    # Prints the balance of each statement account at the bank and the
+    # cleared balance of its YNAB account, and warns about each difference.
+    # `bank_balances` maps each account to its balance at the bank, or to
+    # `None` when the script could not read it. `ynab_matches_statements`
+    # tells whether YNAB has every statement transaction, as cleared.
+    rows = [("Account", "Bank", "YNAB cleared", "Difference")]
+    differences = []
+    compared_all = True
+    for account, ynab_name in YNAB_ACCOUNT_NAMES.items():
+        ynab_account = read_ynab_account(plan, plan.account_ids[account])
+        ynab_balance = from_milliunits(ynab_account.cleared_balance)
+        bank_balance = bank_balances.get(account)
+        if bank_balance is None:
+            compared_all = False
+            rows.append((ynab_name, "unknown", format_amount(ynab_balance), ""))
+            continue
+        difference = bank_balance - ynab_balance
+        rows.append(
+            (
+                ynab_name,
+                format_amount(bank_balance),
+                format_amount(ynab_balance),
+                format_amount(difference),
             )
-        print(f"Added transactions to YNAB: {transaction_count}")
+        )
+        if difference != 0:
+            differences.append((ynab_name, bank_balance, ynab_balance))
+
+    # The amounts align to the right. A line can end in an empty column, so
+    # the spaces at the end go away.
+    label_width = max(len(row[0]) for row in rows)
+    for label, *amounts in rows:
+        line = f"{label:<{label_width}}" + "".join(
+            f"  {amount:>12}" for amount in amounts
+        )
+        print(line.rstrip())
+
+    if not differences:
+        if compared_all:
+            print("The cleared balances in YNAB match the bank.")
+        return
+    for ynab_name, bank_balance, ynab_balance in differences:
+        log(
+            f"Warning: {ynab_name} has {format_amount(ynab_balance)} cleared in "
+            f"YNAB, but {format_amount(bank_balance)} at the bank"
+        )
+    if not ynab_matches_statements:
+        log(
+            "YNAB did not get the changes from the statements, so they can "
+            "cause the differences."
+        )
+
+
+def reconcile_questrade(plan, questrade_balance, ynab_matches_statements, upload):
+    # Adds a transaction to the YNAB account of Questrade that brings its
+    # balance to `questrade_balance`. The YNAB balance includes the side of
+    # each transfer from a statement, cleared or not. So the transaction
+    # waits until YNAB matches the statements, which
+    # `ynab_matches_statements` tells. Without `upload`, the script shows the
+    # difference, but changes nothing.
+    ynab_account = read_ynab_account(plan, plan.questrade_account_id)
+    ynab_balance = from_milliunits(ynab_account.balance)
+    difference = questrade_balance - ynab_balance
+    rows = (
+        ("Questrade", questrade_balance),
+        ("YNAB", ynab_balance),
+        ("Difference", difference),
+    )
+    label_width = max(len(label) for label, _ in rows)
+    for label, amount in rows:
+        print(f"{label:<{label_width}}  {format_amount(amount):>12}")
+
+    if difference == 0:
+        print("The YNAB balance matches the Questrade balance already.")
+        return
+    if not upload:
+        print("YNAB did not change, because of --no-upload.")
+        return
+    if not ynab_matches_statements:
+        print(
+            "YNAB did not change, because it did not get the changes from the "
+            "statements. A transfer to Questrade changes the YNAB balance."
+        )
+        return
+    answer = ask(
+        f"Add a reconciliation of {format_amount(difference)} to "
+        f"{QUESTRADE_YNAB_ACCOUNT_NAME} in YNAB? [y/N] "
+    )
+    if answer.casefold() not in ("y", "yes"):
+        print("Cancelled. YNAB did not change.")
+        return
+
+    send_reconciliation(plan, difference)
+    ynab_account = read_ynab_account(plan, plan.questrade_account_id)
+    new_balance = from_milliunits(ynab_account.balance)
+    if new_balance != questrade_balance:
+        die(
+            f"the balance of {QUESTRADE_YNAB_ACCOUNT_NAME} in YNAB is "
+            f"{format_amount(new_balance)} after the reconciliation, expected "
+            f"{format_amount(questrade_balance)}. Check the account in YNAB."
+        )
+    print(f"Added the reconciliation to YNAB: {format_amount(difference)}")
 
 
 def load_ynab_plan(api_client):
@@ -1083,19 +1564,11 @@ def load_ynab_plan(api_client):
         "read the YNAB accounts", ynab.AccountsApi(api_client).get_accounts, plan_id
     )
     accounts = [account for account in accounts.data.accounts if not account.deleted]
-    account_ids = {}
-    for account, account_name in YNAB_ACCOUNT_NAMES.items():
-        matches = [
-            ynab_account
-            for ynab_account in accounts
-            if ynab_account.name == account_name and not ynab_account.closed
-        ]
-        if len(matches) != 1:
-            die(
-                f"expected one open YNAB account named '{account_name}', found "
-                f"{len(matches)}"
-            )
-        account_ids[account] = matches[0].id
+    account_ids = {
+        account: find_open_account_id(accounts, account_name)
+        for account, account_name in YNAB_ACCOUNT_NAMES.items()
+    }
+    questrade_account_id = find_open_account_id(accounts, QUESTRADE_YNAB_ACCOUNT_NAME)
 
     # A transfer names its other account, so a name that more than one open
     # account has cannot be the other side of a transfer.
@@ -1128,6 +1601,7 @@ def load_ynab_plan(api_client):
         api_client=api_client,
         plan_id=plan_id,
         account_ids=account_ids,
+        questrade_account_id=questrade_account_id,
         transfer_payee_ids=transfer_payee_ids,
         account_names={account.id: account.name for account in accounts},
         payees=YnabPayees(
@@ -1139,9 +1613,26 @@ def load_ynab_plan(api_client):
     )
 
 
+def find_open_account_id(accounts, account_name):
+    # Returns the ID of the only open account in `accounts` with the name
+    # `account_name`.
+    matches = [
+        ynab_account
+        for ynab_account in accounts
+        if ynab_account.name == account_name and not ynab_account.closed
+    ]
+    if len(matches) != 1:
+        die(
+            f"expected one open YNAB account named '{account_name}', found "
+            f"{len(matches)}"
+        )
+    return matches[0].id
+
+
 def compare_with_ynab(plan, transactions, start_date):
     missing_transactions = []
     extra_keys_by_account = {}
+    uncleared_transactions = []
     for account, account_id in plan.account_ids.items():
         ynab_transactions = call_ynab(
             "read the YNAB transactions",
@@ -1155,7 +1646,7 @@ def compare_with_ynab(plan, transactions, start_date):
             for transaction in transactions
             if transaction.account == account
         ]
-        missing, extra_keys = compare_account(
+        missing, extra_keys, uncleared = compare_account(
             plan,
             statement_transactions,
             [
@@ -1167,18 +1658,23 @@ def compare_with_ynab(plan, transactions, start_date):
         missing_transactions += missing
         if extra_keys:
             extra_keys_by_account[account] = extra_keys
-    return YnabComparison(missing_transactions, extra_keys_by_account)
+        uncleared_transactions += uncleared
+    return YnabComparison(
+        missing_transactions, extra_keys_by_account, uncleared_transactions
+    )
 
 
 def compare_account(plan, statement_transactions, ynab_transactions):
-    # Returns the statement transactions that YNAB does not have, and the keys
-    # of the YNAB transactions that the statement does not have. Each key
-    # counts as many times as it appears, so two equal transactions on a date
-    # need two in YNAB.
+    # Returns the statement transactions that YNAB does not have, the keys of
+    # the YNAB transactions that the statement does not have, and the YNAB
+    # transactions that match a statement transaction but are not cleared.
+    # Each key counts as many times as it appears, so two equal transactions
+    # on a date need two in YNAB.
     statement_counts = collections.Counter(map(statement_key, statement_transactions))
-    ynab_counts = collections.Counter(
+    ynab_keys = [
         ynab_key(plan, ynab_transaction) for ynab_transaction in ynab_transactions
-    )
+    ]
+    ynab_counts = collections.Counter(ynab_keys)
 
     missing_counts = statement_counts - ynab_counts
     missing_transactions = []
@@ -1189,7 +1685,21 @@ def compare_account(plan, statement_transactions, ynab_transactions):
             missing_transactions.append(transaction)
 
     extra_keys = sorted((ynab_counts - statement_counts).elements())
-    return missing_transactions, extra_keys
+
+    # The cleared YNAB transactions take the matches first, and the uncleared
+    # ones take the rest. The sort keeps the order of YNAB within each group.
+    unmatched_counts = statement_counts.copy()
+    uncleared_transactions = []
+    for key, ynab_transaction in sorted(
+        zip(ynab_keys, ynab_transactions),
+        key=lambda pair: pair[1].cleared == ynab.TransactionClearedStatus.UNCLEARED,
+    ):
+        if unmatched_counts[key] == 0:
+            continue
+        unmatched_counts[key] -= 1
+        if ynab_transaction.cleared == ynab.TransactionClearedStatus.UNCLEARED:
+            uncleared_transactions.append(ynab_transaction)
+    return missing_transactions, extra_keys, uncleared_transactions
 
 
 def statement_key(transaction):
@@ -1351,8 +1861,35 @@ def send_transactions(plan, transactions):
                 approved=False,
             )
         )
+    create_ynab_transactions(plan, new_transactions)
+
+
+def send_reconciliation(plan, amount):
+    # Adds a transaction of `amount` to the YNAB account of Questrade, on the
+    # date of today. The payee ID makes YNAB use the payee with exactly this
+    # name. Without one, YNAB looks the name up, or creates a payee with it.
+    transaction = ynab.NewTransaction(
+        account_id=plan.questrade_account_id,
+        var_date=datetime.date.today(),
+        amount=to_milliunits(amount),
+        payee_id=plan.payees.ids_by_name.get(RECONCILIATION_PAYEE),
+        payee_name=RECONCILIATION_PAYEE,
+        memo=RECONCILIATION_MEMO,
+        cleared=ynab.TransactionClearedStatus.CLEARED,
+        approved=False,
+    )
+    create_ynab_transactions(plan, [transaction])
+
+
+def create_ynab_transactions(plan, new_transactions):
+    # Adds `new_transactions` to YNAB. Each one must be cleared and not
+    # approved. YNAB adds the other side of each transfer by itself, with a
+    # status of its own, so each other side then becomes cleared and not
+    # approved too. Last, dies when YNAB holds any of these transactions as
+    # approved or not cleared.
+    transactions_api = ynab.TransactionsApi(plan.api_client)
     try:
-        ynab.TransactionsApi(plan.api_client).create_transaction(
+        response = transactions_api.create_transaction(
             plan.plan_id, ynab.PostTransactionsWrapper(transactions=new_transactions)
         )
     except YNAB_ERRORS as error:
@@ -1360,6 +1897,106 @@ def send_transactions(plan, transactions):
             f"cannot add the transactions to YNAB: {error}\n"
             "Check the accounts in YNAB. Some transactions can be there."
         )
+    # The last state of each transaction, by its ID.
+    saved_transactions = {
+        transaction.id: transaction for transaction in saved_transactions_of(response)
+    }
+
+    other_side_ids = [
+        transaction.transfer_transaction_id
+        for transaction in saved_transactions.values()
+        if transaction.transfer_account_id is not None
+    ]
+    if None in other_side_ids:
+        die(
+            "YNAB returned a transfer without the ID of its other side. Check the "
+            "other sides of the new transfers in YNAB."
+        )
+    if other_side_ids:
+        updates = [
+            ynab.SaveTransactionWithIdOrImportId(
+                id=transaction_id,
+                cleared=ynab.TransactionClearedStatus.CLEARED,
+                approved=False,
+            )
+            for transaction_id in other_side_ids
+        ]
+        try:
+            response = transactions_api.update_transactions(
+                plan.plan_id, ynab.PatchTransactionsWrapper(transactions=updates)
+            )
+        except YNAB_ERRORS as error:
+            die(
+                "cannot update the other sides of the new transfers in YNAB: "
+                f"{error}\nCheck them in YNAB."
+            )
+        for transaction in saved_transactions_of(response):
+            saved_transactions[transaction.id] = transaction
+
+    wrong_transactions = [
+        transaction
+        for transaction in saved_transactions.values()
+        if transaction.approved
+        or transaction.cleared != ynab.TransactionClearedStatus.CLEARED
+    ]
+    if wrong_transactions:
+        log("YNAB holds these new transactions as approved or not cleared:")
+        for transaction in wrong_transactions:
+            log(f"  {describe_ynab_transaction(transaction)}")
+        die("check the transactions above in YNAB")
+
+
+def clear_ynab_transactions(plan, ynab_transactions):
+    # Makes each of `ynab_transactions` cleared, and leaves the rest of it as
+    # it is, such as its approval.
+    updates = [
+        ynab.SaveTransactionWithIdOrImportId(
+            id=ynab_transaction.id, cleared=ynab.TransactionClearedStatus.CLEARED
+        )
+        for ynab_transaction in ynab_transactions
+    ]
+    try:
+        ynab.TransactionsApi(plan.api_client).update_transactions(
+            plan.plan_id, ynab.PatchTransactionsWrapper(transactions=updates)
+        )
+    except YNAB_ERRORS as error:
+        die(
+            f"cannot clear the transactions in YNAB: {error}\n"
+            "Check the accounts in YNAB. Some transactions can be cleared."
+        )
+
+
+def describe_ynab_transaction(ynab_transaction):
+    # Returns the date, the amount, the payee, and the account of a YNAB
+    # transaction, as `format_details` gives them.
+    return format_details(
+        ynab_transaction.var_date,
+        from_milliunits(ynab_transaction.amount),
+        ynab_transaction.payee_name or "",
+        ynab_transaction.account_name,
+    )
+
+
+def saved_transactions_of(response):
+    # Returns the transactions in a response of YNAB to a save. The response
+    # holds a list of transactions, or one transaction.
+    if response.data.transactions is not None:
+        return response.data.transactions
+    if response.data.transaction is not None:
+        return [response.data.transaction]
+    return []
+
+
+def read_ynab_account(plan, account_id):
+    # Returns the YNAB account with `account_id`, with its balances of now.
+    account_name = plan.account_names.get(account_id, str(account_id))
+    response = call_ynab(
+        f"read the YNAB account '{account_name}'",
+        ynab.AccountsApi(plan.api_client).get_account_by_id,
+        plan.plan_id,
+        account_id,
+    )
+    return response.data.account
 
 
 def report_other_sides(transfers):
@@ -1401,13 +2038,19 @@ def report_ignored_transactions(comparison):
 
 def report_ynab_differences(comparison):
     # Logs, for each account, the YNAB transactions that its statement does
-    # not have, and the statement transactions that YNAB does not have.
+    # not have, the statement transactions that YNAB does not have, and the
+    # YNAB transactions that match the statement but are not cleared.
     for account, ynab_name in YNAB_ACCOUNT_NAMES.items():
         extra_keys = comparison.extra_keys_by_account.get(account, [])
         missing_transactions = [
             transaction
             for transaction in comparison.missing_transactions
             if transaction.account == account
+        ]
+        uncleared_transactions = [
+            ynab_transaction
+            for ynab_transaction in comparison.uncleared_transactions
+            if ynab_transaction.account_name == ynab_name
         ]
         if extra_keys:
             log(f"{ynab_name} in YNAB has transactions that its statement lacks:")
@@ -1420,6 +2063,13 @@ def report_ynab_differences(comparison):
                     transaction.date, transaction.amount, transaction.payee
                 )
                 log(f"  {details}")
+        if uncleared_transactions:
+            log(
+                f"{ynab_name} in YNAB has statement transactions that are not "
+                "cleared:"
+            )
+            for ynab_transaction in uncleared_transactions:
+                log(f"  {describe_ynab_transaction(ynab_transaction)}")
 
 
 def to_milliunits(amount):
