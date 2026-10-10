@@ -3,11 +3,13 @@ local strings = require("strings")
 
 local m = {}
 
--- TODO: Drop this once we drop Claude.
---
--- Check if a Docker container name belongs to Claude Code.
+-- Check if a Docker container name belongs to one of the agent launchers.
 local function is_claude_code_container(container_name)
     return container_name:match("^claude_code_")
+end
+
+local function is_opencode_container(container_name)
+    return container_name:match("^opencode_")
 end
 
 -- Resolve the inner process name when `docker` is the foreground process on
@@ -27,6 +29,10 @@ local function resolve_docker_inner_process(args_line)
 
     if is_claude_code_container(container_name) then
         return "claude"
+    end
+
+    if is_opencode_container(container_name) then
+        return "opencode"
     end
 
     return container_name

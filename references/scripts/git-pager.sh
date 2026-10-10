@@ -2,7 +2,8 @@
 set -euo pipefail
 trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 
-# The `cl` launcher sets `AGENT_PROFILE` in every container that it starts.
+# The `cl` and `oc` launchers set `AGENT_PROFILE` in every container that they
+# start.
 # Inside one, use the pager that Git uses when `core.pager` is not set: the
 # `PAGER` variable, or `less`. Git runs the pager through a shell, so `PAGER`
 # can hold arguments, and `sh -c` keeps that behavior.

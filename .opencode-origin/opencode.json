@@ -1,0 +1,558 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "update": "disable",
+  "permissions": [
+    {
+      "action": "*",
+      "resource": "*",
+      "effect": "deny"
+    },
+    {
+      "action": "read",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "glob",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "grep",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "edit",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "skill",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "subagent",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "question",
+      "resource": "*",
+      "effect": "deny"
+    },
+    {
+      "action": "webfetch",
+      "resource": "*",
+      "effect": "deny"
+    },
+    {
+      "action": "websearch",
+      "resource": "*",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "*",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "./jpenv-bin/lint *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "./jpenv-bin/tests *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "ai_git_add *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "ai_git_commit *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "ai_git_restore",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "cat *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "cd *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "cut *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "date *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "echo *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "false",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "git branch --show-current",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "git diff *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "git log *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "git remote --verbose",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "git rev-list *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "git show *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "git status *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "grep *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "head *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "ls *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "mkdir *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "review *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "rg *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "safe_mv *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "safe_rm *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "tail *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "true",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "wc *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "which *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "whois *",
+      "effect": "allow"
+    },
+    {
+      "action": "github_get_commit",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "github_get_file_contents",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "github_get_label",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "github_get_latest_release",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "github_get_me",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "github_get_release_by_tag",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "github_get_tag",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "github_get_team_members",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "github_get_teams",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "github_issue_read",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "github_list_branches",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "github_list_commits",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "github_list_issue_fields",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "github_list_issue_types",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "github_list_issues",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "github_list_pull_requests",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "github_list_releases",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "github_list_repository_collaborators",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "github_list_tags",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "github_pull_request_read",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "github_search_code",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "github_search_commits",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "github_search_issues",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "github_search_pull_requests",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "github_search_repositories",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "github_search_users",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "grafana_list_datasources",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "grafana_list_loki_label_values",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "grafana_query_loki_logs",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "grafana_query_loki_stats",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_extract_images",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_get_attachment",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_get_diff",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_get_diff_threads",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_get_document",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_get_initiative",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_get_issue",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_get_issue_status",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_get_milestone",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_get_project",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_get_release",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_get_release_note",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_get_status_updates",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_get_team",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_get_user",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_get_workspace",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_list_comments",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_list_cycles",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_list_diffs",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_list_documents",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_list_initiative_labels",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_list_initiatives",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_list_issue_labels",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_list_issue_statuses",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_list_issues",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_list_milestones",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_list_project_labels",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_list_projects",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_list_release_notes",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_list_release_pipelines",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_list_releases",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_list_teams",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_list_users",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "linear_search_documentation",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "edit",
+      "resource": "*/opencode.json",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "*/opencode.jsonc",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "*/jpenv-bin/**",
+      "effect": "deny"
+    },
+    {
+      "action": "external_directory",
+      "resource": "*",
+      "effect": "allow"
+    }
+  ],
+  "mcp": {},
+  "references": {}
+}

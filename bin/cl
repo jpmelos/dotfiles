@@ -45,7 +45,7 @@
 # /   - `--setting-sources=user`.
 # /   - `--model` with the `model` of the profile, if any.
 # /   - `--effort` with the `effortLevel` of the profile, if any.
-# /   - One `--add-dir` per visible project.
+# /   - `--add-dir` with `~/devel`.
 # /   A `--setting-sources`, `--model`, or `--effort` that you pass wins. An
 # /   `--add-dir` that you pass adds to the list.
 # /
@@ -200,12 +200,10 @@
 # /   `--no-docker-socket` does not close this path. Run an agent on the
 # /   dotfiles repository only when you trust it.
 # /
-# /   The `~/devel` mount is read-write, and every project is an `--add-dir`,
+# /   The `~/devel` mount is read-write, and `~/devel` itself is an `--add-dir`,
 # /   so the agent can edit every repository under `~/devel`, not only the
 # /   project. Only the dotfiles repository is read-only. Move a repository
-# /   that the agent must not touch out of `~/devel`, or add a
-# /   `.list_project_dirs_ignore` file to keep it out of the `--add-dir` list.
-# /   The mount still exposes an ignored repository.
+# /   that the agent must not touch out of `~/devel`.
 # /
 # /   The image build runs the `jpenv-container.sh` file of the project. A
 # /   cloned repository can commit one, and the agent can write one into any
@@ -484,7 +482,7 @@ def main():
     )
 
     harness_args = build_harness_args(
-        options.harness_args, dependency_dirs, model, effort
+        options.harness_args, paths.devel_dir, model, effort
     )
 
     run_config = RunConfig(
@@ -636,7 +634,7 @@ def resolve_host_paths():
         origin_dir=origin_dir,
         resolved_origin_dir=os.path.realpath(origin_dir),
         dockerfile_path=os.path.join(
-            dotfiles_dir, "references", "ai_containers", "Dockerfile"
+            dotfiles_dir, "references", "ai_containers", "Dockerfile_cl"
         ),
         user_config_path=f"{home}/config.json",
     )
@@ -2232,7 +2230,7 @@ def apply_mcp_servers(profile_json, mcp_servers):
 # --------------------------------------------------------------------------------------
 
 
-def build_harness_args(user_harness_args, dependency_dirs, model, effort):
+def build_harness_args(user_harness_args, devel_dir, model, effort):
     # Read settings from the profile only. The `project` and `local` sources
     # are files under `.claude` in the repository, and a cloned repository can
     # commit either one with hooks in it. The profile is the one place that
@@ -2255,12 +2253,10 @@ def build_harness_args(user_harness_args, dependency_dirs, model, effort):
     if effort is not None:
         harness_args.append(f"--effort={effort}")
 
-    # Add the dependency directories to Claude's context. The current project
-    # is already the working directory, and the caller leaves it out. The
-    # harness refuses to start on a directory that does not exist, so the
-    # caller passes only the projects that the container can see.
-    for project_dir in dependency_dirs:
-        harness_args.append(f"--add-dir={project_dir.path}")
+    # The entire `~/devel` tree is one working directory. The mount exposes
+    # it at this path inside the container, and it always exists: the host
+    # paths refuse to resolve without it.
+    harness_args.append(f"--add-dir={devel_dir}")
 
     # The arguments of the user come last. A `--` among them ends the options
     # for the harness, so nothing of ours can follow it.
