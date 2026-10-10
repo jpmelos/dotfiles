@@ -183,14 +183,14 @@
 # /   there. An origin outside of `~/devel` is not visible in the container.
 # /   The copy overwrites the files that the origin holds, and it mirrors the
 # /   directories that the origin holds, so a file that the agent adds to
-# /   `commands` does not survive the next run. A top-level entry
+# /   `skills` does not survive the next run. A top-level entry
 # /   that an earlier run installed and that the origin no longer holds is
 # /   removed. The list of installed entries lives in
 # /   `~/.oc-launcher/<profile>/manifest`, which no mount exposes, so the
 # /   agent cannot make a run remove another entry. The lock that makes two
 # /   launches of a profile take turns lives next to it, so the agent cannot
 # /   stall a launch from inside the container. The rest of the profile
-# /   directory is not touched. The `/learn` command writes to the origin, so
+# /   directory is not touched. The `learn` skill writes to the origin, so
 # /   it works only from the dotfiles project.
 # /
 # /   The container is limited to a number of processes and an amount of
@@ -2474,7 +2474,7 @@ def profile_mount_args(run_config):
     home = run_config.paths.home
     # The default configuration directory of OpenCode. The mount below puts
     # the profile directory there, so the harness reads the profile
-    # `opencode.json`, `cli.json`, `commands`, `skills`, and `AGENTS.md`
+    # `opencode.json`, `cli.json`, `skills`, and `AGENTS.md`
     # without any indirection, exactly like a stock install. The source lives
     # below `.config` on the host, at the same depth as the target, so a
     # relative link works in both places. See `copy_tree_into`.

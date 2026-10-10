@@ -1,9 +1,8 @@
 ---
 name: linear-issue
 description: Create a Linear issue with a concise title, an implementation-ready description, blocking relations, and a milestone.
-argument-hint: what the issue is about [-- team, project, or other hints]
-disable-model-invocation: true
-allowed-tools: mcp__linear__save_issue
+metadata:
+  opencode/autoinvoke: false
 ---
 
 Create or edit a Linear issue according to the current conversation.
@@ -110,8 +109,4 @@ for them.
 
 Report the identifier and the URL of the created issue.
 
-Follow these additional instructions:
-
-```
-$ARGUMENTS
-```
+Follow any additional instructions in the user message.
