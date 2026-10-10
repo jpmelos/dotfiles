@@ -189,12 +189,22 @@
     },
     {
       "action": "shell",
+      "resource": "sort *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
       "resource": "tail *",
       "effect": "allow"
     },
     {
       "action": "shell",
       "resource": "true",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "uniq *",
       "effect": "allow"
     },
     {

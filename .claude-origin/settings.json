@@ -47,6 +47,8 @@
       "Bash(head *)",
       "Bash(tail *)",
       "Bash(cut *)",
+      "Bash(sort *)",
+      "Bash(uniq *)",
       "Bash(mkdir *)",
       "Bash(safe_mv *)",
       "Bash(safe_rm *)",
