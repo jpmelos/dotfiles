@@ -1,0 +1,1577 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["click>=8.1,<9", "ynab>=4.4.0,<5"]
+# ///
+
+# vim: ft=python
+
+import collections
+import contextlib
+import csv
+import datetime
+import decimal
+import enum
+import io
+import json
+import os
+import re
+import shlex
+import subprocess
+import sys
+import tempfile
+import time
+from dataclasses import dataclass
+
+import click
+import urllib3
+import ynab
+
+LOGIN_URL = "https://www1.bmo.com/banking/digital/"
+# The `agent-browser` session of this script. A session of its own keeps the
+# script from sharing a browser with other uses of `agent-browser`.
+BROWSER_SESSION = "budget_imports"
+# How long to wait for a page to load, and for a download to finish.
+PAGE_WAIT_SECONDS = 5
+DOWNLOAD_WAIT_SECONDS = 10
+# How many days back the script looks. The chequing download covers these
+# days, and the script ignores the transactions before them, in the statements
+# and in YNAB.
+HISTORY_DAYS = 30
+# The first date of the transactions to process, without `--from-date`.
+DEFAULT_FROM_DATE = datetime.date(2026, 10, 1)
+# The format of the date that `--from-date` takes.
+OPTION_DATE_FORMAT = "%Y-%m-%d"
+# The forms take dates as MM/DD/YYYY.
+FORM_DATE_FORMAT = "%m/%d/%Y"
+# The bank gives this name to every statement that it sends.
+DOWNLOAD_NAME = "statement.csv"
+CSV_FORMAT = "Spreadsheet (CSV format)"
+COOKIE_BUTTON = 'button[id="onetrust-accept-btn-handler"]'
+# In the accessibility tree of the page of an account, the current balance is
+# the first text with a dollar sign after the text `Current balance`.
+CURRENT_BALANCE_PATTERN = re.compile(
+    r'StaticText "Current balance".*?StaticText "(?P<balance>[^"]*\$[^"]*)"',
+    re.DOTALL,
+)
+SMS_OPTION_NAME = "SMS text ••• - ••• -"
+VERIFICATION_CONSENT_NAME = (
+    "IMPORTANT: This code grants access to your accounts. It should always be "
+    "kept private. To proceed, you must confirm you will not provide this "
+    "verification code to anyone."
+)
+# The header row of the payee map.
+PAYEE_COLUMNS = ("Original Payee Name", "New Payee Name")
+
+
+# --------------------------------------------------------------------------------------
+# Entry point.
+# --------------------------------------------------------------------------------------
+
+
+# The docstring is the help text. Click rewraps each paragraph, and keeps the
+# indent of its first line. A paragraph after a `\b` line keeps its form.
+@click.command(context_settings={"help_option_names": ["-h", "--help"]})
+@click.option(
+    "--from-date",
+    type=click.DateTime(formats=[OPTION_DATE_FORMAT]),
+    default=DEFAULT_FROM_DATE.isoformat(),
+    show_default=True,
+    metavar="YYYY-MM-DD",
+    help=(
+        "Ignore the transactions before this date. Process the transactions "
+        "on this date and after it. The transactions older than 30 days stay "
+        "ignored."
+    ),
+)
+@click.option(
+    "--no-download",
+    is_flag=True,
+    help=(
+        "Do not log in to the bank. Read the statements that the last run "
+        "downloaded."
+    ),
+)
+@click.option(
+    "--no-upload",
+    is_flag=True,
+    help="Do not change YNAB. Show the transactions that the script would add.",
+)
+def main(from_date, no_download, no_upload):
+    """Download the recent transactions of the BMO chequing account and of
+    the BMO MasterCard as CSV files, through `agent-browser`. Then name the
+    payee of each transaction, print all the transactions, and add to YNAB
+    the ones that it does not have.
+
+    The script logs in with the `bmo.username` and `bmo.password` values that
+    `jc get` reads. When the bank asks for a verification code, the script
+    has the bank send it by SMS, and asks you to type it. The chequing file
+    holds the transactions of the last 30 days. The credit card file holds
+    all the transactions that the bank offers.
+
+    The script works only on the transactions from the start date on, in the
+    statements and in YNAB. The start date is the later of the `--from-date`
+    date and the date 30 days ago. So run the script at least once every 30
+    days, or it will not see some transactions.
+
+    Payees:
+
+      The payee map in `payees.csv` turns each payee name of the bank into
+      your name for that payee. When a payee name of the bank is not in the
+      map, the script shows its transactions and asks you for your name. The
+      script saves the answer to the map at once, and applies it to every
+      transaction with that payee.
+
+      The map also turns each of your names into itself, unless it has an
+      entry for that name already. When a payee name of the bank is one of
+      your names, the script keeps it, without a question.
+
+    Report:
+
+      The report shows the date, the amount, the payee, and the account of
+      each transaction. The transactions are in order of date, then amount,
+      then payee, then account, with the chequing account first. A negative
+      amount is money that you lose, and a positive amount is money that you
+      make. The credit card statement uses the opposite signs, so the script
+      inverts its amounts.
+
+      After the transactions, the report shows the current balance of each
+      account, as the page of the account shows it. The balances have the
+      same signs as the amounts, so they compare with the balances in YNAB.
+      With `--no-download`, the script does not open the pages, so it shows
+      no balances.
+
+    YNAB:
+
+      The script reads the API key with `jc get ynab.api_key`. The YNAB
+      account "BMO Chequing" holds the chequing transactions, and "BMO
+      MasterCard" holds the credit card transactions. They must be in the
+      only plan of the user.
+
+      The script compares each account in YNAB with its statement, from the
+      start date on. Transactions match by date, payee, and amount,
+      and each YNAB transaction matches one statement transaction at most.
+      The script adds the statement transactions that YNAB does not have, as
+      cleared and not approved. It ignores the YNAB transactions that the
+      statement does not have, such as one that you added by hand before the
+      bank posted it. When the bank posts that transaction, it matches only
+      with the same date, payee, and amount. Otherwise, the script adds the
+      transaction of the bank too.
+
+      A payee such as `Transfer: Wallet` marks a transfer to the YNAB account
+      that it names. A negative amount leaves the account of the statement,
+      and a positive amount comes into it. When YNAB gets one side of a
+      transfer, it adds the other side to the other account by itself, on
+      the same date. So the script sends only one side of each transfer:
+
+    \b
+      - A transfer between "BMO Chequing" and "BMO MasterCard" must be in
+        both statements, on the same date.
+      - A transfer to any other account needs only its side in the
+        statement. The script cannot check the other account, so it shows
+        the side that YNAB will add there. If that account has the
+        transaction already, such as from a direct import, the transaction
+        will be there twice.
+
+      The script only adds transactions. It never edits or deletes one. It
+      stops before any change when:
+
+    \b
+      - A transfer to add between "BMO Chequing" and "BMO MasterCard" is in
+        one statement, but not in the other on the same date.
+      - A transfer names the account of its own statement, or no open YNAB
+        account. A name that more than one open account has counts as none.
+      - The payee of a transaction to add is new to YNAB, but differs from a
+        YNAB payee only in case. YNAB can give the transaction that payee.
+
+      Before it adds transactions, the script shows them and asks you. After
+      it adds them, it compares YNAB with the statements again. With
+      `--no-upload`, the script shows them and stops.
+
+    Files:
+
+      The files are in `$XDG_STATE_HOME/budget_imports`, or in
+      `~/.local/state/budget_imports` when that variable is not set or
+      empty. Only you can open that directory. It holds:
+
+    \b
+      - `chequing.csv` and `credit_card.csv`, the statements.
+      - `bmo_session.json`, the cookies of the last session. The next run
+        loads them.
+      - `payees.csv`, the payee map, with the columns `Original Payee Name`
+        and `New Payee Name`. You can edit it. Keep the header row.
+      - `browser-error.png`, a screenshot of the browser after a failed
+        step. The screenshot can show account data.
+    """
+    try:
+        exit_status = run(from_date.date(), no_download, no_upload)
+    except KeyboardInterrupt:
+        # Ctrl-C at a question or during a command. The shell convention for
+        # a death by SIGINT is 128 + 2.
+        sys.exit(130)
+    sys.exit(exit_status)
+
+
+def run(from_date, no_download, no_upload):
+    # Returns the exit status of the script.
+    #
+    # A problem with the YNAB key stops the script before the bank asks for a
+    # code.
+    ynab_api_key = read_config_text("ynab.api_key")
+
+    paths = resolve_session_paths()
+    prepare_session_dir(paths.session_dir)
+    if no_download:
+        use_last_statements(paths)
+        balances = None
+    else:
+        balances = run_download(paths)
+    print(f"Chequing account: {paths.chequing_file}")
+    print(f"Credit card: {paths.credit_card_file}")
+
+    # The script works only on the transactions from this date on, in the
+    # statements and in YNAB.
+    start_date = max(
+        from_date, datetime.date.today() - datetime.timedelta(days=HISTORY_DAYS)
+    )
+
+    step("Reading the statements")
+    statement_transactions = [
+        *read_statement(paths.chequing_file, CHEQUING_STATEMENT),
+        *read_statement(paths.credit_card_file, CREDIT_CARD_STATEMENT),
+    ]
+    transactions = [
+        transaction
+        for transaction in statement_transactions
+        if transaction.date >= start_date
+    ]
+    ignored_count = len(statement_transactions) - len(transactions)
+    print(f"Ignored transactions before {start_date.isoformat()}: {ignored_count}")
+
+    try:
+        step("Naming the payees")
+        payee_map = load_payee_map(paths.payees_file)
+        new_name_count = assign_payees(transactions, payee_map, paths.payees_file)
+        print(f"New payee names saved to {paths.payees_file}: {new_name_count}")
+
+        step("Transactions")
+        print_report(transactions)
+
+        step("Balances")
+        if balances is None:
+            print("Not read, because of --no-download.")
+        else:
+            print_balances(balances)
+
+        step("Checking YNAB")
+        save_to_ynab(transactions, start_date, ynab_api_key, upload=not no_upload)
+    except StepError as error:
+        log(f"Error: {error}")
+        return error.exit_status
+    return 0
+
+
+# --------------------------------------------------------------------------------------
+# Configuration.
+# --------------------------------------------------------------------------------------
+
+
+def read_config_text(path):
+    # Returns the text at `path` in the configuration. Exits when `jc get`
+    # fails, or when the value is missing, `null`, empty, or not text. The
+    # stderr of `jc` passes through, so its message reaches the user.
+    try:
+        result = subprocess.run(
+            ["jc", "get", path],
+            stdout=subprocess.PIPE,
+            encoding="utf-8",
+            errors="replace",
+        )
+    except OSError as error:
+        die(f"cannot run jc: {error}")
+    if result.returncode != 0:
+        sys.exit(1)
+
+    try:
+        value = json.loads(result.stdout)
+    except ValueError as error:
+        die(f"jc returned invalid JSON for {path}: {error}")
+    if value is None or value == "":
+        die(f"{path} not found in ~/config.json")
+    if not isinstance(value, str):
+        die(f"{path} in ~/config.json is not text")
+    return value
+
+
+# --------------------------------------------------------------------------------------
+# Session directory.
+# --------------------------------------------------------------------------------------
+
+
+@dataclass
+class SessionPaths:
+    # The directory holds the cookies of the bank session and the downloaded
+    # statements. It sits at a fixed path outside of any repository, and only
+    # the user can open it.
+    session_dir: str
+    session_file: str
+    chequing_file: str
+    credit_card_file: str
+    # Where the browser saves each statement that the bank sends.
+    download_file: str
+    # The map from the payee names of the bank to the names of the user.
+    payees_file: str
+    screenshot_file: str
+
+
+def resolve_session_paths():
+    state_home = os.environ.get("XDG_STATE_HOME") or os.path.join(
+        os.path.expanduser("~"), ".local", "state"
+    )
+    session_dir = os.path.join(state_home, "budget_imports")
+    return SessionPaths(
+        session_dir=session_dir,
+        session_file=os.path.join(session_dir, "bmo_session.json"),
+        chequing_file=os.path.join(session_dir, "chequing.csv"),
+        credit_card_file=os.path.join(session_dir, "credit_card.csv"),
+        download_file=os.path.join(session_dir, DOWNLOAD_NAME),
+        payees_file=os.path.join(session_dir, "payees.csv"),
+        screenshot_file=os.path.join(session_dir, "browser-error.png"),
+    )
+
+
+def prepare_session_dir(session_dir):
+    # `makedirs` applies the mode only to a directory that it creates, so the
+    # mode of an existing one is set as well.
+    try:
+        os.makedirs(session_dir, mode=0o700, exist_ok=True)
+        os.chmod(session_dir, 0o700)
+    except OSError as error:
+        die(f"cannot prepare {session_dir}: {error}")
+
+
+# --------------------------------------------------------------------------------------
+# Steps.
+# --------------------------------------------------------------------------------------
+
+
+def run_download(paths):
+    # Downloads the statements from the bank, and returns the balances that
+    # `download_statements` returns. Exits with the status of the failed step
+    # when a step fails.
+    username = read_config_text("bmo.username")
+    password = read_config_text("bmo.password")
+
+    os.environ["AGENT_BROWSER_SESSION"] = BROWSER_SESSION
+    browser = Browser()
+    try:
+        balances = download_statements(browser, paths, username, password)
+    except StepError as error:
+        log(f"Error: {error}")
+        # Before the browser opens, there is no page to show.
+        if browser.opened:
+            take_error_screenshot(browser, paths.screenshot_file)
+        sys.exit(error.exit_status)
+
+    step("Statements downloaded")
+    return balances
+
+
+def use_last_statements(paths):
+    step("Using the statements of the last run")
+    for statement_path in (paths.chequing_file, paths.credit_card_file):
+        if not os.path.isfile(statement_path):
+            die(f"{statement_path} does not exist. Run without --no-download first")
+
+
+def download_statements(browser, paths, username, password):
+    # Returns the current balance of each account. See `read_balance`.
+    open_login_page(browser, paths)
+    accept_cookies(browser)
+    log_in(browser, username, password)
+    pass_verification(browser)
+    chequing_balance = download_chequing_statement(browser, paths)
+    credit_card_balance = download_credit_card_statement(browser, paths)
+    save_session(browser, paths)
+    return {
+        Account.CHEQUING: chequing_balance,
+        Account.CREDIT_CARD: credit_card_balance,
+    }
+
+
+def open_login_page(browser, paths):
+    step("Opening the login page")
+    # Close the browser that an earlier run left open, so that `open` launches
+    # a new browser with the download path.
+    browser.run("close", stdout=subprocess.DEVNULL)
+    time.sleep(1)
+
+    open_options = ["--download-path", paths.session_dir]
+    # Before the first successful run, there is no session file.
+    if os.path.isfile(paths.session_file):
+        open_options += ["--state", paths.session_file]
+    browser.open(LOGIN_URL, open_options)
+    time.sleep(PAGE_WAIT_SECONDS)
+
+
+def accept_cookies(browser):
+    step("Accepting cookies")
+    output = browser.run("get", "count", COOKIE_BUTTON, stdout=subprocess.PIPE)
+    try:
+        count = int(output)
+    except ValueError:
+        raise StepError(
+            f"`agent-browser get count` printed {output.strip()!r}, expected a number"
+        ) from None
+    if count > 0:
+        browser.run("click", COOKIE_BUTTON)
+    time.sleep(PAGE_WAIT_SECONDS)
+
+
+def log_in(browser, username, password):
+    step("Logging in")
+    browser.run("fill", 'input[id^="username-input"]', Secret(username))
+    browser.run("fill", 'input[id^="password-input"]', Secret(password))
+    browser.find_role("button", "click", "SIGN IN")
+    time.sleep(PAGE_WAIT_SECONDS)
+
+
+def pass_verification(browser):
+    step("Checking for 2FA")
+    if browser.succeeds("find", "role", "radio", "text", "--name", "SMS text"):
+        browser.find_role("radio", "click", SMS_OPTION_NAME)
+        browser.find_role("checkbox", "click", VERIFICATION_CONSENT_NAME)
+        browser.find_role("button", "click", "SEND CODE")
+        time.sleep(PAGE_WAIT_SECONDS)
+
+        sms_code = ask("Enter the SMS code: ")
+        browser.find_role(
+            "spinbutton", "fill", "Enter verification code", Secret(sms_code)
+        )
+        browser.find_role("button", "click", "CONFIRM")
+        time.sleep(PAGE_WAIT_SECONDS)
+
+    time.sleep(PAGE_WAIT_SECONDS)
+
+
+def download_chequing_statement(browser, paths):
+    # Returns the current balance of the account. See `read_balance`.
+    step("Selecting the chequing account")
+    browser.find_role("link", "click", "Chequing")
+    time.sleep(PAGE_WAIT_SECONDS)
+    balance = read_balance(browser, CHEQUING_STATEMENT)
+
+    step("Downloading the chequing account transactions")
+    browser.find_role("link", "click", "DOWNLOAD")
+    browser.find_role("radio", "click", "Transactions between these dates:")
+    to_date = datetime.date.today()
+    from_date = to_date - datetime.timedelta(days=HISTORY_DAYS)
+    browser.find_role("textbox", "fill", "From", from_date.strftime(FORM_DATE_FORMAT))
+    browser.find_role("textbox", "fill", "To", to_date.strftime(FORM_DATE_FORMAT))
+    browser.run("select", 'select[name="format"]', CSV_FORMAT)
+    browser.run("click", "#ba-tx-download-submit")
+    time.sleep(DOWNLOAD_WAIT_SECONDS)
+
+    browser.find_role("link", "click", "EXIT")
+    save_statement(paths.download_file, paths.chequing_file)
+    return balance
+
+
+def download_credit_card_statement(browser, paths):
+    # Returns the current balance of the account. See `read_balance`.
+    step("Selecting the credit card")
+    browser.find_role("link", "click", "MasterCard")
+    time.sleep(PAGE_WAIT_SECONDS)
+    balance = read_balance(browser, CREDIT_CARD_STATEMENT)
+
+    step("Downloading the credit card transactions")
+    browser.find_role("link", "click", "DOWNLOAD")
+    browser.run("select", 'select[name="period"]', "All Available Transactions")
+    browser.run("select", 'select[name="format"]', CSV_FORMAT)
+    browser.find_role("button", "click", "DOWNLOAD")
+    time.sleep(DOWNLOAD_WAIT_SECONDS)
+
+    save_statement(paths.download_file, paths.credit_card_file)
+    return balance
+
+
+def read_balance(browser, statement_format):
+    # Returns the current balance on the page of the account of
+    # `statement_format`, with the signs of `Transaction.amount`. Returns
+    # `None` when the page shows no balance that the script can read. The
+    # statements do not need the balance, so that case only warns.
+    snapshot = browser.run("snapshot", stdout=subprocess.PIPE)
+    match = CURRENT_BALANCE_PATTERN.search(snapshot)
+    balance = None if match is None else parse_balance(match["balance"])
+    if balance is None:
+        account_label = ACCOUNT_LABELS[statement_format.account]
+        log(f"Warning: cannot read the current balance of the {account_label} page")
+        return None
+    return -balance if statement_format.inverted_amounts else balance
+
+
+def parse_balance(text):
+    # Returns the amount in `text`, such as `$6,494.68` or `- $12.00`, or
+    # `None` when `text` holds no amount.
+    try:
+        balance = decimal.Decimal(re.sub(r"[\s$,]", "", text))
+    except decimal.InvalidOperation:
+        return None
+    return balance if balance.is_finite() else None
+
+
+def capture_page(browser, paths, name):
+    # This function has no caller. It stays to help write new steps: call it
+    # after a step, and read the files to find the elements on the page.
+    #
+    # Saves an annotated screenshot of the page, and the accessibility tree of
+    # the page as text, to the session directory. Both can show account data,
+    # and only the user can open that directory.
+    step(f"Capturing the {name} page")
+    screenshot_path = os.path.join(paths.session_dir, f"{name}-page.png")
+    snapshot_path = os.path.join(paths.session_dir, f"{name}-page.txt")
+    browser.run(
+        "screenshot",
+        "--full",
+        "--annotate",
+        screenshot_path,
+        stdout=subprocess.DEVNULL,
+    )
+    snapshot = browser.run("snapshot", stdout=subprocess.PIPE)
+    try:
+        with open(snapshot_path, "w", encoding="utf-8") as handle:
+            handle.write(snapshot)
+    except OSError as error:
+        raise StepError(f"cannot save {snapshot_path}: {error}") from error
+    print(f"Screenshot: {screenshot_path}")
+    print(f"Page objects: {snapshot_path}")
+
+
+def save_session(browser, paths):
+    step("Saving the state")
+    browser.run("state", "save", paths.session_file)
+    try:
+        os.chmod(paths.session_file, 0o600)
+    except OSError as error:
+        raise StepError(
+            f"cannot set the mode of {paths.session_file}: {error}"
+        ) from error
+
+
+def save_statement(download_path, statement_path):
+    # Moves the statement at `download_path` to `statement_path`. Every
+    # statement arrives under the same name, so each one must move before the
+    # next download.
+    #
+    # Before the header row, the bank adds a line with the time of the export.
+    # It also adds empty lines around the header row. Keep only the header
+    # row, which is the first line with a comma, and the rows of the table.
+    # The lines stay bytes, so the encoding of the bank does not matter.
+    try:
+        with open(download_path, "rb") as download:
+            lines = download.readlines()
+    except FileNotFoundError:
+        raise StepError(
+            f"{download_path} does not exist. The download failed, or took more "
+            f"than {DOWNLOAD_WAIT_SECONDS} seconds"
+        ) from None
+    except OSError as error:
+        raise StepError(f"cannot read {download_path}: {error}") from error
+
+    header_found = False
+    kept_lines = []
+    for line in lines:
+        if b"," in line:
+            header_found = True
+        if header_found and line.strip():
+            kept_lines.append(line if line.endswith(b"\n") else line + b"\n")
+
+    try:
+        with open(statement_path, "wb") as statement:
+            statement.writelines(kept_lines)
+        os.remove(download_path)
+    except OSError as error:
+        raise StepError(f"cannot save {statement_path}: {error}") from error
+
+
+def take_error_screenshot(browser, screenshot_path):
+    # The screenshot can show account data, so it stays in the private session
+    # directory. The output of `agent-browser` goes to stderr, with the error.
+    try:
+        browser.run(
+            "screenshot", "--full", "--annotate", screenshot_path, stdout=sys.stderr
+        )
+    except StepError:
+        log("Warning: Failed to take a screenshot of the browser")
+        return
+    log(f"Screenshot of the browser: {screenshot_path}")
+
+
+# --------------------------------------------------------------------------------------
+# Transactions.
+# --------------------------------------------------------------------------------------
+
+
+class Account(enum.IntEnum):
+    # The order of the values is the order of the accounts in the report.
+    CHEQUING = 0
+    CREDIT_CARD = 1
+
+
+ACCOUNT_LABELS = {
+    Account.CHEQUING: "Chequing",
+    Account.CREDIT_CARD: "Credit card",
+}
+
+
+@dataclass
+class Transaction:
+    date: datetime.date
+    # A negative amount is money that the user loses, and a positive amount is
+    # money that the user makes.
+    amount: decimal.Decimal
+    # The payee name of the bank at first. The payee map replaces it with the
+    # name of the user.
+    payee: str
+    account: Account
+
+
+@dataclass(frozen=True)
+class StatementFormat:
+    account: Account
+    # The names of the columns, without the spaces around them. The column
+    # that the bank calls `Description` holds the payee name.
+    date_column: str
+    amount_column: str = "Transaction Amount"
+    payee_column: str = "Description"
+    # Whether the statement shows money that the user loses as a positive
+    # amount, which is the opposite of `Transaction.amount`.
+    inverted_amounts: bool = False
+
+
+CHEQUING_STATEMENT = StatementFormat(Account.CHEQUING, date_column="Date Posted")
+CREDIT_CARD_STATEMENT = StatementFormat(
+    Account.CREDIT_CARD, date_column="Transaction Date", inverted_amounts=True
+)
+# The statements give dates as YYYYMMDD.
+STATEMENT_DATE_FORMAT = "%Y%m%d"
+
+
+def read_statement(path, statement_format):
+    # Returns the transactions in the statement at `path`. The names in the
+    # header row and the values can have spaces around them, such as the
+    # padding after a payee name, so the spaces go away.
+    reader = csv.reader(io.StringIO(read_statement_text(path)))
+    header = next(reader, None)
+    if header is None:
+        log(f"Warning: {path} is empty, no transactions read")
+        return []
+
+    columns = [name.strip() for name in header]
+    date_index = find_column(path, columns, statement_format.date_column)
+    amount_index = find_column(path, columns, statement_format.amount_column)
+    payee_index = find_column(path, columns, statement_format.payee_column)
+
+    transactions = []
+    for row in reader:
+        if not any(cell.strip() for cell in row):
+            continue
+        # A payee name with a comma and without quotes spreads over the cells
+        # after it. When the payee name is the last column, those cells join
+        # back into it.
+        if len(row) > len(columns) and payee_index == len(columns) - 1:
+            row = [*row[:payee_index], ",".join(row[payee_index:])]
+        location = f"{path}:{reader.line_num}"
+        if len(row) != len(columns):
+            die(f"{location}: expected {len(columns)} values, found {len(row)}")
+
+        amount = parse_statement_amount(row[amount_index], location)
+        if statement_format.inverted_amounts:
+            amount = -amount
+        transactions.append(
+            Transaction(
+                date=parse_statement_date(row[date_index], location),
+                amount=amount,
+                payee=row[payee_index].strip(),
+                account=statement_format.account,
+            )
+        )
+    return transactions
+
+
+def read_statement_text(path):
+    # The statements do not name their encoding. UTF-8 comes first, and
+    # Windows-1252 covers the rest.
+    try:
+        with open(path, "rb") as handle:
+            data = handle.read()
+    except OSError as error:
+        die(f"cannot read {path}: {error}")
+    try:
+        return data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return data.decode("cp1252", errors="replace")
+
+
+def find_column(path, columns, name):
+    # Returns the index of the column `name` in `columns`, the header row of
+    # the statement at `path`.
+    if name not in columns:
+        die(f"{path} has no '{name}' column. Its columns: {', '.join(columns)}")
+    return columns.index(name)
+
+
+def parse_statement_date(value, location):
+    try:
+        return datetime.datetime.strptime(value.strip(), STATEMENT_DATE_FORMAT).date()
+    except ValueError:
+        die(f"{location}: invalid date '{value.strip()}'")
+
+
+def parse_statement_amount(value, location):
+    try:
+        amount = decimal.Decimal(value.strip())
+    except decimal.InvalidOperation:
+        amount = None
+    if amount is None or not amount.is_finite():
+        die(f"{location}: invalid amount '{value.strip()}'")
+    return amount
+
+
+# --------------------------------------------------------------------------------------
+# Payees.
+# --------------------------------------------------------------------------------------
+
+
+def load_payee_map(path):
+    # Returns the map from the payee names of the bank to the names of the
+    # user, in the order of the file. A missing file gives an empty map. The
+    # spaces around each name go away, as they do in the statements.
+    try:
+        handle = open(path, encoding="utf-8", newline="")
+    except FileNotFoundError:
+        return {}
+    except OSError as error:
+        die(f"cannot read {path}: {error}")
+
+    payee_map = {}
+    try:
+        with handle:
+            reader = csv.reader(handle)
+            header = next(reader, None)
+            if header is None:
+                return payee_map
+            if tuple(name.strip() for name in header) != PAYEE_COLUMNS:
+                die(
+                    f"{path} has the header row '{','.join(header)}', expected "
+                    f"'{','.join(PAYEE_COLUMNS)}'"
+                )
+            for row in reader:
+                if not any(cell.strip() for cell in row):
+                    continue
+                location = f"{path}:{reader.line_num}"
+                if len(row) != len(PAYEE_COLUMNS):
+                    die(
+                        f"{location}: expected {len(PAYEE_COLUMNS)} values, "
+                        f"found {len(row)}"
+                    )
+                original_name, new_name = (cell.strip() for cell in row)
+                if not new_name:
+                    die(f"{location}: the new payee name is empty")
+                if original_name in payee_map:
+                    die(f"{location}: '{original_name}' is in the map already")
+                payee_map[original_name] = new_name
+    except (OSError, UnicodeDecodeError, csv.Error) as error:
+        die(f"cannot read {path}: {error}")
+    return payee_map
+
+
+def save_payee_map(path, payee_map):
+    # The new file replaces the old one in one rename, so an interruption
+    # cannot leave a partial map.
+    try:
+        descriptor, temp_path = tempfile.mkstemp(
+            dir=os.path.dirname(path), prefix=".payees-", suffix=".csv"
+        )
+    except OSError as error:
+        die(f"cannot save {path}: {error}")
+
+    replaced = False
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="") as handle:
+            writer = csv.writer(handle, lineterminator="\n")
+            writer.writerow(PAYEE_COLUMNS)
+            writer.writerows(payee_map.items())
+        os.replace(temp_path, path)
+        replaced = True
+    except OSError as error:
+        die(f"cannot save {path}: {error}")
+    finally:
+        if not replaced:
+            with contextlib.suppress(OSError):
+                os.remove(temp_path)
+
+
+def assign_payees(transactions, payee_map, payees_path):
+    # Replaces the payee name of the bank in every transaction with the name
+    # from `payee_map`, and returns how many new names the user gave. For a
+    # payee name without an entry, asks for the new name. The answer goes into
+    # the map, and the map goes to `payees_path` at once, so an interruption
+    # keeps the earlier answers. The questions come in order of date.
+    #
+    # No transaction changes before the last question. A new name can be the
+    # payee name of the bank in another transaction, and a lookup must never
+    # take a new name for a name of the bank.
+    # The file can lack the entries that keep the names of the user, such as
+    # after an edit by hand.
+    if add_kept_names(payee_map):
+        save_payee_map(payees_path, payee_map)
+
+    ordered_transactions = sorted(
+        transactions, key=lambda transaction: (transaction.date, transaction.amount)
+    )
+    new_name_count = 0
+    for transaction in ordered_transactions:
+        bank_name = transaction.payee
+        if bank_name in payee_map:
+            continue
+        matching_transactions = [
+            other for other in ordered_transactions if other.payee == bank_name
+        ]
+        payee_map[bank_name] = ask_payee_name(bank_name, matching_transactions)
+        add_kept_names(payee_map)
+        save_payee_map(payees_path, payee_map)
+        new_name_count += 1
+
+    for transaction in transactions:
+        transaction.payee = payee_map[transaction.payee]
+    return new_name_count
+
+
+def add_kept_names(payee_map):
+    # Adds an entry that turns each name of the user into itself, unless the
+    # map has an entry for that name already. A payee name of the bank that is
+    # also a name of the user then stays as it is. Returns whether the map
+    # changed.
+    changed = False
+    for new_name in list(payee_map.values()):
+        if new_name not in payee_map:
+            payee_map[new_name] = new_name
+            changed = True
+    return changed
+
+
+def ask_payee_name(bank_name, transactions):
+    # Shows `bank_name` and its `transactions`, and returns the payee name
+    # that the user types. The details go to stderr, with the question, so
+    # that they show on the terminal when stdout goes elsewhere.
+    log("")
+    log(f"Payee from the bank: {bank_name}")
+    for transaction in transactions:
+        details = format_details(
+            transaction.date, transaction.amount, ACCOUNT_LABELS[transaction.account]
+        )
+        log(f"  {details}")
+    while True:
+        payee_name = ask("New payee name: ")
+        if payee_name:
+            return payee_name
+        log("The payee name cannot be empty.")
+
+
+# --------------------------------------------------------------------------------------
+# Report.
+# --------------------------------------------------------------------------------------
+
+REPORT_HEADERS = ("Date", "Amount", "Payee", "Account")
+
+
+def print_report(transactions):
+    if not transactions:
+        print("No transactions.")
+        return
+
+    rows = [
+        (
+            transaction.date.isoformat(),
+            format_amount(transaction.amount),
+            transaction.payee,
+            ACCOUNT_LABELS[transaction.account],
+        )
+        for transaction in sorted(transactions, key=report_order)
+    ]
+    widths = [
+        max(len(row[index]) for row in (REPORT_HEADERS, *rows))
+        for index in range(len(REPORT_HEADERS))
+    ]
+    print_report_row(REPORT_HEADERS, widths)
+    print_report_row(tuple("-" * width for width in widths), widths)
+    for row in rows:
+        print_report_row(row, widths)
+
+
+def print_report_row(row, widths):
+    # The amount aligns to the right, and the other columns to the left. The
+    # last column has no padding, so no line ends in spaces.
+    date, amount, payee, account = row
+    date_width, amount_width, payee_width, _ = widths
+    print(
+        f"{date:<{date_width}}  {amount:>{amount_width}}  "
+        f"{payee:<{payee_width}}  {account}"
+    )
+
+
+def print_balances(balances):
+    # `balances` maps each account to its current balance, or to `None` when
+    # the script could not read it.
+    label_width = max(len(label) for label in ACCOUNT_LABELS.values())
+    for account, label in ACCOUNT_LABELS.items():
+        balance = balances.get(account)
+        balance_text = "unknown" if balance is None else format_amount(balance)
+        print(f"{label:<{label_width}}  {balance_text:>12}")
+
+
+def report_order(transaction):
+    # By date, then by amount, then by payee, then by account. The payee
+    # comparison ignores case, and the exact name breaks a tie.
+    return (
+        transaction.date,
+        transaction.amount,
+        transaction.payee.casefold(),
+        transaction.payee,
+        transaction.account,
+    )
+
+
+def format_amount(amount):
+    return f"{amount:,.2f}"
+
+
+def format_details(date, amount, *texts):
+    # Returns the date, the amount aligned to the right, and `texts`, with two
+    # spaces between each two.
+    return "  ".join([date.isoformat(), f"{format_amount(amount):>12}", *texts])
+
+
+# --------------------------------------------------------------------------------------
+# YNAB.
+# --------------------------------------------------------------------------------------
+
+# The YNAB account of each statement.
+YNAB_ACCOUNT_NAMES = {
+    Account.CHEQUING: "BMO Chequing",
+    Account.CREDIT_CARD: "BMO MasterCard",
+}
+ACCOUNTS_BY_YNAB_NAME = {name: account for account, name in YNAB_ACCOUNT_NAMES.items()}
+# YNAB amounts are in milliunits, thousandths of the unit of the currency.
+MILLIUNITS_PER_UNIT = 1000
+# YNAB takes payee names of at most this many characters.
+YNAB_PAYEE_NAME_LIMIT = 200
+# A payee such as `Transfer: BMO MasterCard` marks a transfer to the account
+# that it names. A negative amount leaves the account of the statement for the
+# named account, and a positive amount comes into it from the named account.
+TRANSFER_PATTERN = re.compile(r"Transfer\s*:\s*(?P<account_name>.+)")
+
+
+@dataclass
+class YnabPayees:
+    # The ID of each payee name that exactly one payee has.
+    ids_by_name: dict
+    # Every payee name, by its form without case.
+    names_by_folded_name: dict
+
+
+@dataclass
+class YnabPlan:
+    api_client: ynab.ApiClient
+    plan_id: str
+    # The ID of the YNAB account of each statement.
+    account_ids: dict
+    # The ID of the transfer payee of each open account of the plan, by the
+    # name of the account. A transaction with that payee is a transfer to that
+    # account. A name that more than one open account has is not here.
+    transfer_payee_ids: dict
+    # The name of every account of the plan, by its ID.
+    account_names: dict
+    # The payees that are not transfer payees.
+    payees: YnabPayees
+
+
+@dataclass
+class YnabComparison:
+    # The statement transactions that YNAB does not have.
+    missing_transactions: list
+    # For each account, the keys of the YNAB transactions that its statement
+    # does not have. See `ynab_key` for the keys.
+    extra_keys_by_account: dict
+
+
+def save_to_ynab(transactions, start_date, api_key, upload):
+    # Adds to YNAB the statement transactions that it does not have, and
+    # leaves the YNAB transactions that the statements do not have as they
+    # are. Every read and check happens before the first change, and a
+    # problem stops the script before any change. Without `upload`, the
+    # script reads YNAB and shows the transactions to add, but changes
+    # nothing.
+    with ynab.ApiClient(ynab.Configuration(access_token=api_key)) as api_client:
+        plan = load_ynab_plan(api_client)
+        comparison = compare_with_ynab(plan, transactions, start_date)
+        report_ignored_transactions(comparison)
+        transactions_to_send, problems = plan_additions(
+            plan, comparison.missing_transactions
+        )
+        for problem in problems:
+            log(f"Problem: {problem}")
+        if problems:
+            die("YNAB did not change. Fix the problems above, and run again.")
+
+        if not comparison.missing_transactions:
+            print("YNAB has every transaction of the statements already.")
+            return
+
+        step("Transactions to add to YNAB")
+        print_report(comparison.missing_transactions)
+        transfers = [
+            transaction
+            for transaction in transactions_to_send
+            if transfer_target(transaction.payee) is not None
+        ]
+        if transfers:
+            print(
+                f"Transfers: {len(transfers)}. For each one, YNAB adds the side in "
+                "the other account by itself."
+            )
+        report_other_sides(transfers)
+        transaction_count = len(comparison.missing_transactions)
+        if not upload:
+            print("YNAB did not change, because of --no-upload.")
+            return
+        answer = ask(f"Add {transaction_count} transactions to YNAB? [y/N] ")
+        if answer.casefold() not in ("y", "yes"):
+            print("Cancelled. YNAB did not change.")
+            return
+
+        send_transactions(plan, transactions_to_send)
+
+        # The second comparison also covers the sides of the transfers that
+        # YNAB added by itself. After the additions, YNAB must have every
+        # statement transaction, and no new transaction that the statements do
+        # not have.
+        result = compare_with_ynab(plan, transactions, start_date)
+        if (
+            result.missing_transactions
+            or result.extra_keys_by_account != comparison.extra_keys_by_account
+        ):
+            report_ynab_differences(result)
+            die(
+                "YNAB does not match the statements after the additions. Check "
+                "the accounts in YNAB. This script does not edit or delete "
+                "transactions."
+            )
+        print(f"Added transactions to YNAB: {transaction_count}")
+
+
+def load_ynab_plan(api_client):
+    plans = call_ynab("read the YNAB plans", ynab.PlansApi(api_client).get_plans)
+    plans = plans.data.plans
+    if len(plans) != 1:
+        plan_names = ", ".join(plan.name for plan in plans) or "none"
+        die(f"expected one YNAB plan, found {len(plans)}: {plan_names}")
+    plan_id = str(plans[0].id)
+
+    accounts = call_ynab(
+        "read the YNAB accounts", ynab.AccountsApi(api_client).get_accounts, plan_id
+    )
+    accounts = [account for account in accounts.data.accounts if not account.deleted]
+    account_ids = {}
+    for account, account_name in YNAB_ACCOUNT_NAMES.items():
+        matches = [
+            ynab_account
+            for ynab_account in accounts
+            if ynab_account.name == account_name and not ynab_account.closed
+        ]
+        if len(matches) != 1:
+            die(
+                f"expected one open YNAB account named '{account_name}', found "
+                f"{len(matches)}"
+            )
+        account_ids[account] = matches[0].id
+
+    # A transfer names its other account, so a name that more than one open
+    # account has cannot be the other side of a transfer.
+    open_accounts = [
+        ynab_account for ynab_account in accounts if not ynab_account.closed
+    ]
+    open_name_counts = collections.Counter(
+        ynab_account.name for ynab_account in open_accounts
+    )
+    transfer_payee_ids = {
+        ynab_account.name: ynab_account.transfer_payee_id
+        for ynab_account in open_accounts
+        if open_name_counts[ynab_account.name] == 1
+    }
+
+    payees = call_ynab(
+        "read the YNAB payees", ynab.PayeesApi(api_client).get_payees, plan_id
+    )
+    payees = [
+        payee
+        for payee in payees.data.payees
+        if not payee.deleted and payee.transfer_account_id is None
+    ]
+    name_counts = collections.Counter(payee.name for payee in payees)
+    names_by_folded_name = collections.defaultdict(set)
+    for payee in payees:
+        names_by_folded_name[payee.name.casefold()].add(payee.name)
+
+    return YnabPlan(
+        api_client=api_client,
+        plan_id=plan_id,
+        account_ids=account_ids,
+        transfer_payee_ids=transfer_payee_ids,
+        account_names={account.id: account.name for account in accounts},
+        payees=YnabPayees(
+            ids_by_name={
+                payee.name: payee.id for payee in payees if name_counts[payee.name] == 1
+            },
+            names_by_folded_name=dict(names_by_folded_name),
+        ),
+    )
+
+
+def compare_with_ynab(plan, transactions, start_date):
+    missing_transactions = []
+    extra_keys_by_account = {}
+    for account, account_id in plan.account_ids.items():
+        ynab_transactions = call_ynab(
+            "read the YNAB transactions",
+            ynab.TransactionsApi(plan.api_client).get_transactions_by_account,
+            plan.plan_id,
+            str(account_id),
+            since_date=start_date,
+        )
+        statement_transactions = [
+            transaction
+            for transaction in transactions
+            if transaction.account == account
+        ]
+        missing, extra_keys = compare_account(
+            plan,
+            statement_transactions,
+            [
+                ynab_transaction
+                for ynab_transaction in ynab_transactions.data.transactions
+                if not ynab_transaction.deleted
+            ],
+        )
+        missing_transactions += missing
+        if extra_keys:
+            extra_keys_by_account[account] = extra_keys
+    return YnabComparison(missing_transactions, extra_keys_by_account)
+
+
+def compare_account(plan, statement_transactions, ynab_transactions):
+    # Returns the statement transactions that YNAB does not have, and the keys
+    # of the YNAB transactions that the statement does not have. Each key
+    # counts as many times as it appears, so two equal transactions on a date
+    # need two in YNAB.
+    statement_counts = collections.Counter(map(statement_key, statement_transactions))
+    ynab_counts = collections.Counter(
+        ynab_key(plan, ynab_transaction) for ynab_transaction in ynab_transactions
+    )
+
+    missing_counts = statement_counts - ynab_counts
+    missing_transactions = []
+    for transaction in statement_transactions:
+        key = statement_key(transaction)
+        if missing_counts[key] > 0:
+            missing_counts[key] -= 1
+            missing_transactions.append(transaction)
+
+    extra_keys = sorted((ynab_counts - statement_counts).elements())
+    return missing_transactions, extra_keys
+
+
+def statement_key(transaction):
+    # The date, the payee, and the amount in milliunits. The payee of a
+    # transfer is `Transfer: <account name>`, whatever its spacing in the
+    # payee map.
+    target_name = transfer_target(transaction.payee)
+    payee = transaction.payee if target_name is None else transfer_payee(target_name)
+    return (transaction.date, payee, to_milliunits(transaction.amount))
+
+
+def ynab_key(plan, ynab_transaction):
+    # The key of a YNAB transaction, in the form of `statement_key`. YNAB
+    # names transfer payees in a format of its own, so the payee of a
+    # transfer comes from the account at the other side.
+    transfer_account_id = ynab_transaction.transfer_account_id
+    if transfer_account_id is None:
+        payee = ynab_transaction.payee_name or ""
+    else:
+        payee = transfer_payee(
+            plan.account_names.get(transfer_account_id, str(transfer_account_id))
+        )
+    return (ynab_transaction.var_date, payee, ynab_transaction.amount)
+
+
+def transfer_target(payee):
+    # Returns the name of the account that `payee` names as the other side of
+    # a transfer, or `None` when `payee` does not mark a transfer.
+    match = TRANSFER_PATTERN.fullmatch(payee)
+    return None if match is None else match["account_name"].strip()
+
+
+def transfer_payee(account_name):
+    return f"Transfer: {account_name}"
+
+
+def plan_additions(plan, missing_transactions):
+    # Returns the transactions to send to YNAB, and the problems that stop
+    # every addition. YNAB adds the other side of a transfer by itself, on the
+    # same date, so only one side goes to YNAB. A transfer between two
+    # accounts with statements needs both of its sides among the missing
+    # transactions, and the side of the first account in the order of
+    # `Account` goes to YNAB. A transfer to an account without a statement
+    # has only the one side.
+    transactions_to_send = []
+    problems = []
+    # The missing sides of the transfers, by date, the two accounts in the
+    # order of `Account`, and the amount for the first account.
+    transfer_sides = collections.defaultdict(lambda: ([], []))
+    for transaction in missing_transactions:
+        target_name = transfer_target(transaction.payee)
+        if target_name is None:
+            problem = find_payee_problem(plan.payees, transaction.payee)
+            if problem is None:
+                transactions_to_send.append(transaction)
+            elif problem not in problems:
+                problems.append(problem)
+            continue
+
+        own_name = YNAB_ACCOUNT_NAMES[transaction.account]
+        if target_name == own_name or target_name not in plan.transfer_payee_ids:
+            details = format_details(
+                transaction.date, transaction.amount, transaction.payee, own_name
+            )
+            if target_name == own_name:
+                reason = "a transfer cannot go to the account of its own statement"
+            else:
+                reason = (
+                    f"YNAB has no open account named '{target_name}', or more "
+                    "than one"
+                )
+            problems.append(f"{details}: {reason}")
+            continue
+
+        target_account = ACCOUNTS_BY_YNAB_NAME.get(target_name)
+        if target_account is None:
+            transactions_to_send.append(transaction)
+            continue
+        if transaction.account < target_account:
+            key = (transaction.date, transaction.account, target_account)
+            transfer_sides[(*key, transaction.amount)][0].append(transaction)
+        else:
+            key = (transaction.date, target_account, transaction.account)
+            transfer_sides[(*key, -transaction.amount)][1].append(transaction)
+
+    for key, (first_sides, second_sides) in transfer_sides.items():
+        pair_count = min(len(first_sides), len(second_sides))
+        transactions_to_send += first_sides[:pair_count]
+        if len(first_sides) != len(second_sides):
+            problems.append(
+                describe_unpaired_transfers(key, len(first_sides), len(second_sides))
+            )
+    return transactions_to_send, problems
+
+
+def describe_unpaired_transfers(key, first_count, second_count):
+    # `key` holds the date, the two accounts in the order of `Account`, and
+    # the amount for the first account. The counts are the missing sides in
+    # the statement of each account.
+    date, first_account, second_account, amount = key
+    first_name = YNAB_ACCOUNT_NAMES[first_account]
+    second_name = YNAB_ACCOUNT_NAMES[second_account]
+    if amount < 0:
+        source_name, destination_name = first_name, second_name
+    else:
+        source_name, destination_name = second_name, first_name
+    return (
+        f"on {date.isoformat()}, the {first_name} statement has {first_count} "
+        f"and the {second_name} statement has {second_count} transfers of "
+        f"{format_amount(abs(amount))} from {source_name} to {destination_name} "
+        "that YNAB does not have. YNAB adds the two sides of a transfer "
+        "together, on the same date, so the two counts must be equal"
+    )
+
+
+def find_payee_problem(payees, payee):
+    # Returns why a transaction with `payee` cannot go to YNAB, or `None` when
+    # it can.
+    if len(payee) > YNAB_PAYEE_NAME_LIMIT:
+        return (
+            f"'{payee}' has more than {YNAB_PAYEE_NAME_LIMIT} characters, the "
+            "limit of YNAB for a payee name"
+        )
+    if payee in payees.ids_by_name:
+        return None
+    other_names = payees.names_by_folded_name.get(payee.casefold(), set()) - {payee}
+    if other_names:
+        quoted_names = ", ".join(f"'{name}'" for name in sorted(other_names))
+        return (
+            f"'{payee}' is new to YNAB, but YNAB has {quoted_names}, which differs "
+            "only in case. YNAB can give the new transaction that payee instead. "
+            "Use the same name in the payee map, or rename the payee in YNAB"
+        )
+    return None
+
+
+def send_transactions(plan, transactions):
+    new_transactions = []
+    for transaction in transactions:
+        target_name = transfer_target(transaction.payee)
+        if target_name is None:
+            # The ID makes YNAB use the payee with exactly this name. Without
+            # one, YNAB looks the name up, or creates a payee with it.
+            payee_id = plan.payees.ids_by_name.get(transaction.payee)
+            payee_name = transaction.payee
+        else:
+            # The transfer payee of the account at the other side makes the
+            # transaction a transfer.
+            payee_id = plan.transfer_payee_ids[target_name]
+            payee_name = None
+        new_transactions.append(
+            ynab.NewTransaction(
+                account_id=plan.account_ids[transaction.account],
+                var_date=transaction.date,
+                amount=to_milliunits(transaction.amount),
+                payee_id=payee_id,
+                payee_name=payee_name,
+                cleared=ynab.TransactionClearedStatus.CLEARED,
+                approved=False,
+            )
+        )
+    try:
+        ynab.TransactionsApi(plan.api_client).create_transaction(
+            plan.plan_id, ynab.PostTransactionsWrapper(transactions=new_transactions)
+        )
+    except YNAB_ERRORS as error:
+        die(
+            f"cannot add the transactions to YNAB: {error}\n"
+            "Check the accounts in YNAB. Some transactions can be there."
+        )
+
+
+def report_other_sides(transfers):
+    # Prints the sides of `transfers` that YNAB adds by itself to accounts
+    # without a statement. The script cannot check those accounts.
+    other_sides = []
+    for transfer in transfers:
+        target_name = transfer_target(transfer.payee)
+        if target_name in ACCOUNTS_BY_YNAB_NAME:
+            continue
+        other_sides.append(
+            format_details(
+                transfer.date,
+                -transfer.amount,
+                transfer_payee(YNAB_ACCOUNT_NAMES[transfer.account]),
+                target_name,
+            )
+        )
+    if other_sides:
+        print(
+            "YNAB also adds these sides to accounts without a statement. Make "
+            "sure that those accounts do not have them already:"
+        )
+        for other_side in other_sides:
+            print(f"  {other_side}")
+
+
+def report_ignored_transactions(comparison):
+    # Prints, for each account, the YNAB transactions that its statement does
+    # not have. The script leaves them as they are.
+    for account, ynab_name in YNAB_ACCOUNT_NAMES.items():
+        extra_keys = comparison.extra_keys_by_account.get(account, [])
+        if not extra_keys:
+            continue
+        print(f"Ignored, in {ynab_name} in YNAB but not in its statement:")
+        for date, payee, milliunits in extra_keys:
+            print(f"  {format_details(date, from_milliunits(milliunits), payee)}")
+
+
+def report_ynab_differences(comparison):
+    # Logs, for each account, the YNAB transactions that its statement does
+    # not have, and the statement transactions that YNAB does not have.
+    for account, ynab_name in YNAB_ACCOUNT_NAMES.items():
+        extra_keys = comparison.extra_keys_by_account.get(account, [])
+        missing_transactions = [
+            transaction
+            for transaction in comparison.missing_transactions
+            if transaction.account == account
+        ]
+        if extra_keys:
+            log(f"{ynab_name} in YNAB has transactions that its statement lacks:")
+            for date, payee, milliunits in extra_keys:
+                log(f"  {format_details(date, from_milliunits(milliunits), payee)}")
+        if missing_transactions:
+            log(f"The {ynab_name} statement has transactions that YNAB lacks:")
+            for transaction in missing_transactions:
+                details = format_details(
+                    transaction.date, transaction.amount, transaction.payee
+                )
+                log(f"  {details}")
+
+
+def to_milliunits(amount):
+    milliunits = amount * MILLIUNITS_PER_UNIT
+    if milliunits != milliunits.to_integral_value():
+        die(f"the amount {amount} has more than three decimal places")
+    return int(milliunits)
+
+
+def from_milliunits(milliunits):
+    return decimal.Decimal(milliunits) / MILLIUNITS_PER_UNIT
+
+
+# The errors of a call of the YNAB API: an error response, or a failure of the
+# connection.
+YNAB_ERRORS = (ynab.ApiException, urllib3.exceptions.HTTPError)
+
+
+def call_ynab(action, function, *arguments, **keyword_arguments):
+    # Runs one call of the YNAB API. Dies with `action` in the message when
+    # the call fails.
+    try:
+        return function(*arguments, **keyword_arguments)
+    except YNAB_ERRORS as error:
+        die(f"cannot {action}: {error}")
+
+
+# --------------------------------------------------------------------------------------
+# Browser.
+# --------------------------------------------------------------------------------------
+
+
+class StepError(Exception):
+    # A step of the download failed. `exit_status` becomes the exit status of
+    # the script.
+    def __init__(self, message, exit_status=1):
+        super().__init__(message)
+        self.exit_status = exit_status
+
+
+@dataclass(frozen=True)
+class Secret:
+    # An argument of a command that messages must not show, such as a
+    # password. The command gets `value`, and messages show `<hidden>`.
+    value: str
+
+
+class Browser:
+    # Runs `agent-browser` commands, and records whether the browser is open.
+    # A command runs in the session that `AGENT_BROWSER_SESSION` names.
+
+    def __init__(self):
+        self.opened = False
+
+    def open(self, url, options):
+        self.run(*options, "open", url)
+        self.opened = True
+
+    def find_role(self, role, action, name, *values):
+        # Runs `action` on the element with `role` and the accessible `name`.
+        self.run("find", "role", role, action, *values, "--name", name)
+
+    def run(self, *arguments, stdout=None):
+        # Runs `agent-browser` with `arguments`, and returns what it wrote on
+        # standard output when `stdout` is `subprocess.PIPE`. Raises
+        # `StepError` when the command fails.
+        result = run_agent_browser(arguments, stdout=stdout, stderr=None)
+        if result.returncode != 0:
+            raise StepError(
+                f"`{describe_command(arguments)}` failed with exit status "
+                f"{result.returncode}",
+                exit_status_of(result.returncode),
+            )
+        return result.stdout
+
+    def succeeds(self, *arguments):
+        # Runs `agent-browser` with `arguments`, without output, and returns
+        # whether it succeeded.
+        result = run_agent_browser(
+            arguments, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        return result.returncode == 0
+
+
+def run_agent_browser(arguments, stdout, stderr):
+    command = [
+        "agent-browser",
+        *(
+            argument.value if isinstance(argument, Secret) else argument
+            for argument in arguments
+        ),
+    ]
+    try:
+        return subprocess.run(
+            command, stdout=stdout, stderr=stderr, encoding="utf-8", errors="replace"
+        )
+    except OSError as error:
+        raise StepError(f"cannot run agent-browser: {error}") from error
+
+
+def describe_command(arguments):
+    # Returns the command as messages show it, with every `Secret` hidden.
+    return shlex.join(
+        [
+            "agent-browser",
+            *(
+                "<hidden>" if isinstance(argument, Secret) else argument
+                for argument in arguments
+            ),
+        ]
+    )
+
+
+def exit_status_of(returncode):
+    # A command that a signal ends has a negative return code. The shell
+    # convention for that case is 128 + the signal number.
+    if returncode < 0:
+        return 128 - returncode
+    return returncode
+
+
+# --------------------------------------------------------------------------------------
+# Generic helpers.
+# --------------------------------------------------------------------------------------
+
+
+def step(message):
+    # The flush puts the line before the output of the commands of the step.
+    print(f" ==> {message}", flush=True)
+
+
+def ask(question):
+    # Shows `question` on stderr, and returns the line that the user types,
+    # without the whitespace around it.
+    sys.stdout.flush()
+    sys.stderr.write(question)
+    sys.stderr.flush()
+    line = sys.stdin.readline()
+    if not line:
+        raise StepError("no answer on standard input")
+    return line.strip()
+
+
+def log(message):
+    print(message, file=sys.stderr)
+
+
+def die(message):
+    # Logs `message` with the `Error: ` prefix and exits with status 1.
+    log(f"Error: {message}")
+    sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
