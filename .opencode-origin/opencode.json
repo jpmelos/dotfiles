@@ -45,12 +45,12 @@
     {
       "action": "webfetch",
       "resource": "*",
-      "effect": "deny"
+      "effect": "allow"
     },
     {
       "action": "websearch",
       "resource": "*",
-      "effect": "deny"
+      "effect": "allow"
     },
     {
       "action": "shell",
@@ -65,6 +65,16 @@
     {
       "action": "shell",
       "resource": "./jpenv-bin/tests *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "agent-browser",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "agent-browser *",
       "effect": "allow"
     },
     {
