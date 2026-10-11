@@ -1,80 +1,61 @@
 # telegram-bot service
 
-User systemd unit that keeps `bin/telegram_bot` running on Debian Trixie. It
-starts at boot, restarts on failure, and stops gracefully on `stop`.
+System systemd unit that keeps `bin/telegram_bot` running as `jpmelos` on
+Debian Trixie. It starts at boot, restarts on failure, and stops gracefully on
+`stop`.
 
 ## Install
 
-1. Create the environment file with the bot token. Only the owner can read it:
+1. Make sure `jc` serves the secrets from `~/config.json`. The file must have
+   mode 600 and belong to you, or `jc` refuses it:
 
    ```
-   mkdir -p ~/.config/telegram-bot
-   printf 'TELEGRAM_BOT_TOKEN=%s\n' '123456:ABC...' > ~/.config/telegram-bot/env
-   chmod 600 ~/.config/telegram-bot/env
+   jc get telegram_bot.bot_token
+   jc get telegram_bot.chat_id
    ```
 
-   Optional extra lines in the same file:
+   The `budget_sync` task also needs `bmo.username`, `bmo.password`,
+   `ynab.api_key`, and `questrade.api_key`. The unit passes no secrets itself.
+   Everything comes from `jc`.
+
+2. Install and start the unit as root. It runs as `jpmelos` and starts at boot.
 
    ```
-   TELEGRAM_CHAT_ID=123456789
-   TELEGRAM_TASKS_DIR=/home/user/tasks
-   TELEGRAM_STATE_DIR=/home/user/.local/state/telegram_bot
-   TELEGRAM_HEARTBEAT_URL=https://hc-ping.com/your-uuid-here
+   sudo cp ~/devel/dotfiles/references/telegram_bot/telegram-bot.service /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now telegram-bot
    ```
 
-   Anything not set falls back to `jc get` keys and built-in defaults. See
-   `telegram_bot --help`.
-
-2. Create the tasks directory if it does not exist, and put `<name>.py` task
-   files there. The unit defaults to `~/telegram_tasks`. To serve the tasks
-   from the dotfiles checkout instead, switch the `ExecStart` line to the
-   commented alternative in the unit.
-
-3. Install and start the unit:
+3. Verify:
 
    ```
-   mkdir -p ~/.config/systemd/user
-   cp ~/devel/dotfiles/references/telegram_bot/telegram-bot.service ~/.config/systemd/user/
-   systemctl --user daemon-reload
-   systemctl --user enable --now telegram-bot
-   ```
-
-4. Run at boot without login:
-
-   ```
-   sudo loginctl enable-linger "$USER"
-   ```
-
-5. Verify:
-
-   ```
-   systemctl --user status telegram-bot
-   journalctl --user -u telegram-bot -e
+   systemctl status telegram-bot
+   journalctl -u telegram-bot -e
    ```
 
    Then send `/list` to the bot in the allowlisted chat.
 
 ## Operate
 
-- Logs: `journalctl --user -u telegram-bot -f`.
-- Restart after editing the bot itself:
-  `systemctl --user restart telegram-bot`.
+- Logs: `journalctl -u telegram-bot -f`.
+- Restart after editing the bot itself: `sudo systemctl restart telegram-bot`.
 - Editing a task needs no restart. The bot loads the file fresh on every
   `/run`.
-- Stop: `systemctl --user stop telegram-bot`. The running task is cancelled and
+- Stop: `sudo systemctl stop telegram-bot`. The running task is cancelled and
   its shutdown hook runs before exit.
-- Installed unit differs from the reference:
-  `systemctl --user cat telegram-bot`.
+- Installed unit differs from the reference: `systemctl cat telegram-bot`.
 
 ## Notes
 
 - Only one process can poll one bot token. A second copy gets 409 conflicts,
   waits, and retries until the first stops.
 - A bad token exits at once, so the unit lands in `failed` after a few tries
-  instead of looping. Check status and logs, fix the env file, then
-  `systemctl --user restart telegram-bot`.
-- Set `TELEGRAM_HEARTBEAT_URL` to a dead-man-switch check so a silent stop
-  pages you. The bot pings it every five minutes by default.
+  instead of looping. Check status and logs, fix `~/config.json`, then
+  `sudo systemctl restart telegram-bot`.
+- Heartbeat has no `jc` key. To ping a dead-man-switch check, add
+  `--heartbeat-url=` with your URL to the `ExecStart` line of the installed
+  copy under `/etc/systemd/system/`, keeping the URL out of the repository.
+  Then `daemon-reload` and restart.
 - The host clock must be roughly correct. The bot drops backlog older than
   `--recent-window` by message date, and TLS needs a sane clock anyway. Debian
   enables time sync by default.

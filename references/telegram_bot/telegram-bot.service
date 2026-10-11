@@ -1,23 +1,24 @@
 [Unit]
 Description=Telegram bot for interactive tasks
-Documentation=file:%h/devel/dotfiles/references/telegram_bot/README.md
+Documentation=file:/home/jpmelos/devel/dotfiles/references/telegram_bot/README.md
 Wants=network-online.target
 After=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h
-# uv must be on PATH: the script runs through `uv run --script`.
-# Adjust the first entry to your uv install location.
-Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
-# Holds TELEGRAM_BOT_TOKEN and optional overrides. Mode 600. A missing
-# file fails the start, so a missing token is visible instead of looping.
-EnvironmentFile=%h/.config/telegram-bot/env
+User=jpmelos
+# Paths are hardcoded: in a system unit %h expands to /root and ignores
+# User=. Do not switch these back to %h.
+WorkingDirectory=/home/jpmelos
+# HOME is how `jc` finds ~/config.json. PATH holds ~/bin for `jc` and the
+# uv location for `uv run --script`. All secrets come from `jc get`, so the
+# unit holds none and reads no environment file.
+Environment=HOME=/home/jpmelos
+Environment=PATH=/home/jpmelos/bin:/home/jpmelos/.local/bin:/usr/local/bin:/usr/bin:/bin
 # Only one process can poll one bot token. Point --tasks-dir at the
 # directory with your <name>.py task files. An alternative line for the
 # dotfiles checkout is commented below.
-ExecStart=%h/bin/telegram_bot --tasks-dir=%h/telegram_tasks
-# ExecStart=%h/bin/telegram_bot --tasks-dir=%h/devel/dotfiles/telegram_tasks
+ExecStart=/home/jpmelos/bin/telegram_bot --tasks-dir=/home/jpmelos/devel/dotfiles/telegram_tasks
 Restart=always
 RestartSec=10
 # SIGTERM stops the running task gracefully, including its shutdown hook.
@@ -38,4 +39,4 @@ RestrictSUIDSGID=true
 LockPersonality=true
 
 [Install]
-WantedBy=default.target
+WantedBy=multi-user.target
