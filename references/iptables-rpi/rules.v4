@@ -16,7 +16,6 @@
 # Allow incoming traffic through the VPN tunnel `wg0`.
 -A INPUT -i wg0 -j ACCEPT
 
-
 # Allow outgoing established connections.
 -A OUTPUT -m conntrack --ctstate ESTABLISHED -j ACCEPT
 # Allow traffic on the loopback interface.
