@@ -121,6 +121,7 @@ def run(ctx, args=None):
         questrade_balances = read_questrade_balances(paths.questrade_token_file)
         questrade_balance = sum(questrade_balances.values())
         ctx.log(f"Questrade total {format_amount(questrade_balance)}")
+        _say(f"Got Questrade balance {format_amount(questrade_balance)}.")
         balances = run_download(ctx, paths)
 
     # The task works only on the transactions from this date on, in the
@@ -141,11 +142,13 @@ def run(ctx, args=None):
     ]
     ignored_count = len(statement_transactions) - len(transactions)
     ctx.log(f"Ignored transactions before {start_date.isoformat()}: {ignored_count}")
+    _say(f"Read {len(statement_transactions)} transactions from the statements.")
 
     ctx.log("Naming the payees")
     payee_map = load_payee_map(ctx)
     new_name_count = assign_payees(ctx, transactions, payee_map)
     ctx.log(f"New payee names saved: {new_name_count}")
+    _say(f"Named the payees, {new_name_count} new.")
 
     matched, added_count, cleared_count = save_to_ynab(
         ctx,
@@ -341,11 +344,13 @@ def run_download(ctx, paths):
         raise TaskError(str(error)) from error
 
     ctx.log("Statements downloaded")
+    _say("Statements downloaded.")
     return balances
 
 
 def use_last_statements(paths):
     _log("Using the statements of the last run")
+    _say("Using the statements of the last run.")
     for statement_path in (paths.chequing_file, paths.credit_card_file):
         if not os.path.isfile(statement_path):
             raise TaskError("No downloaded statements. Run without --no-download first")
@@ -379,6 +384,7 @@ def open_login_page(browser, paths):
         open_options += ["--state", paths.session_file]
     browser.open(LOGIN_URL, open_options)
     time.sleep(PAGE_WAIT_SECONDS)
+    _say("Opened the browser in the desired page.")
 
 
 def accept_cookies(browser):
@@ -393,6 +399,7 @@ def accept_cookies(browser):
     if count > 0:
         browser.run("click", COOKIE_BUTTON)
     time.sleep(PAGE_WAIT_SECONDS)
+    _say("Accepted cookies.")
 
 
 def log_in(browser, username, password):
@@ -401,6 +408,7 @@ def log_in(browser, username, password):
     browser.run("fill", 'input[id^="password-input"]', Secret(password))
     browser.find_role("button", "click", "SIGN IN")
     time.sleep(PAGE_WAIT_SECONDS)
+    _say("Logged in successfully.")
 
 
 def pass_verification(browser):
@@ -417,6 +425,9 @@ def pass_verification(browser):
         )
         browser.find_role("button", "click", "CONFIRM")
         time.sleep(PAGE_WAIT_SECONDS)
+        _say("Passed verification.")
+    else:
+        _say("No verification needed.")
 
     time.sleep(PAGE_WAIT_SECONDS)
 
@@ -427,6 +438,7 @@ def download_chequing_statement(browser, paths):
     browser.find_role("link", "click", "Chequing")
     time.sleep(PAGE_WAIT_SECONDS)
     balance = read_balance(browser, CHEQUING_STATEMENT)
+    _say("Opened chequing account.")
 
     _log("Downloading the chequing account transactions")
     browser.find_role("link", "click", "DOWNLOAD")
@@ -441,6 +453,7 @@ def download_chequing_statement(browser, paths):
 
     browser.find_role("link", "click", "EXIT")
     save_statement(paths.download_file, paths.chequing_file)
+    _say("Chequing statement downloaded successfully.")
     return balance
 
 
@@ -450,6 +463,7 @@ def download_credit_card_statement(browser, paths):
     browser.find_role("link", "click", "MasterCard")
     time.sleep(PAGE_WAIT_SECONDS)
     balance = read_balance(browser, CREDIT_CARD_STATEMENT)
+    _say("Opened credit card.")
 
     _log("Downloading the credit card transactions")
     browser.find_role("link", "click", "DOWNLOAD")
@@ -459,6 +473,7 @@ def download_credit_card_statement(browser, paths):
     time.sleep(DOWNLOAD_WAIT_SECONDS)
 
     save_statement(paths.download_file, paths.credit_card_file)
+    _say("Credit card statement downloaded successfully.")
     return balance
 
 
@@ -473,6 +488,7 @@ def read_balance(browser, statement_format):
     if balance is None:
         account_label = ACCOUNT_LABELS[statement_format.account]
         _log(f"Warning: cannot read the current balance of the {account_label} page")
+        _say(f"Cannot read the current balance of the {account_label} page.")
         return None
     return -balance if statement_format.inverted_amounts else balance
 
@@ -494,6 +510,7 @@ def save_session(browser, paths):
         os.chmod(paths.session_file, 0o600)
     except OSError as error:
         raise StepError(f"cannot set the mode of the session file: {error}") from error
+    _say("Saved the session.")
 
 
 def save_statement(download_path, statement_path):
@@ -615,6 +632,7 @@ def read_statement(path, statement_format):
     header = next(reader, None)
     if header is None:
         _log("Warning: a statement is empty, no transactions read")
+        _say("A statement is empty, no transactions read.")
         return []
 
     columns = [name.strip() for name in header]
@@ -833,7 +851,10 @@ def report_order(transaction):
 
 
 def format_amount(amount):
-    return f"{amount:.2f}"
+    # Returns the amount as $10,000.00, with the minus before the dollar
+    # sign for negatives.
+    sign = "-" if amount < 0 else ""
+    return f"{sign}${abs(amount):,.2f}"
 
 
 def format_details(date, amount, *texts):
@@ -1314,9 +1335,10 @@ def reconcile_questrade(plan, questrade_balance, ynab_matches_statements, upload
     ynab_account = read_ynab_account(plan, plan.questrade_account_id)
     ynab_balance = from_milliunits(ynab_account.balance)
     difference = questrade_balance - ynab_balance
+    mark = "OK" if difference == 0 else "DIFF"
     _say(
         f"QT {format_amount(questrade_balance)} / "
-        f"{format_amount(ynab_balance)} = {format_amount(difference)}"
+        f"{format_amount(ynab_balance)} {mark}"
     )
 
     if difference == 0:
@@ -1798,6 +1820,7 @@ def report_ignored_counts(comparison):
         extra_keys = comparison.extra_keys_by_account.get(account, [])
         if extra_keys:
             _log(f"Ignored {len(extra_keys)} in {ynab_name}, not in its statement")
+            _say(f"Ignored {len(extra_keys)} in {ynab_name}, not in its statement.")
 
 
 def log_ynab_differences(comparison):
