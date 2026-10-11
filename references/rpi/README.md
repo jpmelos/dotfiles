@@ -26,6 +26,7 @@ curl -sS https://downloads.1password.com/linux/keys/1password.asc \
     && curl -sS https://downloads.1password.com/linux/keys/1password.asc \
     | sudo gpg --dearmor --output /usr/share/debsig/keyrings/AC2D62742012EA22/debsig.gpg \
     && sudo apt update && sudo apt install 1password-cli
+curl -LsSf https://repo.plex.tv/scripts/setupRepo.sh | sudo bash
 ```
 
 ## 3. Sign In to 1Password
@@ -161,6 +162,8 @@ PostDown = ip rule del fwmark 2727 table 2727
 PostDown = ip route del default via 192.168.42.1 dev eth0 table 2727
 ```
 
+Put it in `/etc/wireguard/wg0.conf`.
+
 Configure it to always run:
 
 ```bash
@@ -180,7 +183,8 @@ sudo service transmission-daemon stop
 Copy the settings file from the dotfiles repo to the config path:
 
 ```bash
-sudo cp references/rpi/transmission-daemon-settings.json .config/transmission-daemon/settings.json
+sudo cp references/rpi/transmission-daemon-settings.json /etc/transmission-daemon/settings.json
+sudo chown root:root /etc/transmission-daemon/settings.json
 ```
 
 Run the service again:
@@ -192,21 +196,7 @@ sudo service transmission-daemon start
 Go into the web UI. Verify that all looks right. Verify that the port is open
 via AirVPN website.
 
-## 11. Install Plex
-
-Install Plex via APT:
-
-```bash
-curl -LsSf https://repo.plex.tv/scripts/setupRepo.sh | sudo bash
-```
-
-Start the service:
-
-```bash
-sudo service plexmediaserver start
-```
-
-## 12. Run Telegram Bot (Bypasses VPN)
+## 11. Run Telegram Bot (Bypasses VPN)
 
 The bot runs under systemd with primary group `vpn-bypass` (see section 6),
 which marks its packets for the public Internet route. The unit file already
