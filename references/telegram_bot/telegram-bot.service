@@ -8,6 +8,9 @@ After=network-online.target
 Type=simple
 User=jpmelos
 Group=vpn-bypass
+# The VPN replaces /etc/resolv.conf with VPN-only resolvers.
+# The bot bypasses the VPN, so it needs clearnet resolvers from its own file instead.
+BindReadOnlyPaths=/etc/resolv.conf.bypass:/etc/resolv.conf
 # Paths are hardcoded: in a system unit %h expands to /root and ignores
 # User=. Do not switch these back to %h.
 WorkingDirectory=/home/jpmelos

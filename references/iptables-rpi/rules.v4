@@ -1,5 +1,17 @@
 # /etc/iptables/rules.v4 in Raspberry Pi.
 
+*nat
+:PREROUTING ACCEPT [0:0]
+:INPUT ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+:POSTROUTING ACCEPT [0:0]
+
+# MASQUERADE rewrites bypassed packets to the LAN source address.
+# The mark applies after source selection, so this rewrite is required.
+-A POSTROUTING -o eth0 -m mark --mark 2727 -j MASQUERADE
+
+COMMIT
+
 *mangle
 :PREROUTING ACCEPT [0:0]
 :INPUT ACCEPT [0:0]
@@ -35,7 +47,7 @@ COMMIT
 # Allow outgoing traffic to the local network 192.168.42.0/24.
 -A OUTPUT -d 192.168.42.0/24 -j ACCEPT
 # Allow outgoing traffic to WireGuard VPN on port 1637/UDP.
--A OUTPUT -d 128.127.104.82 -p udp --dport 1637  -j ACCEPT
+-A OUTPUT -d 79.142.77.189 -p udp --dport 1637  -j ACCEPT
 # Allow outgoing clearnet traffic from group `vpn-bypass`.
 -A OUTPUT -m owner --gid-owner vpn-bypass -j ACCEPT
 # Allow outgoing traffic through the VPN tunnel `wg0`.

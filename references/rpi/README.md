@@ -12,7 +12,7 @@ sudo apt-get -y clean
 ## 2. Install Required Software
 
 ```bash
-sudo apt install curl wget git neovim iptables-persistent openresolv wireguard transmission-daemon ca-certificates gpg jq starship stow fzf tmux
+sudo apt install curl wget git neovim iptables-persistent openresolv wireguard transmission-daemon ca-certificates gpg jq starship stow fzf tmux npm chromium-browser
 git clone https://github.com/hyperupcall/autoenv ~/.autoenv
 curl -LsSf https://astral.sh/uv/install.sh | sh
 curl -sS https://downloads.1password.com/linux/keys/1password.asc \
@@ -27,6 +27,7 @@ curl -sS https://downloads.1password.com/linux/keys/1password.asc \
     | sudo gpg --dearmor --output /usr/share/debsig/keyrings/AC2D62742012EA22/debsig.gpg \
     && sudo apt update && sudo apt install 1password-cli
 curl -LsSf https://repo.plex.tv/scripts/setupRepo.sh | sudo bash
+sudo npm install -g agent-browser
 ```
 
 ## 3. Sign In to 1Password
@@ -84,7 +85,9 @@ The Telegram bot is the process that uses this bypass. Its unit
 ## 7. Configure iptables
 
 Copy iptables rules from dotfiles (`references/iptables-rpi/rules.v{4,6}`).
-Adjust IP address of VPN server as necessary.
+Adjust IP address of VPN server as necessary. Keep the endpoint in step with
+the `Endpoint` in `/etc/wireguard/wg0.conf`. A stale address drops the
+handshake and kills the tunnel.
 
 ```bash
 sudo cp references/iptables-rpi/rules.v4 /etc/iptables/rules.v4
@@ -96,12 +99,6 @@ Apply the rules:
 ```bash
 sudo iptables-restore < /etc/iptables/rules.v4
 sudo ip6tables-restore < /etc/iptables/rules.v6
-```
-
-Check that rules are in effect:
-
-```bash
-sudo iptables -vnL
 ```
 
 ## 8. Mount External Volume
@@ -201,7 +198,17 @@ via AirVPN website.
 
 The bot runs under systemd with primary group `vpn-bypass` (see section 6),
 which marks its packets for the public Internet route. The unit file already
-sets this.
+sets this. The VPN replaces `/etc/resolv.conf` with VPN-only resolvers.
+Bypassed traffic cannot reach those resolvers. The unit bind-mounts
+`/etc/resolv.conf.bypass` over `/etc/resolv.conf`.
+
+Create that file with clearnet resolvers first:
+
+```bash
+printf 'nameserver 192.168.42.1\nnameserver 1.1.1.1\n' | sudo tee /etc/resolv.conf.bypass
+sudo chown root:root /etc/resolv.conf.bypass
+sudo chmod 644 /etc/resolv.conf.bypass
+```
 
 Install and start the unit:
 
