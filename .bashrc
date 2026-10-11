@@ -1,4 +1,4 @@
-# vim: ft=sh
+# vim: ft=bash
 
 # Set up the GPG Agent.
 export GPG_TTY=$(tty)
@@ -12,8 +12,8 @@ export GPG_TTY=$(tty)
 # Replace an interactive shell with a tmux client when it starts. Attach to the
 # running server if there is one, otherwise start a new server. The `exec`
 # makes the terminal close when the client exits, instead of leaving a shell
-# that ran the rest of this file for nothing. Skip this inside a tmux pane (tmux
-# sets `$TMUX` there), because the shell in the pane would otherwise open
+# that ran the rest of this file for nothing. Skip this inside a tmux pane
+# (tmux sets `$TMUX` there), because the shell in the pane would otherwise open
 # another client, forever.
 if [[ $- == *i* ]] && [ -z "$TMUX" ] && command -v tmux &> /dev/null; then
     if tmux has-session &> /dev/null; then

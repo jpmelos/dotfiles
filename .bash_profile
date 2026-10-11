@@ -1,13 +1,13 @@
-# vim: ft=sh
+# vim: ft=bash
 
-#################
-#               #
-#    Imports    #
-#               #
-#################
+###############################
+#                             #
+#    Bash-specific Imports    #
+#                             #
+###############################
 
-[[ -f ~/devel/dotfiles/references/scripts/bash_fields.sh ]] \
-    && source ~/devel/dotfiles/references/scripts/bash_fields.sh
+[[ -f ~/devel/dotfiles/bash_imports/fields.bash ]] \
+    && source ~/devel/dotfiles/bash_imports/fields.bash
 
 ##############################
 #                            #
@@ -17,16 +17,12 @@
 
 # Set the PATH. Things are always prepended, so the last entry to be entered
 # here is the one with the highest priority.
-# Binaries installed by Homebrew.
 if [ "$(uname -s)" = "Darwin" ]; then
     field_prepend PATH /opt/homebrew/sbin
     field_prepend PATH /opt/homebrew/bin
 fi
-# Binaries not managed via a package manager.
 field_prepend PATH "$HOME/.local/bin"
-# Rust tooling's own binaries.
 field_prepend PATH "$HOME/.cargo/bin"
-# My own executables.
 field_prepend PATH "$HOME/bin"
 export PATH
 
@@ -39,11 +35,11 @@ export PATH
 export TERMINFO_DIRS=$HOME/.local/share/terminfo:$TERMINFO_DIRS
 export TERM="wezterm"
 
-#############################
-#                           #
-#    Bash-specific stuff    #
-#                           #
-#############################
+################################
+#                              #
+#    Bash-specific settings    #
+#                              #
+################################
 
 # How many commands to keep in history.
 export HISTSIZE=100000
@@ -51,11 +47,11 @@ export HISTFILESIZE=$HISTSIZE
 # Erase all duplicate lines, don't store lines starting with space.
 export HISTCONTROL=erasedups:ignoreboth
 
-########################
-#                      #
-#    Work utilities    #
-#                      #
-########################
+###################
+#                 #
+#    Utilities    #
+#                 #
+###################
 
 # Sets the default pager for various commands. Useful when working with tools
 # like `psql` which can have large outputs that are more easily viewed in a
@@ -78,10 +74,6 @@ export OP_ACCOUNT=my.1password.com
 #    Python-specific stuff    #
 #                             #
 ###############################
-
-# Make Pip require a virtual environment to install stuff. Do not pollute
-# the system.
-export PIP_REQUIRE_VIRTUALENV=true
 
 # No need to show the current virtual environment in the prompt, since we'll
 # use Starship for that.
