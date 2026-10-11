@@ -1,10 +1,23 @@
-#!/usr/bin/env -S uv run --quiet --script
-# /// script
-# requires-python = ">=3.11"
-# dependencies = ["click>=8.1,<9", "ynab>=4.4.0,<5"]
-# ///
+# Task that downloads the BMO statements and syncs new transactions to YNAB.
+#
+# Run it with `/run budget_sync` from the allowlisted chat. Optional words
+# after the name are `--from-date YYYY-MM-DD`, `--no-download`, and
+# `--no-upload`, with the same meaning as in `bin/budget_imports`.
+#
+# All state lives in the task state directory, including the payee map as a
+# plain CSV file with the same format as before, so the old file can be
+# copied over it. The chat only gets the new transactions, one short line
+# each, plus short confirmations and balance lines.
 
-# vim: ft=python
+NAME = "budget_sync"
+DESCRIPTION = "Sync new BMO transactions to YNAB."
+# Banking with user questions can take a while. This is the budget for one
+# run, in seconds.
+TIMEOUT = 7200
+
+# Requirement strings that the bot installs with `uv` into the venv of the
+# task on every run.
+DEPENDENCIES = ("ynab>=4.4.0,<5", "urllib3>=2,<3")
 
 import collections
 import contextlib
@@ -18,26 +31,24 @@ import os
 import re
 import shlex
 import subprocess
-import sys
 import tempfile
 import time
 import urllib.parse
 import uuid
 from dataclasses import dataclass
 
-import click
 import urllib3
 import ynab
 
 LOGIN_URL = "https://www1.bmo.com/banking/digital/"
-# The `agent-browser` session of this script. A session of its own keeps the
-# script from sharing a browser with other uses of `agent-browser`.
-BROWSER_SESSION = "budget_imports"
+# The `agent-browser` session of this task. A session of its own keeps the
+# task from sharing a browser with other uses of `agent-browser`.
+BROWSER_SESSION = "budget_sync"
 # How long to wait for a page to load, and for a download to finish.
 PAGE_WAIT_SECONDS = 5
 DOWNLOAD_WAIT_SECONDS = 10
-# How many days back the script looks. The chequing download covers these
-# days, and the script ignores the transactions before them, in the statements
+# How many days back the task looks. The chequing download covers these
+# days, and the task ignores the transactions before them, in the statements
 # and in YNAB.
 HISTORY_DAYS = 30
 # The first date of the transactions to process, without `--from-date`.
@@ -64,236 +75,61 @@ VERIFICATION_CONSENT_NAME = (
 )
 # The header row of the payee map.
 PAYEE_COLUMNS = ("Original Payee Name", "New Payee Name")
+# State identifiers. Every file lives in the task state directory.
+PAYEES_ID = "payees.csv"
+CHEQUING_ID = "chequing.csv"
+CREDIT_CARD_ID = "credit_card.csv"
+DOWNLOAD_ID = "statement.csv"
+SESSION_ID = "bmo_session.json"
+TOKEN_ID = "questrade_refresh_token.txt"
+SCREENSHOT_ID = "browser-error.png"
+# How many new transactions the chat report lists before it summarizes.
+REPORT_LINE_LIMIT = 60
 
 
 # --------------------------------------------------------------------------------------
-# Entry point.
+# Task entry points.
 # --------------------------------------------------------------------------------------
 
+# The context of the current run. Set by `run`, read by the helpers below.
+_CTX = None
 
-# The docstring is the help text. Click rewraps each paragraph, and keeps the
-# indent of its first line. A paragraph after a `\b` line keeps its form.
-@click.command(context_settings={"help_option_names": ["-h", "--help"]})
-@click.option(
-    "--from-date",
-    type=click.DateTime(formats=[OPTION_DATE_FORMAT]),
-    default=DEFAULT_FROM_DATE.isoformat(),
-    show_default=True,
-    metavar="YYYY-MM-DD",
-    help=(
-        "Ignore the transactions before this date. Process the transactions "
-        "on this date and after it. The transactions older than 30 days stay "
-        "ignored."
-    ),
-)
-@click.option(
-    "--no-download",
-    is_flag=True,
-    help=(
-        "Do not log in to the bank, and do not read Questrade. Read the "
-        "statements that the last run downloaded."
-    ),
-)
-@click.option(
-    "--no-upload",
-    is_flag=True,
-    help=(
-        "Do not change YNAB. Show the transactions and the reconciliation that "
-        "the script would add."
-    ),
-)
-def main(from_date, no_download, no_upload):
-    """Download the recent transactions of the BMO chequing account and of
-    the BMO MasterCard as CSV files, through `agent-browser`. Then name the
-    payee of each transaction, print all the transactions, and add to YNAB
-    the ones that it does not have. Last, bring the balance of the YNAB
-    account of Questrade up to date.
 
-    The script logs in with the `bmo.username` and `bmo.password` values that
-    `jc get` reads. When the bank asks for a verification code, the script
-    has the bank send it by SMS, and asks you to type it. The chequing file
-    holds the transactions of the last 30 days. The credit card file holds
-    all the transactions that the bank offers.
+class TaskError(Exception):
+    pass
 
-    The script works only on the transactions from the start date on, in the
-    statements and in YNAB. The start date is the later of the `--from-date`
-    date and the date 30 days ago. So run the script at least once every 30
-    days, or it will not see some transactions.
 
-    Payees:
-
-      The payee map in `payees.csv` turns each payee name of the bank into
-      your name for that payee. When a payee name of the bank is not in the
-      map, the script shows its transactions and asks you for your name. The
-      script saves the answer to the map at once, and applies it to every
-      transaction with that payee.
-
-      The map also turns each of your names into itself, unless it has an
-      entry for that name already. When a payee name of the bank is one of
-      your names, the script keeps it, without a question.
-
-    Report:
-
-      The report shows the date, the amount, the payee, and the account of
-      each transaction. The transactions are in order of date, then amount,
-      then payee, then account, with the chequing account first. A negative
-      amount is money that you lose, and a positive amount is money that you
-      make. The credit card statement uses the opposite signs, so the script
-      inverts its amounts.
-
-      After the transactions, the report shows the current balance of each
-      account, as the page of the account shows it. The balances have the
-      same signs as the amounts, so they compare with the balances in YNAB.
-      With `--no-download`, the script does not open the pages, so it shows
-      no balances.
-
-    YNAB:
-
-      The script reads the API key with `jc get ynab.api_key`. The YNAB
-      account "BMO Chequing" holds the chequing transactions, and "BMO
-      MasterCard" holds the credit card transactions. They must be in the
-      only plan of the user.
-
-      The script compares each account in YNAB with its statement, from the
-      start date on. Transactions match by date, payee, and amount,
-      and each YNAB transaction matches one statement transaction at most.
-      The script adds the statement transactions that YNAB does not have, as
-      cleared and not approved. It ignores the YNAB transactions that the
-      statement does not have, such as one that you added by hand before the
-      bank posted it. When the bank posts that transaction, it matches only
-      with the same date, payee, and amount. Otherwise, the script adds the
-      transaction of the bank too.
-
-      A statement holds only cleared transactions. So when a YNAB
-      transaction matches a statement transaction but is not cleared, the
-      script clears it. The script changes nothing else in it, such as its
-      approval. The cleared YNAB transactions take the matches first.
-
-      A payee such as `Transfer: Wallet` marks a transfer to the YNAB account
-      that it names. A negative amount leaves the account of the statement,
-      and a positive amount comes into it. When YNAB gets one side of a
-      transfer, it adds the other side to the other account by itself, on
-      the same date. So the script sends only one side of each transfer:
-
-    \b
-      - A transfer between "BMO Chequing" and "BMO MasterCard" must be in
-        both statements, on the same date.
-      - A transfer to any other account needs only its side in the
-        statement. The script cannot check the other account, so it shows
-        the side that YNAB will add there. If that account has the
-        transaction already, such as from a direct import, the transaction
-        will be there twice.
-
-      Every transaction that the script adds is cleared and not approved.
-      YNAB gives the other side of a transfer a status of its own, so the
-      script then makes that side cleared and not approved too. Apart from
-      these sides and the transactions that it clears, the script edits no
-      transaction. It deletes none. It stops before any change when:
-
-    \b
-      - A transfer to add between "BMO Chequing" and "BMO MasterCard" is in
-        one statement, but not in the other on the same date.
-      - A transfer names the account of its own statement, or no open YNAB
-        account. A name that more than one open account has counts as none.
-      - The payee of a transaction to add is new to YNAB, but differs from a
-        YNAB payee only in case. YNAB can give the transaction that payee.
-
-      Before it adds or clears transactions, the script shows them and asks
-      you. After the changes, it compares YNAB with the statements again.
-      With `--no-upload`, the script shows the changes, but does not make
-      them.
-
-      Then the script compares the balance of each account at the bank with
-      the cleared balance of its YNAB account, and warns about each
-      difference. With `--no-download`, the script has no balances from the
-      bank, so it skips this comparison.
-
-    Questrade:
-
-      The script reads the balances of your Questrade accounts first, so
-      that a problem with Questrade stops it before the bank asks for a
-      code. For each account, Questrade converts the cash and the securities
-      in all currencies to Canadian dollars. The Questrade balance is the
-      total of these amounts. With `--no-download`, the script does not read
-      Questrade, and does not reconcile it in YNAB.
-
-      The Questrade API takes a refresh token. The script uses the token
-      that the last run saved. When there is no saved token, or Questrade
-      rejects it, the script uses the token that `jc get questrade.api_key`
-      reads. Questrade accepts each token only once, and gives a new token
-      each time. The script saves the new token before it calls Questrade
-      again. A token expires three days after Questrade gives it. When
-      Questrade rejects the two tokens, generate a new token for manual
-      authorization in the API Centre of Questrade. Then save it as
-      `questrade.api_key`.
-
-      After YNAB matches the statements, the script compares the balance of
-      the YNAB account "Questrade" with the Questrade balance.
-      That account must be in the same plan as the BMO accounts. Its
-      balance includes the transactions that are not cleared, and the sides
-      of the transfers from the statements. When the two balances differ,
-      the script shows the difference and asks you. Then it adds a
-      transaction for the difference to "Questrade", with the date of today.
-      The transaction has the payee "Balance Reconciliation" and the memo
-      "Balance reconciliation". It is cleared and not approved. With
-      `--no-upload`, or when you cancel the changes from the statements, the
-      script only shows the difference.
-
-    Files:
-
-      The files are in `$XDG_STATE_HOME/budget_imports`, or in
-      `~/.local/state/budget_imports` when that variable is not set or
-      empty. Only you can open that directory. It holds:
-
-    \b
-      - `chequing.csv` and `credit_card.csv`, the statements.
-      - `bmo_session.json`, the cookies of the last session. The next run
-        loads them.
-      - `questrade_refresh_token.txt`, the Questrade token that the last
-        run saved. The next run uses it.
-      - `payees.csv`, the payee map, with the columns `Original Payee Name`
-        and `New Payee Name`. You can edit it. Keep the header row.
-      - `browser-error.png`, a screenshot of the browser after a failed
-        step. The screenshot can show account data.
-    """
+def run(ctx, args=None):
+    """Download the statements, name the payees, and sync YNAB. Returns a
+    short summary for the chat."""
+    global _CTX
+    _CTX = ctx
+    from_date, no_download, no_upload = parse_task_args(list(args or []))
+    ctx.say("Budget sync started.")
     try:
-        exit_status = run(from_date.date(), no_download, no_upload)
-    except KeyboardInterrupt:
-        # Ctrl-C at a question or during a command. The shell convention for
-        # a death by SIGINT is 128 + 2.
-        sys.exit(130)
-    sys.exit(exit_status)
-
-
-def run(from_date, no_download, no_upload):
-    # Returns the exit status of the script.
-    #
-    # A problem with the YNAB key or with Questrade stops the script before
-    # the bank asks for a code.
-    ynab_api_key = read_config_text("ynab.api_key")
-
-    paths = resolve_session_paths()
-    prepare_session_dir(paths.session_dir)
+        ynab_api_key = read_config_text("ynab.api_key")
+    except TaskError as error:
+        _say(f"Cannot start: {error}")
+        raise TaskError("YNAB API key is missing.") from error
+    paths = resolve_state_files(ctx)
     if no_download:
         use_last_statements(paths)
         balances = None
         questrade_balance = None
     else:
-        step(f"Reading the Questrade balances in {QUESTRADE_CURRENCY}")
+        ctx.log(f"Reading the Questrade balances in {QUESTRADE_CURRENCY}")
         questrade_balances = read_questrade_balances(paths.questrade_token_file)
         questrade_balance = sum(questrade_balances.values())
-        print_questrade_balances(questrade_balances, questrade_balance)
-        balances = run_download(paths)
-    print(f"Chequing account: {paths.chequing_file}")
-    print(f"Credit card: {paths.credit_card_file}")
+        ctx.log(f"Questrade total {format_amount(questrade_balance)}")
+        balances = run_download(ctx, paths)
 
-    # The script works only on the transactions from this date on, in the
+    # The task works only on the transactions from this date on, in the
     # statements and in YNAB.
     start_date = max(
         from_date, datetime.date.today() - datetime.timedelta(days=HISTORY_DAYS)
     )
 
-    step("Reading the statements")
+    ctx.log("Reading the statements")
     statement_transactions = [
         *read_statement(paths.chequing_file, CHEQUING_STATEMENT),
         *read_statement(paths.credit_card_file, CREDIT_CARD_STATEMENT),
@@ -304,36 +140,107 @@ def run(from_date, no_download, no_upload):
         if transaction.date >= start_date
     ]
     ignored_count = len(statement_transactions) - len(transactions)
-    print(f"Ignored transactions before {start_date.isoformat()}: {ignored_count}")
+    ctx.log(f"Ignored transactions before {start_date.isoformat()}: {ignored_count}")
 
+    ctx.log("Naming the payees")
+    payee_map = load_payee_map(ctx)
+    new_name_count = assign_payees(ctx, transactions, payee_map)
+    ctx.log(f"New payee names saved: {new_name_count}")
+
+    matched, added_count, cleared_count = save_to_ynab(
+        ctx,
+        transactions,
+        start_date,
+        balances,
+        questrade_balance,
+        ynab_api_key,
+        upload=not no_upload,
+    )
+    if not matched:
+        return "Done, preview only. YNAB unchanged."
+    summary = f"Done: {added_count} added, {cleared_count} cleared."
+    return summary
+
+
+def shutdown(ctx, reason):
+    # Closes the browser that a run leaves open, whatever the outcome. Never
+    # raises, so the shutdown itself cannot fail the task.
+    ctx.log(f"shutdown: {reason}")
     try:
-        step("Naming the payees")
-        payee_map = load_payee_map(paths.payees_file)
-        new_name_count = assign_payees(transactions, payee_map, paths.payees_file)
-        print(f"New payee names saved to {paths.payees_file}: {new_name_count}")
-
-        step("Transactions")
-        print_report(transactions)
-
-        step("Balances")
-        if balances is None:
-            print("Not read, because of --no-download.")
-        else:
-            print_balances(balances)
-
-        step("Checking YNAB")
-        save_to_ynab(
-            transactions,
-            start_date,
-            balances,
-            questrade_balance,
-            ynab_api_key,
-            upload=not no_upload,
+        os.environ["AGENT_BROWSER_SESSION"] = BROWSER_SESSION
+        subprocess.run(
+            ["agent-browser", "close"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=30,
         )
-    except StepError as error:
-        log(f"Error: {error}")
-        return error.exit_status
-    return 0
+    except Exception as error:
+        ctx.log(f"browser close failed: {error}")
+
+
+def parse_task_args(args):
+    # Returns the from date, no-download, and no-upload from `args`, the
+    # words after the task name.
+    from_date = DEFAULT_FROM_DATE
+    no_download = False
+    no_upload = False
+    index = 0
+    while index < len(args):
+        argument = args[index]
+        if argument == "--from-date":
+            index += 1
+            if index >= len(args):
+                raise TaskError("Usage: /run budget_sync [--from-date YYYY-MM-DD]")
+            try:
+                from_date = datetime.datetime.strptime(
+                    args[index], OPTION_DATE_FORMAT
+                ).date()
+            except ValueError:
+                raise TaskError(
+                    f"Invalid --from-date {args[index]!r}, expected YYYY-MM-DD"
+                ) from None
+        elif argument == "--no-download":
+            no_download = True
+        elif argument == "--no-upload":
+            no_upload = True
+        else:
+            raise TaskError(
+                "Usage: /run budget_sync [--from-date YYYY-MM-DD] "
+                "[--no-download] [--no-upload]"
+            )
+        index += 1
+    return from_date, no_download, no_upload
+
+
+# --------------------------------------------------------------------------------------
+# Chat helpers.
+# --------------------------------------------------------------------------------------
+
+
+def _say(text):
+    _CTX.say(text)
+
+
+def _log(text):
+    _CTX.log(text)
+
+
+def ask_code():
+    # Asks for the SMS verification code of the bank. The reply never reaches
+    # the log. A timeout stops the task through the bot.
+    return _CTX.ask(
+        "BMO sent an SMS code. Reply with the digits.", pattern=r"\d+", timeout=300
+    )
+
+
+def ask_yes(question, timeout=300):
+    # Asks a yes or no question. Returns True for yes.
+    answer = _CTX.ask(
+        question + " Reply y or n.",
+        pattern=r"(?i:yes|y|no|n)",
+        timeout=timeout,
+    )
+    return answer.casefold() in ("y", "yes")
 
 
 # --------------------------------------------------------------------------------------
@@ -342,80 +249,70 @@ def run(from_date, no_download, no_upload):
 
 
 def read_config_text(path):
-    # Returns the text at `path` in the configuration. Exits when `jc get`
-    # fails, or when the value is missing, `null`, empty, or not text. The
-    # stderr of `jc` passes through, so its message reaches the user.
+    # Returns the text at `path` in the configuration. Raises when `jc get`
+    # fails, or when the value is missing, `null`, empty, or not text.
     try:
         result = subprocess.run(
             ["jc", "get", path],
             stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             encoding="utf-8",
             errors="replace",
+            timeout=15,
         )
     except OSError as error:
-        die(f"cannot run jc: {error}")
+        raise TaskError(f"cannot run jc: {error}") from error
     if result.returncode != 0:
-        sys.exit(1)
+        detail = (result.stderr or "").strip() or "no error message from jc"
+        raise TaskError(f"cannot read ~/config.json: {detail}")
 
     try:
         value = json.loads(result.stdout)
     except ValueError as error:
-        die(f"jc returned invalid JSON for {path}: {error}")
+        raise TaskError(f"jc returned invalid JSON for {path}: {error}") from error
     if value is None or value == "":
-        die(f"{path} not found in ~/config.json")
+        raise TaskError(f"{path} not found in ~/config.json")
     if not isinstance(value, str):
-        die(f"{path} in ~/config.json is not text")
+        raise TaskError(f"{path} in ~/config.json is not text")
     return value
 
 
 # --------------------------------------------------------------------------------------
-# Session directory.
+# State files.
 # --------------------------------------------------------------------------------------
 
 
 @dataclass
 class SessionPaths:
-    # The directory holds the cookies of the bank session and the downloaded
-    # statements. It sits at a fixed path outside of any repository, and only
-    # the user can open it.
+    # Every path sits in the task state directory. The statements, the bank
+    # session, the Questrade token, the payee map, and the error screenshot
+    # all persist there across runs.
     session_dir: str
     session_file: str
     chequing_file: str
     credit_card_file: str
     # Where the browser saves each statement that the bank sends.
     download_file: str
-    # The map from the payee names of the bank to the names of the user.
-    payees_file: str
     screenshot_file: str
     # The refresh token for the Questrade API that the last run saved.
     questrade_token_file: str
 
 
-def resolve_session_paths():
-    state_home = os.environ.get("XDG_STATE_HOME") or os.path.join(
-        os.path.expanduser("~"), ".local", "state"
-    )
-    session_dir = os.path.join(state_home, "budget_imports")
-    return SessionPaths(
-        session_dir=session_dir,
-        session_file=os.path.join(session_dir, "bmo_session.json"),
-        chequing_file=os.path.join(session_dir, "chequing.csv"),
-        credit_card_file=os.path.join(session_dir, "credit_card.csv"),
-        download_file=os.path.join(session_dir, DOWNLOAD_NAME),
-        payees_file=os.path.join(session_dir, "payees.csv"),
-        screenshot_file=os.path.join(session_dir, "browser-error.png"),
-        questrade_token_file=os.path.join(session_dir, "questrade_refresh_token.txt"),
-    )
-
-
-def prepare_session_dir(session_dir):
-    # `makedirs` applies the mode only to a directory that it creates, so the
-    # mode of an existing one is set as well.
+def resolve_state_files(ctx):
+    session_dir = os.path.dirname(ctx.state_path(DOWNLOAD_ID))
     try:
         os.makedirs(session_dir, mode=0o700, exist_ok=True)
-        os.chmod(session_dir, 0o700)
     except OSError as error:
-        die(f"cannot prepare {session_dir}: {error}")
+        raise TaskError(f"cannot prepare the state directory: {error}") from error
+    return SessionPaths(
+        session_dir=session_dir,
+        session_file=ctx.state_path(SESSION_ID),
+        chequing_file=ctx.state_path(CHEQUING_ID),
+        credit_card_file=ctx.state_path(CREDIT_CARD_ID),
+        download_file=ctx.state_path(DOWNLOAD_ID),
+        screenshot_file=ctx.state_path(SCREENSHOT_ID),
+        questrade_token_file=ctx.state_path(TOKEN_ID),
+    )
 
 
 # --------------------------------------------------------------------------------------
@@ -423,33 +320,35 @@ def prepare_session_dir(session_dir):
 # --------------------------------------------------------------------------------------
 
 
-def run_download(paths):
+def run_download(ctx, paths):
     # Downloads the statements from the bank, and returns the balances that
-    # `download_statements` returns. Exits with the status of the failed step
-    # when a step fails.
-    username = read_config_text("bmo.username")
-    password = read_config_text("bmo.password")
+    # `download_statements` returns.
+    try:
+        username = read_config_text("bmo.username")
+        password = read_config_text("bmo.password")
+    except TaskError as error:
+        _say(f"Cannot log in: {error}")
+        raise TaskError("BMO credentials are missing.") from error
 
     os.environ["AGENT_BROWSER_SESSION"] = BROWSER_SESSION
     browser = Browser()
     try:
         balances = download_statements(browser, paths, username, password)
     except StepError as error:
-        log(f"Error: {error}")
         # Before the browser opens, there is no page to show.
         if browser.opened:
-            take_error_screenshot(browser, paths.screenshot_file)
-        sys.exit(error.exit_status)
+            take_error_screenshot(ctx, browser, paths.screenshot_file)
+        raise TaskError(str(error)) from error
 
-    step("Statements downloaded")
+    ctx.log("Statements downloaded")
     return balances
 
 
 def use_last_statements(paths):
-    step("Using the statements of the last run")
+    _log("Using the statements of the last run")
     for statement_path in (paths.chequing_file, paths.credit_card_file):
         if not os.path.isfile(statement_path):
-            die(f"{statement_path} does not exist. Run without --no-download first")
+            raise TaskError("No downloaded statements. Run without --no-download first")
 
 
 def download_statements(browser, paths, username, password):
@@ -468,7 +367,7 @@ def download_statements(browser, paths, username, password):
 
 
 def open_login_page(browser, paths):
-    step("Opening the login page")
+    _log("Opening the login page")
     # Close the browser that an earlier run left open, so that `open` launches
     # a new browser with the download path.
     browser.run("close", stdout=subprocess.DEVNULL)
@@ -483,7 +382,7 @@ def open_login_page(browser, paths):
 
 
 def accept_cookies(browser):
-    step("Accepting cookies")
+    _log("Accepting cookies")
     output = browser.run("get", "count", COOKIE_BUTTON, stdout=subprocess.PIPE)
     try:
         count = int(output)
@@ -497,7 +396,7 @@ def accept_cookies(browser):
 
 
 def log_in(browser, username, password):
-    step("Logging in")
+    _log("Logging in")
     browser.run("fill", 'input[id^="username-input"]', Secret(username))
     browser.run("fill", 'input[id^="password-input"]', Secret(password))
     browser.find_role("button", "click", "SIGN IN")
@@ -505,14 +404,14 @@ def log_in(browser, username, password):
 
 
 def pass_verification(browser):
-    step("Checking for 2FA")
+    _log("Checking for 2FA")
     if browser.succeeds("find", "role", "radio", "text", "--name", "SMS text"):
         browser.find_role("radio", "click", SMS_OPTION_NAME)
         browser.find_role("checkbox", "click", VERIFICATION_CONSENT_NAME)
         browser.find_role("button", "click", "SEND CODE")
         time.sleep(PAGE_WAIT_SECONDS)
 
-        sms_code = ask("Enter the SMS code: ")
+        sms_code = ask_code()
         browser.find_role(
             "spinbutton", "fill", "Enter verification code", Secret(sms_code)
         )
@@ -524,12 +423,12 @@ def pass_verification(browser):
 
 def download_chequing_statement(browser, paths):
     # Returns the current balance of the account. See `read_balance`.
-    step("Selecting the chequing account")
+    _log("Selecting the chequing account")
     browser.find_role("link", "click", "Chequing")
     time.sleep(PAGE_WAIT_SECONDS)
     balance = read_balance(browser, CHEQUING_STATEMENT)
 
-    step("Downloading the chequing account transactions")
+    _log("Downloading the chequing account transactions")
     browser.find_role("link", "click", "DOWNLOAD")
     browser.find_role("radio", "click", "Transactions between these dates:")
     to_date = datetime.date.today()
@@ -547,12 +446,12 @@ def download_chequing_statement(browser, paths):
 
 def download_credit_card_statement(browser, paths):
     # Returns the current balance of the account. See `read_balance`.
-    step("Selecting the credit card")
+    _log("Selecting the credit card")
     browser.find_role("link", "click", "MasterCard")
     time.sleep(PAGE_WAIT_SECONDS)
     balance = read_balance(browser, CREDIT_CARD_STATEMENT)
 
-    step("Downloading the credit card transactions")
+    _log("Downloading the credit card transactions")
     browser.find_role("link", "click", "DOWNLOAD")
     browser.run("select", 'select[name="period"]', "All Available Transactions")
     browser.run("select", 'select[name="format"]', CSV_FORMAT)
@@ -566,14 +465,14 @@ def download_credit_card_statement(browser, paths):
 def read_balance(browser, statement_format):
     # Returns the current balance on the page of the account of
     # `statement_format`, with the signs of `Transaction.amount`. Returns
-    # `None` when the page shows no balance that the script can read. The
-    # statements do not need the balance, so that case only warns.
+    # `None` when the page shows no balance that the task can read. The
+    # statements do not need the balance, so that case only logs.
     snapshot = browser.run("snapshot", stdout=subprocess.PIPE)
     match = CURRENT_BALANCE_PATTERN.search(snapshot)
     balance = None if match is None else parse_balance(match["balance"])
     if balance is None:
         account_label = ACCOUNT_LABELS[statement_format.account]
-        log(f"Warning: cannot read the current balance of the {account_label} page")
+        _log(f"Warning: cannot read the current balance of the {account_label} page")
         return None
     return -balance if statement_format.inverted_amounts else balance
 
@@ -588,48 +487,20 @@ def parse_balance(text):
     return balance if balance.is_finite() else None
 
 
-def capture_page(browser, paths, name):
-    # This function has no caller. It stays to help write new steps: call it
-    # after a step, and read the files to find the elements on the page.
-    #
-    # Saves an annotated screenshot of the page, and the accessibility tree of
-    # the page as text, to the session directory. Both can show account data,
-    # and only the user can open that directory.
-    step(f"Capturing the {name} page")
-    screenshot_path = os.path.join(paths.session_dir, f"{name}-page.png")
-    snapshot_path = os.path.join(paths.session_dir, f"{name}-page.txt")
-    browser.run(
-        "screenshot",
-        "--full",
-        "--annotate",
-        screenshot_path,
-        stdout=subprocess.DEVNULL,
-    )
-    snapshot = browser.run("snapshot", stdout=subprocess.PIPE)
-    try:
-        with open(snapshot_path, "w", encoding="utf-8") as handle:
-            handle.write(snapshot)
-    except OSError as error:
-        raise StepError(f"cannot save {snapshot_path}: {error}") from error
-    print(f"Screenshot: {screenshot_path}")
-    print(f"Page objects: {snapshot_path}")
-
-
 def save_session(browser, paths):
-    step("Saving the state")
+    _log("Saving the state")
     browser.run("state", "save", paths.session_file)
     try:
         os.chmod(paths.session_file, 0o600)
     except OSError as error:
-        raise StepError(
-            f"cannot set the mode of {paths.session_file}: {error}"
-        ) from error
+        raise StepError(f"cannot set the mode of the session file: {error}") from error
 
 
 def save_statement(download_path, statement_path):
     # Moves the statement at `download_path` to `statement_path`. Every
     # statement arrives under the same name, so each one must move before the
-    # next download.
+    # next download. Removes the download afterwards, so no transient file
+    # stays in the state.
     #
     # Before the header row, the bank adds a line with the time of the export.
     # It also adds empty lines around the header row. Keep only the header
@@ -640,11 +511,11 @@ def save_statement(download_path, statement_path):
             lines = download.readlines()
     except FileNotFoundError:
         raise StepError(
-            f"{download_path} does not exist. The download failed, or took more "
+            "The download is missing. The download failed, or took more "
             f"than {DOWNLOAD_WAIT_SECONDS} seconds"
         ) from None
     except OSError as error:
-        raise StepError(f"cannot read {download_path}: {error}") from error
+        raise StepError(f"cannot read the download: {error}") from error
 
     header_found = False
     kept_lines = []
@@ -657,22 +528,27 @@ def save_statement(download_path, statement_path):
     try:
         with open(statement_path, "wb") as statement:
             statement.writelines(kept_lines)
+        try:
+            os.chmod(statement_path, 0o600)
+        except OSError:
+            pass
         os.remove(download_path)
     except OSError as error:
-        raise StepError(f"cannot save {statement_path}: {error}") from error
+        raise StepError(f"cannot save the statement: {error}") from error
 
 
-def take_error_screenshot(browser, screenshot_path):
-    # The screenshot can show account data, so it stays in the private session
-    # directory. The output of `agent-browser` goes to stderr, with the error.
+def take_error_screenshot(ctx, browser, screenshot_path):
+    # The screenshot can show account data, so it stays in the private state
+    # directory.
     try:
         browser.run(
-            "screenshot", "--full", "--annotate", screenshot_path, stdout=sys.stderr
+            "screenshot", "--full", "--annotate", screenshot_path,
+            stdout=subprocess.DEVNULL,
         )
     except StepError:
-        log("Warning: Failed to take a screenshot of the browser")
+        ctx.log("Warning: failed to take a screenshot of the browser")
         return
-    log(f"Screenshot of the browser: {screenshot_path}")
+    ctx.log("Screenshot of the browser saved to the state")
 
 
 # --------------------------------------------------------------------------------------
@@ -689,6 +565,12 @@ class Account(enum.IntEnum):
 ACCOUNT_LABELS = {
     Account.CHEQUING: "Chequing",
     Account.CREDIT_CARD: "Credit card",
+}
+
+# Short account tags for the narrow chat report.
+ACCOUNT_TAGS = {
+    Account.CHEQUING: "Chq",
+    Account.CREDIT_CARD: "MC",
 }
 
 
@@ -732,13 +614,13 @@ def read_statement(path, statement_format):
     reader = csv.reader(io.StringIO(read_statement_text(path)))
     header = next(reader, None)
     if header is None:
-        log(f"Warning: {path} is empty, no transactions read")
+        _log("Warning: a statement is empty, no transactions read")
         return []
 
     columns = [name.strip() for name in header]
-    date_index = find_column(path, columns, statement_format.date_column)
-    amount_index = find_column(path, columns, statement_format.amount_column)
-    payee_index = find_column(path, columns, statement_format.payee_column)
+    date_index = find_column(columns, statement_format.date_column)
+    amount_index = find_column(columns, statement_format.amount_column)
+    payee_index = find_column(columns, statement_format.payee_column)
 
     transactions = []
     for row in reader:
@@ -749,16 +631,18 @@ def read_statement(path, statement_format):
         # back into it.
         if len(row) > len(columns) and payee_index == len(columns) - 1:
             row = [*row[:payee_index], ",".join(row[payee_index:])]
-        location = f"{path}:{reader.line_num}"
         if len(row) != len(columns):
-            die(f"{location}: expected {len(columns)} values, found {len(row)}")
+            raise TaskError(
+                f"a statement row has {len(row)} values, "
+                f"expected {len(columns)}"
+            )
 
-        amount = parse_statement_amount(row[amount_index], location)
+        amount = parse_statement_amount(row[amount_index])
         if statement_format.inverted_amounts:
             amount = -amount
         transactions.append(
             Transaction(
-                date=parse_statement_date(row[date_index], location),
+                date=parse_statement_date(row[date_index]),
                 amount=amount,
                 payee=row[payee_index].strip(),
                 account=statement_format.account,
@@ -774,35 +658,35 @@ def read_statement_text(path):
         with open(path, "rb") as handle:
             data = handle.read()
     except OSError as error:
-        die(f"cannot read {path}: {error}")
+        raise TaskError(f"cannot read a statement: {error}") from error
     try:
         return data.decode("utf-8-sig")
     except UnicodeDecodeError:
         return data.decode("cp1252", errors="replace")
 
 
-def find_column(path, columns, name):
+def find_column(columns, name):
     # Returns the index of the column `name` in `columns`, the header row of
-    # the statement at `path`.
+    # a statement.
     if name not in columns:
-        die(f"{path} has no '{name}' column. Its columns: {', '.join(columns)}")
+        raise TaskError(f"a statement has no '{name}' column")
     return columns.index(name)
 
 
-def parse_statement_date(value, location):
+def parse_statement_date(value):
     try:
         return datetime.datetime.strptime(value.strip(), STATEMENT_DATE_FORMAT).date()
     except ValueError:
-        die(f"{location}: invalid date '{value.strip()}'")
+        raise TaskError(f"invalid date {value.strip()!r} in a statement") from None
 
 
-def parse_statement_amount(value, location):
+def parse_statement_amount(value):
     try:
         amount = decimal.Decimal(value.strip())
     except decimal.InvalidOperation:
         amount = None
     if amount is None or not amount.is_finite():
-        die(f"{location}: invalid amount '{value.strip()}'")
+        raise TaskError(f"invalid amount {value.strip()!r} in a statement")
     return amount
 
 
@@ -811,81 +695,67 @@ def parse_statement_amount(value, location):
 # --------------------------------------------------------------------------------------
 
 
-def load_payee_map(path):
+def load_payee_map(ctx):
     # Returns the map from the payee names of the bank to the names of the
     # user, in the order of the file. A missing file gives an empty map. The
-    # spaces around each name go away, as they do in the statements.
-    try:
-        handle = open(path, encoding="utf-8", newline="")
-    except FileNotFoundError:
+    # format is the same CSV as in `bin/budget_imports`, with the same header
+    # row, so the old file can be copied over. The spaces around each name go
+    # away, as they do in the statements.
+    raw = ctx.load_state(PAYEES_ID)
+    if raw is None:
         return {}
-    except OSError as error:
-        die(f"cannot read {path}: {error}")
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise TaskError(f"cannot read {PAYEES_ID}: {error}") from error
 
     payee_map = {}
     try:
-        with handle:
-            reader = csv.reader(handle)
-            header = next(reader, None)
-            if header is None:
-                return payee_map
-            if tuple(name.strip() for name in header) != PAYEE_COLUMNS:
-                die(
-                    f"{path} has the header row '{','.join(header)}', expected "
-                    f"'{','.join(PAYEE_COLUMNS)}'"
+        reader = csv.reader(io.StringIO(text))
+        header = next(reader, None)
+        if header is None:
+            return payee_map
+        if tuple(name.strip() for name in header) != PAYEE_COLUMNS:
+            raise TaskError(f"{PAYEES_ID} has a bad header row")
+        for row in reader:
+            if not any(cell.strip() for cell in row):
+                continue
+            if len(row) != len(PAYEE_COLUMNS):
+                raise TaskError(
+                    f"{PAYEES_ID} has a row with {len(row)} values, "
+                    f"expected {len(PAYEE_COLUMNS)}"
                 )
-            for row in reader:
-                if not any(cell.strip() for cell in row):
-                    continue
-                location = f"{path}:{reader.line_num}"
-                if len(row) != len(PAYEE_COLUMNS):
-                    die(
-                        f"{location}: expected {len(PAYEE_COLUMNS)} values, "
-                        f"found {len(row)}"
-                    )
-                original_name, new_name = (cell.strip() for cell in row)
-                if not new_name:
-                    die(f"{location}: the new payee name is empty")
-                if original_name in payee_map:
-                    die(f"{location}: '{original_name}' is in the map already")
-                payee_map[original_name] = new_name
-    except (OSError, UnicodeDecodeError, csv.Error) as error:
-        die(f"cannot read {path}: {error}")
+            original_name, new_name = (cell.strip() for cell in row)
+            if not new_name:
+                raise TaskError(f"{PAYEES_ID} has an empty new payee name")
+            if original_name in payee_map:
+                raise TaskError(f"{original_name!r} is in the map already")
+            payee_map[original_name] = new_name
+    except csv.Error as error:
+        raise TaskError(f"cannot read {PAYEES_ID}: {error}") from error
     return payee_map
 
 
-def save_payee_map(path, payee_map):
-    # The new file replaces the old one in one rename, so an interruption
-    # cannot leave a partial map.
+def save_payee_map(ctx, payee_map):
+    # Writes the map in the same CSV format that it is read in, so a human
+    # can keep editing the file by hand.
+    output = io.StringIO()
+    writer = csv.writer(output, lineterminator="\n")
+    writer.writerow(PAYEE_COLUMNS)
+    writer.writerows(payee_map.items())
     try:
-        descriptor, temp_path = tempfile.mkstemp(
-            dir=os.path.dirname(path), prefix=".payees-", suffix=".csv"
-        )
-    except OSError as error:
-        die(f"cannot save {path}: {error}")
-
-    replaced = False
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8", newline="") as handle:
-            writer = csv.writer(handle, lineterminator="\n")
-            writer.writerow(PAYEE_COLUMNS)
-            writer.writerows(payee_map.items())
-        os.replace(temp_path, path)
-        replaced = True
-    except OSError as error:
-        die(f"cannot save {path}: {error}")
-    finally:
-        if not replaced:
-            with contextlib.suppress(OSError):
-                os.remove(temp_path)
+        ctx.save_state(PAYEES_ID, output.getvalue())
+    except (OSError, TypeError, ValueError) as error:
+        raise TaskError(f"cannot save {PAYEES_ID}: {error}") from error
 
 
-def assign_payees(transactions, payee_map, payees_path):
+def assign_payees(ctx, transactions, payee_map):
     # Replaces the payee name of the bank in every transaction with the name
     # from `payee_map`, and returns how many new names the user gave. For a
-    # payee name without an entry, asks for the new name. The answer goes into
-    # the map, and the map goes to `payees_path` at once, so an interruption
-    # keeps the earlier answers. The questions come in order of date.
+    # payee name without an entry, asks for the new name in the chat. The
+    # answer goes into the map, and the map is saved at once, so an
+    # interruption keeps the earlier answers. The questions come in order of
+    # date.
     #
     # No transaction changes before the last question. A new name can be the
     # payee name of the bank in another transaction, and a lookup must never
@@ -893,7 +763,7 @@ def assign_payees(transactions, payee_map, payees_path):
     # The file can lack the entries that keep the names of the user, such as
     # after an edit by hand.
     if add_kept_names(payee_map):
-        save_payee_map(payees_path, payee_map)
+        save_payee_map(ctx, payee_map)
 
     ordered_transactions = sorted(
         transactions, key=lambda transaction: (transaction.date, transaction.amount)
@@ -906,9 +776,9 @@ def assign_payees(transactions, payee_map, payees_path):
         matching_transactions = [
             other for other in ordered_transactions if other.payee == bank_name
         ]
-        payee_map[bank_name] = ask_payee_name(bank_name, matching_transactions)
+        payee_map[bank_name] = ask_payee_name(ctx, bank_name, matching_transactions)
         add_kept_names(payee_map)
-        save_payee_map(payees_path, payee_map)
+        save_payee_map(ctx, payee_map)
         new_name_count += 1
 
     for transaction in transactions:
@@ -929,83 +799,25 @@ def add_kept_names(payee_map):
     return changed
 
 
-def ask_payee_name(bank_name, transactions):
-    # Shows `bank_name` and its `transactions`, and returns the payee name
-    # that the user types. The details go to stderr, with the question, so
-    # that they show on the terminal when stdout goes elsewhere.
-    log("")
-    log(f"Payee from the bank: {bank_name}")
-    for transaction in transactions:
-        details = format_details(
-            transaction.date, transaction.amount, ACCOUNT_LABELS[transaction.account]
+def ask_payee_name(ctx, bank_name, transactions):
+    # Shows `bank_name` with short sample lines, and returns the payee name
+    # that the user replies with.
+    lines = ["New payee:", bank_name]
+    for transaction in transactions[:3]:
+        lines.append(
+            f"{transaction.date.strftime('%m-%d')} "
+            f"{format_amount(transaction.amount)} "
+            f"{ACCOUNT_TAGS[transaction.account]}"
         )
-        log(f"  {details}")
-    while True:
-        payee_name = ask("New payee name: ")
-        if payee_name:
-            return payee_name
-        log("The payee name cannot be empty.")
+    if len(transactions) > 3:
+        lines.append(f"+{len(transactions) - 3} more")
+    lines.append("Reply with the name to use.")
+    return ctx.ask("\n".join(lines), pattern=r"[\s\S]+", timeout=600)
 
 
 # --------------------------------------------------------------------------------------
-# Report.
+# Narrow chat report.
 # --------------------------------------------------------------------------------------
-
-REPORT_HEADERS = ("Date", "Amount", "Payee", "Account")
-
-
-def print_report(transactions):
-    if not transactions:
-        print("No transactions.")
-        return
-
-    rows = [
-        (
-            transaction.date.isoformat(),
-            format_amount(transaction.amount),
-            transaction.payee,
-            ACCOUNT_LABELS[transaction.account],
-        )
-        for transaction in sorted(transactions, key=report_order)
-    ]
-    widths = [
-        max(len(row[index]) for row in (REPORT_HEADERS, *rows))
-        for index in range(len(REPORT_HEADERS))
-    ]
-    print_report_row(REPORT_HEADERS, widths)
-    print_report_row(tuple("-" * width for width in widths), widths)
-    for row in rows:
-        print_report_row(row, widths)
-
-
-def print_report_row(row, widths):
-    # The amount aligns to the right, and the other columns to the left. The
-    # last column has no padding, so no line ends in spaces.
-    date, amount, payee, account = row
-    date_width, amount_width, payee_width, _ = widths
-    print(
-        f"{date:<{date_width}}  {amount:>{amount_width}}  "
-        f"{payee:<{payee_width}}  {account}"
-    )
-
-
-def print_balances(balances):
-    # `balances` maps each account to its current balance, or to `None` when
-    # the script could not read it.
-    label_width = max(len(label) for label in ACCOUNT_LABELS.values())
-    for account, label in ACCOUNT_LABELS.items():
-        balance = balances.get(account)
-        balance_text = "unknown" if balance is None else format_amount(balance)
-        print(f"{label:<{label_width}}  {balance_text:>12}")
-
-
-def print_questrade_balances(balances, total):
-    # `balances` maps the label of each Questrade account to its balance, and
-    # `total` is the sum of the balances.
-    rows = [*balances.items(), ("Total", total)]
-    label_width = max(len(label) for label, _ in rows)
-    for label, balance in rows:
-        print(f"{label:<{label_width}}  {format_amount(balance):>12}")
 
 
 def report_order(transaction):
@@ -1021,13 +833,37 @@ def report_order(transaction):
 
 
 def format_amount(amount):
-    return f"{amount:,.2f}"
+    return f"{amount:.2f}"
 
 
 def format_details(date, amount, *texts):
-    # Returns the date, the amount aligned to the right, and `texts`, with two
-    # spaces between each two.
-    return "  ".join([date.isoformat(), f"{format_amount(amount):>12}", *texts])
+    # Returns the date, the amount, and `texts` for the bot log.
+    return "  ".join([date.isoformat(), format_amount(amount), *texts])
+
+
+def compact_line(transaction):
+    # One short line for a narrow screen: date, account tag, amount, payee.
+    payee = transaction.payee
+    if len(payee) > 20:
+        payee = payee[:19] + "…"
+    return (
+        f"{transaction.date.strftime('%m-%d')} "
+        f"{ACCOUNT_TAGS[transaction.account]} "
+        f"{format_amount(transaction.amount)} {payee}"
+    )
+
+
+def say_new_transactions(transactions):
+    # Reports only the transactions that YNAB does not have yet.
+    if not transactions:
+        _say("No new transactions.")
+        return
+    lines = [f"New ({len(transactions)}):"]
+    for transaction in sorted(transactions, key=report_order)[:REPORT_LINE_LIMIT]:
+        lines.append(compact_line(transaction))
+    if len(transactions) > REPORT_LINE_LIMIT:
+        lines.append(f"+{len(transactions) - REPORT_LINE_LIMIT} more")
+    _say("\n".join(lines))
 
 
 # --------------------------------------------------------------------------------------
@@ -1059,14 +895,16 @@ def read_questrade_balances(token_path):
     accounts = questrade_get(session, "accounts", "read the Questrade accounts")
     accounts = accounts.get("accounts")
     if not isinstance(accounts, list) or not accounts:
-        die("Questrade returned no accounts")
+        raise TaskError("Questrade returned no accounts")
 
     balances = {}
     for account in accounts:
         number = account.get("number") if isinstance(account, dict) else None
         # The number goes into the URL of the next call.
         if not isinstance(number, str) or not number.isdigit():
-            die(f"Questrade returned an account with the number {number!r}")
+            raise TaskError(
+                f"Questrade returned an account with the number {number!r}"
+            )
         account_balances = questrade_get(
             session,
             f"accounts/{number}/balances",
@@ -1094,13 +932,13 @@ def find_combined_balance(account_balances, account_number):
         if isinstance(total_equity, bool) or not isinstance(
             total_equity, (int, decimal.Decimal)
         ):
-            die(
-                f"Questrade returned the total equity {total_equity!r} for the "
+            raise TaskError(
+                f"Questrade returned a bad total equity for "
                 f"account {account_number}"
             )
         return decimal.Decimal(total_equity).quantize(CENT)
-    die(
-        f"Questrade returned no combined balance in {QUESTRADE_CURRENCY} for the "
+    raise TaskError(
+        f"Questrade returned no combined balance in {QUESTRADE_CURRENCY} for "
         f"account {account_number}"
     )
 
@@ -1114,39 +952,41 @@ def start_questrade_session(token_path):
     response = None
     saved_token = read_questrade_token(token_path)
     if saved_token is None:
-        print(
-            f"No refresh token in {token_path}. The script uses the one from "
-            "`jc get questrade.api_key`."
-        )
+        _log("No saved Questrade token. The task uses `jc get questrade.api_key`.")
     else:
         response = redeem_questrade_token(saved_token)
         if response is None:
-            log(
-                f"Warning: Questrade rejected the refresh token in {token_path}. "
-                "The script uses the one from `jc get questrade.api_key`."
+            _log(
+                "Warning: Questrade rejected the saved refresh token. The task "
+                "uses `jc get questrade.api_key`."
             )
     if response is None:
-        response = redeem_questrade_token(read_config_text("questrade.api_key"))
+        try:
+            fallback = read_config_text("questrade.api_key")
+        except TaskError as error:
+            _say(f"Questrade needs a refresh token: {error}")
+            raise TaskError("Questrade refresh token is missing.") from error
+        response = redeem_questrade_token(fallback)
         if response is None:
-            die(
-                "Questrade rejected the refresh token from `jc get "
-                "questrade.api_key`. Generate a new token for manual authorization "
-                "in the API Centre of Questrade, and save it as questrade.api_key "
-                "in ~/config.json"
+            _say(
+                "Questrade rejected both refresh tokens. Generate a new "
+                "token in the Questrade API Centre and save it as "
+                "questrade.api_key."
             )
+            raise TaskError("Questrade rejected both refresh tokens.")
 
     refresh_token = response.get("refresh_token")
     if not isinstance(refresh_token, str) or not refresh_token:
-        die("Questrade returned no refresh token")
+        raise TaskError("Questrade returned no refresh token")
     save_questrade_token(token_path, refresh_token)
 
     access_token = response.get("access_token")
     if not isinstance(access_token, str) or not access_token:
-        die("Questrade returned no access token")
+        raise TaskError("Questrade returned no access token")
     # The access token goes to this server, so the connection must be secure.
     api_server = response.get("api_server")
     if not isinstance(api_server, str) or not api_server.startswith("https://"):
-        die(f"Questrade returned the API server {api_server!r}, expected HTTPS")
+        raise TaskError("Questrade returned a bad API server")
     return QuestradeSession(access_token=access_token, api_server=api_server)
 
 
@@ -1159,7 +999,7 @@ def read_questrade_token(path):
     except FileNotFoundError:
         return None
     except (OSError, UnicodeDecodeError) as error:
-        die(f"cannot read {path}: {error}")
+        raise TaskError(f"cannot read the Questrade token: {error}") from error
     return token or None
 
 
@@ -1172,7 +1012,7 @@ def save_questrade_token(path, token):
             dir=os.path.dirname(path), prefix=".questrade-", suffix=".txt"
         )
     except OSError as error:
-        die(f"cannot save {path}: {error}")
+        raise TaskError(f"cannot save the Questrade token: {error}") from error
 
     replaced = False
     try:
@@ -1181,7 +1021,7 @@ def save_questrade_token(path, token):
         os.replace(temp_path, path)
         replaced = True
     except OSError as error:
-        die(f"cannot save {path}: {error}")
+        raise TaskError(f"cannot save the Questrade token: {error}") from error
     finally:
         if not replaced:
             with contextlib.suppress(OSError):
@@ -1206,13 +1046,13 @@ def redeem_questrade_token(refresh_token):
     if response.status in QUESTRADE_REJECTED_STATUSES:
         return None
     if response.status != 200:
-        die(f"cannot {action}: {describe_questrade_failure(response)}")
+        raise TaskError(f"cannot {action}: {describe_questrade_failure(response)}")
     return parse_questrade_response(action, response)
 
 
 def questrade_get(session, path, action):
     # Returns the JSON object that the API server of `session` returns for
-    # `path`, such as `accounts`. Dies with `action` in the message when the
+    # `path`, such as `accounts`. Raises with `action` in the message when the
     # call fails.
     response = send_questrade_request(
         action,
@@ -1221,7 +1061,7 @@ def questrade_get(session, path, action):
         headers={"Authorization": f"Bearer {session.access_token}"},
     )
     if response.status != 200:
-        die(f"cannot {action}: {describe_questrade_failure(response)}")
+        raise TaskError(f"cannot {action}: {describe_questrade_failure(response)}")
     return parse_questrade_response(action, response)
 
 
@@ -1234,14 +1074,14 @@ def questrade_url(api_server, path):
 
 
 def send_questrade_request(action, method, url, **keyword_arguments):
-    # Sends one request to Questrade, and returns the response. Dies with
+    # Sends one request to Questrade, and returns the response. Raises with
     # `action` in the message when no response arrives.
     try:
         return urllib3.request(
             method, url, timeout=QUESTRADE_TIMEOUT_SECONDS, **keyword_arguments
         )
     except urllib3.exceptions.HTTPError as error:
-        die(f"cannot {action}: {error}")
+        raise TaskError(f"cannot {action}: {error}") from error
 
 
 def parse_questrade_response(action, response):
@@ -1251,9 +1091,11 @@ def parse_questrade_response(action, response):
     try:
         value = json.loads(response.data, parse_float=decimal.Decimal)
     except ValueError as error:
-        die(f"cannot {action}: Questrade returned invalid JSON: {error}")
+        raise TaskError(
+            f"cannot {action}: Questrade returned invalid JSON: {error}"
+        ) from error
     if not isinstance(value, dict):
-        die(f"cannot {action}: Questrade returned no JSON object")
+        raise TaskError(f"cannot {action}: Questrade returned no JSON object")
     return value
 
 
@@ -1334,31 +1176,29 @@ class YnabComparison:
 
 
 def save_to_ynab(
-    transactions, start_date, bank_balances, questrade_balance, api_key, upload
+    ctx, transactions, start_date, bank_balances, questrade_balance, api_key, upload
 ):
-    # Brings YNAB up to date with the statements. Then compares the cleared
-    # balances in YNAB with `bank_balances`, and brings the balance of the
-    # YNAB account of Questrade to `questrade_balance`. Because of
-    # `--no-download`, `bank_balances` and `questrade_balance` can be `None`,
-    # and the step of each one does not run. Without `upload`, the script
-    # reads YNAB and shows the changes, but changes nothing.
+    # Brings YNAB up to date with the statements, then compares the cleared
+    # balances with `bank_balances`, then brings the YNAB account of
+    # Questrade to `questrade_balance`. Returns whether YNAB matches the
+    # statements, with the counts of added and cleared transactions. Because
+    # of `--no-download`, `bank_balances` and `questrade_balance` can be
+    # `None`, and the step of each one does not run. Without `upload`, the
+    # task reads YNAB and reports the changes, but changes nothing.
     with ynab.ApiClient(ynab.Configuration(access_token=api_key)) as api_client:
         plan = load_ynab_plan(api_client)
-        ynab_matches_statements = update_from_statements(
+        matched, added_count, cleared_count = update_from_statements(
             plan, transactions, start_date, upload
         )
-        step("Comparing the bank balances with YNAB")
         if bank_balances is None:
-            print("Skipped, because of --no-download.")
+            _say("Bank balances skipped.")
         else:
-            compare_bank_balances(plan, bank_balances, ynab_matches_statements)
-        step("Reconciling Questrade in YNAB")
+            compare_bank_balances(plan, bank_balances, matched)
         if questrade_balance is None:
-            print("Skipped, because of --no-download.")
+            _say("Questrade skipped.")
         else:
-            reconcile_questrade(
-                plan, questrade_balance, ynab_matches_statements, upload
-            )
+            reconcile_questrade(plan, questrade_balance, matched, upload)
+    return matched, added_count, cleared_count
 
 
 def update_from_statements(plan, transactions, start_date, upload):
@@ -1366,59 +1206,51 @@ def update_from_statements(plan, transactions, start_date, upload):
     # clears the YNAB transactions that match a statement transaction but are
     # not cleared. Leaves the YNAB transactions that the statements do not
     # have as they are. Every read and check happens before the first change,
-    # and a problem stops the script before any change. Without `upload`, the
-    # script reads YNAB and shows the changes, but changes nothing. Returns
-    # whether YNAB matches the statements at the end.
+    # and a problem stops the task before any change. Without `upload`, the
+    # task reads YNAB and reports the changes, but changes nothing. Returns
+    # whether YNAB matches the statements at the end, with the counts of
+    # added and cleared transactions.
     comparison = compare_with_ynab(plan, transactions, start_date)
-    report_ignored_transactions(comparison)
+    report_ignored_counts(comparison)
     transactions_to_send, problems = plan_additions(
         plan, comparison.missing_transactions
     )
-    for problem in problems:
-        log(f"Problem: {problem}")
     if problems:
-        die("YNAB did not change. Fix the problems above, and run again.")
+        _say("Blocked:\n" + "\n".join(problems))
+        raise TaskError("YNAB unchanged. Fix and rerun.")
 
     missing_count = len(comparison.missing_transactions)
     uncleared_count = len(comparison.uncleared_transactions)
     if not missing_count and not uncleared_count:
-        print("YNAB has every transaction of the statements already, as cleared.")
-        return True
+        _say("YNAB already matches.")
+        return True, 0, 0
 
-    changes = []
     if missing_count:
-        changes.append(f"add {missing_count} transactions")
-        step("Transactions to add to YNAB")
-        print_report(comparison.missing_transactions)
+        say_new_transactions(comparison.missing_transactions)
         transfers = [
             transaction
             for transaction in transactions_to_send
             if transfer_target(transaction.payee) is not None
         ]
         if transfers:
-            print(
-                f"Transfers: {len(transfers)}. For each one, YNAB adds the side "
-                "in the other account by itself."
+            _say(
+                f"{len(transfers)} transfer(s). YNAB adds each other side "
+                "by itself."
             )
         report_other_sides(transfers)
     if uncleared_count:
-        changes.append(f"clear {uncleared_count} transactions")
-        step("Transactions to clear in YNAB")
-        for ynab_transaction in sorted(
-            comparison.uncleared_transactions,
-            key=lambda ynab_transaction: (
-                ynab_transaction.var_date,
-                ynab_transaction.account_name,
-            ),
-        ):
-            print(describe_ynab_transaction(ynab_transaction))
+        _say(f"Clear {uncleared_count} in YNAB.")
     if not upload:
-        print("YNAB did not change, because of --no-upload.")
-        return False
-    answer = ask(f"In YNAB, {' and '.join(changes)}? [y/N] ")
-    if answer.casefold() not in ("y", "yes"):
-        print("Cancelled. YNAB did not change.")
-        return False
+        _say("Preview only. YNAB unchanged.")
+        return False, 0, 0
+    changes = []
+    if missing_count:
+        changes.append(f"add {missing_count}")
+    if uncleared_count:
+        changes.append(f"clear {uncleared_count}")
+    if not ask_yes(f"In YNAB, {' and '.join(changes)}?"):
+        _say("Cancelled. YNAB unchanged.")
+        return False, 0, 0
 
     if missing_count:
         send_transactions(plan, transactions_to_send)
@@ -1435,70 +1267,41 @@ def update_from_statements(plan, transactions, start_date, upload):
         or result.uncleared_transactions
         or result.extra_keys_by_account != comparison.extra_keys_by_account
     ):
-        report_ynab_differences(result)
-        die(
-            "YNAB does not match the statements after the changes. Check the "
-            "accounts in YNAB. This script does not fix the differences."
-        )
-    if missing_count:
-        print(f"Added transactions to YNAB: {missing_count}")
-    if uncleared_count:
-        print(f"Cleared transactions in YNAB: {uncleared_count}")
-    return True
+        log_ynab_differences(result)
+        _say("YNAB still differs. Check YNAB.")
+        raise TaskError("YNAB differs after the changes.")
+    _say(f"Added {missing_count}, cleared {uncleared_count}.")
+    return True, missing_count, uncleared_count
 
 
 def compare_bank_balances(plan, bank_balances, ynab_matches_statements):
-    # Prints the balance of each statement account at the bank and the
-    # cleared balance of its YNAB account, and warns about each difference.
+    # Sends one short line per account with the balance at the bank and the
+    # cleared balance in YNAB, plus one line per difference.
     # `bank_balances` maps each account to its balance at the bank, or to
-    # `None` when the script could not read it. `ynab_matches_statements`
+    # `None` when the task could not read it. `ynab_matches_statements`
     # tells whether YNAB has every statement transaction, as cleared.
-    rows = [("Account", "Bank", "YNAB cleared", "Difference")]
-    differences = []
-    compared_all = True
+    lines = []
+    differences = 0
     for account, ynab_name in YNAB_ACCOUNT_NAMES.items():
+        tag = "Chq" if account == Account.CHEQUING else "MC"
         ynab_account = read_ynab_account(plan, plan.account_ids[account])
         ynab_balance = from_milliunits(ynab_account.cleared_balance)
         bank_balance = bank_balances.get(account)
         if bank_balance is None:
-            compared_all = False
-            rows.append((ynab_name, "unknown", format_amount(ynab_balance), ""))
+            lines.append(f"{tag} bank ? / {format_amount(ynab_balance)}")
             continue
         difference = bank_balance - ynab_balance
-        rows.append(
-            (
-                ynab_name,
-                format_amount(bank_balance),
-                format_amount(ynab_balance),
-                format_amount(difference),
-            )
-        )
+        mark = "OK" if difference == 0 else "DIFF"
         if difference != 0:
-            differences.append((ynab_name, bank_balance, ynab_balance))
-
-    # The amounts align to the right. A line can end in an empty column, so
-    # the spaces at the end go away.
-    label_width = max(len(row[0]) for row in rows)
-    for label, *amounts in rows:
-        line = f"{label:<{label_width}}" + "".join(
-            f"  {amount:>12}" for amount in amounts
+            differences += 1
+        lines.append(
+            f"{tag} {format_amount(bank_balance)} / "
+            f"{format_amount(ynab_balance)} {mark}"
         )
-        print(line.rstrip())
-
-    if not differences:
-        if compared_all:
-            print("The cleared balances in YNAB match the bank.")
-        return
-    for ynab_name, bank_balance, ynab_balance in differences:
-        log(
-            f"Warning: {ynab_name} has {format_amount(ynab_balance)} cleared in "
-            f"YNAB, but {format_amount(bank_balance)} at the bank"
-        )
-    if not ynab_matches_statements:
-        log(
-            "YNAB did not get the changes from the statements, so they can "
-            "cause the differences."
-        )
+    _say("Bank / YNAB:\n" + "\n".join(lines))
+    if differences and not ynab_matches_statements:
+        _say("Pending changes can cause the diffs.")
+    _log(f"bank balance differences: {differences}")
 
 
 def reconcile_questrade(plan, questrade_balance, ynab_matches_statements, upload):
@@ -1506,50 +1309,36 @@ def reconcile_questrade(plan, questrade_balance, ynab_matches_statements, upload
     # balance to `questrade_balance`. The YNAB balance includes the side of
     # each transfer from a statement, cleared or not. So the transaction
     # waits until YNAB matches the statements, which
-    # `ynab_matches_statements` tells. Without `upload`, the script shows the
+    # `ynab_matches_statements` tells. Without `upload`, the task reports the
     # difference, but changes nothing.
     ynab_account = read_ynab_account(plan, plan.questrade_account_id)
     ynab_balance = from_milliunits(ynab_account.balance)
     difference = questrade_balance - ynab_balance
-    rows = (
-        ("Questrade", questrade_balance),
-        ("YNAB", ynab_balance),
-        ("Difference", difference),
+    _say(
+        f"QT {format_amount(questrade_balance)} / "
+        f"{format_amount(ynab_balance)} = {format_amount(difference)}"
     )
-    label_width = max(len(label) for label, _ in rows)
-    for label, amount in rows:
-        print(f"{label:<{label_width}}  {format_amount(amount):>12}")
 
     if difference == 0:
-        print("The YNAB balance matches the Questrade balance already.")
+        _say("Questrade already matches.")
         return
     if not upload:
-        print("YNAB did not change, because of --no-upload.")
+        _say("Preview only. YNAB unchanged.")
         return
     if not ynab_matches_statements:
-        print(
-            "YNAB did not change, because it did not get the changes from the "
-            "statements. A transfer to Questrade changes the YNAB balance."
-        )
+        _say("Skipped: YNAB missed the statement changes.")
         return
-    answer = ask(
-        f"Add a reconciliation of {format_amount(difference)} to "
-        f"{QUESTRADE_YNAB_ACCOUNT_NAME} in YNAB? [y/N] "
-    )
-    if answer.casefold() not in ("y", "yes"):
-        print("Cancelled. YNAB did not change.")
+    if not ask_yes(f"Add QT {format_amount(difference)}?"):
+        _say("Cancelled. YNAB unchanged.")
         return
 
     send_reconciliation(plan, difference)
     ynab_account = read_ynab_account(plan, plan.questrade_account_id)
     new_balance = from_milliunits(ynab_account.balance)
     if new_balance != questrade_balance:
-        die(
-            f"the balance of {QUESTRADE_YNAB_ACCOUNT_NAME} in YNAB is "
-            f"{format_amount(new_balance)} after the reconciliation, expected "
-            f"{format_amount(questrade_balance)}. Check the account in YNAB."
-        )
-    print(f"Added the reconciliation to YNAB: {format_amount(difference)}")
+        _say("QT differs after the change. Check YNAB.")
+        raise TaskError("Questrade differs after the reconciliation.")
+    _say(f"QT {format_amount(difference)} added.")
 
 
 def load_ynab_plan(api_client):
@@ -1557,7 +1346,7 @@ def load_ynab_plan(api_client):
     plans = plans.data.plans
     if len(plans) != 1:
         plan_names = ", ".join(plan.name for plan in plans) or "none"
-        die(f"expected one YNAB plan, found {len(plans)}: {plan_names}")
+        raise TaskError(f"expected one YNAB plan, found {len(plans)}")
     plan_id = str(plans[0].id)
 
     accounts = call_ynab(
@@ -1622,7 +1411,7 @@ def find_open_account_id(accounts, account_name):
         if ynab_account.name == account_name and not ynab_account.closed
     ]
     if len(matches) != 1:
-        die(
+        raise TaskError(
             f"expected one open YNAB account named '{account_name}', found "
             f"{len(matches)}"
         )
@@ -1761,17 +1550,11 @@ def plan_additions(plan, missing_transactions):
 
         own_name = YNAB_ACCOUNT_NAMES[transaction.account]
         if target_name == own_name or target_name not in plan.transfer_payee_ids:
-            details = format_details(
-                transaction.date, transaction.amount, transaction.payee, own_name
-            )
             if target_name == own_name:
-                reason = "a transfer cannot go to the account of its own statement"
+                reason = "transfer to its own account"
             else:
-                reason = (
-                    f"YNAB has no open account named '{target_name}', or more "
-                    "than one"
-                )
-            problems.append(f"{details}: {reason}")
+                reason = f"no open YNAB account {target_name!r}"
+            problems.append(f"{compact_line(transaction)}: {reason}")
             continue
 
         target_account = ACCOUNTS_BY_YNAB_NAME.get(target_name)
@@ -1807,11 +1590,9 @@ def describe_unpaired_transfers(key, first_count, second_count):
     else:
         source_name, destination_name = second_name, first_name
     return (
-        f"on {date.isoformat()}, the {first_name} statement has {first_count} "
-        f"and the {second_name} statement has {second_count} transfers of "
-        f"{format_amount(abs(amount))} from {source_name} to {destination_name} "
-        "that YNAB does not have. YNAB adds the two sides of a transfer "
-        "together, on the same date, so the two counts must be equal"
+        f"on {date.isoformat()}, {first_name} has {first_count} and "
+        f"{second_name} has {second_count} transfers of "
+        f"{format_amount(abs(amount))} from {source_name} to {destination_name}"
     )
 
 
@@ -1819,20 +1600,13 @@ def find_payee_problem(payees, payee):
     # Returns why a transaction with `payee` cannot go to YNAB, or `None` when
     # it can.
     if len(payee) > YNAB_PAYEE_NAME_LIMIT:
-        return (
-            f"'{payee}' has more than {YNAB_PAYEE_NAME_LIMIT} characters, the "
-            "limit of YNAB for a payee name"
-        )
+        return f"{payee[:40]}… is over the YNAB payee limit"
     if payee in payees.ids_by_name:
         return None
     other_names = payees.names_by_folded_name.get(payee.casefold(), set()) - {payee}
     if other_names:
         quoted_names = ", ".join(f"'{name}'" for name in sorted(other_names))
-        return (
-            f"'{payee}' is new to YNAB, but YNAB has {quoted_names}, which differs "
-            "only in case. YNAB can give the new transaction that payee instead. "
-            "Use the same name in the payee map, or rename the payee in YNAB"
-        )
+        return f"{payee!r} differs only in case from {quoted_names}"
     return None
 
 
@@ -1885,7 +1659,7 @@ def create_ynab_transactions(plan, new_transactions):
     # Adds `new_transactions` to YNAB. Each one must be cleared and not
     # approved. YNAB adds the other side of each transfer by itself, with a
     # status of its own, so each other side then becomes cleared and not
-    # approved too. Last, dies when YNAB holds any of these transactions as
+    # approved too. Last, raises when YNAB holds any of these transactions as
     # approved or not cleared.
     transactions_api = ynab.TransactionsApi(plan.api_client)
     try:
@@ -1893,10 +1667,7 @@ def create_ynab_transactions(plan, new_transactions):
             plan.plan_id, ynab.PostTransactionsWrapper(transactions=new_transactions)
         )
     except YNAB_ERRORS as error:
-        die(
-            f"cannot add the transactions to YNAB: {error}\n"
-            "Check the accounts in YNAB. Some transactions can be there."
-        )
+        raise TaskError(f"cannot add the transactions to YNAB: {error}") from error
     # The last state of each transaction, by its ID.
     saved_transactions = {
         transaction.id: transaction for transaction in saved_transactions_of(response)
@@ -1908,10 +1679,7 @@ def create_ynab_transactions(plan, new_transactions):
         if transaction.transfer_account_id is not None
     ]
     if None in other_side_ids:
-        die(
-            "YNAB returned a transfer without the ID of its other side. Check the "
-            "other sides of the new transfers in YNAB."
-        )
+        raise TaskError("YNAB returned a transfer without its other side")
     if other_side_ids:
         updates = [
             ynab.SaveTransactionWithIdOrImportId(
@@ -1926,10 +1694,9 @@ def create_ynab_transactions(plan, new_transactions):
                 plan.plan_id, ynab.PatchTransactionsWrapper(transactions=updates)
             )
         except YNAB_ERRORS as error:
-            die(
-                "cannot update the other sides of the new transfers in YNAB: "
-                f"{error}\nCheck them in YNAB."
-            )
+            raise TaskError(
+                f"cannot update the other sides in YNAB: {error}"
+            ) from error
         for transaction in saved_transactions_of(response):
             saved_transactions[transaction.id] = transaction
 
@@ -1940,10 +1707,9 @@ def create_ynab_transactions(plan, new_transactions):
         or transaction.cleared != ynab.TransactionClearedStatus.CLEARED
     ]
     if wrong_transactions:
-        log("YNAB holds these new transactions as approved or not cleared:")
         for transaction in wrong_transactions:
-            log(f"  {describe_ynab_transaction(transaction)}")
-        die("check the transactions above in YNAB")
+            _log(f"  {describe_ynab_transaction(transaction)}")
+        raise TaskError("YNAB holds new transactions as approved or uncleared")
 
 
 def clear_ynab_transactions(plan, ynab_transactions):
@@ -1960,10 +1726,7 @@ def clear_ynab_transactions(plan, ynab_transactions):
             plan.plan_id, ynab.PatchTransactionsWrapper(transactions=updates)
         )
     except YNAB_ERRORS as error:
-        die(
-            f"cannot clear the transactions in YNAB: {error}\n"
-            "Check the accounts in YNAB. Some transactions can be cleared."
-        )
+        raise TaskError(f"cannot clear the transactions in YNAB: {error}") from error
 
 
 def describe_ynab_transaction(ynab_transaction):
@@ -2000,46 +1763,45 @@ def read_ynab_account(plan, account_id):
 
 
 def report_other_sides(transfers):
-    # Prints the sides of `transfers` that YNAB adds by itself to accounts
-    # without a statement. The script cannot check those accounts.
+    # Sends the sides of `transfers` that YNAB adds by itself to accounts
+    # without a statement. The task cannot check those accounts.
     other_sides = []
     for transfer in transfers:
         target_name = transfer_target(transfer.payee)
         if target_name in ACCOUNTS_BY_YNAB_NAME:
             continue
         other_sides.append(
-            format_details(
-                transfer.date,
-                -transfer.amount,
-                transfer_payee(YNAB_ACCOUNT_NAMES[transfer.account]),
-                target_name,
+            Transaction(
+                date=transfer.date,
+                amount=-transfer.amount,
+                payee=transfer_payee(YNAB_ACCOUNT_NAMES[transfer.account]),
+                account=transfer.account,
             )
         )
     if other_sides:
-        print(
-            "YNAB also adds these sides to accounts without a statement. Make "
-            "sure that those accounts do not have them already:"
-        )
-        for other_side in other_sides:
-            print(f"  {other_side}")
+        lines = ["YNAB also adds:"]
+        for side in other_sides:
+            payee = side.payee
+            if len(payee) > 20:
+                payee = payee[:19] + "…"
+            lines.append(
+                f"{side.date.strftime('%m-%d')} {format_amount(side.amount)} {payee}"
+            )
+        lines.append("Check for doubles.")
+        _say("\n".join(lines))
 
 
-def report_ignored_transactions(comparison):
-    # Prints, for each account, the YNAB transactions that its statement does
-    # not have. The script leaves them as they are.
+def report_ignored_counts(comparison):
+    # Sends, for each account, how many YNAB transactions its statement does
+    # not have. The task leaves them as they are.
     for account, ynab_name in YNAB_ACCOUNT_NAMES.items():
         extra_keys = comparison.extra_keys_by_account.get(account, [])
-        if not extra_keys:
-            continue
-        print(f"Ignored, in {ynab_name} in YNAB but not in its statement:")
-        for date, payee, milliunits in extra_keys:
-            print(f"  {format_details(date, from_milliunits(milliunits), payee)}")
+        if extra_keys:
+            _log(f"Ignored {len(extra_keys)} in {ynab_name}, not in its statement")
 
 
-def report_ynab_differences(comparison):
-    # Logs, for each account, the YNAB transactions that its statement does
-    # not have, the statement transactions that YNAB does not have, and the
-    # YNAB transactions that match the statement but are not cleared.
+def log_ynab_differences(comparison):
+    # Logs the remaining differences after the changes, for the bot log.
     for account, ynab_name in YNAB_ACCOUNT_NAMES.items():
         extra_keys = comparison.extra_keys_by_account.get(account, [])
         missing_transactions = [
@@ -2053,29 +1815,22 @@ def report_ynab_differences(comparison):
             if ynab_transaction.account_name == ynab_name
         ]
         if extra_keys:
-            log(f"{ynab_name} in YNAB has transactions that its statement lacks:")
-            for date, payee, milliunits in extra_keys:
-                log(f"  {format_details(date, from_milliunits(milliunits), payee)}")
-        if missing_transactions:
-            log(f"The {ynab_name} statement has transactions that YNAB lacks:")
-            for transaction in missing_transactions:
-                details = format_details(
+            _log(f"{ynab_name} has {len(extra_keys)} extra in YNAB")
+        for transaction in missing_transactions:
+            _log(
+                "  missing in YNAB: "
+                + format_details(
                     transaction.date, transaction.amount, transaction.payee
                 )
-                log(f"  {details}")
-        if uncleared_transactions:
-            log(
-                f"{ynab_name} in YNAB has statement transactions that are not "
-                "cleared:"
             )
-            for ynab_transaction in uncleared_transactions:
-                log(f"  {describe_ynab_transaction(ynab_transaction)}")
+        for ynab_transaction in uncleared_transactions:
+            _log(f"  not cleared: {describe_ynab_transaction(ynab_transaction)}")
 
 
 def to_milliunits(amount):
     milliunits = amount * MILLIUNITS_PER_UNIT
     if milliunits != milliunits.to_integral_value():
-        die(f"the amount {amount} has more than three decimal places")
+        raise TaskError(f"the amount {amount} has more than three decimals")
     return int(milliunits)
 
 
@@ -2089,12 +1844,12 @@ YNAB_ERRORS = (ynab.ApiException, urllib3.exceptions.HTTPError)
 
 
 def call_ynab(action, function, *arguments, **keyword_arguments):
-    # Runs one call of the YNAB API. Dies with `action` in the message when
+    # Runs one call of the YNAB API. Raises with `action` in the message when
     # the call fails.
     try:
         return function(*arguments, **keyword_arguments)
     except YNAB_ERRORS as error:
-        die(f"cannot {action}: {error}")
+        raise TaskError(f"cannot {action}: {error}") from error
 
 
 # --------------------------------------------------------------------------------------
@@ -2102,12 +1857,9 @@ def call_ynab(action, function, *arguments, **keyword_arguments):
 # --------------------------------------------------------------------------------------
 
 
-class StepError(Exception):
-    # A step of the download failed. `exit_status` becomes the exit status of
-    # the script.
-    def __init__(self, message, exit_status=1):
-        super().__init__(message)
-        self.exit_status = exit_status
+class StepError(TaskError):
+    # A step of the download failed.
+    pass
 
 
 @dataclass(frozen=True)
@@ -2140,8 +1892,7 @@ class Browser:
         if result.returncode != 0:
             raise StepError(
                 f"`{describe_command(arguments)}` failed with exit status "
-                f"{result.returncode}",
-                exit_status_of(result.returncode),
+                f"{result.returncode}"
             )
         return result.stdout
 
@@ -2181,47 +1932,3 @@ def describe_command(arguments):
             ),
         ]
     )
-
-
-def exit_status_of(returncode):
-    # A command that a signal ends has a negative return code. The shell
-    # convention for that case is 128 + the signal number.
-    if returncode < 0:
-        return 128 - returncode
-    return returncode
-
-
-# --------------------------------------------------------------------------------------
-# Generic helpers.
-# --------------------------------------------------------------------------------------
-
-
-def step(message):
-    # The flush puts the line before the output of the commands of the step.
-    print(f" ==> {message}", flush=True)
-
-
-def ask(question):
-    # Shows `question` on stderr, and returns the line that the user types,
-    # without the whitespace around it.
-    sys.stdout.flush()
-    sys.stderr.write(question)
-    sys.stderr.flush()
-    line = sys.stdin.readline()
-    if not line:
-        raise StepError("no answer on standard input")
-    return line.strip()
-
-
-def log(message):
-    print(message, file=sys.stderr)
-
-
-def die(message):
-    # Logs `message` with the `Error: ` prefix and exits with status 1.
-    log(f"Error: {message}")
-    sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()
