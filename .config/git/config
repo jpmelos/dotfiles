@@ -4,7 +4,7 @@
 
 [core]
     editor = nvim
-    pager = sh ~/devel/dotfiles/references/scripts/git-pager.sh
+    pager = sh ~/bin/git_pager
 
 [interactive]
     diffFilter = delta --color-only
