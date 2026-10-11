@@ -12,7 +12,7 @@ sudo apt-get -y clean
 ## 2. Install Required Software
 
 ```bash
-sudo apt install curl wget git neovim iptables-persistent openresolv wireguard transmission-daemon ca-certificates gpg starship stow fzf
+sudo apt install curl wget git neovim iptables-persistent openresolv wireguard transmission-daemon ca-certificates gpg jq starship stow fzf tmux
 git clone https://github.com/hyperupcall/autoenv ~/.autoenv
 curl -LsSf https://astral.sh/uv/install.sh | sh
 curl -sS https://downloads.1password.com/linux/keys/1password.asc \
@@ -37,17 +37,37 @@ eval $(op signin)
 ## 4. Get GPG Key from 1Password
 
 ```bash
-op document get "<GPG key>" | gpg --import
+op item get "PGP/GPG Key" --fields notesPlain --reveal --format json \
+    | jq -r .value \
+    | gpg --import
 gpg --list-secret-keys
 ```
 
 ## 5. Clone Dotfiles and Link with `stow`
 
 ```bash
-mkdir devel
+mkdir -p ~/devel
+cd ~/devel
 git clone git@github.com:jpmelos/dotfiles.git
+cd dotfiles
+rm ~/.bashrc
 stow .
 ```
+
+Load the new shell configuration (puts `~/bin` and `~/.local/bin` on PATH):
+
+```bash
+source ~/.bash_profile
+```
+
+Fetch the local configuration from 1Password (needs the sign-in from section
+3):
+
+```bash
+jc fetch
+```
+
+This creates `~/config.json` with mode 600.
 
 ## 6. Create VPN Bypass Group
 
@@ -56,6 +76,9 @@ Create a new group for processes that will be allowed to bypass the VPN:
 ```bash
 sudo groupadd -g 2727 vpn-bypass
 ```
+
+The Telegram bot is the process that uses this bypass. Its unit
+(`references/telegram_bot/telegram-bot.service`) sets `Group=vpn-bypass`.
 
 ## 7. Configure iptables
 
@@ -181,4 +204,25 @@ Start the service:
 
 ```bash
 sudo service plexmediaserver start
+```
+
+## 12. Run Telegram Bot (Bypasses VPN)
+
+The bot runs under systemd with primary group `vpn-bypass` (see section 6),
+which marks its packets for the public Internet route. The unit file already
+sets this.
+
+Install and start the unit:
+
+```bash
+sudo cp ~/devel/dotfiles/references/telegram_bot/telegram-bot.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now telegram-bot
+```
+
+Verify:
+
+```bash
+systemctl status telegram-bot
+journalctl -u telegram-bot -e
 ```
