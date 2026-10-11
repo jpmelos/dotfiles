@@ -16,6 +16,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import signal
 import subprocess
 import sys
@@ -191,6 +192,14 @@ def main(
       ctx.state_path, ctx.delete_state and ctx.list_states manage files at
       STATE_DIR/tasks/<task>/<id>. ctx.check raises when the task must stop.
       ctx.log writes to the bot log.
+
+    \b
+    Task dependencies:
+      A task file may set DEPENDENCIES to a tuple of requirement strings,
+      such as ("ynab>=4.4.0,<5",). The bot installs them with `uv` into a
+      venv per task on every run, and the task imports them normally. The
+      bot itself holds no task dependency. `uv` must be on PATH when a
+      task declares any.
 
     \b
     Polling:
@@ -687,6 +696,135 @@ def read_task_metadata(path, fallback_name):
             values[target.id] = node.value.value.strip()
     display_name = values.get("NAME", fallback_name).strip() or fallback_name
     return display_name, values.get("DESCRIPTION", "").strip()
+
+
+def read_task_timeout(path, default):
+    # Returns the TIMEOUT number of the task file, or `default` when the
+    # file defines none. Read from the syntax tree, so no task code runs.
+    try:
+        with open(path, encoding="utf-8") as handle:
+            tree = ast.parse(handle.read(), filename=path)
+    except (OSError, SyntaxError, ValueError):
+        return default
+    for node in tree.body:
+        if (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id == "TIMEOUT"
+            and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, (int, float))
+            and not isinstance(node.value.value, bool)
+            and node.value.value > 0
+        ):
+            return float(node.value.value)
+    return default
+
+
+def read_task_dependencies(path):
+    # Returns the DEPENDENCIES strings of the task file, or an empty list.
+    # Only a plain tuple or list of strings counts. Read from the syntax
+    # tree, so no task code runs.
+    try:
+        with open(path, encoding="utf-8") as handle:
+            tree = ast.parse(handle.read(), filename=path)
+    except (OSError, SyntaxError, ValueError) as error:
+        raise TaskLoadError(f"cannot read {path}: {error}") from error
+    for node in tree.body:
+        if not (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id == "DEPENDENCIES"
+        ):
+            continue
+        if not isinstance(node.value, (ast.List, ast.Tuple)):
+            raise TaskLoadError(f"task file {path} has bad DEPENDENCIES")
+        entries = []
+        for element in node.value.elts:
+            if not isinstance(element, ast.Constant) or not isinstance(
+                element.value, str
+            ):
+                raise TaskLoadError(f"task file {path} has bad DEPENDENCIES")
+            if element.value.strip():
+                entries.append(element.value.strip())
+        return entries
+    return []
+
+
+# Seconds for the `uv` calls that build the task venv. Installing happens in
+# the worker thread, so a slow index never blocks command handling.
+UV_VENV_TIMEOUT = 120.0
+UV_INSTALL_TIMEOUT = 600.0
+
+
+def ensure_task_env(state_base, task_name, dependencies):
+    # Installs `dependencies` with `uv` into the venv of the task, on every
+    # run, and returns its site-packages directory. Returns None when the
+    # task declares none, so plain tasks never need `uv`.
+    if not dependencies:
+        return None
+    uv = shutil.which("uv")
+    if uv is None:
+        raise TaskLoadError("task needs dependencies but `uv` is not on PATH")
+    venv_dir = os.path.join(state_base, "venvs", task_name)
+    venv_python = os.path.join(venv_dir, "bin", "python")
+    if not os.path.isfile(venv_python):
+        run_uv(uv, ["venv", venv_dir], UV_VENV_TIMEOUT, "create the task venv")
+    # `--upgrade` refreshes the dependencies on every run.
+    run_uv(
+        uv,
+        [
+            "pip",
+            "install",
+            "--python",
+            venv_python,
+            "--upgrade",
+            "--quiet",
+            *dependencies,
+        ],
+        UV_INSTALL_TIMEOUT,
+        "install the task dependencies",
+    )
+    site_packages = venv_site_packages(venv_dir)
+    if site_packages is None:
+        raise TaskLoadError("task venv has no site-packages directory")
+    return site_packages
+
+
+def run_uv(uv, args, timeout, action):
+    # Runs one `uv` call. Raises TaskLoadError with the tail of the uv error
+    # when the call fails. Dependency names are safe to report.
+    try:
+        result = subprocess.run(
+            [uv, *args],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        raise TaskLoadError(f"timed out to {action}") from None
+    except OSError as error:
+        raise TaskLoadError(f"cannot run uv: {error}") from error
+    if result.returncode != 0:
+        tail = (result.stderr or "").strip().splitlines()[-5:]
+        detail = "\n".join(tail) or "no error message from uv"
+        raise TaskLoadError(f"failed to {action}: {detail}")
+
+
+def venv_site_packages(venv_dir):
+    # Returns the site-packages directory of the venv, or None.
+    try:
+        entries = sorted(os.listdir(os.path.join(venv_dir, "lib")))
+    except OSError:
+        return None
+    for entry in entries:
+        candidate = os.path.join(venv_dir, "lib", entry, "site-packages")
+        if os.path.isdir(candidate):
+            return candidate
+    return None
 
 
 _task_module_counter = 0
@@ -1376,13 +1514,7 @@ class Bot:
             hint = ", ".join(sorted(specs)) or "none"
             self.try_send(chat_id, f"Unknown task {name!r}. Available: {hint}.")
             return
-        try:
-            module, shutdown_fn, timeout = load_task_module(spec)
-        except TaskLoadError as error:
-            log(f"task {name}: {error}")
-            self.try_send(chat_id, f"Task {name} failed to load: {error}")
-            return
-        run_timeout = timeout if timeout is not None else self.default_run_timeout
+        run_timeout = read_task_timeout(spec.path, self.default_run_timeout)
         record = RunRecord(
             name=spec.name,
             display_name=spec.display_name,
@@ -1392,7 +1524,7 @@ class Bot:
         )
         thread = threading.Thread(
             target=self.worker,
-            args=(record, module, shutdown_fn),
+            args=(record, spec),
             daemon=True,
             name=f"telegram-task-{spec.name}",
         )
@@ -1495,7 +1627,28 @@ class Bot:
         if thread.is_alive():
             log("Warning: task thread did not stop within the grace period.")
 
-    def worker(self, record, module, shutdown_fn):
+    def worker(self, record, spec):
+        # Loading and dependency installation happen here, in the worker
+        # thread, so a slow index never blocks command handling.
+        added_path = None
+        try:
+            added_path = self.prepare_task_env(record, spec)
+            module, shutdown_fn, _timeout = load_task_module(spec)
+        except TaskLoadError as error:
+            log(f"task {record.name}: {error}")
+            self.report(record, "error", None, str(error))
+            with self.lock:
+                if self.current is record:
+                    self.current = None
+                self.last_summary = f"{record.display_name} error"
+                self.last_time = time.time()
+            if added_path is not None:
+                try:
+                    sys.path.remove(added_path)
+                except ValueError:
+                    pass
+            return
+        record.phase = "running"
         ctx = TaskContext(self, record)
         outcome = "done"
         result_text = None
@@ -1542,6 +1695,24 @@ class Bot:
                 f"{record.display_name} {outcome} in {format_duration(elapsed)}"
             )
             self.last_time = time.time()
+        if added_path is not None:
+            try:
+                sys.path.remove(added_path)
+            except ValueError:
+                pass
+
+    def prepare_task_env(self, record, spec):
+        # Reads the PEP 723 dependencies of the task and installs them into
+        # the venv of the task. Returns the site-packages directory put on
+        # sys.path, or None when the task declares none.
+        dependencies = read_task_dependencies(spec.path)
+        if dependencies:
+            log(f"task {record.name}: ensuring {len(dependencies)} dependencies")
+        site_packages = ensure_task_env(self.store.base_dir, record.name, dependencies)
+        if site_packages is None or site_packages in sys.path:
+            return None
+        sys.path.insert(0, site_packages)
+        return site_packages
 
     def report(self, record, outcome, result_text, error_text):
         if outcome == "done":
