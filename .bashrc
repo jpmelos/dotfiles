@@ -244,6 +244,10 @@ alias python='python3'
 #                                   #
 #####################################
 
+if [ -f /usr/share/bash-completion/completions/git ]; then
+    source /usr/share/bash-completion/completions/git
+fi
+
 alias g='git'
 __git_complete g git
 
