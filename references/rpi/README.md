@@ -145,7 +145,8 @@ Mount the new volume:
 ```bash
 sudo systemctl daemon-reload
 sudo mount -a
-sudo chown jpmelos:jpmelos -R /external/
+sudo chown jpmelos:jpmelos -R /external
+chmod -R a+rwX /external
 ```
 
 ## 9. Configure WireGuard VPN
@@ -206,6 +207,7 @@ Install and start the unit:
 
 ```bash
 sudo cp ~/devel/dotfiles/references/telegram_bot/telegram-bot.service /etc/systemd/system/
+sudo chown root:root /etc/systemd/system/telegram-bot.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now telegram-bot
 ```
@@ -213,6 +215,6 @@ sudo systemctl enable --now telegram-bot
 Verify:
 
 ```bash
-systemctl status telegram-bot
-journalctl -u telegram-bot -e
+sudo systemctl status telegram-bot
+sudo journalctl -u telegram-bot -e
 ```
