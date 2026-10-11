@@ -1,5 +1,17 @@
 # /etc/iptables/rules.v4 in Raspberry Pi.
 
+*mangle
+:PREROUTING ACCEPT [0:0]
+:INPUT ACCEPT [0:0]
+:FORWARD ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+:POSTROUTING ACCEPT [0:0]
+
+# Mark packets from group `vpn-bypass` (GID 2727) for policy routing.
+-A OUTPUT -m owner --gid-owner vpn-bypass -j MARK --set-mark 2727
+
+COMMIT
+
 *filter
 :INPUT DROP [0:0]
 :FORWARD DROP [0:0]
@@ -24,6 +36,8 @@
 -A OUTPUT -d 192.168.42.0/24 -j ACCEPT
 # Allow outgoing traffic to WireGuard VPN on port 1637/UDP.
 -A OUTPUT -d 128.127.104.82 -p udp --dport 1637  -j ACCEPT
+# Allow outgoing clearnet traffic from group `vpn-bypass`.
+-A OUTPUT -m owner --gid-owner vpn-bypass -j ACCEPT
 # Allow outgoing traffic through the VPN tunnel `wg0`.
 -A OUTPUT -o wg0 -j ACCEPT
 
