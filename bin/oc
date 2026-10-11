@@ -242,11 +242,13 @@
 # /   directory of the user at the same path, and the `TMUX_PANE_STATES_DIR`
 # /   variable names it. Every profile uses that one directory, so a pane has
 # /   one state file. When the launcher runs inside tmux, the container also
-# /   gets the `TMUX_PANE` variable. The `running`, `waiting`, `ready`, and
-# /   `default` scripts then mark the pane that runs the agent, and `waiting`
-# /   and `ready` request the notification chime. The `pane-state-sync` script
-# /   on the host picks both up. Outside tmux the variable is absent, and these
-# /   scripts do nothing.
+# /   gets the `TMUX_PANE` variable. The `plugins/pane-state.js` plugin calls
+# /   the `running`, `ready`, and `default` scripts to mark the pane that runs
+# /   the agent, like the `hooks` in `.claude-origin/settings.json` do for
+# /   Claude Code, and `ready` requests the notification chime. The
+# /   `pane-state-sync` script on the host picks both up. Outside tmux the
+# /   variable is absent, and these scripts do nothing. A reaper clears the
+# /   pane to `default` when the container exits, whatever the ending is.
 
 import contextlib
 import datetime
@@ -259,10 +261,12 @@ import pwd
 import re
 import shlex
 import shutil
+import signal
 import stat
 import subprocess
 import sys
 import tempfile
+import time
 from dataclasses import dataclass, field
 from decimal import ROUND_CEILING, ROUND_DOWN, Decimal
 
@@ -546,7 +550,15 @@ def main():
     log("Running container...")
 
     if options.process_output:
-        return run_captured(run_command, env, run_config.container_name)
+        try:
+            return run_captured(run_command, env, run_config.container_name)
+        finally:
+            reset_pane_state(paths)
+
+    # The `exec` below replaces this process, so nothing here could clear the
+    # pane after the container exits. A forked reaper waits on the container
+    # instead. See `spawn_state_reaper`.
+    spawn_state_reaper(run_config.container_name, paths)
 
     # Replace this process with the container. OpenCode then owns the
     # terminal and its exit status becomes ours.
@@ -2488,7 +2500,7 @@ def profile_mount_args(run_config):
     home = run_config.paths.home
     # The default configuration directory of OpenCode. The mount below puts
     # the profile directory there, so the harness reads the profile
-    # `opencode.json`, `cli.json`, `skills`, and `AGENTS.md`
+    # `opencode.json`, `cli.json`, `skills`, `plugins`, and `AGENTS.md`
     # without any indirection, exactly like a stock install. The source lives
     # below `.config` on the host, at the same depth as the target, so a
     # relative link works in both places. See `copy_tree_into`.
@@ -2787,6 +2799,104 @@ def build_container_env(opencode_api_key):
     else:
         env.pop("OPENCODE_API_KEY", None)
     return env
+
+
+# --------------------------------------------------------------------------------------
+# Pane state reaper.
+# --------------------------------------------------------------------------------------
+
+
+def pane_state_script(paths):
+    # The `pane-state` script on the host. The container mounts the same file
+    # at `/usr/local/bin`, but the reaper runs on the host.
+    return os.path.join(paths.dotfiles_dir, "bin", "pane-state")
+
+
+def reset_pane_state(paths):
+    # Writes the `default` pane state. Without `TMUX_PANE` the script exits
+    # with success and does nothing, so callers do not check for tmux.
+    script = pane_state_script(paths)
+    if not os.path.isfile(script):
+        return
+    with contextlib.suppress(OSError):
+        subprocess.run(
+            [script, "default"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+
+def spawn_state_reaper(container_name, paths):
+    # Forks a reaper that clears the pane when the container exits. The
+    # interactive launch below replaces this process with the container, so
+    # nothing here could run after it. The reaper waits on the container
+    # instead and resets the pane whatever the ending is: a quit, a crash, or
+    # a kill. A plugin cleanup cannot do this: the session server outlives the
+    # interface, so no in-container hook runs when the container closes.
+    # Without `TMUX_PANE` the scripts do nothing, so no reaper is needed then.
+    if not os.environ.get("TMUX_PANE"):
+        return
+    if not os.path.isfile(pane_state_script(paths)):
+        return
+    try:
+        pid = os.fork()
+    except OSError as error:
+        log(f"Warning: cannot fork the pane state reaper: {error}")
+        return
+    if pid != 0:
+        return
+    try:
+        # Detach from the terminal and ignore hangup, so closing the pane does
+        # not kill the reaper before the container exits. Standard streams go
+        # to the null device, so the reaper holds no pipe open.
+        os.setsid()
+        for stream_fd in (0, 1, 2):
+            with contextlib.suppress(OSError):
+                os.close(stream_fd)
+        null_fd = os.open(os.devnull, os.O_RDWR)
+        for stream_fd in (0, 1, 2):
+            os.dup2(null_fd, stream_fd)
+        if null_fd > 2:
+            os.close(null_fd)
+        signal.signal(signal.SIGHUP, signal.SIG_IGN)
+        wait_for_container_exit(container_name)
+        reset_pane_state(paths)
+    finally:
+        os._exit(0)
+
+
+def wait_for_container_exit(container_name):
+    # Waits until the container stops. The container may not exist yet when
+    # the reaper starts, so poll for it first. When it never appears, or it
+    # is already gone (`--rm` removed it), there is nothing to wait for, and
+    # the caller resets the state right away.
+    for _ in range(100):
+        if container_exists(container_name):
+            break
+        time.sleep(0.2)
+    else:
+        return
+    with contextlib.suppress(OSError):
+        subprocess.run(
+            ["docker", "wait", container_name],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+
+def container_exists(container_name):
+    try:
+        result = subprocess.run(
+            ["docker", "inspect", container_name],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError:
+        return False
+    return result.returncode == 0
 
 
 # --------------------------------------------------------------------------------------

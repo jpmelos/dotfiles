@@ -185,16 +185,6 @@
         ]
       }
     ],
-    "PreToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "running"
-          }
-        ]
-      }
-    ],
     "PostToolUse": [
       {
         "hooks": [
