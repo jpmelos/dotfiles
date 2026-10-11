@@ -39,7 +39,8 @@
 # /
 # / Harness arguments:
 # /   Without harness arguments, the launcher runs the interactive OpenCode
-# /   interface. Anything else runs headless through `run`: the launcher puts
+# /   interface from a fresh session with no tabs. Anything else runs
+# /   headless through `run`: the launcher puts
 # /   `run --standalone` before the arguments, plus `--model` with the `model`
 # /   of the profile and `--agent` with the `agent` of the profile, if any.
 # /   File tools may read or edit anywhere inside the container: the profile
@@ -312,6 +313,7 @@ RESERVED_ENV_VARS = frozenset(
         "OPENCODE_CONFIG_PROJECT_DISABLE",
         "OPENCODE_DB",
         "OPENCODE_DISABLE_PROJECT_CONFIG",
+        "OPENCODE_TUI_CHANNEL",
         "COLORTERM",
         "DOCKER_HOST",
         "FORCE_COLOR",
@@ -532,6 +534,7 @@ def main():
         opencode_api_key=opencode_api_key,
         docker_image_name=image_spec.name,
         container_name=generate_container_name(project_root),
+        tui_channel=generate_tui_channel(),
         harness_print_mode=options.harness_print_mode,
         no_docker_socket=options.no_docker_socket,
     )
@@ -2294,6 +2297,7 @@ class RunConfig:
     opencode_api_key: str
     docker_image_name: str
     container_name: str
+    tui_channel: str
     harness_print_mode: bool
     no_docker_socket: bool
 
@@ -2302,6 +2306,15 @@ def generate_container_name(project_root):
     basename = os.path.basename(project_root)
     dir_basename = re.sub(r"[^A-Za-z0-9_.-]", "", basename)
     return f"opencode_{dir_basename[:CONTAINER_NAME_PROJECT_LENGTH]}_{os.getpid()}"
+
+
+def generate_tui_channel():
+    # The TUI stores open tabs per channel below the shared state directory,
+    # so a reused channel restores the tabs of an earlier launch. A
+    # unique channel per interactive launch starts from a fresh session with
+    # no tabs, while prompt history and the other shared state stay in place.
+    # See `tui_fresh_args`.
+    return f"fresh-{os.getpid()}-{os.urandom(4).hex()}"
 
 
 def build_run_command(harness_args, run_config):
@@ -2322,6 +2335,7 @@ def build_run_command(harness_args, run_config):
         *devel_mount_args(run_config),
         *profile_mount_args(run_config),
         *agent_env_args(run_config),
+        *tui_fresh_args(run_config),
         *agent_binary_args(run_config.paths),
         *ripgrep_config_args(run_config.paths),
         *timezone_args(),
@@ -2533,6 +2547,18 @@ def agent_env_args(run_config):
         "--env",
         "NO_COLOR",
     ]
+
+
+def tui_fresh_args(run_config):
+    # The interactive interface restores open tabs from the shared state
+    # directory, so a new launch shows the sessions of earlier launches
+    # in other tabs. A unique `OPENCODE_TUI_CHANNEL` isolates the tab storage
+    # of the launch, and the interface starts from a fresh session with no
+    # tabs. Headless runs need no interface state, so they keep the default
+    # channel. See `generate_tui_channel`.
+    if run_config.harness_print_mode:
+        return []
+    return ["--env", f"OPENCODE_TUI_CHANNEL={run_config.tui_channel}"]
 
 
 def agent_binary_args(paths):
