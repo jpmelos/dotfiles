@@ -1,0 +1,1638 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["click>=8.1,<9"]
+# ///
+
+# vim: ft=python
+
+# Help comes from `telegram_bot --help`. The main command below holds the text.
+
+import ast
+import asyncio
+import inspect
+import importlib.util
+import json
+import os
+import re
+import shlex
+import signal
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+import traceback
+import urllib.error
+import urllib.request
+from dataclasses import dataclass
+
+import click
+
+TASK_NAME_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
+# Telegram refuses messages past 4096 characters. Chunks stay below that.
+SEND_CHUNK_LIMIT = 4000
+RESULT_PREVIEW_LIMIT = 3500
+ERROR_PREVIEW_LIMIT = 500
+# Update types that can carry a reply or a command.
+MESSAGE_KEYS = ("message", "edited_message")
+# Shutdown reasons passed to the shutdown hook.
+REASONS = ("done", "error", "timeout", "cancelled", "shutdown")
+
+
+# --------------------------------------------------------------------------------------
+# Entry point.
+# --------------------------------------------------------------------------------------
+
+
+@click.command(context_settings={"help_option_names": ["-h", "--help"]})
+@click.option(
+    "--tasks-dir",
+    type=click.Path(file_okay=False),
+    default=None,
+    metavar="DIR",
+    help=(
+        "Directory with <name>.py task files. Defaults to TELEGRAM_TASKS_DIR, "
+        "else ./telegram_tasks."
+    ),
+)
+@click.option(
+    "--state-dir",
+    type=click.Path(file_okay=False),
+    default=None,
+    metavar="DIR",
+    help=(
+        "Directory for task state. Defaults to XDG_STATE_HOME/telegram_bot, "
+        "else ~/.local/state/telegram_bot."
+    ),
+)
+@click.option(
+    "--token",
+    default=None,
+    metavar="TOKEN",
+    help=(
+        "Bot token. Defaults to TELEGRAM_BOT_TOKEN, else the "
+        "telegram_bot.bot_token key in ~/config.json."
+    ),
+)
+@click.option(
+    "--chat-id",
+    "chat_ids",
+    multiple=True,
+    metavar="ID",
+    help=(
+        "Allow one chat. Repeat for more chats, or pass a comma separated "
+        "list. Defaults to TELEGRAM_CHAT_ID, else the telegram_bot.chat_id "
+        "key in ~/config.json."
+    ),
+)
+@click.option(
+    "--poll-timeout",
+    type=click.FloatRange(1.0, 50.0),
+    default=30.0,
+    show_default=True,
+    metavar="S",
+    help="Long-poll wait of one getUpdates call, in seconds.",
+)
+@click.option(
+    "--ask-timeout",
+    type=click.FloatRange(1.0, 86400.0),
+    default=300.0,
+    show_default=True,
+    metavar="S",
+    help="Default wait for one ask reply, in seconds.",
+)
+@click.option(
+    "--run-timeout",
+    type=click.FloatRange(1.0, 604800.0),
+    default=3600.0,
+    show_default=True,
+    metavar="S",
+    help="Default budget for one task run, in seconds.",
+)
+@click.option(
+    "--shutdown-timeout",
+    type=click.FloatRange(1.0, 900.0),
+    default=60.0,
+    show_default=True,
+    metavar="S",
+    help="Grace for the shutdown hook when the bot stops, in seconds.",
+)
+@click.option(
+    "--heartbeat-url",
+    default=None,
+    metavar="URL",
+    help=(
+        "Dead-man-switch URL to ping. Defaults to TELEGRAM_HEARTBEAT_URL, "
+        "else no ping."
+    ),
+)
+@click.option(
+    "--heartbeat-interval",
+    type=click.FloatRange(10.0, 86400.0),
+    default=300.0,
+    show_default=True,
+    metavar="S",
+    help="Seconds between heartbeat pings.",
+)
+@click.option(
+    "--recent-window",
+    type=click.FloatRange(0.0, 3600.0),
+    default=30.0,
+    show_default=True,
+    metavar="S",
+    help=(
+        "On start, process backlog younger than this, in seconds. Older "
+        "backlog is discarded. Zero discards all backlog."
+    ),
+)
+def main(
+    tasks_dir,
+    state_dir,
+    token,
+    chat_ids,
+    poll_timeout,
+    ask_timeout,
+    run_timeout,
+    shutdown_timeout,
+    heartbeat_url,
+    heartbeat_interval,
+    recent_window,
+):
+    """Run a Telegram bot that starts tasks and relays their questions to you.
+
+    \b
+    Chat commands:
+      /list - show the available tasks
+      /run <name> ... - start a task; only one task runs at a time
+      /status - show uptime, the running task, and the last result
+      /cancel - stop the running task; its shutdown hook still runs
+      /help - show the commands
+    Any other text goes to the running task while it waits for a reply.
+    Text that starts with / is always a command, never a reply.
+
+    \b
+    Task files:
+      A task is a Python file at TASKS_DIR/<name>.py, where <name> holds
+      letters, digits, _ and -. Files that start with _ or . are ignored.
+      The bot loads the file fresh on every /run, so edits apply to the
+      next run without a restart. A task module may define NAME,
+      DESCRIPTION, TIMEOUT, run and shutdown. run is required as run(ctx)
+      or run(ctx, args) and may be async. shutdown is optional as
+      shutdown(ctx) or shutdown(ctx, reason) and runs once after every
+      outcome: done, error, timeout, cancelled or shutdown.
+
+    \b
+    Task context:
+      ctx.say(text) sends a message. ctx.ask(prompt, pattern, timeout)
+      sends a prompt and waits for a reply that fully matches the regex.
+      A mismatch asks again within the same wait. A timeout stops the task
+      and runs shutdown with reason timeout. ctx.load_state, ctx.save_state,
+      ctx.state_path, ctx.delete_state and ctx.list_states manage files at
+      STATE_DIR/tasks/<task>/<id>. ctx.check raises when the task must stop.
+      ctx.log writes to the bot log.
+
+    \b
+    Polling:
+      The bot uses long polling, so no inbound port is needed. The poll
+      offset is saved after every batch, so a restart replays nothing
+      already processed. Backlog younger than --recent-window is still
+      processed on start, while older backlog is discarded. Only one
+      process can poll one bot token at a time.
+
+    \b
+    Security:
+      Only the allowlisted chats can talk to the bot. A one-time code lives
+      only in memory and is never logged. Never send passwords or account
+      data through the chat.
+    """
+    try:
+        bot = Bot(
+            token=resolve_token(token),
+            allowed_chats=resolve_allowed_chats(chat_ids),
+            tasks_dir=resolve_tasks_dir(tasks_dir),
+            state_base=resolve_state_base(state_dir),
+            poll_timeout=poll_timeout,
+            default_ask_timeout=ask_timeout,
+            default_run_timeout=run_timeout,
+            shutdown_timeout=shutdown_timeout,
+            heartbeat_url=heartbeat_url,
+            heartbeat_interval=heartbeat_interval,
+            recent_window=recent_window,
+        )
+        exit_status = bot.serve()
+    except KeyboardInterrupt:
+        # Ctrl-C during startup. The shell convention for SIGINT is 128 + 2.
+        sys.exit(130)
+    sys.exit(exit_status)
+
+
+# --------------------------------------------------------------------------------------
+# Poll state.
+# --------------------------------------------------------------------------------------
+
+
+def read_poll_offset(path):
+    # Returns the last processed update identifier in path, or None when the
+    # file is missing or broken. A broken file only warns, so the bot still
+    # starts and falls back to the recency filter.
+    try:
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError) as error:
+        log(f"Warning: cannot read {path}: {error}. Starting without a saved offset.")
+        return None
+    if isinstance(data, dict):
+        value = data.get("last_update_id")
+        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+            return value
+    return None
+
+
+def write_poll_offset(path, update_id):
+    # Atomically stores the last processed update identifier. Raises OSError
+    # on failure. The caller logs and goes on, so persistence never stops
+    # the bot.
+    raw = (json.dumps({"last_update_id": update_id}, indent=2) + "\n").encode("utf-8")
+    os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
+    descriptor, temp_path = tempfile.mkstemp(
+        dir=os.path.dirname(path), prefix=".poll-"
+    )
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(raw)
+            handle.flush()
+            os.fsync(handle.fileno())
+            os.fchmod(handle.fileno(), 0o600)
+        os.replace(temp_path, path)
+    except BaseException:
+        try:
+            os.remove(temp_path)
+        except OSError:
+            pass
+        raise
+
+
+def message_time(update):
+    # Returns the Unix time of the message in update, or None when the update
+    # holds no dated message. An edit counts at its edit time.
+    if not isinstance(update, dict):
+        return None
+    for key in MESSAGE_KEYS:
+        message = update.get(key)
+        if not isinstance(message, dict):
+            continue
+        if key == "edited_message":
+            stamp = message.get("edit_date", message.get("date"))
+        else:
+            stamp = message.get("date")
+        if isinstance(stamp, bool):
+            return None
+        if isinstance(stamp, (int, float)):
+            return float(stamp)
+        return None
+    return None
+
+
+# --------------------------------------------------------------------------------------
+# Configuration.
+# --------------------------------------------------------------------------------------
+
+
+def resolve_token(token):
+    if token and token.strip():
+        return token.strip()
+    value = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+    if value:
+        return value
+    found = read_jc_string("telegram_bot.bot_token")
+    if found:
+        return found
+    die(
+        "No bot token. Pass --token, set TELEGRAM_BOT_TOKEN, or store the "
+        "token as telegram_bot.bot_token in ~/config.json"
+    )
+
+
+def resolve_allowed_chats(chat_ids):
+    raw_values = list(chat_ids)
+    env_value = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+    if env_value:
+        raw_values.append(env_value)
+    if not raw_values:
+        found = read_jc_value("telegram_bot.chat_id")
+        if isinstance(found, bool):
+            die("telegram_bot.chat_id in ~/config.json is not a chat identifier")
+        if isinstance(found, int):
+            return [found]
+        if isinstance(found, float) and found.is_integer():
+            return [int(found)]
+        if isinstance(found, str) and found.strip():
+            raw_values.append(found)
+    if not raw_values:
+        die(
+            "No allowed chat. Pass --chat-id, set TELEGRAM_CHAT_ID, or store "
+            "the chat identifier as telegram_bot.chat_id in ~/config.json"
+        )
+    chats = []
+    for raw in raw_values:
+        for part in str(raw).split(","):
+            part = part.strip()
+            if not part:
+                continue
+            try:
+                chat_id = int(part)
+            except ValueError:
+                die(f"Invalid chat identifier {part!r}, expected an integer")
+            if chat_id == 0:
+                die("Invalid chat identifier 0")
+            if chat_id not in chats:
+                chats.append(chat_id)
+    if not chats:
+        die("No allowed chat. The chat list is empty")
+    return chats
+
+
+def resolve_tasks_dir(tasks_dir):
+    value = (tasks_dir or "").strip() or os.environ.get("TELEGRAM_TASKS_DIR", "").strip()
+    if not value:
+        value = os.path.join(os.getcwd(), "telegram_tasks")
+    return os.path.abspath(value)
+
+
+def resolve_state_base(state_dir):
+    value = (state_dir or "").strip() or os.environ.get("TELEGRAM_STATE_DIR", "").strip()
+    if value:
+        return os.path.abspath(value)
+    home_base = os.environ.get("XDG_STATE_HOME", "").strip()
+    if not home_base:
+        home_base = os.path.join(os.path.expanduser("~"), ".local", "state")
+    return os.path.join(home_base, "telegram_bot")
+
+
+def read_jc_string(path):
+    value = read_jc_value(path)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        die(f"{path} in ~/config.json is not text")
+    return value.strip()
+
+
+def read_jc_value(path):
+    # Returns the parsed value at path in ~/config.json, or None when jc is
+    # missing, the file is missing, or the value is null. Dies on other jc
+    # failures so a broken setup never starts half configured.
+    try:
+        result = subprocess.run(
+            ["jc", "get", path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            encoding="utf-8",
+            errors="replace",
+            timeout=15,
+        )
+    except FileNotFoundError:
+        return None
+    except (OSError, subprocess.SubprocessError) as error:
+        die(f"cannot run jc: {error}")
+    if result.returncode == 2:
+        return None
+    if result.returncode != 0:
+        detail = (result.stderr or "").strip() or "no error message from jc"
+        die(f"cannot read ~/config.json: {detail}")
+    try:
+        return json.loads(result.stdout)
+    except ValueError as error:
+        die(f"jc returned invalid JSON: {error}")
+
+
+def ensure_dir(path, mode=0o700):
+    try:
+        os.makedirs(path, mode=mode, exist_ok=True)
+        os.chmod(path, mode)
+    except OSError as error:
+        die(f"cannot prepare {path}: {error}")
+
+
+# --------------------------------------------------------------------------------------
+# Errors.
+# --------------------------------------------------------------------------------------
+
+
+class BotError(Exception):
+    pass
+
+
+class ApiError(BotError):
+    def __init__(self, code, description, retry_after=None):
+        super().__init__(f"Telegram API error {code}: {description}")
+        self.code = code
+        self.description = description
+        self.retry_after = retry_after
+
+
+class NetworkError(BotError):
+    pass
+
+
+class TaskTimeout(TimeoutError):
+    pass
+
+
+class TaskCancelled(Exception):
+    pass
+
+
+class TaskKilled(Exception):
+    pass
+
+
+class TaskLoadError(BotError):
+    pass
+
+
+# --------------------------------------------------------------------------------------
+# Telegram API.
+# --------------------------------------------------------------------------------------
+
+
+class TelegramApi:
+    def __init__(self, token, http_timeout=45.0):
+        self.base_url = f"https://api.telegram.org/bot{token}/"
+        self.http_timeout = http_timeout
+
+    def call(self, method, params=None, http_timeout=None):
+        body = json.dumps(params or {}).encode("utf-8")
+        request = urllib.request.Request(
+            self.base_url + method,
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        timeout = self.http_timeout if http_timeout is None else http_timeout
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as error:
+            raise self.http_error(method, error) from error
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError) as error:
+            raise NetworkError(f"{method} failed: {error}") from error
+        if not isinstance(payload, dict) or not payload.get("ok"):
+            description = "unknown error"
+            if isinstance(payload, dict):
+                description = str(payload.get("description", description))
+            raise ApiError(0, f"{method} failed: {description}")
+        return payload.get("result")
+
+    def http_error(self, method, error):
+        try:
+            payload = json.loads(error.read().decode("utf-8", errors="replace"))
+        except (OSError, ValueError):
+            payload = None
+        if isinstance(payload, dict):
+            description = str(payload.get("description", error.reason))
+            code = payload.get("error_code", error.code)
+            retry_after = None
+            parameters = payload.get("parameters")
+            if isinstance(parameters, dict):
+                retry_after = parameters.get("retry_after")
+            return ApiError(code, f"{method} failed: {description}", retry_after)
+        return ApiError(error.code, f"{method} failed: {error.reason}")
+
+
+def split_text(text, limit=SEND_CHUNK_LIMIT):
+    # Splits text into chunks below the Telegram length limit. Splits at line
+    # boundaries when one is near, else cuts at the limit.
+    chunks = []
+    rest = text
+    while len(rest) > limit:
+        cut = rest.rfind("\n", 0, limit)
+        if cut < limit // 2:
+            cut = limit
+        chunks.append(rest[:cut])
+        rest = rest[cut:].lstrip("\n")
+    chunks.append(rest)
+    return chunks
+
+
+def truncate(text, limit):
+    if len(text) <= limit:
+        return text
+    return text[:limit] + " [truncated]"
+
+
+# --------------------------------------------------------------------------------------
+# State store.
+# --------------------------------------------------------------------------------------
+
+
+class StateStore:
+    def __init__(self, base_dir):
+        self.base_dir = os.path.abspath(base_dir)
+        ensure_dir(self.base_dir)
+
+    def task_dir(self, task_name):
+        # Task names come from file names that match TASK_NAME_PATTERN, so
+        # the join cannot escape the base directory. resolve() guards anyway.
+        path = os.path.join(self.base_dir, "tasks", task_name)
+        ensure_dir(path)
+        return path
+
+    def resolve(self, task_name, identifier):
+        if not isinstance(identifier, str) or not identifier or len(identifier) > 200:
+            raise ValueError(f"invalid state identifier {identifier!r}")
+        if "\0" in identifier or identifier.startswith("/"):
+            raise ValueError(f"invalid state identifier {identifier!r}")
+        parts = identifier.split("/")
+        if any(part in ("", ".", "..") for part in parts):
+            raise ValueError(f"invalid state identifier {identifier!r}")
+        full = os.path.realpath(os.path.join(self.task_dir(task_name), *parts))
+        root = os.path.realpath(os.path.join(self.base_dir, "tasks", task_name))
+        if full != root and not full.startswith(root + os.sep):
+            raise ValueError(f"invalid state identifier {identifier!r}")
+        return full
+
+    def load(self, task_name, identifier, default=None):
+        try:
+            path = self.resolve(task_name, identifier)
+        except ValueError:
+            raise
+        try:
+            with open(path, "rb") as handle:
+                return handle.read()
+        except FileNotFoundError:
+            return default
+        except OSError as error:
+            raise BotError(f"cannot read state {identifier!r}: {error}") from error
+
+    def save(self, task_name, identifier, data):
+        if isinstance(data, str):
+            raw = data.encode("utf-8")
+        elif isinstance(data, (bytes, bytearray)):
+            raw = bytes(data)
+        elif isinstance(data, (dict, list)):
+            raw = (json.dumps(data, indent=2, ensure_ascii=False) + "\n").encode(
+                "utf-8"
+            )
+        else:
+            raise TypeError("state data must be str, bytes, or a JSON value")
+        path = self.resolve(task_name, identifier)
+        ensure_dir(os.path.dirname(path))
+        descriptor, temp_path = tempfile.mkstemp(
+            dir=os.path.dirname(path), prefix=".state-"
+        )
+        replaced = False
+        try:
+            with os.fdopen(descriptor, "wb") as handle:
+                handle.write(raw)
+                handle.flush()
+                os.fsync(handle.fileno())
+                os.fchmod(handle.fileno(), 0o600)
+            os.replace(temp_path, path)
+            replaced = True
+        except OSError as error:
+            raise BotError(f"cannot write state {identifier!r}: {error}") from error
+        finally:
+            if not replaced:
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
+        try:
+            os.chmod(path, 0o600)
+        except OSError as error:
+            raise BotError(f"cannot set the mode of {identifier!r}: {error}") from error
+
+    def delete(self, task_name, identifier):
+        path = self.resolve(task_name, identifier)
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            return False
+        except OSError as error:
+            raise BotError(f"cannot delete state {identifier!r}: {error}") from error
+        return True
+
+    def list(self, task_name):
+        root = self.task_dir(task_name)
+        found = []
+        for current, _directories, files in os.walk(root):
+            for name in files:
+                if name.startswith(".state-"):
+                    continue
+                full = os.path.join(current, name)
+                found.append(os.path.relpath(full, root))
+        return sorted(found)
+
+
+# --------------------------------------------------------------------------------------
+# Tasks.
+# --------------------------------------------------------------------------------------
+
+
+@dataclass
+class TaskSpec:
+    name: str
+    path: str
+    display_name: str
+    description: str
+
+
+def discover_tasks(tasks_dir):
+    # Lists the tasks without executing their code. NAME and DESCRIPTION come
+    # from a syntax tree scan, so listing never runs task code.
+    specs = {}
+    if not os.path.isdir(tasks_dir):
+        return specs
+    try:
+        entries = sorted(os.listdir(tasks_dir))
+    except OSError:
+        return specs
+    for entry in entries:
+        if not entry.endswith(".py"):
+            continue
+        stem = entry[:-3]
+        if not TASK_NAME_PATTERN.fullmatch(stem):
+            continue
+        if stem.startswith("_"):
+            continue
+        path = os.path.join(tasks_dir, entry)
+        if not os.path.isfile(path):
+            continue
+        display_name, description = read_task_metadata(path, stem)
+        specs[stem] = TaskSpec(
+            name=stem, path=path, display_name=display_name, description=description
+        )
+    return specs
+
+
+def read_task_metadata(path, fallback_name):
+    try:
+        with open(path, encoding="utf-8") as handle:
+            source = handle.read()
+        tree = ast.parse(source, filename=path)
+    except (OSError, SyntaxError, ValueError):
+        return fallback_name, ""
+    values = {}
+    for node in tree.body:
+        if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+            continue
+        target = node.targets[0]
+        if not isinstance(target, ast.Name) or target.id not in ("NAME", "DESCRIPTION"):
+            continue
+        if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+            values[target.id] = node.value.value.strip()
+    display_name = values.get("NAME", fallback_name).strip() or fallback_name
+    return display_name, values.get("DESCRIPTION", "").strip()
+
+
+_task_module_counter = 0
+_task_module_lock = threading.Lock()
+
+
+def load_task_module(spec):
+    global _task_module_counter
+    with _task_module_lock:
+        _task_module_counter += 1
+        suffix = _task_module_counter
+    module_name = f"telegram_task_{spec.name}_{suffix}"
+    try:
+        loader = importlib.util.spec_from_file_location(module_name, spec.path)
+        if loader is None or loader.loader is None:
+            raise TaskLoadError(f"cannot load {spec.path}")
+        module = importlib.util.module_from_spec(loader)
+        loader.loader.exec_module(module)
+    except TaskLoadError:
+        raise
+    except Exception as error:
+        raise TaskLoadError(
+            f"cannot load task {spec.name}: {type(error).__name__}: {error}"
+        ) from error
+    run_fn = getattr(module, "run", None)
+    if not callable(run_fn):
+        raise TaskLoadError(f"task {spec.name} defines no callable run")
+    shutdown_fn = getattr(module, "shutdown", None)
+    if shutdown_fn is not None and not callable(shutdown_fn):
+        raise TaskLoadError(f"task {spec.name} defines a shutdown that is not callable")
+    timeout = getattr(module, "TIMEOUT", None)
+    if timeout is not None:
+        if isinstance(timeout, bool) or not isinstance(timeout, (int, float)):
+            raise TaskLoadError(f"task {spec.name} defines a TIMEOUT that is not a number")
+        if not timeout > 0:
+            raise TaskLoadError(f"task {spec.name} defines a TIMEOUT that is not positive")
+        timeout = float(timeout)
+    return module, shutdown_fn, timeout
+
+
+def build_call(fn, ctx, extra):
+    # Calls fn with (ctx,) or (ctx, extra). A function that takes another
+    # positional argument gets the extra one, else it gets the context only.
+    try:
+        parameters = inspect.signature(fn).parameters.values()
+    except (TypeError, ValueError):
+        return (ctx, extra)
+    positionals = 0
+    has_var_positional = False
+    for parameter in parameters:
+        if parameter.kind == inspect.Parameter.VAR_POSITIONAL:
+            has_var_positional = True
+        elif parameter.kind in (
+            inspect.Parameter.POSITIONAL_ONLY,
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        ):
+            positionals += 1
+    if has_var_positional or positionals >= 2:
+        return (ctx, extra)
+    return (ctx,)
+
+
+def call_task_function(fn, ctx, extra):
+    arguments = build_call(fn, ctx, extra)
+    if inspect.iscoroutinefunction(fn):
+        return asyncio.run(fn(*arguments))
+    return fn(*arguments)
+
+
+# --------------------------------------------------------------------------------------
+# Task context.
+# --------------------------------------------------------------------------------------
+
+
+class RunRecord:
+    def __init__(self, name, display_name, args, chat_id, run_timeout):
+        self.name = name
+        self.display_name = display_name
+        self.args = args
+        self.chat_id = chat_id
+        self.run_timeout = run_timeout
+        self.start_mono = time.monotonic()
+        self.overall_deadline = self.start_mono + run_timeout
+        self.thread = None
+        # Abort reason, one of None, cancelled, timeout, shutdown. First set wins.
+        self.abort = None
+        self.pending = None
+        self.phase = "starting"
+        self.pending_serial = 0
+
+
+class TaskContext:
+    Timeout = TaskTimeout
+    Cancelled = TaskCancelled
+    Killed = TaskKilled
+
+    def __init__(self, bot, record, in_shutdown=False):
+        self._bot = bot
+        self._record = record
+        self._in_shutdown = in_shutdown
+
+    @property
+    def task_name(self):
+        return self._record.name
+
+    @property
+    def args(self):
+        return list(self._record.args)
+
+    @property
+    def chat_id(self):
+        return self._record.chat_id
+
+    def elapsed(self):
+        return time.monotonic() - self._record.start_mono
+
+    def log(self, text):
+        log(f"task {self._record.name}: {text}")
+
+    def check(self):
+        self._check()
+
+    def say(self, text):
+        if not isinstance(text, str):
+            text = str(text)
+        self._check()
+        return self._bot.send_text(self._record.chat_id, text)
+
+    def ask(self, prompt, pattern=None, timeout=None):
+        if not isinstance(prompt, str):
+            prompt = str(prompt)
+        if pattern is not None and not isinstance(pattern, str):
+            raise TypeError("pattern must be a regex string or None")
+        compiled = None
+        if pattern is not None:
+            try:
+                compiled = re.compile(pattern)
+            except re.error as error:
+                raise ValueError(f"invalid pattern {pattern!r}: {error}") from error
+        if timeout is None:
+            timeout = self._bot.default_ask_timeout
+        try:
+            timeout = float(timeout)
+        except (TypeError, ValueError) as error:
+            raise TypeError("timeout must be a number of seconds") from error
+        if not timeout > 0:
+            raise ValueError("timeout must be positive")
+        if self._in_shutdown:
+            raise TaskKilled("the task is shutting down, ask is not allowed")
+        self._check()
+        bot = self._bot
+        record = self._record
+        deadline = min(time.monotonic() + timeout, record.overall_deadline)
+        with bot.lock:
+            record.pending_serial += 1
+            serial = record.pending_serial
+            record.pending = {
+                "serial": serial,
+                "compiled": compiled,
+                "deadline": deadline,
+                "reply": None,
+            }
+        try:
+            bot.send_text(record.chat_id, prompt)
+        except Exception:
+            with bot.lock:
+                if record.pending is not None and record.pending["serial"] == serial:
+                    record.pending = None
+                    bot.cond.notify_all()
+            raise
+        try:
+            while True:
+                with bot.lock:
+                    if record.pending is None or record.pending["serial"] != serial:
+                        raise TaskKilled("the wait was superseded")
+                    abort = record.abort
+                    if abort == "cancelled":
+                        record.pending = None
+                        raise TaskCancelled("the task was cancelled")
+                    if abort == "shutdown" or bot.stopping.is_set():
+                        record.pending = None
+                        raise TaskKilled("the bot is stopping")
+                    if abort == "timeout":
+                        record.pending = None
+                        raise TaskTimeout("the task timed out")
+                    reply = record.pending["reply"]
+                    if reply is not None:
+                        record.pending["reply"] = None
+                        if compiled is not None and compiled.fullmatch(reply) is None:
+                            need_retry = True
+                        else:
+                            record.pending = None
+                            return reply
+                    else:
+                        need_retry = False
+                        now = time.monotonic()
+                        if now >= record.overall_deadline:
+                            bot.set_abort_locked(record, "timeout")
+                            record.pending = None
+                            raise TaskTimeout("the run budget is exhausted")
+                        if now >= record.pending["deadline"]:
+                            bot.set_abort_locked(record, "timeout")
+                            record.pending = None
+                            raise TaskTimeout(
+                                f"no matching reply within {timeout:g} seconds"
+                            )
+                        wait_for = record.pending["deadline"] - now
+                        left_overall = record.overall_deadline - now
+                        if left_overall < wait_for:
+                            wait_for = left_overall
+                        bot.cond.wait(timeout=wait_for)
+                        continue
+                if need_retry:
+                    # Sent outside the lock so a slow network never blocks
+                    # command handling. A failure only warns, the wait goes on.
+                    try:
+                        bot.send_text(
+                            record.chat_id,
+                            "That reply does not match the expected format. "
+                            "Try again.",
+                        )
+                    except BotError as error:
+                        log(f"task {record.name}: retry notice failed: {error}")
+        finally:
+            with bot.lock:
+                # No exit path may leave a stale prompt behind. Every normal
+                # path clears pending already, so this only covers abrupt
+                # exits such as interpreter shutdown.
+                if record.pending is not None and record.pending["serial"] == serial:
+                    record.pending = None
+                    bot.cond.notify_all()
+
+    def load_state(self, identifier, default=None):
+        raw = self._bot.store.load(self._record.name, identifier, default=None)
+        return default if raw is None else raw
+
+    def save_state(self, identifier, data):
+        self._bot.store.save(self._record.name, identifier, data)
+
+    def state_path(self, identifier):
+        return self._bot.store.resolve(self._record.name, identifier)
+
+    def delete_state(self, identifier):
+        return self._bot.store.delete(self._record.name, identifier)
+
+    def list_states(self):
+        return self._bot.store.list(self._record.name)
+
+    def _check(self):
+        if self._in_shutdown:
+            if self._bot.stopping.is_set():
+                raise TaskKilled("the bot is stopping")
+            return
+        record = self._record
+        with self._bot.lock:
+            abort = record.abort
+            if abort == "cancelled":
+                raise TaskCancelled("the task was cancelled")
+            if abort == "timeout":
+                raise TaskTimeout("the task timed out")
+            if abort == "shutdown" or self._bot.stopping.is_set():
+                raise TaskKilled("the bot is stopping")
+            if time.monotonic() >= record.overall_deadline:
+                self._bot.set_abort_locked(record, "timeout")
+                raise TaskTimeout("the run budget is exhausted")
+
+
+# --------------------------------------------------------------------------------------
+# Bot.
+# --------------------------------------------------------------------------------------
+
+
+class Bot:
+    def __init__(
+        self,
+        token,
+        allowed_chats,
+        tasks_dir,
+        state_base,
+        poll_timeout=30.0,
+        default_ask_timeout=300.0,
+        default_run_timeout=3600.0,
+        shutdown_timeout=60.0,
+        heartbeat_url=None,
+        heartbeat_interval=300.0,
+        recent_window=30.0,
+    ):
+        self.api = TelegramApi(token)
+        self.allowed_chats = list(allowed_chats)
+        self.tasks_dir = tasks_dir
+        self.store = StateStore(state_base)
+        self.poll_timeout = poll_timeout
+        self.default_ask_timeout = default_ask_timeout
+        self.default_run_timeout = default_run_timeout
+        self.shutdown_timeout = shutdown_timeout
+        self.heartbeat_url = heartbeat_url
+        self.heartbeat_interval = heartbeat_interval
+        self.recent_window = recent_window
+        self.poll_state_path = os.path.join(self.store.base_dir, "poll_state.json")
+        # Last saved offset, the first update identifier still wanted at the
+        # time of the save. None when nothing was saved yet.
+        self.saved_offset = None
+        self.lock = threading.Lock()
+        self.cond = threading.Condition(self.lock)
+        self.stopping = threading.Event()
+        self.current = None
+        self.last_summary = None
+        self.last_time = None
+        self.start_mono = time.monotonic()
+        # Wall time of the start. Backlog older than the recent window
+        # relative to this moment is discarded wherever it is met.
+        self.started_at = time.time()
+
+    # -- serving ----------------------------------------------------------
+
+    def serve(self):
+        try:
+            signal.signal(signal.SIGTERM, self.handle_signal)
+        except (OSError, ValueError):
+            pass
+        try:
+            offset = self.drain_pending(self.load_saved_offset())
+        except BotError as error:
+            log(f"Error: cannot reach Telegram: {error}")
+            return 1
+        specs = discover_tasks(self.tasks_dir)
+        if not os.path.isdir(self.tasks_dir):
+            log(
+                f"Warning: tasks directory {self.tasks_dir} does not exist. "
+                "Create it and add <name>.py files. /list stays empty."
+            )
+        else:
+            log(f"Loaded {len(specs)} task(s) from {self.tasks_dir}")
+        log(
+            f"Allowing {len(self.allowed_chats)} chat(s). "
+            "Polling Telegram for updates."
+        )
+        self.start_heartbeat()
+        self.send_heartbeat()
+        backoff = 0
+        try:
+            while not self.stopping.is_set():
+                try:
+                    params = {
+                        "timeout": int(self.poll_timeout),
+                        "allowed_updates": list(MESSAGE_KEYS),
+                    }
+                    if offset is not None:
+                        params["offset"] = offset
+                    updates = self.api.call(
+                        "getUpdates",
+                        params,
+                        http_timeout=self.poll_timeout + 15.0,
+                    )
+                except ApiError as error:
+                    if error.code == 401:
+                        log("Error: Telegram rejected the token (401). Stopping.")
+                        self.stopping.set()
+                        return 1
+                    if error.code == 409:
+                        log(
+                            "Warning: another process polls this bot (409). "
+                                "Waiting 15 seconds."
+                        )
+                        if self.stopping.wait(15.0):
+                            break
+                        continue
+                    if error.code == 429:
+                        wait_for = error.retry_after or 30.0
+                        log(f"Warning: rate limited. Waiting {wait_for} seconds.")
+                        if self.stopping.wait(float(wait_for)):
+                            break
+                        continue
+                    log(f"Warning: {error}. Waiting 5 seconds.")
+                    if self.stopping.wait(5.0):
+                        break
+                    continue
+                except NetworkError as error:
+                    backoff = min(backoff + 1, 5)
+                    wait_for = min(2.0**backoff, 30.0)
+                    log(f"Warning: {error}. Waiting {wait_for:g} seconds.")
+                    if self.stopping.wait(wait_for):
+                        break
+                    continue
+                backoff = 0
+                if not isinstance(updates, list):
+                    continue
+                stale = 0
+                for update in updates:
+                    if not isinstance(update, dict):
+                        continue
+                    try:
+                        update_id = int(update.get("update_id", 0))
+                    except (TypeError, ValueError):
+                        continue
+                    if offset is None or update_id + 1 > offset:
+                        offset = update_id + 1
+                    if self.is_stale(update):
+                        # Backlog from before the start that the drain never
+                        # met, such as after a failed drain call. The offset
+                        # still advances past it.
+                        stale += 1
+                        continue
+                    try:
+                        self.handle_update(update)
+                    except Exception:
+                        # One bad update never stops the loop.
+                        log("Warning: update handler failed:")
+                        traceback.print_exc()
+                if stale:
+                    log(
+                        f"Discarded {stale} stale update(s) from before the start."
+                    )
+                self.save_offset(offset)
+                self.check_overall_deadline()
+        except KeyboardInterrupt:
+            log("Interrupted. Stopping.")
+            self.stopping.set()
+            self.stop_task("shutdown")
+            return 130
+        self.stop_task("shutdown")
+        return 0
+
+    def handle_signal(self, signum, frame):
+        log("Received stop signal. Stopping.")
+        self.stopping.set()
+
+    def load_saved_offset(self):
+        # Returns the first update identifier still wanted, from the offset
+        # saved by the previous run, or None on the first run. Telegram then
+        # only returns updates past everything already processed.
+        value = read_poll_offset(self.poll_state_path)
+        if value is None:
+            return None
+        self.saved_offset = value + 1
+        return self.saved_offset
+
+    def save_offset(self, offset):
+        # Persists the first update identifier still wanted, so the next
+        # start replays nothing already processed. A failure only warns.
+        if offset is None or offset == self.saved_offset:
+            return
+        try:
+            write_poll_offset(self.poll_state_path, offset - 1)
+        except OSError as error:
+            log(f"Warning: cannot save poll state: {error}")
+            return
+        self.saved_offset = offset
+
+    def is_stale(self, update):
+        # Whether update is backlog from before the start and outside the
+        # recent window. Such updates are discarded everywhere they are met,
+        # even when never processed, so a restart never replays a stale /run
+        # or a stale reply. Messages without a date count as stale. Live
+        # traffic always passes, since its time is past the start.
+        stamp = message_time(update)
+        if stamp is None:
+            return True
+        return stamp < self.started_at - self.recent_window
+
+    def drain_pending(self, start_offset):
+        # Handles the backlog that arrived while the bot was away. Updates
+        # already processed by the previous run never return, because the
+        # call starts past the saved offset. Of the rest, recent messages go
+        # through normal handling and older ones are discarded, so a restart
+        # never replays a stale /run or a stale reply. Returns the offset to
+        # poll from. A message that arrives between two polls needs no such
+        # filter: Telegram holds unacknowledged updates, and the next poll
+        # returns them through the offset.
+        offset = start_offset
+        processed = 0
+        discarded = 0
+        while True:
+            params = {"timeout": 0}
+            if offset is not None:
+                params["offset"] = offset
+            try:
+                updates = self.api.call(
+                    "getUpdates", params, http_timeout=15.0
+                )
+            except ApiError as error:
+                if error.code == 401:
+                    raise
+                log(f"Warning: cannot drain pending updates: {error}")
+                self.save_offset(offset)
+                return offset
+            except NetworkError as error:
+                log(f"Warning: cannot drain pending updates: {error}")
+                self.save_offset(offset)
+                return offset
+            if not isinstance(updates, list) or not updates:
+                break
+            for update in updates:
+                if not isinstance(update, dict):
+                    continue
+                try:
+                    update_id = int(update.get("update_id", 0))
+                except (TypeError, ValueError):
+                    continue
+                offset = update_id + 1
+                if not self.is_stale(update):
+                    processed += 1
+                    try:
+                        self.handle_update(update)
+                    except Exception:
+                        log("Warning: update handler failed:")
+                        traceback.print_exc()
+                else:
+                    discarded += 1
+            if len(updates) < 100:
+                break
+        if processed or discarded:
+            log(
+                f"Startup backlog: processed {processed} recent update(s), "
+                f"discarded {discarded} stale one(s)."
+            )
+        self.save_offset(offset)
+        return offset
+
+    # -- sending ----------------------------------------------------------
+
+    def send_text(self, chat_id, text):
+        if not isinstance(text, str):
+            text = str(text)
+        if not text:
+            text = "(empty message)"
+        last_id = None
+        for chunk in split_text(text):
+            result = self.api.call(
+                "sendMessage", {"chat_id": chat_id, "text": chunk}
+            )
+            if isinstance(result, dict) and isinstance(result.get("message_id"), int):
+                last_id = result["message_id"]
+        return last_id
+
+    def try_send(self, chat_id, text):
+        try:
+            self.send_text(chat_id, text)
+        except BotError as error:
+            log(f"Warning: cannot send message: {error}")
+
+    # -- updates ----------------------------------------------------------
+
+    def handle_update(self, update):
+        message = None
+        for key in MESSAGE_KEYS:
+            candidate = update.get(key)
+            if isinstance(candidate, dict):
+                message = candidate
+                break
+        if message is None:
+            return
+        chat = message.get("chat")
+        chat_id = chat.get("id") if isinstance(chat, dict) else None
+        if not isinstance(chat_id, int) or chat_id not in self.allowed_chats:
+            log("Ignoring update from an unauthorized chat.")
+            return
+        text = message.get("text")
+        if text is None:
+            text = message.get("caption")
+        if not isinstance(text, str):
+            self.handle_non_text(chat_id)
+            return
+        text = text.strip()
+        if not text:
+            return
+        if text.startswith("/"):
+            self.handle_command(chat_id, text)
+            return
+        if self.deliver_to_task(chat_id, text):
+            return
+        with self.lock:
+            running = self.current if self.is_alive_locked(self.current) else None
+            waiting = running is not None and running.pending is not None
+        if running is not None:
+            if waiting:
+                return
+            self.try_send(
+                chat_id,
+                f"Task {running.display_name} is running. It waits for no "
+                "input right now.",
+            )
+            return
+        self.try_send(
+            chat_id, "Send /list to see tasks, /run <name> to start one."
+        )
+
+    def handle_non_text(self, chat_id):
+        with self.lock:
+            running = self.current if self.is_alive_locked(self.current) else None
+            waiting = running is not None and running.pending is not None
+        if waiting:
+            self.try_send(chat_id, "The task waits for a text reply.")
+
+    def handle_command(self, chat_id, text):
+        try:
+            parts = shlex.split(text)
+        except ValueError:
+            parts = text.split()
+        if not parts:
+            return
+        command = parts[0][1:].split("@", 1)[0].lower()
+        arguments = parts[1:]
+        if command in ("start", "help"):
+            self.try_send(chat_id, self.help_text())
+        elif command == "list":
+            self.try_send(chat_id, self.list_text())
+        elif command == "run":
+            self.handle_run(chat_id, arguments)
+        elif command == "status":
+            self.try_send(chat_id, self.status_text())
+        elif command == "cancel":
+            self.handle_cancel(chat_id)
+        else:
+            self.try_send(chat_id, f"Unknown command /{command}. Try /list.")
+
+    def help_text(self):
+        return (
+            "Commands:\n"
+            "/list - show tasks\n"
+            "/run <name> ... - start a task\n"
+            "/status - show the running task\n"
+            "/cancel - stop the running task\n"
+            "/help - show this text"
+        )
+
+    def list_text(self):
+        specs = discover_tasks(self.tasks_dir)
+        if not specs:
+            return (
+                f"No tasks in {self.tasks_dir}. Add a <name>.py file to add one."
+            )
+        lines = ["Tasks:"]
+        for name in sorted(specs):
+            spec = specs[name]
+            if spec.description:
+                lines.append(f"/run {name} - {spec.description}")
+            else:
+                lines.append(f"/run {name}")
+        return "\n".join(lines)
+
+    def status_text(self):
+        uptime = format_duration(time.monotonic() - self.start_mono)
+        with self.lock:
+            running = self.current if self.is_alive_locked(self.current) else None
+            if running is not None:
+                elapsed = format_duration(time.monotonic() - running.start_mono)
+                phase = (
+                    "waiting for a reply"
+                    if running.pending is not None
+                    else running.phase
+                )
+                running_line = (
+                    f"Running: {running.display_name} ({elapsed}, {phase})"
+                )
+            else:
+                running_line = "Running: none"
+            last_summary = self.last_summary
+            last_time = self.last_time
+        lines = [f"Uptime: {uptime}", running_line]
+        specs = discover_tasks(self.tasks_dir)
+        lines.append(f"Tasks: {len(specs)} available")
+        if last_summary is not None and last_time is not None:
+            age = format_duration(time.time() - last_time)
+            lines.append(f"Last: {last_summary} ({age} ago)")
+        return "\n".join(lines)
+
+    # -- running tasks ----------------------------------------------------
+
+    def handle_run(self, chat_id, arguments):
+        if not arguments:
+            self.try_send(chat_id, "Usage: /run <name> ...")
+            return
+        name = arguments[0]
+        task_args = arguments[1:]
+        with self.lock:
+            if self.is_alive_locked(self.current):
+                self.try_send_locked(
+                    chat_id,
+                    f"Task {self.current.display_name} already runs. Wait "
+                    "for it or send /cancel.",
+                )
+                return
+        specs = discover_tasks(self.tasks_dir)
+        spec = specs.get(name)
+        if spec is None:
+            hint = ", ".join(sorted(specs)) or "none"
+            self.try_send(chat_id, f"Unknown task {name!r}. Available: {hint}.")
+            return
+        try:
+            module, shutdown_fn, timeout = load_task_module(spec)
+        except TaskLoadError as error:
+            log(f"task {name}: {error}")
+            self.try_send(chat_id, f"Task {name} failed to load: {error}")
+            return
+        run_timeout = timeout if timeout is not None else self.default_run_timeout
+        record = RunRecord(
+            name=spec.name,
+            display_name=spec.display_name,
+            args=task_args,
+            chat_id=chat_id,
+            run_timeout=run_timeout,
+        )
+        thread = threading.Thread(
+            target=self.worker,
+            args=(record, module, shutdown_fn),
+            daemon=True,
+            name=f"telegram-task-{spec.name}",
+        )
+        with self.lock:
+            if self.is_alive_locked(self.current):
+                self.try_send_locked(
+                    chat_id, "Another task started first. Try again."
+                )
+                return
+            record.thread = thread
+            self.current = record
+        log(f"task {spec.name}: started by chat, budget {run_timeout:g}s")
+        thread.start()
+        self.try_send(chat_id, f"Task {spec.display_name} started.")
+
+    def handle_cancel(self, chat_id):
+        with self.lock:
+            if not self.is_alive_locked(self.current):
+                self.try_send_locked(chat_id, "No task is running.")
+                return
+            name = self.current.display_name
+            self.set_abort_locked(self.current, "cancelled")
+            self.cond.notify_all()
+        log(f"task {name}: cancel requested")
+        self.try_send(chat_id, f"Cancelling task {name}.")
+
+    def deliver_to_task(self, chat_id, text):
+        # Routes a reply to the waiting ask. Returns True when consumed. The
+        # reply content is never logged.
+        with self.lock:
+            record = self.current
+            if record is None or not self.is_alive_locked(record):
+                return False
+            if record.chat_id != chat_id:
+                return False
+            if record.pending is None:
+                return False
+            if record.pending["reply"] is not None:
+                return True
+            record.pending["reply"] = text.strip()
+            self.cond.notify_all()
+            return True
+
+    def check_overall_deadline(self):
+        expired = None
+        with self.lock:
+            record = self.current
+            if (
+                record is not None
+                and record.abort is None
+                and self.is_alive_locked(record)
+                and time.monotonic() >= record.overall_deadline
+            ):
+                record.abort = "timeout"
+                self.cond.notify_all()
+                expired = record
+        if expired is not None:
+            log(f"task {expired.name}: run budget exhausted")
+            self.try_send(
+                expired.chat_id,
+                f"Task {expired.display_name} used its time budget. "
+                "Stopping it.",
+            )
+
+    def set_abort_locked(self, record, reason):
+        if record.abort is None:
+            record.abort = reason
+
+    def set_abort(self, record, reason):
+        with self.lock:
+            self.set_abort_locked(record, reason)
+            self.cond.notify_all()
+
+    def is_alive_locked(self, record):
+        return (
+            record is not None
+            and record.thread is not None
+            and record.thread.is_alive()
+        )
+
+    def try_send_locked(self, chat_id, text):
+        # Called with the lock held. Sending can block on the network, so
+        # release the lock around the call.
+        self.lock.release()
+        try:
+            self.try_send(chat_id, text)
+        finally:
+            self.lock.acquire()
+
+    def stop_task(self, reason):
+        with self.lock:
+            record = self.current
+            if not self.is_alive_locked(record):
+                return
+            self.set_abort_locked(record, "shutdown" if reason == "shutdown" else reason)
+            self.cond.notify_all()
+            thread = record.thread
+        grace = self.shutdown_timeout + 15.0
+        thread.join(timeout=grace)
+        if thread.is_alive():
+            log("Warning: task thread did not stop within the grace period.")
+
+    def worker(self, record, module, shutdown_fn):
+        ctx = TaskContext(self, record)
+        outcome = "done"
+        result_text = None
+        error_text = None
+        try:
+            value = call_task_function(module.run, ctx, record.args)
+            with self.lock:
+                outcome = record.abort if record.abort is not None else "done"
+                if outcome == "done" and value is not None:
+                    result_text = str(value)
+        except TaskTimeout:
+            self.set_abort(record, "timeout")
+            with self.lock:
+                outcome = record.abort or "timeout"
+        except TaskCancelled:
+            with self.lock:
+                outcome = record.abort or "cancelled"
+                if outcome not in REASONS:
+                    outcome = "cancelled"
+        except TaskKilled:
+            with self.lock:
+                outcome = record.abort or "shutdown"
+        except Exception as error:
+            outcome = "error"
+            error_text = f"{type(error).__name__}: {error}"
+            log(f"task {record.name}: run failed:")
+            traceback.print_exc()
+        record.phase = "finishing"
+        if callable(shutdown_fn):
+            shutdown_ctx = TaskContext(self, record, in_shutdown=True)
+            try:
+                call_task_function(shutdown_fn, shutdown_ctx, outcome)
+            except (TaskKilled, TaskCancelled, TaskTimeout) as error:
+                log(f"task {record.name}: shutdown hook interrupted: {error}")
+            except Exception as error:
+                log(f"task {record.name}: shutdown hook failed: {error}")
+                traceback.print_exc()
+        self.report(record, outcome, result_text, error_text)
+        with self.lock:
+            if self.current is record:
+                self.current = None
+            elapsed = time.monotonic() - record.start_mono
+            self.last_summary = (
+                f"{record.display_name} {outcome} in {format_duration(elapsed)}"
+            )
+            self.last_time = time.time()
+
+    def report(self, record, outcome, result_text, error_text):
+        if outcome == "done":
+            if result_text:
+                text = (
+                    f"Task {record.display_name} finished:\n"
+                    + truncate(result_text, RESULT_PREVIEW_LIMIT)
+                )
+            else:
+                text = f"Task {record.display_name} finished."
+        elif outcome == "error":
+            detail = (error_text or "unknown error").splitlines()
+            first_line = detail[0] if detail else "unknown error"
+            text = (
+                f"Task {record.display_name} failed: "
+                + truncate(first_line, ERROR_PREVIEW_LIMIT)
+            )
+        elif outcome == "timeout":
+            text = (
+                f"Task {record.display_name} timed out after "
+                f"{format_duration(record.run_timeout)}. It was stopped."
+            )
+        elif outcome == "cancelled":
+            text = f"Task {record.display_name} cancelled."
+        else:
+            text = f"Task {record.display_name} stopped."
+        log(f"task {record.name}: {outcome}")
+        try:
+            self.send_text(record.chat_id, text)
+        except BotError as error:
+            log(f"Warning: cannot report task {record.name}: {error}")
+
+    # -- heartbeat --------------------------------------------------------
+
+    def start_heartbeat(self):
+        if not self.heartbeat_url:
+            return
+        thread = threading.Thread(
+            target=self.heartbeat_loop, daemon=True, name="telegram-heartbeat"
+        )
+        thread.start()
+
+    def send_heartbeat(self):
+        if not self.heartbeat_url:
+            return
+        try:
+            request = urllib.request.Request(self.heartbeat_url, method="GET")
+            with urllib.request.urlopen(request, timeout=10.0) as response:
+                response.read(1024)
+        except Exception as error:
+            log(f"Warning: heartbeat ping failed: {error}")
+
+    def heartbeat_loop(self):
+        while not self.stopping.is_set():
+            if self.stopping.wait(self.heartbeat_interval):
+                break
+            self.send_heartbeat()
+
+
+# --------------------------------------------------------------------------------------
+# Generic helpers.
+# --------------------------------------------------------------------------------------
+
+
+def log(message):
+    print(f"telegram_bot: {message}", file=sys.stderr, flush=True)
+
+
+def die(message):
+    log(f"Error: {message}")
+    sys.exit(1)
+
+
+def format_duration(seconds):
+    total = max(0, int(seconds))
+    hours, rest = divmod(total, 3600)
+    minutes, seconds = divmod(rest, 60)
+    if hours:
+        return f"{hours}h{minutes}m{seconds}s"
+    if minutes:
+        return f"{minutes}m{seconds}s"
+    return f"{seconds}s"
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        # Ctrl-C during startup. The shell convention for SIGINT is 128 + 2.
+        sys.exit(130)
+    except BrokenPipeError:
+        null_descriptor = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(null_descriptor, sys.stdout.fileno())
+        sys.exit(141)
