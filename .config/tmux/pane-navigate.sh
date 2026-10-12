@@ -52,6 +52,11 @@ fi
 tmux_at_edge=$(tmux display-message -p "$tmux_at_edge_format")
 
 if [ "$tmux_at_edge" = "1" ]; then
+    # Without `wezterm` on `PATH`, for example on a host with no WezTerm,
+    # do nothing at the edge.
+    if ! command -v wezterm > /dev/null 2>&1; then
+        exit 0
+    fi
     # Inside tmux, `WEZTERM_PANE` and `WEZTERM_UNIX_SOCKET` keep the values
     # from the shell that started the tmux server. These values can point to a
     # closed pane, a pane in another tab, or an old WezTerm process. Without
