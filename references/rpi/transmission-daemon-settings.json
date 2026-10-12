@@ -17,7 +17,7 @@
     "cache-size-mb": 4,
     "default-trackers": "",
     "dht-enabled": false,
-    "download-dir": "/external/IPTorrents/",
+    "download-dir": "/external/torrents/",
     "download-limit": 100,
     "download-limit-enabled": 0,
     "download-queue-enabled": true,
@@ -87,7 +87,7 @@
     "upload-limit-enabled": 0,
     "upload-slots-per-torrent": 8,
     "utp-enabled": true,
-    "watch-dir": "/external/IPTorrents/",
+    "watch-dir": "/external/torrents/",
     "watch-dir-enabled": true,
     "watch-dir-force-generic": false
 }
