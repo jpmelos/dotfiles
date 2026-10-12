@@ -4,7 +4,7 @@
 
 [core]
     editor = nvim
-    pager = sh ~/bin/git_pager
+    pager = git_pager
 
 [interactive]
     diffFilter = delta --color-only
