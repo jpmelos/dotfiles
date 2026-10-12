@@ -10,96 +10,107 @@
 # /
 # / Usage: oc [options] [-- harness-args...]
 # / Options:
-# /   --profile <name>  Profile to run as. Selects the `~/.config/opencode-<name>`
-# /                     directory, with its own login, history, and
-# /                     credentials, and the `api_key`, `model`, `agent`,
-# /                     and `mcp_servers` of that profile in `~/config.json`
-# /                     (default: the organization directory of the project,
-# /                     such as `orgname` for `~/devel/orgname/project`, or
-# /                     the user name for a project directly under `~/devel`)
-# /   --channel <name>  OpenCode version to install in the image (default:
-# /                     `latest`). Accepts `latest` or a version such as
-# /                     `2.0.26`. The version is part of the image tag, so each
-# /                     version gets its own image, and a switch to another
-# /                     version builds that image. The image of `latest` is
-# /                     rebuilt once a day. The image of a version is not,
-# /                     because a version names one release.
-# /   --process-output  Capture and process output (requires a headless `run`
-# /                     with `--format json` in harness args)
-# /   --force-rebuild   Rebuild the Docker image even if it is up to date. The
-# /                     build runs without cache, because a cached build would
-# /                     install the same release again
+# /   --profile <name>  Profile to run as. Selects the
+# /                     `~/.config/opencode-<name>` directory, with its own
+# /                     login, history, and credentials, and the `api_key`,
+# /                     `model`, `agent`, and `mcp_servers` of that profile
+# /                     in `~/config.json` (default: the organization
+# /                     directory of the project, such as `orgname` for
+# /                     `~/devel/orgname/project`, or the user name for a
+# /                     project directly under `~/devel`)
+# /   --channel <name>  OpenCode version to install in the image
+# /                     (default: `latest`). Accepts `latest` or a version
+# /                     such as `2.0.26`. The version is part of the image
+# /                     tag, so each version gets its own image, and a
+# /                     switch to another version builds that image. The
+# /                     image of `latest` is rebuilt once a day. The image
+# /                     of a version is not, because a version names one
+# /                     release.
+# /   --process-output  Capture and process output (requires a headless
+# /                     `run` with `--format json` in harness args)
+# /   --force-rebuild   Rebuild the Docker image even if it is up to date.
+# /                     The build runs without cache, because a cached
+# /                     build would install the same release again
 # /   --no-rebuild      Skip rebuilding image even if outdated
 # /   --allow-stale     If build fails, use existing image (fatal if none
 # /                     exists)
 # /   --no-docker-socket
-# /                     Do not mount the host Docker socket into the container
-# /   --add-volume <source>:<target>[:rw]
+# /                     Do not mount the host Docker socket into the
+# /                     container
+# /   --add-volume <path>[:rw] | <source>:<target>[:rw]
 # /                     Mount an extra host directory into the container.
-# /                     Repeat the option for each directory. The source must
-# /                     be an absolute path to a real directory that you own.
-# /                     Links resolve before the mount, and a link as source
-# /                     fails. The target must be an absolute container path
-# /                     outside of the fixed mounts. Append `:rw` for
-# /                     read-write, otherwise the mount is read-only.
+# /                     Repeat the option for each directory. A single path
+# /                     uses the same value for source and target. The
+# /                     source must be an absolute path to a real directory
+# /                     that you own. Links resolve before the mount, and a
+# /                     link as source fails. The target must be an absolute
+# /                     container path outside of the fixed mounts, or `~`
+# /                     or `~/...`, which resolves to the home directory
+# /                     like on the host. Append `:rw` for read-write,
+# /                     otherwise the mount is read-only.
 # /   --verbose         Print the Docker command before running it
 # /   --help, -h        Show this help
 # /
 # / Harness arguments:
-# /   Without harness arguments, the launcher runs the interactive OpenCode
-# /   interface from a fresh session with no tabs, with `--standalone` for a
-# /   private server inside the container. Anything else runs
-# /   headless through `run`: the launcher puts
-# /   `run --standalone` before the arguments, plus `--model` with the `model`
-# /   of the profile and `--agent` with the `agent` of the profile, if any.
-# /   File tools may read or edit anywhere inside the container: the profile
-# /   `opencode.json` allows every `external_directory` request, and the host
-# /   trees the container sees read-write are `~/devel` and the read-write
+# /   Without harness arguments, the launcher runs the interactive
+# /   OpenCode interface from a fresh session with no tabs, with
+# /   `--standalone` for a private server inside the container. Anything
+# /   else runs headless through `run`: the launcher puts
+# /   `run --standalone` before the arguments, plus `--model` with the
+# /   `model` of the profile and `--agent` with the `agent` of the
+# /   profile, if any. File tools may read or edit anywhere inside the
+# /   container: the profile `opencode.json` allows
+# /   every `external_directory` request, and the host trees the
+# /   container sees read-write are `~/devel` and the read-write
 # /   `--add-volume` mounts.
-# /   A `--model`, `--agent`, `--standalone`, or `--server` that you pass wins.
-# /   A first argument that names another subcommand (`serve`, `auth`, `mcp`,
-# /   and the rest) passes through verbatim, except that `run` still gets
-# /   `--standalone`, `--model`, and `--agent` as above. A prompt that starts
-# /   with one of those words needs an explicit `run` first.
+# /   A `--model`, `--agent`, `--standalone`, or `--server` that you pass
+# /   wins. A first argument that names another subcommand (`serve`,
+# /   `auth`, `mcp`, and the rest) passes through verbatim, except that
+# /   `run` still gets `--standalone`, `--model`, and `--agent` as above.
+# /   A prompt that starts with one of those words needs an explicit
+# /   `run` first.
 # /
 # / Projects:
-# /   A project is a directory that `list_project_dirs` reports. The current
-# /   directory can be the project root or any directory below it. Both cases
-# /   behave the same: the profile comes from the root, and the container
-# /   starts in the root. If run from outside of `~/devel`, defaults to
-# /   ~/devel/dotfiles as the project. A run from a directory under `~/devel`
-# /   that is inside no project is an error. The default would start the
-# /   agent on the dotfiles repository, where it can edit the scripts that run
-# /   on the host, and a `.list_project_dirs_ignore` file asks for the
-# /   opposite. `~/devel`, every project, and every directory between the two
-# /   must be real directories, not links. The container sees `~/devel`
-# /   through one mount, and a link whose target is outside of that mount
-# /   does not resolve inside it. The launcher refuses to start when it finds
+# /   A project is a directory that `list_project_dirs` reports. The
+# /   current directory can be the project root or any directory below
+# /   it. Both cases behave the same: the profile comes from the root,
+# /   and the container starts in the root. If run from outside of
+# /   `~/devel`, defaults to ~/devel/dotfiles as the project. A run from
+# /   a directory under `~/devel` that is inside no project is an error.
+# /   The default would start the agent on the dotfiles repository,
+# /   where it can edit the scripts that run on the host, and a
+# /   `.list_project_dirs_ignore` file asks for the opposite. `~/devel`,
+# /   every project, and every directory between the two must be real
+# /   directories, not links. The container sees `~/devel` through one
+# /   mount, and a link whose target is outside of that mount does not
+# /   resolve inside it. The launcher refuses to start when it finds
 # /   one.
 # /
 # / Project script:
-# /   When the project root holds a `jpenv-container.sh` file, the image build
-# /   runs it at the end. The script runs as the container user, in the home
-# /   directory of the image. The project is not visible to it. The script can
-# /   run `sudo` without a password. The build removes that permission after
-# /   the script, so the image does not allow `sudo`.
+# /   When the project root holds a `jpenv-container.sh` file, the image
+# /   build runs it at the end. The script runs as the container user, in
+# /   the home directory of the image. The project is not visible to it.
+# /   The script can run `sudo` without a password. The build removes
+# /   that permission after the script, so the image does not allow
+# /   `sudo`.
 # /
-# /   A project with a script gets its own image, named after the project. A
-# /   change to the script rebuilds that image, and the daily rebuild of the
-# /   channel applies to it as well.
+# /   A project with a script gets its own image, named after the
+# /   project. A change to the script rebuilds that image, and the daily
+# /   rebuild of the channel applies to it as well.
 # /
 # /   The file can be a link, such as one into another repository under
-# /   `~/devel`. The target must be a regular file under `~/devel` that you
-# /   own. The image holds the content of the target, and the container must
-# /   not see a file of the host that no mount exposes. The launcher refuses
-# /   to start when the file breaks one of these rules.
+# /   `~/devel`. The target must be a regular file under `~/devel` that
+# /   you own. The image holds the content of the target, and the
+# /   container must not see a file of the host that no mount exposes.
+# /   The launcher refuses to start when the file breaks one of these
+# /   rules.
 # /
 # / Configuration:
-# /   Reads an optional configuration file at `~/config.json` with API keys
-# /   and other configuration, through `jc get`. See `jc --help` for the
-# /   rules on the file. The profile directory `~/.config/opencode-<name>` must be a
-# /   real directory, not a link. The launcher refuses to start when it is
-# /   one.
+# /   Reads an optional configuration file at `~/config.json` with API
+# /   keys and other configuration, through `jc get`. See `jc --help`
+# /   for the rules on the file. The profile directory
+# /   `~/.config/opencode-<name>` must be a real directory, not a link.
+# /   The launcher refuses to start when it is one.
 # /
 # /   Configuration format:
 # /   ```
@@ -122,35 +133,36 @@
 # /   }
 # /   ```
 # /
-# /   Every key is optional. A profile without an entry in `profiles` is a
-# /   supported configuration. A detected profile without one only warns, and
-# /   only when the configuration file exists. An explicit `--profile` without
-# /   one is an error when the `~/.config/opencode-<name>` directory does not exist
+# /   Every key is optional. A profile without an entry in `profiles`
+# /   is a supported configuration. A detected profile without one
+# /   only warns, and only when the configuration file exists. An
+# /   explicit `--profile` without one is an error
+# /   when the `~/.config/opencode-<name>` directory does not exist
 # /   yet, because that is almost always a typo. To start a new profile
 # /   without an entry, create the directory first.
 # /
-# /   One key pays for the session. `api_key` is an OpenCode (Zen)
-# /   key: it funds models of the `opencode` provider through the Zen proxy.
-# /   Without it only the free Zen models are enabled.
-# /   With `model`, the launcher passes it to `run` with
-# /   `--model` and writes it into the profile `opencode.json`, so the
-# /   interactive interface uses it too. Give the full reference in
-# /   `provider/model#variant` form, such as
+# /   One key pays for the session. `api_key` is an OpenCode (Zen) key:
+# /   it funds models of the `opencode` provider through the Zen proxy.
+# /   Without it only the free Zen models are enabled. With `model`, the
+# /   launcher passes it to `run` with `--model` and writes it into the
+# /   profile `opencode.json`, so the interactive interface uses it too.
+# /   Give the full reference in `provider/model#variant` form, such as
 # /   `anthropic/claude-opus-4-6#xhigh`. `agent` works the same way, with
-# /   `--agent` and `default_agent`. Without `mcp_servers`, the profile keeps
-# /   the `mcp.servers` object of the origin file.
+# /   `--agent` and `default_agent`. Without `mcp_servers`, the profile
+# /   keeps the `mcp.servers` object of the origin file.
 # /
-# /   The `mcp_servers` object of a profile replaces the `mcp.servers` object
-# /   in the profile `opencode.json`. The profile `AGENTS.md` loads as the
-# /   global instructions file. Project configurations stay disabled
-# /   (`OPENCODE_CONFIG_PROJECT_DISABLE=1`), so the profile is the only
-# /   configuration source, like `--setting-sources=user` for Claude Code.
+# /   The `mcp_servers` object of a profile replaces the `mcp.servers`
+# /   object in the profile `opencode.json`. The profile `AGENTS.md`
+# /   loads as the global instructions file. Project configurations stay
+# /   disabled (`OPENCODE_CONFIG_PROJECT_DISABLE=1`), so the profile is
+# /   the only configuration source, like `--setting-sources=user` for
+# /   Claude Code.
 # /
-# /   An `OPENCODE_API_KEY` variable in the environment takes precedence over
-# /   the `api_key` of the profile. The launcher names the source of
+# /   An `OPENCODE_API_KEY` variable in the environment takes precedence
+# /   over the `api_key` of the profile. The launcher names the source of
 # /   the key when it comes from the environment, and warns when both are
-# /   present, because the account of the environment key pays for
-# /   the session.
+# /   present, because the account of the environment key pays for the
+# /   session.
 # /
 # / Environment:
 # /   The launcher reads these variables of the host:
@@ -162,12 +174,12 @@
 # /                      name that the launcher or the image sets for the
 # /                      container is skipped with a warning.
 # /   RIPGREP_CONFIG_PATH
-# /                      The options file of ripgrep. Relayed when the file is
-# /                      under `~/devel`, where the container can read it.
-# /                      Otherwise the container does not get it, and a
-# /                      warning says so.
-# /   DOCKER_HOST        The daemon of the host. A Unix socket is mounted into
-# /                      the container. See `Security`.
+# /                      The options file of ripgrep. Relayed when the
+# /                      file is under `~/devel`, where the container can
+# /                      read it. Otherwise the container does not get it,
+# /                      and a warning says so.
+# /   DOCKER_HOST        The daemon of the host. A Unix socket is mounted
+# /                      into the container. See `Security`.
 # /   TZ                 The time zone of the container. Without it, the
 # /                      launcher reads the zone from `/etc/localtime` or
 # /                      `/etc/timezone`, and leaves it unset when neither
@@ -178,94 +190,100 @@
 # /   The container runs read-only, with an explicit list of mounts. This
 # /   limits mistakes. It is not a security boundary.
 # /
-# /   By default the host Docker socket is mounted and the container joins
-# /   the group of the socket file, and on macOS also group 0, which owns the
-# /   socket inside the Docker Desktop virtual machine. Any process in the
-# /   container can then start a privileged container and take control of the
-# /   host. Use `--no-docker-socket` for repositories that you do not trust.
-# /   Docker is then unavailable inside the container.
+# /   By default the host Docker socket is mounted and the container
+# /   joins the group of the socket file, and on macOS also group 0,
+# /   which owns the socket inside the Docker Desktop virtual machine.
+# /   Any process in the container can then start a privileged container
+# /   and take control of the host. Use `--no-docker-socket` for
+# /   repositories that you do not trust. Docker is then unavailable
+# /   inside the container.
 # /
-# /   The dotfiles repository holds the scripts that the agent calls and the
-# /   `.opencode-origin` directory that every run copies into the profile. When
-# /   the project is not the dotfiles repository, the container sees that
-# /   repository read-only, so the agent cannot change the origin. The
-# /   launcher warns when `~/.opencode-origin` resolves into `~/devel` but
-# /   outside of that repository, because the `~/devel` mount is read-write
-# /   there. An origin outside of `~/devel` is not visible in the container.
-# /   The copy overwrites the files that the origin holds, and it mirrors the
-# /   directories that the origin holds, so a file that the agent adds to
-# /   `skills` does not survive the next run. A top-level entry
-# /   that an earlier run installed and that the origin no longer holds is
-# /   removed. The list of installed entries lives in
-# /   `~/.oc-launcher/<profile>/manifest`, which no mount exposes, so the
-# /   agent cannot make a run remove another entry. The lock that makes two
-# /   launches of a profile take turns lives next to it, so the agent cannot
-# /   stall a launch from inside the container. The rest of the profile
-# /   directory is not touched. The `learn` skill writes to the origin, so
-# /   it works only from the dotfiles project.
+# /   The dotfiles repository holds the scripts that the agent calls and
+# /   the `.opencode-origin` directory that every run copies into the
+# /   profile. When the project is not the dotfiles repository, the
+# /   container sees that repository read-only, so the agent cannot
+# /   change the origin. The launcher warns when `~/.opencode-origin`
+# /   resolves into `~/devel` but outside of that repository, because
+# /   the `~/devel` mount is read-write there. An origin outside of
+# /   `~/devel` is not visible in the container. The copy overwrites
+# /   the files that the origin holds, and it mirrors
+# /   the directories that the origin holds, so a file that the agent
+# /   adds to `skills` does not survive the next run. A top-level entry
+# /   that an earlier run installed and that the origin no longer holds
+# /   is removed. The list of installed entries lives in
+# /   `~/.oc-launcher/<profile>/manifest`, which no mount exposes, so
+# /   the agent cannot make a run remove another entry. The lock that
+# /   makes two launches of a profile take turns lives next to it, so
+# /   the agent cannot stall a launch from inside the container. The
+# /   rest of the profile directory is not touched. The `learn` skill
+# /   writes to the origin, so it works only from the dotfiles project.
 # /
 # /   The container is limited to a number of processes and an amount of
-# /   memory, so a runaway subprocess or a browser cannot take the host down.
-# /   The limits are the `CONTAINER_PIDS_LIMIT` and `CONTAINER_MEMORY_LIMIT`
-# /   constants in this script.
+# /   memory, so a runaway subprocess or a browser cannot take the host
+# /   down. The limits are the `CONTAINER_PIDS_LIMIT` and
+# /   `CONTAINER_MEMORY_LIMIT` constants in this script.
 # /
-# /   The mirror applies to every directory in the origin. `cli.json` in the
-# /   origin sets the interface keybinds; edits made inside the interface
-# /   itself do not survive the next run, like every other origin file.
+# /   The mirror applies to every directory in the origin. `cli.json` in
+# /   the origin sets the interface keybinds; edits made inside the
+# /   interface itself do not survive the next run, like every other
+# /   origin file.
 # /
 # /   When the project is the dotfiles repository, the agent can edit the
 # /   scripts that run on the host, such as `bin/oc`, `bin/jc`,
-# /   `bin/list_project_dirs`, and `bin/pane-state-sync`. The next launch runs
-# /   that code as you.
-# /   `--no-docker-socket` does not close this path. Run an agent on the
-# /   dotfiles repository only when you trust it.
+# /   `bin/list_project_dirs`, and `bin/pane-state-sync`. The next launch
+# /   runs that code as you. `--no-docker-socket` does not close this
+# /   path. Run an agent on the dotfiles repository only when you trust
+# /   it.
 # /
-# /   The `~/devel` mount is read-write, and file tools may reach all of it,
-# /   so the agent can edit every repository under `~/devel`, not only the
-# /   project. Only the dotfiles repository is read-only. Move a repository
-# /   that the agent must not touch out of `~/devel`. Each `--add-volume`
-# /   mount exposes one more host directory to the agent. The mount is
-# /   read-only unless it ends in `:rw`. The launcher mounts the resolved
-# /   source. It refuses a source that is a link. It refuses a source that is
-# /   not a directory that you own. It refuses a target that overlaps a fixed
-# /   mount or a system path. It refuses a source that exposes the launcher
-# /   state. It refuses a read-write source that exposes the dotfiles
-# /   repository outside of its read-only mount.
+# /   The `~/devel` mount is read-write, and file tools may reach all of
+# /   it, so the agent can edit every repository under `~/devel`, not
+# /   only the project. Only the dotfiles repository is read-only. Move
+# /   a repository that the agent must not touch out of `~/devel`. Each
+# /   `--add-volume` mount exposes one more host directory to the agent.
+# /   The mount is read-only unless it ends in `:rw`. The launcher
+# /   mounts the resolved source. It refuses a source that is a link. It
+# /   refuses a source that is not a directory that you own. It refuses
+# /   a target that overlaps a fixed mount or a system path. It refuses
+# /   a source that exposes the launcher state. It refuses a read-write
+# /   source that exposes the dotfiles repository outside of its
+# /   read-only mount.
 # /
-# /   The image build runs the `jpenv-container.sh` file of the project. A
-# /   cloned repository can commit one, and the agent can write one into any
-# /   project under `~/devel`. The script cannot reach the host, but it
-# /   controls the image that the agent of that project runs in.
-# /   `--no-docker-socket` does not change that. Read the file before you
-# /   launch on a repository that you do not trust.
+# /   The image build runs the `jpenv-container.sh` file of the project.
+# /   A cloned repository can commit one, and the agent can write one
+# /   into any project under `~/devel`. The script cannot reach the
+# /   host, but it controls the image that the agent of that project
+# /   runs in. `--no-docker-socket` does not change that. Read the file
+# /   before you launch on a repository that you do not trust.
 # /
-# /   The host directory `/tmp/oc-<user>/<profile>` is mounted at the same path
-# /   in every container of the profile, so these containers share it. It holds
-# /   the data, state, and cache directories of the tools in the image, which
-# /   the `XDG_DATA_HOME`, `XDG_STATE_HOME`, `XDG_CACHE_HOME`, and
-# /   `npm_config_cache` variables name, and the directory
-# /   that the `AGENT_SHARED_DIR` variable names, where the hook scripts write.
-# /   Only you can read those. The hooks see tool input and output, which can
-# /   hold secrets from the session.
+# /   The host directory `/tmp/oc-<user>/<profile>` is mounted at the
+# /   same path in every container of the profile, so these containers
+# /   share it. It holds the data, state, and cache directories of the
+# /   tools in the image, which the `XDG_DATA_HOME`, `XDG_STATE_HOME`,
+# /   `XDG_CACHE_HOME`, and `npm_config_cache` variables name, and the
+# /   directory that the `AGENT_SHARED_DIR` variable names, where the
+# /   hook scripts write. Only you can read those. The hooks see tool
+# /   input and output, which can hold secrets from the session.
 # /
 # / tmux:
 # /   The `pane-state` and `chime` scripts write below
-# /   `/tmp/tmux-pane-states-<user>`, and `pane-state-sync` reads there. Each
-# /   user of the machine has a private directory, named after the user, right
-# /   below `/tmp`. Two users can have a pane with the same tmux target, so the
-# /   states of one user must not reach the tmux server of another. The
-# /   directory has no shared parent other than `/tmp`, whose owner is `root`,
-# /   so no other user can rename or replace it. The container always gets the
-# /   directory of the user at the same path, and the `TMUX_PANE_STATES_DIR`
-# /   variable names it. Every profile uses that one directory, so a pane has
-# /   one state file. When the launcher runs inside tmux, the container also
-# /   gets the `TMUX_PANE` variable. The `plugins/pane-state.js` plugin calls
-# /   the `running`, `ready`, and `default` scripts to mark the pane that runs
-# /   the agent, like the `hooks` in `.claude-origin/settings.json` do for
-# /   Claude Code, and `ready` requests the notification chime. The
-# /   `pane-state-sync` script on the host picks both up. Outside tmux the
-# /   variable is absent, and these scripts do nothing. A reaper clears the
-# /   pane to `default` when the container exits, whatever the ending is.
+# /   `/tmp/tmux-pane-states-<user>`, and `pane-state-sync` reads there.
+# /   Each user of the machine has a private directory, named after the
+# /   user, right below `/tmp`. Two users can have a pane with the same
+# /   tmux target, so the states of one user must not reach the tmux
+# /   server of another. The directory has no shared parent other than
+# /   `/tmp`, whose owner is `root`, so no other user can rename or
+# /   replace it. The container always gets the directory of the user at
+# /   the same path, and the `TMUX_PANE_STATES_DIR` variable names it.
+# /   Every profile uses that one directory, so a pane has one state
+# /   file. When the launcher runs inside tmux, the container also gets
+# /   the `TMUX_PANE` variable. The `plugins/pane-state.js` plugin calls
+# /   the `running`, `ready`, and `default` scripts to mark the pane
+# /   that runs the agent, like the `hooks`
+# /   in `.claude-origin/settings.json` do for Claude Code, and `ready`
+# /   requests the notification chime. The `pane-state-sync` script on
+# /   the host picks both up. Outside tmux the variable is absent, and
+# /   these scripts do nothing. A reaper clears the pane to `default`
+# /   when the container exits, whatever the ending is.
 
 import contextlib
 import datetime
@@ -1192,7 +1210,9 @@ def resolve_opencode_api_key(profile_config, profile):
     )
 
 
-def resolve_configured_key(profile_config, profile, *, field, env_var, label, empty_log):
+def resolve_configured_key(
+    profile_config, profile, *, field, env_var, label, empty_log
+):
     key = profile_config.get(field)
     if key is None:
         key = ""
@@ -2300,10 +2320,7 @@ def build_harness_args(user_harness_args, model, agent):
     # flags.
     if not user_harness_args:
         return ["--standalone"]
-    if (
-        user_harness_args[0] in OPENCODE_SUBCOMMANDS
-        and user_harness_args[0] != "run"
-    ):
+    if user_harness_args[0] in OPENCODE_SUBCOMMANDS and user_harness_args[0] != "run":
         return list(user_harness_args)
     rest = user_harness_args[1:] if user_harness_args[0] == "run" else user_harness_args
 
@@ -2734,27 +2751,44 @@ def resolve_extra_volumes(raw_specs, paths, profile_paths, project_root):
 
 
 def parse_add_volume_spec(spec, paths, profile_paths, project_root):
-    # Parse one `<source>:<target>[:rw]` spec. A path with `:` has no
+    # Parse one `<path>[:rw]` or `<source>:<target>[:rw]` spec. A single path
+    # uses the same value for source and target. A path with `:` has no
     # representation here, because `:` splits the fields.
     parts = spec.split(":")
-    if len(parts) == 2:
+    if len(parts) == 1:
+        raw_source, raw_target = parts[0], parts[0]
+        read_only = True
+        single_path = True
+    elif len(parts) == 2 and parts[1] == "rw":
+        raw_source, raw_target = parts[0], parts[0]
+        read_only = False
+        single_path = True
+    elif len(parts) == 2:
         raw_source, raw_target = parts
         read_only = True
+        single_path = False
     elif len(parts) == 3 and parts[2] == "rw":
         raw_source, raw_target = parts[0], parts[1]
         read_only = False
+        single_path = False
     else:
-        die(
-            f"--add-volume {spec!r} must be `<source>:<target>` or "
-            "`<source>:<target>:rw`"
-        )
+        die(f"--add-volume {spec!r} must be `<path>[:rw]` or `<source>:<target>[:rw]`")
     if not raw_source or not raw_target:
         die(f"--add-volume {spec!r} needs a non-empty source and target")
     for field_value in (raw_source, raw_target):
         if "\0" in field_value:
             die(f"--add-volume {spec!r} must not hold a NUL byte")
+    # A single path uses the same value for source and target, so a leading
+    # `~` expands in both. Otherwise only the target allows it.
+    if single_path and (raw_source == "~" or raw_source.startswith("~/")):
+        raw_source = paths.home + raw_source[1:]
     if not os.path.isabs(raw_source):
         die(f"--add-volume {spec!r} source must be an absolute path")
+    # A leading `~` in the target resolves to the home directory, like on
+    # the host. The container home is the host home, so the same value works
+    # in both places.
+    if raw_target == "~" or raw_target.startswith("~/"):
+        raw_target = paths.home + raw_target[1:]
     if not os.path.isabs(raw_target):
         die(f"--add-volume {spec!r} target must be an absolute path")
     target = os.path.normpath(raw_target)
@@ -2819,10 +2853,13 @@ def check_add_volume_target(spec, target, paths, profile_paths):
     for binary in AGENT_BINARIES:
         reserved_targets.append(os.path.normpath(f"/usr/local/bin/{binary}"))
     for reserved in reserved_targets:
-        if target == reserved or is_below(target, reserved) or is_below(reserved, target):
+        if (
+            target == reserved
+            or is_below(target, reserved)
+            or is_below(reserved, target)
+        ):
             die(
-                f"--add-volume {spec!r} target {target} overlaps fixed mount "
-                f"{reserved}"
+                f"--add-volume {spec!r} target {target} overlaps fixed mount {reserved}"
             )
     for prefix in EXTRA_VOLUME_RESERVED_PREFIXES:
         if target == prefix or is_below(target, prefix):
@@ -2838,7 +2875,9 @@ def check_add_volume_dotfiles(spec, source, paths, project_root, read_only):
     dotfiles = paths.resolved_dotfiles_dir
     if source == dotfiles or is_below(source, dotfiles) or is_below(dotfiles, source):
         if not read_only:
-            die(f"--add-volume {spec!r} touches the dotfiles repository, must be read-only")
+            die(
+                f"--add-volume {spec!r} touches the dotfiles repository, must be read-only"
+            )
 
 
 def check_add_volume_state(spec, source, profile_paths):
@@ -3240,7 +3279,9 @@ def parse_print_output(output):
             if isinstance(message, str) and message:
                 error_message = message
             else:
-                error_message = json.dumps(error) if error is not None else "unknown error"
+                error_message = (
+                    json.dumps(error) if error is not None else "unknown error"
+                )
     if not saw_event:
         raise ValueError("harness output holds no events")
 
