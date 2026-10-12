@@ -34,10 +34,23 @@ Download the latest Neovim from GitHub and copy it onto Raspberry Pi, into
 `~/apps`.
 
 ```
+cd ~/apps
 tar -xzf nvim.tar.gz
 rm nvim.tar.gz
 cd ~/bin
 ln -s ../apps/nvim-linux-arm64/bin/nvim nvim
+```
+
+Download the latest Crystal compiler from GitHub and copy it onto Raspberry Pi,
+into `~/apps`.
+
+```
+cd ~/apps
+tar -xzf crystal.tar.gz --strip-components=1
+rm crystal.tar.gz
+cd ~/bin
+ln -s ../apps/nvim-linux-arm64/bin/crystal crystal
+ln -s ../apps/nvim-linux-arm64/bin/shards shards
 ```
 
 ## 3. Sign In to 1Password
