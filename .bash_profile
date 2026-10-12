@@ -33,7 +33,6 @@ export PATH
 ################################
 
 export TERMINFO_DIRS=$HOME/.local/share/terminfo:$TERMINFO_DIRS
-export TERM="wezterm"
 
 ################################
 #                              #
