@@ -83,6 +83,9 @@ DOWNLOAD_ID = "statement.csv"
 SESSION_ID = "bmo_session.json"
 TOKEN_ID = "questrade_refresh_token.txt"
 SCREENSHOT_ID = "browser-error.png"
+# When the last run finished, as an ISO timestamp. Other tasks read it to
+# check whether this task ran today.
+LAST_RUN_ID = "last_run.json"
 # How many new transactions the chat report lists before it summarizes.
 REPORT_LINE_LIMIT = 60
 
@@ -160,8 +163,10 @@ def run(ctx, args=None):
         upload=not no_upload,
     )
     if not matched:
+        record_last_run(ctx)
         return "Done, preview only. YNAB unchanged."
     summary = f"Done: {added_count} added, {cleared_count} cleared."
+    record_last_run(ctx)
     return summary
 
 
@@ -316,6 +321,17 @@ def resolve_state_files(ctx):
         screenshot_file=ctx.state_path(SCREENSHOT_ID),
         questrade_token_file=ctx.state_path(TOKEN_ID),
     )
+
+
+def record_last_run(ctx):
+    # Stores when this run finished, so other tasks can check whether this
+    # task ran today. A failure to store only warns, so it never fails a
+    # run that already synced.
+    stamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    try:
+        ctx.save_state(LAST_RUN_ID, {"last_run": stamp})
+    except Exception as error:
+        ctx.log(f"Warning: cannot save {LAST_RUN_ID}: {error}")
 
 
 # --------------------------------------------------------------------------------------

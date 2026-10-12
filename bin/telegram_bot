@@ -205,8 +205,10 @@ def main(
       A mismatch asks again within the same wait. A timeout stops the task
       and runs shutdown with reason timeout. ctx.load_state, ctx.save_state,
       ctx.state_path, ctx.delete_state and ctx.list_states manage files at
-      STATE_DIR/tasks/<task>/<id>. ctx.check raises when the task must stop.
-      ctx.log writes to the bot log.
+      STATE_DIR/tasks/<task>/<id>. ctx.load_state and ctx.list_states take
+      an optional task_name to read another task's state; tasks can read
+      each other's states but only write their own. ctx.check raises when
+      the task must stop. ctx.log writes to the bot log.
 
     \b
     Task dependencies:
@@ -1184,8 +1186,9 @@ class TaskContext:
                     record.pending = None
                     bot.cond.notify_all()
 
-    def load_state(self, identifier, default=None):
-        raw = self._bot.store.load(self._record.name, identifier, default=None)
+    def load_state(self, identifier, default=None, task_name=None):
+        target = self._resolve_state_task(task_name)
+        raw = self._bot.store.load(target, identifier, default=None)
         return default if raw is None else raw
 
     def save_state(self, identifier, data):
@@ -1197,8 +1200,21 @@ class TaskContext:
     def delete_state(self, identifier):
         return self._bot.store.delete(self._record.name, identifier)
 
-    def list_states(self):
-        return self._bot.store.list(self._record.name)
+    def list_states(self, task_name=None):
+        return self._bot.store.list(self._resolve_state_task(task_name))
+
+    def _resolve_state_task(self, task_name):
+        # Returns the task whose state a read targets: the running task when
+        # task_name is None, else the named task. Writes always target the
+        # running task, so a task can read another task's state but never
+        # write it.
+        if task_name is None:
+            return self._record.name
+        if not isinstance(task_name, str) or not TASK_NAME_PATTERN.fullmatch(
+            task_name
+        ):
+            raise ValueError(f"invalid task name {task_name!r}")
+        return task_name
 
     def _check(self):
         if self._in_shutdown:
