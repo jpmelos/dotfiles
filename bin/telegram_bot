@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["click>=8.1,<9"]
+# dependencies = ["click>=8.1,<9", "croniter>=6,<7"]
 # ///
 
 # vim: ft=python
@@ -10,6 +10,7 @@
 
 import ast
 import asyncio
+import datetime
 import inspect
 import importlib.util
 import json
@@ -29,16 +30,20 @@ import urllib.request
 from dataclasses import dataclass
 
 import click
+from croniter import croniter
 
 TASK_NAME_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
 # Telegram refuses messages past 4096 characters. Chunks stay below that.
 SEND_CHUNK_LIMIT = 4000
-RESULT_PREVIEW_LIMIT = 3500
 ERROR_PREVIEW_LIMIT = 500
 # Update types that can carry a reply or a command.
 MESSAGE_KEYS = ("message", "edited_message")
 # Shutdown reasons passed to the shutdown hook.
 REASONS = ("done", "error", "timeout", "cancelled", "shutdown")
+# File name of the schedule state in the state directory.
+SCHEDULE_STATE_FILENAME = "schedule_state.json"
+# A bad SCHEDULE warns at most once per task per hour, so the log stays quiet.
+SCHEDULE_WARN_INTERVAL = 3600.0
 
 
 # --------------------------------------------------------------------------------------
@@ -147,6 +152,14 @@ REASONS = ("done", "error", "timeout", "cancelled", "shutdown")
         "backlog is discarded. Zero discards all backlog."
     ),
 )
+@click.option(
+    "--schedule-interval",
+    type=click.FloatRange(1.0, 3600.0),
+    default=5.0,
+    show_default=True,
+    metavar="S",
+    help="Seconds between schedule checks for periodic tasks.",
+)
 def main(
     tasks_dir,
     state_dir,
@@ -159,6 +172,7 @@ def main(
     heartbeat_url,
     heartbeat_interval,
     recent_window,
+    schedule_interval,
 ):
     """Run a Telegram bot that starts tasks and relays their questions to you.
 
@@ -178,7 +192,8 @@ def main(
       letters, digits, _ and -. Files that start with _ or . are ignored.
       The bot loads the file fresh on every /run, so edits apply to the
       next run without a restart. A task module may define NAME,
-      DESCRIPTION, TIMEOUT, run and shutdown. run is required as run(ctx)
+      DESCRIPTION, TIMEOUT, SCHEDULE, SCHEDULE_ARGS, run and shutdown.
+      run is required as run(ctx)
       or run(ctx, args) and may be async. shutdown is optional as
       shutdown(ctx) or shutdown(ctx, reason) and runs once after every
       outcome: done, error, timeout, cancelled or shutdown.
@@ -200,6 +215,19 @@ def main(
       venv per task on every run, and the task imports them normally. The
       bot itself holds no task dependency. `uv` must be on PATH when a
       task declares any.
+
+    \b
+    Scheduling:
+      A task file may set SCHEDULE to a crontab string with five fields,
+      such as "0 9 * * *" for 09:00 every day (minute, hour, day of
+      month, month, day of week, local time). The bot checks every
+      --schedule-interval seconds and auto-starts each due task with
+      SCHEDULE_ARGS as its args. Only one task runs at a time, so a due
+      task waits for the running one to finish. Missed executions never
+      burst: a task runs at most once per check no matter how many ticks
+      it skipped. A manual /run counts as an execution. Only failures
+      reach the chat: scheduled runs report failures to the first
+      allowlisted chat, while successful runs stay silent.
 
     \b
     Polling:
@@ -228,6 +256,7 @@ def main(
             heartbeat_url=heartbeat_url,
             heartbeat_interval=heartbeat_interval,
             recent_window=recent_window,
+            schedule_interval=schedule_interval,
         )
         exit_status = bot.serve()
     except KeyboardInterrupt:
@@ -752,6 +781,104 @@ def read_task_dependencies(path):
     return []
 
 
+def read_task_schedule(path):
+    # Returns the (SCHEDULE, SCHEDULE_ARGS) pair of the task file. SCHEDULE
+    # is a crontab string such as "0 9 * * *", or None when the file defines
+    # none. SCHEDULE_ARGS holds the words passed to run on scheduled runs.
+    # Read from the syntax tree, so no task code runs. Raises TaskLoadError
+    # on a malformed value.
+    try:
+        with open(path, encoding="utf-8") as handle:
+            tree = ast.parse(handle.read(), filename=path)
+    except (OSError, SyntaxError, ValueError) as error:
+        raise TaskLoadError(f"cannot read {path}: {error}") from error
+    expr = None
+    args = []
+    for node in tree.body:
+        if not (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id in ("SCHEDULE", "SCHEDULE_ARGS")
+        ):
+            continue
+        if node.targets[0].id == "SCHEDULE":
+            if isinstance(node.value, ast.Constant) and isinstance(
+                node.value.value, str
+            ):
+                expr = node.value.value.strip() or None
+            else:
+                raise TaskLoadError(f"task file {path} has bad SCHEDULE")
+        else:
+            if not isinstance(node.value, (ast.List, ast.Tuple)):
+                raise TaskLoadError(f"task file {path} has bad SCHEDULE_ARGS")
+            entries = []
+            for element in node.value.elts:
+                if not isinstance(element, ast.Constant) or not isinstance(
+                    element.value, str
+                ):
+                    raise TaskLoadError(f"task file {path} has bad SCHEDULE_ARGS")
+                entries.append(element.value)
+            args = entries
+    return expr, args
+
+
+def read_schedule_state(path):
+    # Returns the {task name: last dispatch epoch} map in path, or an empty
+    # map when the file is missing or broken. A broken file only warns, so
+    # the bot still starts and re-baselines every schedule.
+    try:
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError) as error:
+        log(f"Warning: cannot read {path}: {error}. Starting with no schedule state.")
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    state = {}
+    for name, value in data.items():
+        if not isinstance(name, str) or not TASK_NAME_PATTERN.fullmatch(name):
+            continue
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            continue
+        if value > 0:
+            state[name] = float(value)
+    return state
+
+
+def write_schedule_state(path, state):
+    # Atomically stores the schedule state. Raises OSError on failure. The
+    # caller logs and goes on, so persistence never stops the bot.
+    raw = (json.dumps(state, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
+    descriptor, temp_path = tempfile.mkstemp(
+        dir=os.path.dirname(path), prefix=".schedule-"
+    )
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(raw)
+            handle.flush()
+            os.fsync(handle.fileno())
+            os.fchmod(handle.fileno(), 0o600)
+        os.replace(temp_path, path)
+    except BaseException:
+        try:
+            os.remove(temp_path)
+        except OSError:
+            pass
+        raise
+
+
+def cron_next_after(expr, after_epoch):
+    # Returns the epoch of the first crontab time of expr strictly after
+    # after_epoch. Times follow the local timezone. Raises on a bad expr.
+    tz = datetime.datetime.now().astimezone().tzinfo
+    base = datetime.datetime.fromtimestamp(after_epoch, tz=tz)
+    return croniter(expr, base).get_next(datetime.datetime).timestamp()
+
+
 # Seconds for the `uv` calls that build the task venv. Installing happens in
 # the worker thread, so a slow index never blocks command handling.
 UV_VENV_TIMEOUT = 120.0
@@ -1111,6 +1238,7 @@ class Bot:
         heartbeat_url=None,
         heartbeat_interval=300.0,
         recent_window=30.0,
+        schedule_interval=5.0,
     ):
         self.api = TelegramApi(token)
         self.allowed_chats = list(allowed_chats)
@@ -1123,6 +1251,14 @@ class Bot:
         self.heartbeat_url = heartbeat_url
         self.heartbeat_interval = heartbeat_interval
         self.recent_window = recent_window
+        self.schedule_interval = schedule_interval
+        self.schedule_state_path = os.path.join(
+            self.store.base_dir, SCHEDULE_STATE_FILENAME
+        )
+        # Last dispatch epoch per task, for manual and scheduled runs alike.
+        self.schedule_last = {}
+        # Monotonic time of the last bad-schedule warning per task.
+        self.schedule_warned_at = {}
         self.poll_state_path = os.path.join(self.store.base_dir, "poll_state.json")
         # Last saved offset, the first update identifier still wanted at the
         # time of the save. None when nothing was saved yet.
@@ -1162,7 +1298,9 @@ class Bot:
             f"Allowing {len(self.allowed_chats)} chat(s). "
             "Polling Telegram for updates."
         )
+        self.load_schedule_state()
         self.start_heartbeat()
+        self.start_scheduler()
         self.send_heartbeat()
         backoff = 0
         try:
@@ -1460,10 +1598,16 @@ class Bot:
         lines = ["Tasks:"]
         for name in sorted(specs):
             spec = specs[name]
-            if spec.description:
-                lines.append(f"/run {name} - {spec.description}")
+            try:
+                expr, _args = read_task_schedule(spec.path)
+            except TaskLoadError:
+                suffix = " [bad schedule]"
             else:
-                lines.append(f"/run {name}")
+                suffix = f" [scheduled: {expr}]" if expr else ""
+            if spec.description:
+                lines.append(f"/run {name} - {spec.description}{suffix}")
+            else:
+                lines.append(f"/run {name}{suffix}")
         return "\n".join(lines)
 
     def status_text(self):
@@ -1487,10 +1631,50 @@ class Bot:
         lines = [f"Uptime: {uptime}", running_line]
         specs = discover_tasks(self.tasks_dir)
         lines.append(f"Tasks: {len(specs)} available")
+        lines.extend(self.scheduled_lines())
         if last_summary is not None and last_time is not None:
             age = format_duration(time.time() - last_time)
             lines.append(f"Last: {last_summary} ({age} ago)")
         return "\n".join(lines)
+
+    def scheduled_lines(self):
+        # One line per scheduled task with its next run, soonest first.
+        now = time.time()
+        specs = discover_tasks(self.tasks_dir)
+        with self.lock:
+            last_map = dict(self.schedule_last)
+        entries = []
+        for name in sorted(specs):
+            try:
+                expr, _args = read_task_schedule(specs[name].path)
+            except TaskLoadError:
+                entries.append((None, f"Scheduled: {name}: bad schedule"))
+                continue
+            if expr is None:
+                continue
+            last = last_map.get(name)
+            if last is None:
+                entries.append(
+                    (None, f"Scheduled: {name}: waits for the first tick ({expr})")
+                )
+                continue
+            try:
+                next_at = cron_next_after(expr, last)
+            except Exception:
+                entries.append((None, f"Scheduled: {name}: bad schedule ({expr})"))
+                continue
+            if next_at <= now:
+                entries.append((0.0, f"Scheduled: {name}: due now ({expr})"))
+            else:
+                entries.append(
+                    (
+                        next_at - now,
+                        f"Scheduled: {name}: in "
+                        f"{format_duration(next_at - now)} ({expr})",
+                    )
+                )
+        entries.sort(key=lambda item: (item[0] is None, item[0] or 0.0))
+        return [line for _key, line in entries]
 
     # -- running tasks ----------------------------------------------------
 
@@ -1536,9 +1720,12 @@ class Bot:
                 return
             record.thread = thread
             self.current = record
+            # A manual run counts as an execution, so a schedule never fires
+            # right after a manual run of the same task.
+            self.schedule_last[record.name] = time.time()
+        self.save_schedule_state()
         log(f"task {spec.name}: started by chat, budget {run_timeout:g}s")
         thread.start()
-        self.try_send(chat_id, f"Task {spec.display_name} started.")
 
     def handle_cancel(self, chat_id):
         with self.lock:
@@ -1582,12 +1769,9 @@ class Bot:
                 self.cond.notify_all()
                 expired = record
         if expired is not None:
+            # The failure report goes out when the worker finishes. The
+            # chat stays quiet until then.
             log(f"task {expired.name}: run budget exhausted")
-            self.try_send(
-                expired.chat_id,
-                f"Task {expired.display_name} used its time budget. "
-                "Stopping it.",
-            )
 
     def set_abort_locked(self, record, reason):
         if record.abort is None:
@@ -1636,7 +1820,7 @@ class Bot:
             module, shutdown_fn, _timeout = load_task_module(spec)
         except TaskLoadError as error:
             log(f"task {record.name}: {error}")
-            self.report(record, "error", None, str(error))
+            self.report(record, "error", str(error))
             with self.lock:
                 if self.current is record:
                     self.current = None
@@ -1651,14 +1835,11 @@ class Bot:
         record.phase = "running"
         ctx = TaskContext(self, record)
         outcome = "done"
-        result_text = None
         error_text = None
         try:
-            value = call_task_function(module.run, ctx, record.args)
+            call_task_function(module.run, ctx, record.args)
             with self.lock:
                 outcome = record.abort if record.abort is not None else "done"
-                if outcome == "done" and value is not None:
-                    result_text = str(value)
         except TaskTimeout:
             self.set_abort(record, "timeout")
             with self.lock:
@@ -1686,7 +1867,7 @@ class Bot:
             except Exception as error:
                 log(f"task {record.name}: shutdown hook failed: {error}")
                 traceback.print_exc()
-        self.report(record, outcome, result_text, error_text)
+        self.report(record, outcome, error_text)
         with self.lock:
             if self.current is record:
                 self.current = None
@@ -1714,16 +1895,11 @@ class Bot:
         sys.path.insert(0, site_packages)
         return site_packages
 
-    def report(self, record, outcome, result_text, error_text):
-        if outcome == "done":
-            if result_text:
-                text = (
-                    f"Task {record.display_name} finished:\n"
-                    + truncate(result_text, RESULT_PREVIEW_LIMIT)
-                )
-            else:
-                text = f"Task {record.display_name} finished."
-        elif outcome == "error":
+    def report(self, record, outcome, error_text):
+        # Only failures reach the chat: an error or a timeout always sends
+        # a message, while done, cancelled and shutdown stay silent. The
+        # log records every outcome, and /status still shows the last one.
+        if outcome == "error":
             detail = (error_text or "unknown error").splitlines()
             first_line = detail[0] if detail else "unknown error"
             text = (
@@ -1735,15 +1911,136 @@ class Bot:
                 f"Task {record.display_name} timed out after "
                 f"{format_duration(record.run_timeout)}. It was stopped."
             )
-        elif outcome == "cancelled":
-            text = f"Task {record.display_name} cancelled."
         else:
-            text = f"Task {record.display_name} stopped."
+            text = None
         log(f"task {record.name}: {outcome}")
+        if text is None:
+            return
         try:
             self.send_text(record.chat_id, text)
         except BotError as error:
             log(f"Warning: cannot report task {record.name}: {error}")
+
+    # -- scheduled tasks --------------------------------------------------
+
+    def load_schedule_state(self):
+        with self.lock:
+            self.schedule_last = read_schedule_state(self.schedule_state_path)
+
+    def save_schedule_state(self):
+        with self.lock:
+            snapshot = dict(self.schedule_last)
+        try:
+            write_schedule_state(self.schedule_state_path, snapshot)
+        except OSError as error:
+            log(f"Warning: cannot save schedule state: {error}")
+
+    def warn_schedule(self, name, message):
+        # Warns about a bad SCHEDULE at most once per hour per task, so one
+        # broken file cannot fill the log every few seconds.
+        now_mono = time.monotonic()
+        with self.lock:
+            last = self.schedule_warned_at.get(name)
+            if last is not None and now_mono - last < SCHEDULE_WARN_INTERVAL:
+                return
+            self.schedule_warned_at[name] = now_mono
+        log(f"Warning: {message}")
+
+    def start_scheduler(self):
+        thread = threading.Thread(
+            target=self.scheduler_loop, daemon=True, name="telegram-scheduler"
+        )
+        thread.start()
+
+    def scheduler_loop(self):
+        while not self.stopping.is_set():
+            if self.stopping.wait(self.schedule_interval):
+                break
+            try:
+                self.check_schedules()
+            except Exception:
+                # One bad check never stops the scheduler.
+                log("Warning: schedule check failed:")
+                traceback.print_exc()
+
+    def check_schedules(self, now=None):
+        # Starts the most overdue scheduled task when idle. A dispatch stamps
+        # last with now, so skipped executions coalesce instead of bursting:
+        # a task runs at most once per check. A busy bot leaves due tasks
+        # for the next check.
+        if now is None:
+            now = time.time()
+        specs = discover_tasks(self.tasks_dir)
+        due = []
+        baselined = False
+        for name in sorted(specs):
+            spec = specs[name]
+            try:
+                expr, args = read_task_schedule(spec.path)
+            except TaskLoadError as error:
+                self.warn_schedule(name, f"task {name} has a bad schedule: {error}")
+                continue
+            if expr is None:
+                continue
+            with self.lock:
+                last = self.schedule_last.get(name)
+            if last is None:
+                # A new schedule waits for its next tick instead of running
+                # at once.
+                with self.lock:
+                    if self.schedule_last.get(name) is None:
+                        self.schedule_last[name] = now
+                        baselined = True
+                continue
+            try:
+                next_at = cron_next_after(expr, last)
+            except Exception as error:
+                self.warn_schedule(
+                    name, f"task {name} has bad SCHEDULE {expr!r}: {error}"
+                )
+                continue
+            if next_at <= now:
+                due.append((now - next_at, name, spec, args))
+        if baselined:
+            self.save_schedule_state()
+        if not due:
+            return
+        due.sort(key=lambda item: (-item[0], item[1]))
+        for _overdue, _name, spec, args in due:
+            if self.start_scheduled_task(spec, args, now):
+                break
+
+    def start_scheduled_task(self, spec, args, now):
+        # Starts one scheduled run when no task runs. Returns True when the
+        # run started. Stamps last at dispatch, even when loading later
+        # fails, so a broken task cannot error every few seconds.
+        run_timeout = read_task_timeout(spec.path, self.default_run_timeout)
+        with self.lock:
+            if self.is_alive_locked(self.current):
+                return False
+            if not self.allowed_chats:
+                return False
+            chat_id = self.allowed_chats[0]
+            record = RunRecord(
+                name=spec.name,
+                display_name=spec.display_name,
+                args=list(args),
+                chat_id=chat_id,
+                run_timeout=run_timeout,
+            )
+            thread = threading.Thread(
+                target=self.worker,
+                args=(record, spec),
+                daemon=True,
+                name=f"telegram-task-{spec.name}",
+            )
+            record.thread = thread
+            self.current = record
+            self.schedule_last[spec.name] = now
+        self.save_schedule_state()
+        log(f"task {spec.name}: scheduled start, budget {run_timeout:g}s")
+        thread.start()
+        return True
 
     # -- heartbeat --------------------------------------------------------
 
