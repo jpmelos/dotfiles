@@ -13,11 +13,11 @@
 # /   --profile <name>  Profile to run as. Selects the
 # /                     `~/.config/opencode-<name>` directory, with its own
 # /                     login, history, and credentials, and the `api_key`,
-# /                     `model`, `agent`, and `mcp_servers` of that profile
-# /                     in `~/config.json` (default: the organization
-# /                     directory of the project, such as `orgname` for
-# /                     `~/devel/orgname/project`, or the user name for a
-# /                     project directly under `~/devel`)
+# /                     `model`, `agent`, `mcp_servers`, and `permissions`
+# /                     of that profile in `~/config.json` (default: the
+# /                     organization directory of the project, such as
+# /                     `orgname` for `~/devel/orgname/project`, or the
+# /                     user name for a project directly under `~/devel`)
 # /   --channel <name>  OpenCode version to install in the image
 # /                     (default: `latest`). Accepts `latest` or a version
 # /                     such as `2.0.26`. The version is part of the image
@@ -123,7 +123,10 @@
 # /           "agent": "build",
 # /           "mcp_servers": {
 # /             "server-name": {"type": "local", "command": ["..."]}
-# /           }
+# /           },
+# /           "permissions": [
+# /             {"action": "server-name_tool-name", "resource": "*", "effect": "allow"}
+# /           ]
 # /         },
 # /         "orgname": {
 # /           "api_key": "ok-..."
@@ -152,7 +155,12 @@
 # /   keeps the `mcp.servers` object of the origin file.
 # /
 # /   The `mcp_servers` object of a profile replaces the `mcp.servers`
-# /   object in the profile `opencode.json`. The profile `AGENTS.md`
+# /   object in the profile `opencode.json`. The `permissions` list of a
+# /   profile holds extra rules for the `permissions` list in that profile
+# /   `opencode.json`, after the rules of the origin file. The last
+# /   matching rule wins, so a profile rule overrides an origin rule for
+# /   the same action and resource. Without `permissions`, the profile
+# /   keeps the permissions of the origin file. The profile `AGENTS.md`
 # /   loads as the global instructions file. Project configurations stay
 # /   disabled (`OPENCODE_CONFIG_PROJECT_DISABLE=1`), so the profile is
 # /   the only configuration source, like `--setting-sources=user` for
@@ -2221,7 +2229,9 @@ def sync_opencode_json(origin_path, profile_path, profile_prep):
     #
     # The `model` and the `agent` of the profile become the `model` and the
     # `default_agent` of the file. The `mcp_servers` object of the profile
-    # replaces the `mcp.servers` object of the file.
+    # replaces the `mcp.servers` object of the file. The `permissions` list
+    # of the profile adds rules to the `permissions` list of the file, after
+    # the rules of the origin file.
     # The profile `AGENTS.md` sits next to the file, so OpenCode loads it as
     # the global instructions file. A missing origin file leaves a profile
     # copy from an earlier launch in place; `remove_entries_gone_from_origin`
@@ -2251,6 +2261,18 @@ def sync_opencode_json(origin_path, profile_path, profile_prep):
             mcp = {}
             origin_config["mcp"] = mcp
         mcp["servers"] = mcp_servers
+    extra_permissions = resolve_profile_permissions(profile_config, profile_prep.profile)
+    if extra_permissions:
+        permissions = origin_config.get("permissions")
+        if not isinstance(permissions, list):
+            log(
+                f"Warning: {origin_path} has no `permissions` list, "
+                "extra permissions not set"
+            )
+        else:
+            for rule in extra_permissions:
+                if rule not in permissions:
+                    permissions.append(rule)
 
     content = json.dumps(origin_config, indent=2, ensure_ascii=False) + "\n"
 
@@ -2299,6 +2321,47 @@ def resolve_mcp_servers(profile_config, profile):
         )
         return None
     return mcp_servers
+
+
+def resolve_profile_permissions(profile_config, profile):
+    # Returns the extra permission rules of the profile, in the order given,
+    # without duplicates. A profile without `permissions` adds none. Rules
+    # without a non-empty text `action`, a text `resource`, and an `effect`
+    # of `allow`, `deny`, or `ask` are skipped with a warning.
+    permissions = profile_config.get("permissions")
+    if permissions is None:
+        return []
+    if not isinstance(permissions, list):
+        log(
+            f"Warning: the `permissions` of profile '{profile}' is not a list, "
+            "extra permissions not set"
+        )
+        return []
+    extra_permissions = []
+    for rule in permissions:
+        if not is_permission_rule(rule):
+            log(
+                f"Warning: the `permissions` of profile '{profile}' holds a rule "
+                "without a non-empty text `action`, a text `resource`, and an "
+                "`effect` of `allow`, `deny`, or `ask`, skipping it"
+            )
+            continue
+        if rule not in extra_permissions:
+            extra_permissions.append(rule)
+    return extra_permissions
+
+
+def is_permission_rule(rule):
+    # Whether `rule` is a permission rule object with a non-empty text
+    # `action`, a text `resource`, and an `effect` of `allow`, `deny`, or
+    # `ask`.
+    return (
+        isinstance(rule, dict)
+        and isinstance(rule.get("action"), str)
+        and bool(rule.get("action"))
+        and isinstance(rule.get("resource"), str)
+        and rule.get("effect") in ("allow", "deny", "ask")
+    )
 
 
 # --------------------------------------------------------------------------------------

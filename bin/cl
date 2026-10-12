@@ -13,11 +13,11 @@
 # /   --profile <name>  Profile to run as. Selects the `~/.claude-<name>`
 # /                     directory, with its own login, history, and
 # /                     credentials, and the `api_key`, `model`,
-# /                     `effortLevel`, and `mcp_servers` of that profile in
-# /                     `~/config.json` (default: the organization directory
-# /                     of the project, such as `orgname` for
-# /                     `~/devel/orgname/project`, or the user name for a
-# /                     project directly under `~/devel`)
+# /                     `effortLevel`, `mcp_servers`, and `permissions`
+# /                     of that profile in `~/config.json` (default: the
+# /                     organization directory of the project, such as
+# /                     `orgname` for `~/devel/orgname/project`, or the
+# /                     user name for a project directly under `~/devel`)
 # /   --channel <name>  Claude Code release channel or version to install
 # /                     in the image (default: `latest`). Accepts `latest`,
 # /                     `stable`, or a version such as `2.1.0`. The channel
@@ -115,7 +115,8 @@
 # /           "effortLevel": "xhigh",
 # /           "mcp_servers": {
 # /             "server-name": {"command": "...", "args": ["..."]}
-# /           }
+# /           },
+# /           "permissions": ["mcp__server-name__tool-name"]
 # /         },
 # /         "orgname": {
 # /           "api_key": "sk-..."
@@ -137,12 +138,17 @@
 # /   asks the user to log in. With `model`, the launcher passes it to
 # /   Claude Code with `--model`. Without it, the session uses the
 # /   `model` of `~/.claude-origin/settings.json`, if any. Every run
-# /   copies that file into the profile. `effortLevel` works the same
-# /   way, with `--effort`. Without `mcp_servers`, the profile keeps the
-# /   `mcpServers` key that is already in its `.claude.json`.
+# /   writes that file into the profile with the `permissions` of the
+# /   profile added to `permissions.allow`. Without `permissions`, the
+# /   profile keeps the permissions of the origin file. `effortLevel`
+# /   works the same way, with `--effort`. Without `mcp_servers`, the
+# /   profile keeps the `mcpServers` key that is already in its
+# /   `.claude.json`.
 # /
 # /   The `mcp_servers` object of a profile replaces the `mcpServers` key
-# /   in that profile's `.claude.json`.
+# /   in that profile's `.claude.json`. The `permissions` list of a
+# /   profile holds extra entries for `permissions.allow` in that
+# /   profile's `settings.json`, after the entries of the origin file.
 # /
 # /   An `ANTHROPIC_API_KEY` variable in the environment takes precedence
 # /   over the `api_key` of the profile. The launcher names the source of
@@ -1711,14 +1717,14 @@ def prepare_profile_dir(profile_prep):
 
         # The profile directory also holds history and credentials, so only
         # the directories that the origin has are mirrored. The top level is
-        # not. `CLAUDE.md` is a derived file, so the copy skips it. See
-        # `apply_dependencies_list`.
+        # not. `CLAUDE.md` and `settings.json` are derived files, so the copy
+        # skips them. See `apply_dependencies_list` and `sync_settings_json`.
         try:
             copied_names = copy_tree_contents(
                 profile_prep.origin_dir,
                 profile_dir,
                 mirror=False,
-                skip=("CLAUDE.md",),
+                skip=("CLAUDE.md", "settings.json"),
             )
         except OSError as error:
             die(f"cannot copy {profile_prep.origin_dir}: {error}")
@@ -1734,6 +1740,13 @@ def prepare_profile_dir(profile_prep):
             profile_prep.dependency_names,
         ):
             installed_names.add("CLAUDE.md")
+
+        if sync_settings_json(
+            f"{profile_prep.origin_dir}/settings.json",
+            f"{profile_dir}/settings.json",
+            profile_prep,
+        ):
+            installed_names.add("settings.json")
 
         remove_entries_gone_from_origin(
             profile_dir, f"{state_dir}/{MANIFEST_NAME}", installed_names
@@ -2126,6 +2139,96 @@ def expand_dependencies_marker(claude_md, marker, dependency_names):
         else:
             lines.append(line)
     return "".join(f"{line}\n" for line in lines)
+
+
+def sync_settings_json(origin_path, profile_path, profile_prep):
+    # Writes the profile `settings.json` as the origin file with the
+    # `permissions` of the profile added to `permissions.allow`, after the
+    # entries of the origin file. Returns whether the origin file exists.
+    try:
+        with open(origin_path, "rb") as handle:
+            origin_config = json.load(handle)
+    except FileNotFoundError:
+        return False
+    except (OSError, ValueError) as error:
+        log(f"Warning: cannot read {origin_path}: {error}")
+        return True
+    if not isinstance(origin_config, dict):
+        log(f"Warning: {origin_path} is not a JSON object, not installed")
+        return True
+
+    permissions = origin_config.get("permissions")
+    if not isinstance(permissions, dict):
+        log(f"Warning: {origin_path} has no `permissions` object, not installed")
+        return True
+    allow = permissions.get("allow")
+    if not isinstance(allow, list):
+        log(f"Warning: {origin_path} has no `permissions.allow` list, not installed")
+        return True
+
+    for extra in resolve_profile_permissions(
+        profile_prep.profile_config, profile_prep.profile
+    ):
+        if extra not in allow:
+            allow.append(extra)
+
+    content = json.dumps(origin_config, indent=2, ensure_ascii=False) + "\n"
+
+    # The profile path can be a planted directory or link, see the section
+    # note above. A directory makes the write below fail, and a link makes the
+    # comparison below read a file elsewhere on the host. Only a regular file
+    # stays.
+    if os.path.lexists(profile_path) and (
+        os.path.islink(profile_path) or not os.path.isfile(profile_path)
+    ):
+        try:
+            remove_path(profile_path)
+        except OSError as error:
+            log(f"Warning: cannot remove {profile_path}: {error}")
+            return True
+        log(f"Removed {profile_path}, it was not a regular file")
+
+    try:
+        current_content = read_text(profile_path, follow_links=False)
+    except (OSError, ValueError):
+        current_content = _MISSING
+
+    if current_content == content:
+        return True
+    try:
+        write_text_atomically(profile_path, content, origin_path)
+    except (OSError, ValueError) as error:
+        log(f"Warning: cannot write {profile_path}: {error}")
+        return True
+    if current_content is not _MISSING:
+        log(f"Reset {profile_path}, it differed from the origin")
+    return True
+
+
+def resolve_profile_permissions(profile_config, profile):
+    # Returns the extra `permissions.allow` entries of the profile, in the
+    # order given, without duplicates. A profile without `permissions` adds
+    # none. Entries that are not non-empty text are skipped with a warning.
+    permissions = profile_config.get("permissions")
+    if permissions is None:
+        return []
+    if not isinstance(permissions, list):
+        log(
+            f"Warning: the `permissions` of profile '{profile}' is not a list, "
+            "extra permissions not set"
+        )
+        return []
+    extra_permissions = []
+    for entry in permissions:
+        if not isinstance(entry, str) or not entry:
+            log(
+                f"Warning: the `permissions` of profile '{profile}' holds an entry "
+                "that is not non-empty text, skipping it"
+            )
+            continue
+        if entry not in extra_permissions:
+            extra_permissions.append(entry)
+    return extra_permissions
 
 
 def create_profile_json(profile_json_path):
