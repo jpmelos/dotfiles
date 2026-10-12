@@ -39,7 +39,8 @@
 # /
 # / Harness arguments:
 # /   Without harness arguments, the launcher runs the interactive OpenCode
-# /   interface from a fresh session with no tabs. Anything else runs
+# /   interface from a fresh session with no tabs, with `--standalone` for a
+# /   private server inside the container. Anything else runs
 # /   headless through `run`: the launcher puts
 # /   `run --standalone` before the arguments, plus `--model` with the `model`
 # /   of the profile and `--agent` with the `agent` of the profile, if any.
@@ -2243,15 +2244,19 @@ def resolve_mcp_servers(profile_config, profile):
 
 
 def build_harness_args(user_harness_args, model, agent):
-    # Without harness arguments, the launcher runs the interactive TUI, so
-    # nothing is prepended. Anything else runs headless through `run`.
+    # Without harness arguments, the launcher runs the interactive TUI with a
+    # private in-process server, so that any number of containers can run at
+    # once. A managed background service registers one file per profile below
+    # the shared state directory, and two such services replace each other, so
+    # each TUI keeps losing its server with a `Restarting service` notice.
+    # Anything else runs headless through `run`.
     #
     # An explicit subcommand takes over the harness CLI and passes through
     # verbatim, except that `run` gets the profile settings below. Anything
     # else is the arguments of an implied `run`: message words and `run`
     # flags.
     if not user_harness_args:
-        return []
+        return ["--standalone"]
     if (
         user_harness_args[0] in OPENCODE_SUBCOMMANDS
         and user_harness_args[0] != "run"
