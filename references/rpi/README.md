@@ -12,7 +12,7 @@ sudo apt-get -y clean
 ## 2. Install Required Software
 
 ```bash
-sudo apt install curl wget git neovim iptables-persistent openresolv wireguard transmission-daemon ca-certificates gpg jq starship stow fzf tmux npm chromium-browser
+sudo apt install curl wget git iptables-persistent openresolv wireguard transmission-daemon ca-certificates gpg jq starship stow fzf tmux npm chromium-browser sqlite3 libsqlite3-dev
 git clone https://github.com/hyperupcall/autoenv ~/.autoenv
 curl -LsSf https://astral.sh/uv/install.sh | sh
 curl -sS https://downloads.1password.com/linux/keys/1password.asc \
@@ -28,6 +28,16 @@ curl -sS https://downloads.1password.com/linux/keys/1password.asc \
     && sudo apt update && sudo apt install 1password-cli
 curl -LsSf https://repo.plex.tv/scripts/setupRepo.sh | sudo bash
 sudo npm install -g agent-browser
+```
+
+Download the latest Neovim from GitHub and copy it onto Raspberry Pi, into
+`~/apps`.
+
+```
+tar -xzf nvim.tar.gz
+rm nvim.tar.gz
+cd ~/bin
+ln -s ../apps/nvim-linux-arm64/bin/nvim nvim
 ```
 
 ## 3. Sign In to 1Password
