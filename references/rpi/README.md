@@ -12,7 +12,7 @@ sudo apt-get -y clean
 ## 2. Install Required Software
 
 ```bash
-sudo apt install curl wget git iptables-persistent openresolv wireguard transmission-daemon ca-certificates gpg jq starship stow fzf tmux npm chromium-browser sqlite3 libsqlite3-dev delta
+sudo apt install curl wget git iptables-persistent openresolv wireguard transmission-daemon ca-certificates gpg jq starship stow fzf tmux npm chromium-browser sqlite3 libsqlite3-dev delta ffmpeg
 git clone https://github.com/hyperupcall/autoenv ~/.autoenv
 curl -LsSf https://astral.sh/uv/install.sh | sh
 curl -sS https://downloads.1password.com/linux/keys/1password.asc \
