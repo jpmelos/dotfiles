@@ -34,6 +34,14 @@
 # /                     exists)
 # /   --no-docker-socket
 # /                     Do not mount the host Docker socket into the container
+# /   --add-volume <source>:<target>[:rw]
+# /                     Mount an extra host directory into the container.
+# /                     Repeat the option for each directory. The source must
+# /                     be an absolute path to a real directory that you own.
+# /                     Links resolve before the mount, and a link as source
+# /                     fails. The target must be an absolute container path
+# /                     outside of the fixed mounts. Append `:rw` for
+# /                     read-write, otherwise the mount is read-only.
 # /   --verbose         Print the Docker command before running it
 # /   --help, -h        Show this help
 # /
@@ -45,8 +53,9 @@
 # /   `run --standalone` before the arguments, plus `--model` with the `model`
 # /   of the profile and `--agent` with the `agent` of the profile, if any.
 # /   File tools may read or edit anywhere inside the container: the profile
-# /   `opencode.json` allows every `external_directory` request, and the only
-# /   host tree the container sees read-write is `~/devel`.
+# /   `opencode.json` allows every `external_directory` request, and the host
+# /   trees the container sees read-write are `~/devel` and the read-write
+# /   `--add-volume` mounts.
 # /   A `--model`, `--agent`, `--standalone`, or `--server` that you pass wins.
 # /   A first argument that names another subcommand (`serve`, `auth`, `mcp`,
 # /   and the rest) passes through verbatim, except that `run` still gets
@@ -214,7 +223,14 @@
 # /   The `~/devel` mount is read-write, and file tools may reach all of it,
 # /   so the agent can edit every repository under `~/devel`, not only the
 # /   project. Only the dotfiles repository is read-only. Move a repository
-# /   that the agent must not touch out of `~/devel`.
+# /   that the agent must not touch out of `~/devel`. Each `--add-volume`
+# /   mount exposes one more host directory to the agent. The mount is
+# /   read-only unless it ends in `:rw`. The launcher mounts the resolved
+# /   source. It refuses a source that is a link. It refuses a source that is
+# /   not a directory that you own. It refuses a target that overlaps a fixed
+# /   mount or a system path. It refuses a source that exposes the launcher
+# /   state. It refuses a read-write source that exposes the dotfiles
+# /   repository outside of its read-only mount.
 # /
 # /   The image build runs the `jpenv-container.sh` file of the project. A
 # /   cloned repository can commit one, and the agent can write one into any
@@ -278,6 +294,11 @@ _MISSING = object()
 VALUE_OPTIONS = {
     "--profile": "profile",
     "--channel": "channel",
+}
+# Options of this script that take a value and can repeat. Each use appends
+# to the list in the mapped `Options` field.
+REPEATABLE_VALUE_OPTIONS = {
+    "--add-volume": "add_volumes",
 }
 # Options of this script that take no value, mapped to the `Options` field that
 # they turn on.
@@ -445,6 +466,9 @@ def main():
     profile = options.profile
     profile_paths = resolve_profile_paths(paths.home, username, profile)
     check_origin_dir(paths, profile, profile_paths.profile_dir)
+    extra_volumes = resolve_extra_volumes(
+        options.add_volumes, paths, profile_paths, project_root
+    )
 
     log(f"Profile: {profile}")
     log(f"Project: {project_name}")
@@ -542,6 +566,7 @@ def main():
         tui_channel=generate_tui_channel(),
         harness_print_mode=options.harness_print_mode,
         no_docker_socket=options.no_docker_socket,
+        extra_volumes=extra_volumes,
     )
 
     run_command, env = build_run_command(harness_args, run_config)
@@ -592,7 +617,7 @@ def process_help_option(argv):
             # Any `--help` is targeted for OpenCode instead of this script.
             return
 
-        if argument in VALUE_OPTIONS:
+        if argument in VALUE_OPTIONS or argument in REPEATABLE_VALUE_OPTIONS:
             skip_next = True
             continue
 
@@ -866,6 +891,8 @@ class Options:
     verbose: bool = False
     harness_print_mode: bool = False
     harness_args: list[str] = field(default_factory=list)
+    # Raw `--add-volume` specs, in the order given.
+    add_volumes: list[str] = field(default_factory=list)
 
 
 def parse_options(argv, project_name, username):
@@ -887,7 +914,23 @@ def parse_options(argv, project_name, username):
         # Accept both `--option value` and `--option=value`.
         option_name, separator, inline_value = argument.partition("=")
         has_inline_value = bool(separator)
-        if has_inline_value and option_name in VALUE_OPTIONS:
+        if has_inline_value and option_name in REPEATABLE_VALUE_OPTIONS:
+            if not inline_value:
+                die(f"{option_name} requires a non-empty argument")
+            getattr(options, REPEATABLE_VALUE_OPTIONS[option_name]).append(inline_value)
+            index += 1
+        elif argument in REPEATABLE_VALUE_OPTIONS:
+            index += 1
+            if index >= len(argv) or not argv[index]:
+                die(f"{argument} requires a non-empty argument")
+            if argv[index].startswith("-"):
+                die(
+                    f"{argument} requires a value, and a value cannot start "
+                    f"with `-`. Got '{argv[index]}'"
+                )
+            getattr(options, REPEATABLE_VALUE_OPTIONS[argument]).append(argv[index])
+            index += 1
+        elif has_inline_value and option_name in VALUE_OPTIONS:
             if not inline_value:
                 die(f"{option_name} requires a non-empty argument")
             set_value_option(option_name, inline_value)
@@ -2317,6 +2360,8 @@ class RunConfig:
     tui_channel: str
     harness_print_mode: bool
     no_docker_socket: bool
+    # Checked `--add-volume` mounts, in the order given.
+    extra_volumes: list = field(default_factory=list)
 
 
 def generate_container_name(project_root):
@@ -2357,6 +2402,7 @@ def build_run_command(harness_args, run_config):
         *ripgrep_config_args(run_config.paths),
         *timezone_args(),
         *git_config_args(home),
+        *extra_volume_args(run_config),
         *terminal_args(run_config.harness_print_mode),
         *additional_env_args(),
     ]
@@ -2641,6 +2687,179 @@ def git_config_args(home):
         )
         return []
     return ["--volume", f"{os.path.realpath(git_config_dir)}:{git_config_dir}:ro"]
+
+
+@dataclass
+class ExtraVolume:
+    # Resolved host source, normalized container target, read-only flag,
+    # and the raw spec for messages.
+    source: str
+    target: str
+    read_only: bool
+    spec: str
+
+
+# Container prefixes that an extra target must not touch. A target under one
+# shadows image files or the tmpfs mounts.
+EXTRA_VOLUME_RESERVED_PREFIXES = (
+    "/proc",
+    "/sys",
+    "/dev",
+    "/run",
+    "/tmp",
+    "/var",
+    "/etc",
+    "/bin",
+    "/sbin",
+    "/lib",
+    "/lib64",
+    "/usr",
+)
+
+
+def resolve_extra_volumes(raw_specs, paths, profile_paths, project_root):
+    # Check each `--add-volume` spec and return the mounts in order. Fail on
+    # the first bad spec, so no run starts with a partial set.
+    volumes = []
+    seen_targets = set()
+    for spec in raw_specs:
+        volume = parse_add_volume_spec(spec, paths, profile_paths, project_root)
+        if volume.target in seen_targets:
+            die(f"--add-volume {spec!r} repeats target {volume.target}")
+        seen_targets.add(volume.target)
+        volumes.append(volume)
+        mode = "read-only" if volume.read_only else "read-write"
+        log(f"Additional volume ({mode}): {volume.source} -> {volume.target}")
+    return volumes
+
+
+def parse_add_volume_spec(spec, paths, profile_paths, project_root):
+    # Parse one `<source>:<target>[:rw]` spec. A path with `:` has no
+    # representation here, because `:` splits the fields.
+    parts = spec.split(":")
+    if len(parts) == 2:
+        raw_source, raw_target = parts
+        read_only = True
+    elif len(parts) == 3 and parts[2] == "rw":
+        raw_source, raw_target = parts[0], parts[1]
+        read_only = False
+    else:
+        die(
+            f"--add-volume {spec!r} must be `<source>:<target>` or "
+            "`<source>:<target>:rw`"
+        )
+    if not raw_source or not raw_target:
+        die(f"--add-volume {spec!r} needs a non-empty source and target")
+    for field_value in (raw_source, raw_target):
+        if "\0" in field_value:
+            die(f"--add-volume {spec!r} must not hold a NUL byte")
+    if not os.path.isabs(raw_source):
+        die(f"--add-volume {spec!r} source must be an absolute path")
+    if not os.path.isabs(raw_target):
+        die(f"--add-volume {spec!r} target must be an absolute path")
+    target = os.path.normpath(raw_target)
+    if target == "/":
+        die(f"--add-volume {spec!r} target must not be `/`")
+    source = resolve_add_volume_source(spec, raw_source)
+    check_add_volume_target(spec, target, paths, profile_paths)
+    check_add_volume_dotfiles(spec, source, paths, project_root, read_only)
+    check_add_volume_state(spec, source, profile_paths)
+    return ExtraVolume(source=source, target=target, read_only=read_only, spec=spec)
+
+
+def resolve_add_volume_source(spec, raw_source):
+    # Return the resolved source. The path itself must be a real directory,
+    # not a link, so a planted link cannot redirect the mount. The resolved
+    # path must be a directory owned by the user, so Docker creates no
+    # root-owned directory and exposes no files of another user. Docker
+    # mounts by resolved path, like the fixed mounts do.
+    try:
+        info = os.lstat(raw_source)
+    except FileNotFoundError:
+        die(f"--add-volume {spec!r} source {raw_source} does not exist")
+    except OSError as error:
+        die(f"--add-volume {spec!r} cannot read source {raw_source}: {error}")
+    if stat.S_ISLNK(info.st_mode):
+        die(f"--add-volume {spec!r} source {raw_source} is a link")
+    if not stat.S_ISDIR(info.st_mode):
+        die(f"--add-volume {spec!r} source {raw_source} is not a directory")
+    resolved = os.path.realpath(raw_source)
+    try:
+        resolved_info = os.stat(resolved)
+    except OSError as error:
+        die(f"--add-volume {spec!r} cannot read source {resolved}: {error}")
+    if not stat.S_ISDIR(resolved_info.st_mode):
+        die(f"--add-volume {spec!r} source {resolved} is not a directory")
+    if resolved_info.st_uid != os.getuid():
+        die(
+            f"--add-volume {spec!r} source {resolved} is owned by user ID "
+            f"{resolved_info.st_uid}, not by you"
+        )
+    return resolved
+
+
+def check_add_volume_target(spec, target, paths, profile_paths):
+    # Refuse a target that overlaps a fixed mount in either direction. A
+    # target under one shadows part of it, and a target above one shadows it
+    # whole. Any overlap with `~/devel` fails here, so an extra read-write
+    # mount cannot bypass the dotfiles read-only overlay.
+    home = paths.home
+    config_dir = f"{home}/.config/opencode"
+    git_config_dir = f"{home}/.config/git"
+    reserved_targets = [
+        os.path.normpath(paths.devel_dir),
+        os.path.normpath(paths.dotfiles_dir),
+        os.path.normpath(config_dir),
+        os.path.normpath(git_config_dir),
+        os.path.normpath(profile_paths.profile_tmp_dir),
+        os.path.normpath(profile_paths.pane_states_dir),
+        os.path.normpath(f"/run/user/{os.getuid()}"),
+        os.path.normpath("/var/run/docker.sock"),
+    ]
+    for binary in AGENT_BINARIES:
+        reserved_targets.append(os.path.normpath(f"/usr/local/bin/{binary}"))
+    for reserved in reserved_targets:
+        if target == reserved or is_below(target, reserved) or is_below(reserved, target):
+            die(
+                f"--add-volume {spec!r} target {target} overlaps fixed mount "
+                f"{reserved}"
+            )
+    for prefix in EXTRA_VOLUME_RESERVED_PREFIXES:
+        if target == prefix or is_below(target, prefix):
+            die(f"--add-volume {spec!r} target {target} is under system path {prefix}")
+
+
+def check_add_volume_dotfiles(spec, source, paths, project_root, read_only):
+    # The dotfiles repository mounts read-only, except when it is the
+    # project. A read-write extra mount that holds it or sits in it exposes
+    # it read-write at a second path, so such a mount must stay read-only.
+    if project_root == paths.dotfiles_dir:
+        return
+    dotfiles = paths.resolved_dotfiles_dir
+    if source == dotfiles or is_below(source, dotfiles) or is_below(dotfiles, source):
+        if not read_only:
+            die(f"--add-volume {spec!r} touches the dotfiles repository, must be read-only")
+
+
+def check_add_volume_state(spec, source, profile_paths):
+    # The launcher state holds the manifest and the lock, which no mount
+    # exposes. A source that is the state directory or holds it exposes them,
+    # and a source under it exposes part of them.
+    state = os.path.realpath(profile_paths.state_dir)
+    if source == state or is_below(source, state) or is_below(state, source):
+        die(f"--add-volume {spec!r} source {source} exposes the launcher state")
+
+
+def extra_volume_args(run_config):
+    # Return the `--volume` args for the checked extra mounts, in the order
+    # given. Sources are resolved, targets are normalized container paths.
+    args = []
+    for volume in run_config.extra_volumes:
+        if volume.read_only:
+            args += ["--volume", f"{volume.source}:{volume.target}:ro"]
+        else:
+            args += ["--volume", f"{volume.source}:{volume.target}"]
+    return args
 
 
 def terminal_args(harness_print_mode):
