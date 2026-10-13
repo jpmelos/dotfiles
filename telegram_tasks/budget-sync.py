@@ -162,10 +162,11 @@ def run(ctx, args=None):
         upload=not no_upload,
     )
     if not matched:
-        record_last_run(ctx)
-        return "Done, preview only. YNAB unchanged."
-    summary = f"Done: {added_count} added, {cleared_count} cleared."
+        summary = "Done, preview only. YNAB unchanged."
+    else:
+        summary = f"Done: {added_count} added, {cleared_count} cleared."
     record_last_run(ctx)
+    _say(summary)
     return summary
 
 
