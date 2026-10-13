@@ -7,7 +7,8 @@
 # All state lives in the task state directory, including the payee map as a
 # plain CSV file with the same format as before, so the old file can be
 # copied over it. The chat only gets the new transactions, one short line
-# each, plus short confirmations and balance lines.
+# each, plus short confirmations, balance lines, and a count of the
+# transactions without a memo.
 
 DESCRIPTION = "Sync new BMO transactions to YNAB."
 # Banking with user questions can take a while. This is the budget for one
@@ -1213,6 +1214,10 @@ class YnabComparison:
     # The YNAB transactions that match a statement transaction, but are not
     # cleared.
     uncleared_transactions: list
+    # How many YNAB transactions in the period have no memo. After the
+    # changes, the second comparison already includes the transactions that
+    # the current run added.
+    ynab_without_memo_count: int = 0
 
 
 def save_to_ynab(
@@ -1257,12 +1262,14 @@ def update_from_statements(plan, transactions, start_date, upload):
     )
     if problems:
         _say("Blocked:\n" + "\n".join(problems))
+        report_memo_count(comparison, start_date)
         raise TaskError("YNAB unchanged. Fix and rerun.")
 
     missing_count = len(comparison.missing_transactions)
     uncleared_count = len(comparison.uncleared_transactions)
     if not missing_count and not uncleared_count:
         _say("YNAB already matches.")
+        report_memo_count(comparison, start_date)
         return True, 0, 0
 
     if missing_count:
@@ -1282,6 +1289,7 @@ def update_from_statements(plan, transactions, start_date, upload):
         _say(f"Clear {uncleared_count} in YNAB.")
     if not upload:
         _say("Preview only. YNAB unchanged.")
+        report_memo_count(comparison, start_date)
         return False, 0, 0
     changes = []
     if missing_count:
@@ -1290,6 +1298,7 @@ def update_from_statements(plan, transactions, start_date, upload):
         changes.append(f"clear {uncleared_count}")
     if not ask_yes(f"In YNAB, {' and '.join(changes)}?"):
         _say("Cancelled. YNAB unchanged.")
+        report_memo_count(comparison, start_date)
         return False, 0, 0
 
     if missing_count:
@@ -1309,8 +1318,10 @@ def update_from_statements(plan, transactions, start_date, upload):
     ):
         log_ynab_differences(result)
         _say("YNAB still differs. Check YNAB.")
+        report_memo_count(result, start_date)
         raise TaskError("YNAB differs after the changes.")
     _say(f"Added {missing_count}, cleared {uncleared_count}.")
+    report_memo_count(result, start_date)
     return True, missing_count, uncleared_count
 
 
@@ -1490,6 +1501,7 @@ def compare_with_ynab(plan, transactions, start_date):
     missing_transactions = []
     extra_keys_by_account = {}
     uncleared_transactions = []
+    ynab_without_memo_count = 0
     for account, account_id in plan.account_ids.items():
         ynab_transactions = call_ynab(
             "read the YNAB transactions",
@@ -1503,21 +1515,31 @@ def compare_with_ynab(plan, transactions, start_date):
             for transaction in transactions
             if transaction.account == account
         ]
+        visible_transactions = [
+            ynab_transaction
+            for ynab_transaction in ynab_transactions.data.transactions
+            if not ynab_transaction.deleted
+        ]
+        ynab_without_memo_count += sum(
+            1
+            for ynab_transaction in visible_transactions
+            if ynab_transaction.var_date >= start_date
+            and ynab_memo_missing(ynab_transaction)
+        )
         missing, extra_keys, uncleared = compare_account(
             plan,
             statement_transactions,
-            [
-                ynab_transaction
-                for ynab_transaction in ynab_transactions.data.transactions
-                if not ynab_transaction.deleted
-            ],
+            visible_transactions,
         )
         missing_transactions += missing
         if extra_keys:
             extra_keys_by_account[account] = extra_keys
         uncleared_transactions += uncleared
     return YnabComparison(
-        missing_transactions, extra_keys_by_account, uncleared_transactions
+        missing_transactions,
+        extra_keys_by_account,
+        uncleared_transactions,
+        ynab_without_memo_count,
     )
 
 
@@ -1885,6 +1907,21 @@ def report_ignored_counts(comparison):
         if extra_keys:
             _log(f"Ignored {len(extra_keys)} in {ynab_name}, not in its statement")
             _say(f"Ignored {len(extra_keys)} in {ynab_name}, not in its statement.")
+
+
+def ynab_memo_missing(ynab_transaction):
+    # Returns whether the YNAB transaction has no memo. A memo with only
+    # spaces counts as no memo, like a missing one.
+    return not (getattr(ynab_transaction, "memo", None) or "").strip()
+
+
+def report_memo_count(comparison, start_date):
+    # Reports how many YNAB transactions in the period have no memo. The
+    # count comes from the comparison, so after the changes it already
+    # includes the transactions that the current run added.
+    count = comparison.ynab_without_memo_count
+    _log(f"transactions without a memo since {start_date.isoformat()}: {count}")
+    _say(f"{count} transactions without a memo since {start_date.isoformat()}.")
 
 
 def log_ynab_differences(comparison):
