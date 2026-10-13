@@ -103,6 +103,10 @@ REPORT_LINE_LIMIT = 60
 
 # The context of the current run. Set by `run`, read by the helpers below.
 _CTX = None
+# Whether this run opened the browser. Set by `Browser.open`, read by
+# `shutdown` so the session is saved before the browser closes, even when the
+# run is cancelled after the browser opened.
+_BROWSER_OPENED = False
 
 
 class TaskError(Exception):
@@ -182,11 +186,40 @@ def run(ctx, args=None):
 
 
 def shutdown(ctx, reason):
-    # Closes the browser that a run leaves open, whatever the outcome. Never
-    # raises, so the shutdown itself cannot fail the task.
+    # Saves the browser session and closes the browser that a run leaves
+    # open, whatever the outcome. The save runs first so a cancellation
+    # after the browser opened keeps the login session. Never raises, so the
+    # shutdown itself cannot fail the task.
     ctx.log(f"shutdown: {reason}")
     try:
         os.environ["AGENT_BROWSER_SESSION"] = BROWSER_SESSION
+    except Exception as error:
+        ctx.log(f"browser session setup failed: {error}")
+        return
+    if _BROWSER_OPENED:
+        try:
+            session_file = ctx.state_path(SESSION_ID)
+        except Exception as error:
+            ctx.log(f"browser session save skipped: {error}")
+            session_file = None
+        if session_file:
+            try:
+                parent = os.path.dirname(session_file)
+                if parent:
+                    os.makedirs(parent, mode=0o700, exist_ok=True)
+                subprocess.run(
+                    ["agent-browser", "state", "save", session_file],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=30,
+                )
+                try:
+                    os.chmod(session_file, 0o600)
+                except OSError as error:
+                    ctx.log(f"browser session chmod failed: {error}")
+            except Exception as error:
+                ctx.log(f"browser session save failed: {error}")
+    try:
         subprocess.run(
             ["agent-browser", "close"],
             stdout=subprocess.DEVNULL,
@@ -2378,8 +2411,10 @@ class Browser:
         self.opened = False
 
     def open(self, url, options):
+        global _BROWSER_OPENED
         self.run(*options, "open", url)
         self.opened = True
+        _BROWSER_OPENED = True
 
     def find_role(self, role, action, name, *values):
         # Runs `action` on the element with `role` and the accessible `name`.
