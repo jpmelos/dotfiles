@@ -6,7 +6,7 @@
 # `--no-upload`, with the same meaning as in `bin/budget_imports`.
 #
 # BMO comes from `agent-browser` downloads. Wise comes from the Wise API with
-# the token in `wise.api_token`, without a browser. The Wise cache lives in
+# the token in `wise.api_key`, without a browser. The Wise cache lives in
 # the task state directory as JSON, so `--no-download` reuses the last Wise
 # fetch, same as it reuses the last BMO statements.
 #
@@ -1194,7 +1194,7 @@ def run_wise_download(ctx, paths):
     # transactions to the Wise cache, and returns the balance. Same role as
     # `run_download` for BMO, but without a browser.
     try:
-        api_token = read_config_text("wise.api_token")
+        api_token = read_config_text("wise.api_key")
     except TaskError as error:
         _say(f"Cannot read Wise: {error}")
         raise TaskError("Wise API token is missing.") from error
