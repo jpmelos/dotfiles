@@ -1347,7 +1347,9 @@ def reconcile_questrade(plan, questrade_balance, ynab_matches_statements, upload
     # each transfer from a statement, cleared or not. So the transaction
     # waits until YNAB matches the statements, which
     # `ynab_matches_statements` tells. Without `upload`, the task reports the
-    # difference, but changes nothing.
+    # difference, but changes nothing. The balance goes to YNAB only once a
+    # day: when the account already has a reconciliation transaction dated
+    # today, the task reports the difference, but changes nothing.
     ynab_account = read_ynab_account(plan, plan.questrade_account_id)
     ynab_balance = from_milliunits(ynab_account.balance)
     difference = questrade_balance - ynab_balance
@@ -1366,6 +1368,9 @@ def reconcile_questrade(plan, questrade_balance, ynab_matches_statements, upload
     if not ynab_matches_statements:
         _say("Skipped: YNAB missed the statement changes.")
         return
+    if questrade_reconciled_today(plan):
+        _say("Skipped: Questrade already reconciled today.")
+        return
     if not ask_yes(f"Add QT {format_amount(difference)}?"):
         _say("Cancelled. YNAB unchanged.")
         return
@@ -1377,6 +1382,28 @@ def reconcile_questrade(plan, questrade_balance, ynab_matches_statements, upload
         _say("QT differs after the change. Check YNAB.")
         raise TaskError("Questrade differs after the reconciliation.")
     _say(f"QT {format_amount(difference)} added.")
+
+
+def questrade_reconciled_today(plan):
+    # Returns whether the YNAB account of Questrade already has a
+    # reconciliation transaction dated today, deleted transactions aside.
+    today = datetime.date.today()
+    ynab_transactions = call_ynab(
+        "read the Questrade transactions",
+        ynab.TransactionsApi(plan.api_client).get_transactions_by_account,
+        plan.plan_id,
+        str(plan.questrade_account_id),
+        since_date=today,
+    )
+    for ynab_transaction in ynab_transactions.data.transactions:
+        if ynab_transaction.deleted:
+            continue
+        if ynab_transaction.var_date != today:
+            continue
+        if ynab_transaction.payee_name != RECONCILIATION_PAYEE:
+            continue
+        return True
+    return False
 
 
 def load_ynab_plan(api_client):
