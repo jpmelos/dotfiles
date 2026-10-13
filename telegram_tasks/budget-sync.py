@@ -1,6 +1,6 @@
 # Task that downloads the BMO statements and syncs new transactions to YNAB.
 #
-# Run it with `/run budget_sync` from the allowlisted chat. Optional words
+# Run it with `/run budget-sync` from the allowlisted chat. Optional words
 # after the name are `--from-date YYYY-MM-DD`, `--no-download`, and
 # `--no-upload`, with the same meaning as in `bin/budget_imports`.
 #
@@ -9,7 +9,6 @@
 # copied over it. The chat only gets the new transactions, one short line
 # each, plus short confirmations and balance lines.
 
-NAME = "budget_sync"
 DESCRIPTION = "Sync new BMO transactions to YNAB."
 # Banking with user questions can take a while. This is the budget for one
 # run, in seconds.
@@ -43,7 +42,7 @@ import ynab
 LOGIN_URL = "https://www1.bmo.com/banking/digital/"
 # The `agent-browser` session of this task. A session of its own keeps the
 # task from sharing a browser with other uses of `agent-browser`.
-BROWSER_SESSION = "budget_sync"
+BROWSER_SESSION = "budget-sync"
 # How long to wait for a page to load, and for a download to finish.
 PAGE_WAIT_SECONDS = 5
 DOWNLOAD_WAIT_SECONDS = 10
@@ -198,7 +197,7 @@ def parse_task_args(args):
         if argument == "--from-date":
             index += 1
             if index >= len(args):
-                raise TaskError("Usage: /run budget_sync [--from-date YYYY-MM-DD]")
+                raise TaskError("Usage: /run budget-sync [--from-date YYYY-MM-DD]")
             try:
                 from_date = datetime.datetime.strptime(
                     args[index], OPTION_DATE_FORMAT
@@ -213,7 +212,7 @@ def parse_task_args(args):
             no_upload = True
         else:
             raise TaskError(
-                "Usage: /run budget_sync [--from-date YYYY-MM-DD] "
+                "Usage: /run budget-sync [--from-date YYYY-MM-DD] "
                 "[--no-download] [--no-upload]"
             )
         index += 1

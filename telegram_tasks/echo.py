@@ -1,9 +1,8 @@
 # Example task for telegram_bot. Copy this file to start a new task.
 #
-# A task module may define NAME, DESCRIPTION, TIMEOUT, run, and shutdown.
+# A task module may define DESCRIPTION, TIMEOUT, run, and shutdown.
 # Run it with /run echo from the allowlisted chat.
 
-NAME = "echo"
 DESCRIPTION = "Ask for a name and a number, then store them as state."
 TIMEOUT = 600
 

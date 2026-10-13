@@ -191,7 +191,8 @@ def main(
       A task is a Python file at TASKS_DIR/<name>.py, where <name> holds
       letters, digits, _ and -. Files that start with _ or . are ignored.
       The bot loads the file fresh on every /run, so edits apply to the
-      next run without a restart. A task module may define NAME,
+      next run without a restart. The file name is the task name in /list,
+      /run, /status, and the state directory. A task module may define
       DESCRIPTION, TIMEOUT, SCHEDULE, SCHEDULE_ARGS, run and shutdown.
       run is required as run(ctx)
       or run(ctx, args) and may be async. shutdown is optional as
@@ -677,12 +678,11 @@ class StateStore:
 class TaskSpec:
     name: str
     path: str
-    display_name: str
     description: str
 
 
 def discover_tasks(tasks_dir):
-    # Lists the tasks without executing their code. NAME and DESCRIPTION come
+    # Lists the tasks without executing their code. DESCRIPTION comes
     # from a syntax tree scan, so listing never runs task code.
     specs = {}
     if not os.path.isdir(tasks_dir):
@@ -702,31 +702,31 @@ def discover_tasks(tasks_dir):
         path = os.path.join(tasks_dir, entry)
         if not os.path.isfile(path):
             continue
-        display_name, description = read_task_metadata(path, stem)
         specs[stem] = TaskSpec(
-            name=stem, path=path, display_name=display_name, description=description
+            name=stem, path=path, description=read_task_description(path)
         )
     return specs
 
 
-def read_task_metadata(path, fallback_name):
+def read_task_description(path):
+    # Returns the DESCRIPTION string of the task file, or an empty string
+    # when the file defines none. Read from the syntax tree, so no task
+    # code runs.
     try:
         with open(path, encoding="utf-8") as handle:
             source = handle.read()
         tree = ast.parse(source, filename=path)
     except (OSError, SyntaxError, ValueError):
-        return fallback_name, ""
-    values = {}
+        return ""
     for node in tree.body:
         if not isinstance(node, ast.Assign) or len(node.targets) != 1:
             continue
         target = node.targets[0]
-        if not isinstance(target, ast.Name) or target.id not in ("NAME", "DESCRIPTION"):
+        if not isinstance(target, ast.Name) or target.id != "DESCRIPTION":
             continue
         if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
-            values[target.id] = node.value.value.strip()
-    display_name = values.get("NAME", fallback_name).strip() or fallback_name
-    return display_name, values.get("DESCRIPTION", "").strip()
+            return node.value.value.strip()
+    return ""
 
 
 def read_task_timeout(path, default):
@@ -1029,9 +1029,8 @@ def call_task_function(fn, ctx, extra):
 
 
 class RunRecord:
-    def __init__(self, name, display_name, args, chat_id, run_timeout):
+    def __init__(self, name, args, chat_id, run_timeout):
         self.name = name
-        self.display_name = display_name
         self.args = args
         self.chat_id = chat_id
         self.run_timeout = run_timeout
@@ -1558,7 +1557,7 @@ class Bot:
                 return
             self.try_send(
                 chat_id,
-                f"Task {running.display_name} is running. It waits for no "
+                f"Task {running.name} is running. It waits for no "
                 "input right now.",
             )
             return
@@ -1637,9 +1636,7 @@ class Bot:
                     if running.pending is not None
                     else running.phase
                 )
-                running_line = (
-                    f"Running: {running.display_name} ({elapsed}, {phase})"
-                )
+                running_line = f"Running: {running.name} ({elapsed}, {phase})"
             else:
                 running_line = "Running: none"
             last_summary = self.last_summary
@@ -1661,8 +1658,9 @@ class Bot:
             last_map = dict(self.schedule_last)
         entries = []
         for name in sorted(specs):
+            spec = specs[name]
             try:
-                expr, _args = read_task_schedule(specs[name].path)
+                expr, _args = read_task_schedule(spec.path)
             except TaskLoadError:
                 entries.append((None, f"Scheduled: {name}: bad schedule"))
                 continue
@@ -1704,7 +1702,7 @@ class Bot:
             if self.is_alive_locked(self.current):
                 self.try_send_locked(
                     chat_id,
-                    f"Task {self.current.display_name} already runs. Wait "
+                    f"Task {self.current.name} already runs. Wait "
                     "for it or send /cancel.",
                 )
                 return
@@ -1717,7 +1715,6 @@ class Bot:
         run_timeout = read_task_timeout(spec.path, self.default_run_timeout)
         record = RunRecord(
             name=spec.name,
-            display_name=spec.display_name,
             args=task_args,
             chat_id=chat_id,
             run_timeout=run_timeout,
@@ -1748,7 +1745,7 @@ class Bot:
             if not self.is_alive_locked(self.current):
                 self.try_send_locked(chat_id, "No task is running.")
                 return
-            name = self.current.display_name
+            name = self.current.name
             self.set_abort_locked(self.current, "cancelled")
             self.cond.notify_all()
         log(f"task {name}: cancel requested")
@@ -1840,7 +1837,7 @@ class Bot:
             with self.lock:
                 if self.current is record:
                     self.current = None
-                self.last_summary = f"{record.display_name} error"
+                self.last_summary = f"{record.name} error"
                 self.last_time = time.time()
             if added_path is not None:
                 try:
@@ -1888,9 +1885,7 @@ class Bot:
             if self.current is record:
                 self.current = None
             elapsed = time.monotonic() - record.start_mono
-            self.last_summary = (
-                f"{record.display_name} {outcome} in {format_duration(elapsed)}"
-            )
+            self.last_summary = f"{record.name} {outcome} in {format_duration(elapsed)}"
             self.last_time = time.time()
         if added_path is not None:
             try:
@@ -1919,12 +1914,12 @@ class Bot:
             detail = (error_text or "unknown error").splitlines()
             first_line = detail[0] if detail else "unknown error"
             text = (
-                f"Task {record.display_name} failed: "
+                f"Task {record.name} failed: "
                 + truncate(first_line, ERROR_PREVIEW_LIMIT)
             )
         elif outcome == "timeout":
             text = (
-                f"Task {record.display_name} timed out after "
+                f"Task {record.name} timed out after "
                 f"{format_duration(record.run_timeout)}. It was stopped."
             )
         else:
@@ -2039,7 +2034,6 @@ class Bot:
             chat_id = self.allowed_chats[0]
             record = RunRecord(
                 name=spec.name,
-                display_name=spec.display_name,
                 args=list(args),
                 chat_id=chat_id,
                 run_timeout=run_timeout,
