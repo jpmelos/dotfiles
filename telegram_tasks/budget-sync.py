@@ -617,6 +617,9 @@ class Transaction:
     # name of the user.
     payee: str
     account: Account
+    # The memo for YNAB. None means no memo. The chat gives it before the
+    # transaction goes to YNAB.
+    memo: str = None
 
 
 @dataclass(frozen=True)
@@ -1675,7 +1678,24 @@ def find_payee_problem(payees, payee):
     return None
 
 
+def ask_memo(transaction):
+    # Asks for the memo of `transaction`, and returns it. Returns None when
+    # the reply is a dash, which means no memo.
+    reply = _CTX.ask(
+        f"{compact_line(transaction)}\nReply with the memo, or - for none.",
+        pattern=r"[\s\S]+",
+        timeout=300,
+    )
+    memo = reply.strip()
+    return None if memo == "-" or not memo else memo
+
+
 def send_transactions(plan, transactions):
+    # Asks for a memo for each of `transactions`, then adds them to YNAB.
+    # The Questrade reconciliation keeps its own memo, so it does not come
+    # through here. See `send_reconciliation`.
+    for transaction in sorted(transactions, key=report_order):
+        transaction.memo = ask_memo(transaction)
     new_transactions = []
     for transaction in transactions:
         target_name = transfer_target(transaction.payee)
@@ -1696,6 +1716,7 @@ def send_transactions(plan, transactions):
                 amount=to_milliunits(transaction.amount),
                 payee_id=payee_id,
                 payee_name=payee_name,
+                memo=transaction.memo,
                 cleared=ynab.TransactionClearedStatus.CLEARED,
                 approved=False,
             )
