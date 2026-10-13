@@ -1250,29 +1250,29 @@ def ask_single_payee(ctx, transaction, count):
 
 def ask_split_decision(ctx, transaction, count):
     # Returns the split decision row for one group of identical bank entries.
-    # Asks the part count, then the payee, amount, and memo of each part.
-    # Restarts the entry when the parts do not add to the bank amount.
+    # Asks the part count, then the payee, amount, and memo of each part but
+    # the last. The last amount is the remainder, confirmed in the chat. A
+    # rejected remainder restarts the parts from the first, with the same
+    # count, since an earlier part holds the mistake.
     if transaction.amount == 0:
         raise TaskError("cannot split a zero amount")
     key = transaction_decision_key(transaction)
+    part_count = ask_part_count(ctx)
     while True:
-        part_count = ask_part_count(ctx)
         parts = [
             ask_split_part(ctx, transaction, part_number, part_count)
-            for part_number in range(1, part_count + 1)
+            for part_number in range(1, part_count)
         ]
-        total = sum((part["amount"] for part in parts), decimal.Decimal("0"))
-        if total == transaction.amount:
-            return {
-                "key": key,
-                "count": count,
-                "kind": "split",
-                "parts": parts,
-            }
-        _say(
-            f"Parts add to {format_amount(total)}, "
-            f"expected {format_amount(transaction.amount)}. Start over."
-        )
+        last_part = ask_split_last_part(ctx, transaction, parts, part_count)
+        if last_part is None:
+            continue
+        parts.append(last_part)
+        return {
+            "key": key,
+            "count": count,
+            "kind": "split",
+            "parts": parts,
+        }
 
 
 def ask_part_count(ctx):
@@ -1292,10 +1292,9 @@ def ask_part_count(ctx):
             return count
 
 
-def ask_split_part(ctx, transaction, part_number, part_count):
-    # Returns one split part with its payee, amount, and memo. Restarts the
-    # part when the payee or the amount cannot go to YNAB.
-    label = f"Part {part_number} of {part_count} for {decision_line(transaction)}"
+def ask_split_payee(ctx, label):
+    # Returns the YNAB payee for one split part. Asks until the reply holds
+    # a name within the YNAB limit.
     while True:
         payee = ctx.ask(
             f"{label}\nReply with the payee.", pattern=r"[\s\S]+", timeout=600
@@ -1305,7 +1304,14 @@ def ask_split_part(ctx, transaction, part_number, part_count):
         if len(payee) > YNAB_PAYEE_NAME_LIMIT:
             _say(f"That name is over the YNAB payee limit of {YNAB_PAYEE_NAME_LIMIT}.")
             continue
-        break
+        return payee
+
+
+def ask_split_part(ctx, transaction, part_number, part_count):
+    # Returns one split part with its payee, amount, and memo. Restarts the
+    # part when the payee or the amount cannot go to YNAB.
+    label = f"Part {part_number} of {part_count} for {decision_line(transaction)}"
+    payee = ask_split_payee(ctx, label)
     while True:
         reply = ctx.ask(
             f"{label}\n{payee}\nReply with the signed amount "
@@ -1332,6 +1338,38 @@ def ask_split_part(ctx, transaction, part_number, part_count):
         )
     )
     return {"payee": payee, "amount": amount, "memo": memo}
+
+
+def ask_split_last_part(ctx, transaction, parts, part_count):
+    # Returns the last split part with its payee, calculated amount, and
+    # memo. The amount is the remainder after `parts`. Returns None when the
+    # remainder cannot work or the chat rejects it, so the caller restarts
+    # the parts from the first.
+    label = f"Part {part_count} of {part_count} for {decision_line(transaction)}"
+    payee = ask_split_payee(ctx, label)
+    entered = sum((part["amount"] for part in parts), decimal.Decimal("0"))
+    remaining = transaction.amount - entered
+    if remaining == 0 or (remaining > 0) != (transaction.amount > 0):
+        _say(
+            f"Parts so far add to {format_amount(entered)}, "
+            f"leaving {format_amount(remaining)}. Start over from part 1."
+        )
+        return None
+    if not ask_yes(
+        f"{label}\n{payee}\nCalculated amount {format_amount(remaining)}. "
+        "Is that right?"
+    ):
+        _say("Start over from part 1.")
+        return None
+    memo = ask_memo(
+        Transaction(
+            date=transaction.date,
+            amount=remaining,
+            payee=payee,
+            account=transaction.account,
+        )
+    )
+    return {"payee": payee, "amount": remaining, "memo": memo}
 
 
 def parse_user_amount(text):
