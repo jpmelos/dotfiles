@@ -1184,9 +1184,9 @@ WISE_TIMEOUT_SECONDS = 30
 # Wise holds each currency in a balance of its own. Transactions and the
 # balance come from the CAD STANDARD balance, the chequing account. SAVINGS
 # balances, the jars, and other currencies stay out. That balance maps to the
-# "Wise" account in YNAB.
+# "Wise" account in YNAB. The profile and the balance come from
+# `wise.profile_id` and `wise.balance_id` in the configuration, as strings.
 WISE_CURRENCY = "CAD"
-WISE_BALANCE_TYPES = "STANDARD"
 
 
 def run_wise_download(ctx, paths):
@@ -1198,10 +1198,18 @@ def run_wise_download(ctx, paths):
     except TaskError as error:
         _say(f"Cannot read Wise: {error}")
         raise TaskError("Wise API token is missing.") from error
+    try:
+        profile_id = read_wise_id("wise.profile_id")
+        balance_id = read_wise_id("wise.balance_id")
+    except TaskError as error:
+        _say(f"Cannot read Wise: {error}")
+        raise
 
     to_date = datetime.date.today()
     from_date = to_date - datetime.timedelta(days=HISTORY_DAYS)
-    transactions, balance = fetch_wise_data(api_token, from_date, to_date)
+    transactions, balance = fetch_wise_data(
+        api_token, profile_id, balance_id, from_date, to_date
+    )
     save_wise_transactions(paths.wise_file, transactions)
     ctx.log(f"Wise transactions: {len(transactions)}, balance {format_amount(balance)}")
     _say(
@@ -1211,65 +1219,37 @@ def run_wise_download(ctx, paths):
     return balance
 
 
-def fetch_wise_data(api_token, from_date, to_date):
+def read_wise_id(path):
+    # Returns the Wise profile or balance ID at `path` in the configuration.
+    # The file holds the ID as a string, and the API takes it as an integer.
+    raw = read_config_text(path)
+    text = raw.strip()
+    if not text.isdigit():
+        raise TaskError(f"{path} in ~/config.json is not a numeric ID")
+    try:
+        value = int(text)
+    except ValueError:
+        raise TaskError(f"{path} in ~/config.json is not a numeric ID") from None
+    if value <= 0:
+        raise TaskError(f"{path} in ~/config.json is not a numeric ID")
+    return value
+
+
+def fetch_wise_data(api_token, profile_id, balance_id, from_date, to_date):
     # Returns the transactions between `from_date` and `to_date` and the
-    # current balance of the CAD chequing account, the STANDARD balance in
-    # `WISE_CURRENCY`. That account maps to the "Wise" account in YNAB.
-    profiles = wise_list_profiles(api_token)
-    if not profiles:
-        raise TaskError("Wise returned no profiles")
-
-    candidates = []
-    seen_currencies = set()
-    for profile in profiles:
-        if not isinstance(profile, dict):
-            raise TaskError("Wise returned a bad profile")
-        profile_id = profile.get("id")
-        if not isinstance(profile_id, int) or isinstance(profile_id, bool):
-            raise TaskError(f"Wise returned a profile with the ID {profile_id!r}")
-        profile_type = profile.get("type")
-        for record in wise_list_balances(api_token, profile_id):
-            if not isinstance(record, dict):
-                raise TaskError("Wise returned a bad balance")
-            currency = record.get("currency")
-            if isinstance(currency, str):
-                seen_currencies.add(currency)
-            if currency != WISE_CURRENCY:
-                continue
-            if record.get("type") != "STANDARD":
-                continue
-            balance_id = record.get("id")
-            if not isinstance(balance_id, int) or isinstance(balance_id, bool):
-                raise TaskError(
-                    f"Wise returned a balance with the ID {balance_id!r}"
-                )
-            candidates.append((profile_id, profile_type, balance_id))
-    if not candidates:
-        seen = ", ".join(sorted(seen_currencies)) or "none"
+    # current balance of the configured chequing account. That account maps
+    # to the "Wise" account in YNAB.
+    record = wise_get_balance(api_token, profile_id, balance_id)
+    if not isinstance(record, dict):
+        raise TaskError("Wise returned a bad balance")
+    if record.get("currency") != WISE_CURRENCY:
         raise TaskError(
-            f"Wise returned no {WISE_CURRENCY} chequing balance "
-            f"(currencies seen: {seen})"
+            f"Wise balance {balance_id} is in "
+            f"{record.get('currency')!r}, expected {WISE_CURRENCY!r}"
         )
-    if len(candidates) > 1:
-        personal = [
-            candidate for candidate in candidates if candidate[1] == "PERSONAL"
-        ]
-        if len(personal) == 1:
-            candidates = personal
-        else:
-            ids = ", ".join(
-                f"profile {profile_id} balance {balance_id}"
-                for profile_id, _, balance_id in candidates
-            )
-            raise TaskError(
-                f"Wise returned more than one {WISE_CURRENCY} chequing "
-                f"balance: {ids}"
-            )
-    profile_id, _, balance_id = candidates[0]
-
-    balance = wise_balance_value(
-        wise_get_balance(api_token, profile_id, balance_id)
-    )
+    if record.get("type") != "STANDARD":
+        raise TaskError(f"Wise balance {balance_id} is not a chequing balance")
+    balance = wise_balance_value(record)
     interval_start = from_date.strftime("%Y-%m-%dT00:00:00.000Z")
     interval_end = to_date.strftime("%Y-%m-%dT23:59:59.999Z")
     statement = wise_get_statement(
@@ -1280,31 +1260,6 @@ def fetch_wise_data(api_token, from_date, to_date):
         for item in statement_transactions_of(statement)
     ]
     return transactions, balance
-
-
-def wise_list_profiles(api_token):
-    # Returns the list of Wise profiles of the token.
-    response = wise_get(
-        "read the Wise profiles", f"{WISE_API_BASE}/v1/profiles", api_token
-    )
-    if not isinstance(response, list):
-        raise TaskError("Wise returned no profile list")
-    return response
-
-
-def wise_list_balances(api_token, profile_id):
-    # Returns the STANDARD balances of one Wise profile.
-    query = urllib.parse.urlencode({"types": WISE_BALANCE_TYPES})
-    response = wise_get(
-        f"read the Wise balances of profile {profile_id}",
-        f"{WISE_API_BASE}/v4/profiles/{profile_id}/balances?{query}",
-        api_token,
-    )
-    if not isinstance(response, list):
-        raise TaskError(
-            f"Wise returned no balance list for profile {profile_id}"
-        )
-    return response
 
 
 def wise_get_balance(api_token, profile_id, balance_id):
