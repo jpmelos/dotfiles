@@ -1,8 +1,14 @@
-# Task that downloads the BMO statements and syncs new transactions to YNAB.
+# Task that downloads the BMO statements and the Wise transactions and syncs
+# new transactions to YNAB.
 #
 # Run it with `/run budget-sync` from the allowlisted chat. Optional words
 # after the name are `--from-date YYYY-MM-DD`, `--no-download`, and
 # `--no-upload`, with the same meaning as in `bin/budget_imports`.
+#
+# BMO comes from `agent-browser` downloads. Wise comes from the Wise API with
+# the token in `wise.api_token`, without a browser. The Wise cache lives in
+# the task state directory as JSON, so `--no-download` reuses the last Wise
+# fetch, same as it reuses the last BMO statements.
 #
 # All state lives in the task state directory, including the payee map as a
 # plain CSV file with the same format as before, so the old file can be
@@ -10,7 +16,7 @@
 # each, plus short confirmations, balance lines, and a count of the
 # transactions without a memo.
 
-DESCRIPTION = "Sync new BMO transactions to YNAB."
+DESCRIPTION = "Sync new BMO and Wise transactions to YNAB."
 # Banking with user questions can take a while. This is the budget for one
 # run, in seconds.
 TIMEOUT = 7200
@@ -79,6 +85,7 @@ PAYEE_COLUMNS = ("Original Payee Name", "New Payee Name")
 PAYEES_ID = "payees.csv"
 CHEQUING_ID = "chequing.csv"
 CREDIT_CARD_ID = "credit_card.csv"
+WISE_ID = "wise.json"
 DOWNLOAD_ID = "statement.csv"
 SESSION_ID = "bmo_session.json"
 TOKEN_ID = "questrade_refresh_token.txt"
@@ -125,7 +132,9 @@ def run(ctx, args=None):
         questrade_balance = sum(questrade_balances.values())
         ctx.log(f"Questrade total {format_amount(questrade_balance)}")
         _say(f"Got Questrade balance {format_amount(questrade_balance)}.")
+        wise_balance = run_wise_download(ctx, paths)
         balances = run_download(ctx, paths)
+        balances[Account.WISE] = wise_balance
 
     # The task works only on the transactions from this date on, in the
     # statements and in YNAB.
@@ -137,6 +146,7 @@ def run(ctx, args=None):
     statement_transactions = [
         *read_statement(paths.chequing_file, CHEQUING_STATEMENT),
         *read_statement(paths.credit_card_file, CREDIT_CARD_STATEMENT),
+        *read_wise_transactions(paths.wise_file),
     ]
     transactions = [
         transaction
@@ -293,13 +303,14 @@ def read_config_text(path):
 
 @dataclass
 class SessionPaths:
-    # Every path sits in the task state directory. The statements, the bank
-    # session, the Questrade token, the payee map, and the error screenshot
-    # all persist there across runs.
+    # Every path sits in the task state directory. The statements, the Wise
+    # cache, the bank session, the Questrade token, the payee map, and the
+    # error screenshot all persist there across runs.
     session_dir: str
     session_file: str
     chequing_file: str
     credit_card_file: str
+    wise_file: str
     # Where the browser saves each statement that the bank sends.
     download_file: str
     screenshot_file: str
@@ -318,6 +329,7 @@ def resolve_state_files(ctx):
         session_file=ctx.state_path(SESSION_ID),
         chequing_file=ctx.state_path(CHEQUING_ID),
         credit_card_file=ctx.state_path(CREDIT_CARD_ID),
+        wise_file=ctx.state_path(WISE_ID),
         download_file=ctx.state_path(DOWNLOAD_ID),
         screenshot_file=ctx.state_path(SCREENSHOT_ID),
         questrade_token_file=ctx.state_path(TOKEN_ID),
@@ -368,7 +380,11 @@ def run_download(ctx, paths):
 def use_last_statements(paths):
     _log("Using the statements of the last run")
     _say("Using the statements of the last run.")
-    for statement_path in (paths.chequing_file, paths.credit_card_file):
+    for statement_path in (
+        paths.chequing_file,
+        paths.credit_card_file,
+        paths.wise_file,
+    ):
         if not os.path.isfile(statement_path):
             raise TaskError("No downloaded statements. Run without --no-download first")
 
@@ -594,17 +610,20 @@ class Account(enum.IntEnum):
     # The order of the values is the order of the accounts in the report.
     CHEQUING = 0
     CREDIT_CARD = 1
+    WISE = 2
 
 
 ACCOUNT_LABELS = {
     Account.CHEQUING: "Chequing",
     Account.CREDIT_CARD: "Credit card",
+    Account.WISE: "Wise",
 }
 
 # Short account tags for the narrow chat report.
 ACCOUNT_TAGS = {
     Account.CHEQUING: "Chq",
     Account.CREDIT_CARD: "MC",
+    Account.WISE: "Wise",
 }
 
 
@@ -1154,6 +1173,416 @@ def describe_questrade_failure(response):
 
 
 # --------------------------------------------------------------------------------------
+# Wise.
+# --------------------------------------------------------------------------------------
+
+# The base of the Wise Platform API. The balance calls use `/v4` and the
+# profile and statement calls use `/v1`, as in the Wise docs.
+WISE_API_BASE = "https://api.wise.com"
+WISE_TIMEOUT_SECONDS = 30
+# Only this currency syncs to YNAB. The YNAB account holds one currency, and
+# Wise holds each currency in a balance of its own. Transactions and the
+# balance come from the CAD STANDARD balance, the chequing account. SAVINGS
+# balances, the jars, and other currencies stay out. That balance maps to the
+# "Wise" account in YNAB.
+WISE_CURRENCY = "CAD"
+WISE_BALANCE_TYPES = "STANDARD"
+
+
+def run_wise_download(ctx, paths):
+    # Fetches the Wise transactions and balance through the API, saves the
+    # transactions to the Wise cache, and returns the balance. Same role as
+    # `run_download` for BMO, but without a browser.
+    try:
+        api_token = read_config_text("wise.api_token")
+    except TaskError as error:
+        _say(f"Cannot read Wise: {error}")
+        raise TaskError("Wise API token is missing.") from error
+
+    to_date = datetime.date.today()
+    from_date = to_date - datetime.timedelta(days=HISTORY_DAYS)
+    transactions, balance = fetch_wise_data(api_token, from_date, to_date)
+    save_wise_transactions(paths.wise_file, transactions)
+    ctx.log(f"Wise transactions: {len(transactions)}, balance {format_amount(balance)}")
+    _say(
+        f"Got Wise balance {format_amount(balance)} "
+        f"with {len(transactions)} transactions."
+    )
+    return balance
+
+
+def fetch_wise_data(api_token, from_date, to_date):
+    # Returns the transactions between `from_date` and `to_date` and the
+    # current balance of the CAD chequing account, the STANDARD balance in
+    # `WISE_CURRENCY`. That account maps to the "Wise" account in YNAB.
+    profiles = wise_list_profiles(api_token)
+    if not profiles:
+        raise TaskError("Wise returned no profiles")
+
+    candidates = []
+    seen_currencies = set()
+    for profile in profiles:
+        if not isinstance(profile, dict):
+            raise TaskError("Wise returned a bad profile")
+        profile_id = profile.get("id")
+        if not isinstance(profile_id, int) or isinstance(profile_id, bool):
+            raise TaskError(f"Wise returned a profile with the ID {profile_id!r}")
+        profile_type = profile.get("type")
+        for record in wise_list_balances(api_token, profile_id):
+            if not isinstance(record, dict):
+                raise TaskError("Wise returned a bad balance")
+            currency = record.get("currency")
+            if isinstance(currency, str):
+                seen_currencies.add(currency)
+            if currency != WISE_CURRENCY:
+                continue
+            if record.get("type") != "STANDARD":
+                continue
+            balance_id = record.get("id")
+            if not isinstance(balance_id, int) or isinstance(balance_id, bool):
+                raise TaskError(
+                    f"Wise returned a balance with the ID {balance_id!r}"
+                )
+            candidates.append((profile_id, profile_type, balance_id))
+    if not candidates:
+        seen = ", ".join(sorted(seen_currencies)) or "none"
+        raise TaskError(
+            f"Wise returned no {WISE_CURRENCY} chequing balance "
+            f"(currencies seen: {seen})"
+        )
+    if len(candidates) > 1:
+        personal = [
+            candidate for candidate in candidates if candidate[1] == "PERSONAL"
+        ]
+        if len(personal) == 1:
+            candidates = personal
+        else:
+            ids = ", ".join(
+                f"profile {profile_id} balance {balance_id}"
+                for profile_id, _, balance_id in candidates
+            )
+            raise TaskError(
+                f"Wise returned more than one {WISE_CURRENCY} chequing "
+                f"balance: {ids}"
+            )
+    profile_id, _, balance_id = candidates[0]
+
+    balance = wise_balance_value(
+        wise_get_balance(api_token, profile_id, balance_id)
+    )
+    interval_start = from_date.strftime("%Y-%m-%dT00:00:00.000Z")
+    interval_end = to_date.strftime("%Y-%m-%dT23:59:59.999Z")
+    statement = wise_get_statement(
+        api_token, profile_id, balance_id, interval_start, interval_end
+    )
+    transactions = [
+        wise_to_transaction(item)
+        for item in statement_transactions_of(statement)
+    ]
+    return transactions, balance
+
+
+def wise_list_profiles(api_token):
+    # Returns the list of Wise profiles of the token.
+    response = wise_get(
+        "read the Wise profiles", f"{WISE_API_BASE}/v1/profiles", api_token
+    )
+    if not isinstance(response, list):
+        raise TaskError("Wise returned no profile list")
+    return response
+
+
+def wise_list_balances(api_token, profile_id):
+    # Returns the STANDARD balances of one Wise profile.
+    query = urllib.parse.urlencode({"types": WISE_BALANCE_TYPES})
+    response = wise_get(
+        f"read the Wise balances of profile {profile_id}",
+        f"{WISE_API_BASE}/v4/profiles/{profile_id}/balances?{query}",
+        api_token,
+    )
+    if not isinstance(response, list):
+        raise TaskError(
+            f"Wise returned no balance list for profile {profile_id}"
+        )
+    return response
+
+
+def wise_get_balance(api_token, profile_id, balance_id):
+    # Returns one Wise balance, with its current amounts.
+    return wise_get(
+        f"read the Wise balance {balance_id}",
+        f"{WISE_API_BASE}/v4/profiles/{profile_id}/balances/{balance_id}",
+        api_token,
+    )
+
+
+def wise_get_statement(api_token, profile_id, balance_id, interval_start, interval_end):
+    # Returns the statement of one Wise balance between the two UTC instants.
+    query = urllib.parse.urlencode(
+        {
+            "currency": WISE_CURRENCY,
+            "intervalStart": interval_start,
+            "intervalEnd": interval_end,
+            "type": "COMPACT",
+        }
+    )
+    return wise_get(
+        f"read the Wise statement of balance {balance_id}",
+        f"{WISE_API_BASE}/v1/profiles/{profile_id}/balance-statements/"
+        f"{balance_id}/statement.json?{query}",
+        api_token,
+    )
+
+
+def statement_transactions_of(statement):
+    # Returns the transaction items in a Wise statement.
+    records = statement.get("transactions")
+    if not isinstance(records, list):
+        raise TaskError("Wise returned a statement without transactions")
+    return records
+
+
+def wise_balance_value(record):
+    # Returns the current cash in a Wise balance. Prefers `cashAmount`, then
+    # `amount`, then `totalWorth`.
+    if not isinstance(record, dict):
+        raise TaskError("Wise returned a bad balance")
+    for key in ("cashAmount", "amount", "totalWorth"):
+        amount = wise_amount_value(record.get(key), f"Wise balance field {key}")
+        if amount is not None:
+            return amount
+    raise TaskError("Wise returned a balance without an amount")
+
+
+def wise_to_transaction(item):
+    # Returns the task transaction for one Wise statement item. The Wise
+    # amount already has the sign of `Transaction.amount`: negative for money
+    # that the user loses.
+    if not isinstance(item, dict):
+        raise TaskError("Wise returned a bad transaction")
+    return Transaction(
+        date=parse_wise_date(item.get("date")),
+        amount=parse_wise_signed_amount(item.get("amount")),
+        payee=wise_payee(item),
+        account=Account.WISE,
+    )
+
+
+def wise_payee(item):
+    # Returns the bank payee name of one Wise statement item. The payee map
+    # replaces it with the name of the user, same as for BMO. Prefers the
+    # human description, then the merchant name, then the sender name.
+    details = item.get("details")
+    if not isinstance(details, dict):
+        details = {}
+    description = details.get("description")
+    if isinstance(description, str) and description.strip():
+        return description.strip()
+    merchant = details.get("merchant")
+    if isinstance(merchant, dict):
+        merchant_name = merchant.get("name")
+        if isinstance(merchant_name, str) and merchant_name.strip():
+            return merchant_name.strip()
+    sender_name = details.get("senderName")
+    if isinstance(sender_name, str) and sender_name.strip():
+        sender_name = sender_name.strip()
+        reference = details.get("paymentReference")
+        if isinstance(reference, str) and reference.strip():
+            return f"{sender_name} {reference.strip()}"
+        return sender_name
+    detail_type = details.get("type")
+    if isinstance(detail_type, str) and detail_type.strip():
+        return detail_type.strip()
+    reference_number = item.get("referenceNumber")
+    if isinstance(reference_number, str) and reference_number.strip():
+        return reference_number.strip()
+    return "Wise transaction"
+
+
+def parse_wise_date(value):
+    # Returns the date of a Wise ISO timestamp, such as
+    # `2018-04-30T08:47:05.832Z`.
+    if not isinstance(value, str) or not value.strip():
+        raise TaskError(f"Wise returned a bad date {value!r}")
+    text = value.strip().replace("Z", "+00:00")
+    try:
+        moment = datetime.datetime.fromisoformat(text)
+    except ValueError:
+        raise TaskError(f"Wise returned a bad date {value!r}") from None
+    return moment.date()
+
+
+def parse_wise_signed_amount(value):
+    # Returns the signed amount of a Wise statement item, negative for debits.
+    amount = wise_amount_value(value, "Wise transaction amount")
+    if amount is None:
+        raise TaskError(f"Wise returned a bad amount {value!r}")
+    return amount
+
+
+def wise_amount_value(value, what):
+    # Returns the decimal value in `value`, an object with a `value` amount
+    # such as `{"value": 310.86, "currency": "EUR"}`, or `None` when `value`
+    # holds no such object. Raises when the object holds a bad amount.
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise TaskError(f"Wise returned a bad {what}: {value!r}")
+    raw = value.get("value")
+    if isinstance(raw, bool):
+        raise TaskError(f"Wise returned a bad {what}: {raw!r}")
+    if isinstance(raw, int):
+        amount = decimal.Decimal(raw)
+    elif isinstance(raw, decimal.Decimal):
+        amount = raw
+    elif isinstance(raw, float):
+        amount = decimal.Decimal(str(raw))
+    elif isinstance(raw, str) and raw.strip():
+        try:
+            amount = decimal.Decimal(raw.strip())
+        except decimal.InvalidOperation:
+            raise TaskError(f"Wise returned a bad {what}: {raw!r}") from None
+    else:
+        raise TaskError(f"Wise returned a bad {what}: {raw!r}")
+    if not amount.is_finite():
+        raise TaskError(f"Wise returned a bad {what}: {raw!r}")
+    return amount
+
+
+def save_wise_transactions(path, transactions):
+    # Writes the Wise transactions to the cache at `path`, so `--no-download`
+    # can reuse them. The cache holds plain JSON with ISO dates and string
+    # amounts, so an exact decimal survives.
+    data = [
+        {
+            "date": transaction.date.isoformat(),
+            "amount": str(transaction.amount),
+            "payee": transaction.payee,
+        }
+        for transaction in transactions
+    ]
+    try:
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(data, handle, indent=2)
+            handle.write("\n")
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            pass
+    except OSError as error:
+        raise TaskError(f"cannot save the Wise cache: {error}") from error
+
+
+def read_wise_transactions(path):
+    # Returns the Wise transactions in the cache at `path`.
+    try:
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle, parse_float=decimal.Decimal)
+    except FileNotFoundError:
+        raise TaskError(
+            "No downloaded statements. Run without --no-download first"
+        ) from None
+    except (OSError, ValueError) as error:
+        raise TaskError(f"cannot read the Wise cache: {error}") from error
+    if not isinstance(data, list):
+        raise TaskError("the Wise cache holds no transaction list")
+    transactions = []
+    for entry in data:
+        if not isinstance(entry, dict):
+            raise TaskError("the Wise cache holds a bad transaction")
+        try:
+            date = datetime.date.fromisoformat(entry.get("date", ""))
+        except ValueError:
+            raise TaskError(
+                f"the Wise cache holds a bad date {entry.get('date')!r}"
+            ) from None
+        raw_amount = entry.get("amount")
+        if isinstance(raw_amount, bool):
+            raise TaskError("the Wise cache holds a bad amount")
+        if isinstance(raw_amount, (int, decimal.Decimal)):
+            amount = decimal.Decimal(raw_amount)
+        elif isinstance(raw_amount, float):
+            amount = decimal.Decimal(str(raw_amount))
+        elif isinstance(raw_amount, str):
+            try:
+                amount = decimal.Decimal(raw_amount.strip())
+            except decimal.InvalidOperation:
+                raise TaskError(
+                    f"the Wise cache holds a bad amount {raw_amount!r}"
+                ) from None
+        else:
+            raise TaskError(
+                f"the Wise cache holds a bad amount {raw_amount!r}"
+            )
+        if not amount.is_finite():
+            raise TaskError(f"the Wise cache holds a bad amount {raw_amount!r}")
+        payee = entry.get("payee")
+        if not isinstance(payee, str) or not payee.strip():
+            raise TaskError("the Wise cache holds a bad payee")
+        transactions.append(
+            Transaction(
+                date=date,
+                amount=amount,
+                payee=payee,
+                account=Account.WISE,
+            )
+        )
+    return transactions
+
+
+def wise_get(action, url, api_token):
+    # Returns the JSON body that the Wise API returns for `url`. A number
+    # with a fraction becomes a `decimal.Decimal`, so an amount keeps its
+    # exact value.
+    try:
+        response = urllib3.request(
+            "GET",
+            url,
+            headers={"Authorization": f"Bearer {api_token}"},
+            timeout=WISE_TIMEOUT_SECONDS,
+        )
+    except urllib3.exceptions.HTTPError as error:
+        raise TaskError(f"cannot {action}: {error}") from error
+    if response.status == 401:
+        raise TaskError(
+            f"cannot {action}: Wise rejected the token "
+            f"({describe_wise_failure(response)})"
+        )
+    if response.status == 403:
+        raise TaskError(
+            f"cannot {action}: Wise refused the call "
+            f"({describe_wise_failure(response)})"
+        )
+    if response.status != 200:
+        raise TaskError(f"cannot {action}: {describe_wise_failure(response)}")
+    try:
+        value = json.loads(response.data, parse_float=decimal.Decimal)
+    except ValueError as error:
+        raise TaskError(
+            f"cannot {action}: Wise returned invalid JSON: {error}"
+        ) from error
+    if not isinstance(value, (dict, list)):
+        raise TaskError(f"cannot {action}: Wise returned no JSON object or list")
+    return value
+
+
+def describe_wise_failure(response):
+    # Returns the HTTP status of `response`, with the message of the error
+    # when the body holds one.
+    description = f"HTTP {response.status}"
+    try:
+        body = json.loads(response.data)
+    except ValueError:
+        return description
+    if isinstance(body, dict):
+        for key in ("message", "error", "description"):
+            message = body.get(key)
+            if isinstance(message, str) and message.strip():
+                return f"{description}, {message.strip()}"
+    return description
+
+
+# --------------------------------------------------------------------------------------
 # YNAB.
 # --------------------------------------------------------------------------------------
 
@@ -1161,6 +1590,7 @@ def describe_questrade_failure(response):
 YNAB_ACCOUNT_NAMES = {
     Account.CHEQUING: "BMO Chequing",
     Account.CREDIT_CARD: "BMO MasterCard",
+    Account.WISE: "Wise",
 }
 ACCOUNTS_BY_YNAB_NAME = {name: account for account, name in YNAB_ACCOUNT_NAMES.items()}
 # The YNAB account of all the Questrade accounts.
@@ -1334,7 +1764,7 @@ def compare_bank_balances(plan, bank_balances, ynab_matches_statements):
     lines = []
     differences = 0
     for account, ynab_name in YNAB_ACCOUNT_NAMES.items():
-        tag = "Chq" if account == Account.CHEQUING else "MC"
+        tag = ACCOUNT_TAGS[account]
         ynab_account = read_ynab_account(plan, plan.account_ids[account])
         ynab_balance = from_milliunits(ynab_account.cleared_balance)
         bank_balance = bank_balances.get(account)
