@@ -12,11 +12,13 @@
 # Every bank entry needs a decision in `transactions.json` in the task state:
 # its YNAB payee, or its split parts with payee, amount, and memo each. The
 # task asks in date order and remembers. One decision covers every identical
-# entry of one day. YNAB gains missing copies and loses surplus copies of
-# bank entries after one confirmation. Deletion happens only there. The chat
-# only gets the new transactions, one short line each, plus short
-# confirmations, balance lines, and a count of the transactions without a
-# memo.
+# entry of one day. When YNAB already holds the same account, date, and
+# amount, the task offers its payee and memo first, and an accepted offer
+# becomes the decision with nothing else to ask. YNAB gains missing copies
+# and loses surplus copies of bank entries after one confirmation. Deletion
+# happens only there. The chat only gets the new transactions, one short line
+# each, plus short confirmations, balance lines, and a count of the
+# transactions without a memo.
 
 DESCRIPTION = "Sync new BMO and Wise transactions to YNAB."
 # Banking with user questions can take a while. This is the budget for one
@@ -163,7 +165,7 @@ def run(ctx, args=None):
 
     ctx.log("Recording the decisions")
     decisions = load_decisions(ctx)
-    transactions = apply_decisions(ctx, transactions, decisions)
+    transactions = apply_decisions(ctx, transactions, decisions, ynab_api_key, start_date)
     ctx.log(f"Decided transactions: {len(transactions)} after expansion")
 
     matched, added_count, cleared_count, deleted_count, memo_count = save_to_ynab(
@@ -991,22 +993,26 @@ def transaction_decision_key(transaction):
     )
 
 
-def apply_decisions(ctx, transactions, decisions):
+def apply_decisions(ctx, transactions, decisions, ynab_api_key=None, start_date=None):
     # Walks `transactions` in date order. A stored decision applies silently.
-    # Any other group of identical entries asks whether to split, then asks
-    # for the payee or the parts, and stores the new decision at once.
-    # Returns the expanded list, with every split replaced by its parts.
+    # For a group without one, a YNAB transaction with the same account, date,
+    # and amount offers its payee and memo first. An accepted offer becomes a
+    # single decision with its memo stored, so nothing else asks. Any other
+    # group asks whether to split, then asks for the payee or the parts, and
+    # stores the new decision at once. Returns the expanded list, with every
+    # split replaced by its parts.
     lookup = {decision["key"]: decision for decision in decisions}
     groups = {}
     for transaction in sorted(transactions, key=lambda item: (item.date, item.amount)):
         groups.setdefault(transaction_decision_key(transaction), []).append(transaction)
+    suggestions = load_ynab_suggestions(ctx, groups, lookup, ynab_api_key, start_date)
     remembered_count = 0
     new_count = 0
     dirty = False
     for key, members in groups.items():
         decision = lookup.get(key)
         if decision is None:
-            decision = ask_decision(ctx, members)
+            decision = ask_decision(ctx, members, suggestions.get(suggestion_key(members[0])))
             decision["count"] = len(members)
             decisions.append(decision)
             lookup[key] = decision
@@ -1026,6 +1032,75 @@ def apply_decisions(ctx, transactions, decisions):
     ctx.log(f"decisions: {remembered_count} remembered, {new_count} new")
     _say(f"Decisions done, {new_count} new.")
     return expanded
+
+
+def suggestion_key(transaction):
+    # Returns the YNAB lookup key of `transaction`: account, date, and amount
+    # in milliunits. Returns None when the amount cannot go to YNAB, so the
+    # group gets no offer.
+    try:
+        milliunits = to_milliunits(transaction.amount)
+    except TaskError:
+        return None
+    return (transaction.account, transaction.date, milliunits)
+
+
+def load_ynab_suggestions(ctx, groups, lookup, ynab_api_key, start_date):
+    # Returns the YNAB payee and memo offers by suggestion key, for the groups
+    # without a stored decision. Fetches YNAB once. Returns an empty map when
+    # nothing is undecided, when the caller gives no API key or start date, or
+    # when the fetch fails, so the run falls back to the manual questions.
+    undecided = any(key not in lookup for key in groups)
+    if not undecided or ynab_api_key is None or start_date is None:
+        return {}
+    ctx.log("Checking YNAB for payee suggestions")
+    try:
+        return fetch_ynab_suggestions(ynab_api_key, start_date)
+    except Exception as error:
+        ctx.log(f"YNAB suggestion lookup skipped: {error}")
+        return {}
+
+
+def fetch_ynab_suggestions(api_key, start_date):
+    # Returns the distinct YNAB payee and memo pairs by suggestion key, from
+    # the transactions since `start_date`. Skips deleted transactions and ones
+    # without a usable payee. Transfer payees use the canonical `Transfer:
+    # <account name>` form, so an adopted payee matches `statement_key` later.
+    suggestions = {}
+    with ynab.ApiClient(ynab.Configuration(access_token=api_key)) as api_client:
+        plan = load_ynab_plan(api_client)
+        for account, account_id in plan.account_ids.items():
+            response = call_ynab(
+                "read the YNAB transactions",
+                ynab.TransactionsApi(api_client).get_transactions_by_account,
+                plan.plan_id,
+                str(account_id),
+                since_date=start_date,
+            )
+            for ynab_transaction in response.data.transactions:
+                if ynab_transaction.deleted:
+                    continue
+                if ynab_transaction.transfer_account_id is not None:
+                    payee = transfer_payee(
+                        plan.account_names.get(
+                            ynab_transaction.transfer_account_id,
+                            str(ynab_transaction.transfer_account_id),
+                        )
+                    )
+                else:
+                    payee = ynab_transaction.payee_name or ""
+                    if not payee.strip():
+                        continue
+                    if len(payee) > YNAB_PAYEE_NAME_LIMIT:
+                        continue
+                memo = (ynab_transaction.memo or "").strip() or None
+                key = (account, ynab_transaction.var_date, ynab_transaction.amount)
+                entries = suggestions.setdefault(key, [])
+                if (payee, memo) not in {
+                    (entry["payee"], entry["memo"]) for entry in entries
+                }:
+                    entries.append({"payee": payee, "memo": memo})
+    return suggestions
 
 
 def decision_transactions(decision, template):
@@ -1058,9 +1133,14 @@ def decision_transactions(decision, template):
     ]
 
 
-def ask_decision(ctx, members):
+def ask_decision(ctx, members, suggestions=None):
     # Asks how one group of identical bank entries splits, and returns the
-    # new decision row. `members` holds the entries.
+    # new decision row. `members` holds the entries. `suggestions` holds the
+    # YNAB payee and memo offers for the group, if any. An accepted offer
+    # becomes a single decision with its memo stored, so nothing else asks.
+    adopted = ask_ynab_suggestion(ctx, members, suggestions)
+    if adopted is not None:
+        return adopted
     representative = members[0]
     lines = [decision_line(representative)]
     if len(members) > 1:
@@ -1076,6 +1156,67 @@ def ask_decision(ctx, members):
         "memo": None,
         "memo_ready": False,
     }
+
+
+def ask_ynab_suggestion(ctx, members, suggestions):
+    # Returns a single decision row from a YNAB offer that the chat accepts,
+    # or None when there is no offer or the chat declines. The memo always
+    # stores, so no later question asks for it.
+    if not suggestions:
+        return None
+    if len(suggestions) > 1:
+        return ask_ynab_choice(ctx, members, suggestions)
+    offer = suggestions[0]
+    representative = members[0]
+    lines = [decision_line(representative)]
+    if len(members) > 1:
+        lines.append(f"Applies to {len(members)} identical entries.")
+    lines.append(
+        f'YNAB has payee "{offer["payee"]}" memo {display_memo(offer["memo"])}.'
+    )
+    if ask_yes("\n".join(lines) + "\nTake payee and memo from YNAB?"):
+        return {
+            "key": transaction_decision_key(representative),
+            "count": len(members),
+            "kind": "single",
+            "payee": offer["payee"],
+            "memo": offer["memo"],
+            "memo_ready": True,
+        }
+    return None
+
+
+def ask_ynab_choice(ctx, members, suggestions):
+    # Returns a single decision row from one of several YNAB offers, or None
+    # when the chat declines them all.
+    representative = members[0]
+    lines = [decision_line(representative)]
+    if len(members) > 1:
+        lines.append(f"Applies to {len(members)} identical entries.")
+    lines.append("YNAB has:")
+    for index, offer in enumerate(suggestions, start=1):
+        lines.append(
+            f'{index}. payee "{offer["payee"]}" memo {display_memo(offer["memo"])}'
+        )
+    lines.append("Reply with the number to take, or n for none.")
+    while True:
+        reply = ctx.ask("\n".join(lines), pattern=r"(?i:n|\d+)", timeout=300).strip()
+        if reply.casefold() == "n":
+            return None
+        try:
+            choice = int(reply)
+        except ValueError:
+            continue
+        if 1 <= choice <= len(suggestions):
+            offer = suggestions[choice - 1]
+            return {
+                "key": transaction_decision_key(representative),
+                "count": len(members),
+                "kind": "single",
+                "payee": offer["payee"],
+                "memo": offer["memo"],
+                "memo_ready": True,
+            }
 
 
 def decision_line(transaction):
