@@ -340,7 +340,7 @@ def record_last_run(ctx):
     # Stores when this run finished, so other tasks can check whether this
     # task ran today. A failure to store only warns, so it never fails a
     # run that already synced.
-    stamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    stamp = datetime.datetime.now(datetime.UTC).isoformat()
     try:
         ctx.save_state(LAST_RUN_ID, {"last_run": stamp})
     except Exception as error:
@@ -417,7 +417,7 @@ def open_login_page(browser, paths):
         open_options += ["--state", paths.session_file]
     browser.open(LOGIN_URL, open_options)
     time.sleep(PAGE_WAIT_SECONDS)
-    _say("Opened the browser in the desired page.")
+    _say("Opened the browser in the BMO login page.")
 
 
 def accept_cookies(browser):
@@ -592,7 +592,10 @@ def take_error_screenshot(ctx, browser, screenshot_path):
     # directory.
     try:
         browser.run(
-            "screenshot", "--full", "--annotate", screenshot_path,
+            "screenshot",
+            "--full",
+            "--annotate",
+            screenshot_path,
             stdout=subprocess.DEVNULL,
         )
     except StepError:
@@ -690,8 +693,7 @@ def read_statement(path, statement_format):
             row = [*row[:payee_index], ",".join(row[payee_index:])]
         if len(row) != len(columns):
             raise TaskError(
-                f"a statement row has {len(row)} values, "
-                f"expected {len(columns)}"
+                f"a statement row has {len(row)} values, expected {len(columns)}"
             )
 
         amount = parse_statement_amount(row[amount_index])
@@ -962,9 +964,7 @@ def read_questrade_balances(token_path):
         number = account.get("number") if isinstance(account, dict) else None
         # The number goes into the URL of the next call.
         if not isinstance(number, str) or not number.isdigit():
-            raise TaskError(
-                f"Questrade returned an account with the number {number!r}"
-            )
+            raise TaskError(f"Questrade returned an account with the number {number!r}")
         account_balances = questrade_get(
             session,
             f"accounts/{number}/balances",
@@ -993,8 +993,7 @@ def find_combined_balance(account_balances, account_number):
             total_equity, (int, decimal.Decimal)
         ):
             raise TaskError(
-                f"Questrade returned a bad total equity for "
-                f"account {account_number}"
+                f"Questrade returned a bad total equity for account {account_number}"
             )
         return decimal.Decimal(total_equity).quantize(CENT)
     raise TaskError(
@@ -1256,8 +1255,7 @@ def fetch_wise_data(api_token, profile_id, balance_id, from_date, to_date):
         api_token, profile_id, balance_id, interval_start, interval_end
     )
     transactions = [
-        wise_to_transaction(item)
-        for item in statement_transactions_of(statement)
+        wise_to_transaction(item) for item in statement_transactions_of(statement)
     ]
     return transactions, balance
 
@@ -1466,9 +1464,7 @@ def read_wise_transactions(path):
                     f"the Wise cache holds a bad amount {raw_amount!r}"
                 ) from None
         else:
-            raise TaskError(
-                f"the Wise cache holds a bad amount {raw_amount!r}"
-            )
+            raise TaskError(f"the Wise cache holds a bad amount {raw_amount!r}")
         if not amount.is_finite():
             raise TaskError(f"the Wise cache holds a bad amount {raw_amount!r}")
         payee = entry.get("payee")
@@ -1665,10 +1661,7 @@ def update_from_statements(plan, transactions, start_date, upload):
             if transfer_target(transaction.payee) is not None
         ]
         if transfers:
-            _say(
-                f"{len(transfers)} transfer(s). YNAB adds each other side "
-                "by itself."
-            )
+            _say(f"{len(transfers)} transfer(s). YNAB adds each other side by itself.")
         report_other_sides(transfers)
     if uncleared_count:
         _say(f"Clear {uncleared_count} in YNAB.")
@@ -1754,8 +1747,7 @@ def reconcile_questrade(plan, questrade_balance, ynab_matches_statements, upload
     difference = questrade_balance - ynab_balance
     mark = "OK" if difference == 0 else "DIFF"
     _say(
-        f"QT {format_amount(questrade_balance)} / "
-        f"{format_amount(ynab_balance)} {mark}"
+        f"QT {format_amount(questrade_balance)} / {format_amount(ynab_balance)} {mark}"
     )
 
     if difference == 0:
