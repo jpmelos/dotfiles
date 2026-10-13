@@ -27,6 +27,7 @@ import time
 import traceback
 import urllib.error
 import urllib.request
+import zipfile
 from dataclasses import dataclass
 
 import click
@@ -42,6 +43,12 @@ MESSAGE_KEYS = ("message", "edited_message")
 REASONS = ("done", "error", "timeout", "cancelled", "shutdown")
 # File name of the schedule state in the state directory.
 SCHEDULE_STATE_FILENAME = "schedule_state.json"
+# File name of the poll offset in the state directory.
+POLL_STATE_FILENAME = "poll_state.json"
+# File name of the export manifest inside the export zip.
+EXPORT_MANIFEST_NAME = "telegram_bot_export.json"
+# Version of the export format written by export and read by import.
+EXPORT_VERSION = 1
 # A bad SCHEDULE warns at most once per task per hour, so the log stays quiet.
 SCHEDULE_WARN_INTERVAL = 3600.0
 
@@ -51,7 +58,10 @@ SCHEDULE_WARN_INTERVAL = 3600.0
 # --------------------------------------------------------------------------------------
 
 
-@click.command(context_settings={"help_option_names": ["-h", "--help"]})
+@click.group(
+    invoke_without_command=True,
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
 @click.option(
     "--tasks-dir",
     type=click.Path(file_okay=False),
@@ -160,7 +170,9 @@ SCHEDULE_WARN_INTERVAL = 3600.0
     metavar="S",
     help="Seconds between schedule checks for periodic tasks.",
 )
+@click.pass_context
 def main(
+    ctx,
     tasks_dir,
     state_dir,
     token,
@@ -175,6 +187,13 @@ def main(
     schedule_interval,
 ):
     """Run a Telegram bot that starts tasks and relays their questions to you.
+
+    \b
+    Run with no subcommand to start the bot:
+      telegram_bot [--tasks-dir DIR] [--state-dir DIR] ...
+    Move the bot to another machine with:
+      telegram_bot export [--state-dir DIR] [--force] FILE
+      telegram_bot import [--state-dir DIR] FILE
 
     \b
     Chat commands:
@@ -245,7 +264,35 @@ def main(
       Only the allowlisted chats can talk to the bot. A one-time code lives
       only in memory and is never logged. Never send passwords or account
       data through the chat.
+
+    \b
+    State transfer:
+      export writes everything the bot needs to resume into a zip file at
+      FILE: the poll offset, the schedule state, and every file under
+      STATE_DIR/tasks. Task venvs under STATE_DIR/venvs are left out, since
+      the next run rebuilds them from DEPENDENCIES. Temporary files whose
+      name starts with . are left out as well. The zip itself gets mode
+      0600, since task state can hold sessions and tokens. import restores
+      such a zip into STATE_DIR, replacing the poll offset, the schedule
+      state, and the tasks tree, while it leaves venvs alone. Stop the bot
+      before import, and do not run two bots from one state directory.
     """
+    ctx.obj = {
+        "tasks_dir": tasks_dir,
+        "state_dir": state_dir,
+        "token": token,
+        "chat_ids": chat_ids,
+        "poll_timeout": poll_timeout,
+        "ask_timeout": ask_timeout,
+        "run_timeout": run_timeout,
+        "shutdown_timeout": shutdown_timeout,
+        "heartbeat_url": heartbeat_url,
+        "heartbeat_interval": heartbeat_interval,
+        "recent_window": recent_window,
+        "schedule_interval": schedule_interval,
+    }
+    if ctx.invoked_subcommand is not None:
+        return
     try:
         bot = Bot(
             token=resolve_token(token),
@@ -266,6 +313,60 @@ def main(
         # Ctrl-C during startup. The shell convention for SIGINT is 128 + 2.
         sys.exit(130)
     sys.exit(exit_status)
+
+
+@main.command("export")
+@click.argument("path", type=click.Path(dir_okay=False))
+@click.option(
+    "--state-dir",
+    type=click.Path(file_okay=False),
+    default=None,
+    metavar="DIR",
+    help=(
+        "Directory for task state. Defaults to the --state-dir given before "
+        "export, else TELEGRAM_STATE_DIR, else XDG_STATE_HOME/telegram_bot, "
+        "else ~/.local/state/telegram_bot."
+    ),
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    default=False,
+    help="Replace FILE when it already exists.",
+)
+@click.pass_context
+def export_state(ctx, path, state_dir, force):
+    """Export all bot and task state into the zip file at PATH."""
+    base = resolve_state_base(state_dir or (ctx.obj or {}).get("state_dir"))
+    try:
+        count = export_state_dir(base, path, overwrite=force)
+    except BotError as error:
+        die(str(error))
+    log(f"Exported {count} file(s) from {base} to {path}.")
+
+
+@main.command("import")
+@click.argument("path", type=click.Path(exists=True, dir_okay=False))
+@click.option(
+    "--state-dir",
+    type=click.Path(file_okay=False),
+    default=None,
+    metavar="DIR",
+    help=(
+        "Directory for task state. Defaults to the --state-dir given before "
+        "import, else TELEGRAM_STATE_DIR, else XDG_STATE_HOME/telegram_bot, "
+        "else ~/.local/state/telegram_bot."
+    ),
+)
+@click.pass_context
+def import_state(ctx, path, state_dir):
+    """Import bot and task state from the zip file at PATH."""
+    base = resolve_state_base(state_dir or (ctx.obj or {}).get("state_dir"))
+    try:
+        count = import_state_dir(base, path)
+    except BotError as error:
+        die(str(error))
+    log(f"Imported {count} file(s) from {path} to {base}.")
 
 
 # --------------------------------------------------------------------------------------
@@ -1274,7 +1375,7 @@ class Bot:
         self.schedule_last = {}
         # Monotonic time of the last bad-schedule warning per task.
         self.schedule_warned_at = {}
-        self.poll_state_path = os.path.join(self.store.base_dir, "poll_state.json")
+        self.poll_state_path = os.path.join(self.store.base_dir, POLL_STATE_FILENAME)
         # Last saved offset, the first update identifier still wanted at the
         # time of the save. None when nothing was saved yet.
         self.saved_offset = None
@@ -2077,6 +2178,233 @@ class Bot:
             if self.stopping.wait(self.heartbeat_interval):
                 break
             self.send_heartbeat()
+
+
+# --------------------------------------------------------------------------------------
+# State transfer.
+# --------------------------------------------------------------------------------------
+
+
+def collect_export_files(base_dir):
+    # Returns the sorted relative paths to store in an export: the poll
+    # offset, the schedule state, and every task state file. Venvs are left
+    # out, since the next run rebuilds them from DEPENDENCIES. Dotfiles are
+    # left out, since they are temporary files of atomic writes. Symlinks are
+    # left out, since tasks store plain files. Missing files are skipped, so
+    # a fresh state directory still exports.
+    found = []
+    for name in (POLL_STATE_FILENAME, SCHEDULE_STATE_FILENAME):
+        full = os.path.join(base_dir, name)
+        try:
+            if os.path.isfile(full) and not os.path.islink(full):
+                found.append(name)
+        except OSError:
+            continue
+    tasks_root = os.path.join(base_dir, "tasks")
+    try:
+        walker = os.walk(tasks_root)
+    except OSError:
+        walker = None
+    if walker is not None:
+        for current, directories, files in walker:
+            directories[:] = sorted(
+                name
+                for name in directories
+                if not name.startswith(".") and name not in ("__pycache__")
+            )
+            for name in sorted(files):
+                if name.startswith("."):
+                    continue
+                full = os.path.join(current, name)
+                try:
+                    if os.path.islink(full) or not os.path.isfile(full):
+                        continue
+                except OSError:
+                    continue
+                found.append(os.path.relpath(full, base_dir))
+    return sorted(found)
+
+
+def export_state_dir(base_dir, dest_path, overwrite=False):
+    # Writes every export file under base_dir into the zip at dest_path, and
+    # returns how many state files were stored, not counting the manifest.
+    # Raises BotError on failure. The write is atomic: the zip goes to a
+    # temporary file in the destination directory first.
+    base_dir = os.path.abspath(base_dir)
+    dest_path = os.path.abspath(dest_path)
+    if os.path.isdir(dest_path):
+        raise BotError(f"cannot export to {dest_path}: it is a directory")
+    if os.path.exists(dest_path) and not overwrite:
+        raise BotError(f"{dest_path} already exists, pass --force to replace it")
+    parent = os.path.dirname(dest_path)
+    if parent:
+        try:
+            os.makedirs(parent, exist_ok=True)
+        except OSError as error:
+            raise BotError(f"cannot prepare {parent}: {error}") from error
+    names = collect_export_files(base_dir)
+    manifest = {
+        "version": EXPORT_VERSION,
+        "tool": "telegram_bot",
+        "created_at": datetime.datetime.now(datetime.UTC).isoformat(),
+        "files": names,
+    }
+    try:
+        descriptor, temp_path = tempfile.mkstemp(
+            dir=parent or ".", prefix=".telegram-bot-export-", suffix=".zip"
+        )
+    except OSError as error:
+        raise BotError(f"cannot export to {dest_path}: {error}") from error
+    try:
+        os.close(descriptor)
+    except OSError:
+        pass
+    try:
+        try:
+            with zipfile.ZipFile(temp_path, "w", zipfile.ZIP_DEFLATED) as archive:
+                info = zipfile.ZipInfo(EXPORT_MANIFEST_NAME)
+                info.external_attr = (0o600 & 0xFFFF) << 16
+                archive.writestr(
+                    info,
+                    (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode(
+                        "utf-8"
+                    ),
+                )
+                for name in names:
+                    archive.write(os.path.join(base_dir, name), name)
+        except (OSError, ValueError) as error:
+            raise BotError(f"cannot export to {dest_path}: {error}") from error
+        try:
+            os.chmod(temp_path, 0o600)
+            os.replace(temp_path, dest_path)
+        except OSError as error:
+            raise BotError(f"cannot export to {dest_path}: {error}") from error
+    finally:
+        try:
+            os.remove(temp_path)
+        except OSError:
+            pass
+    try:
+        os.chmod(dest_path, 0o600)
+    except OSError:
+        pass
+    return len(names)
+
+
+def check_export_entry(name):
+    # Returns the relative path for the zip entry name, or raises BotError
+    # when the entry would escape the state directory. Zip names always use
+    # forward slashes, so a backslash stays a plain filename character.
+    if not name or "\0" in name or name.startswith("/"):
+        raise BotError(f"bad entry {name!r} in the export")
+    parts = name.split("/")
+    if any(part in ("", ".", "..") for part in parts):
+        raise BotError(f"bad entry {name!r} in the export")
+    return name
+
+
+def import_state_dir(base_dir, src_path):
+    # Restores the export zip at src_path into base_dir, and returns how many
+    # state files were restored, not counting the manifest. Replaces the poll
+    # offset, the schedule state, and the tasks tree, while it leaves venvs
+    # alone. Raises BotError on failure. The caller must stop the bot first.
+    base_dir = os.path.abspath(base_dir)
+    try:
+        archive = zipfile.ZipFile(src_path)
+    except FileNotFoundError:
+        raise BotError(f"{src_path} does not exist") from None
+    except (OSError, zipfile.BadZipFile) as error:
+        raise BotError(f"cannot read {src_path}: {error}") from error
+    with archive:
+        try:
+            infos = archive.infolist()
+        except (OSError, ValueError) as error:
+            raise BotError(f"cannot read {src_path}: {error}") from error
+        manifest = None
+        for info in infos:
+            if info.filename == EXPORT_MANIFEST_NAME:
+                try:
+                    manifest = json.loads(archive.read(info.filename).decode("utf-8"))
+                except (OSError, ValueError, UnicodeDecodeError) as error:
+                    raise BotError(
+                        f"cannot read {src_path}: bad export manifest: {error}"
+                    ) from error
+                break
+        if not isinstance(manifest, dict) or manifest.get("version") != EXPORT_VERSION:
+            raise BotError(f"{src_path} is not a telegram_bot export")
+        planned = []
+        for info in infos:
+            name = info.filename
+            if name == EXPORT_MANIFEST_NAME:
+                continue
+            if name.endswith("/"):
+                name = name.rstrip("/")
+                if not name:
+                    continue
+            cleaned = check_export_entry(name)
+            is_dir = info.is_dir()
+            if cleaned == "tasks":
+                if not is_dir:
+                    log(f"Warning: skipping {cleaned!r}, it is not bot state.")
+                    continue
+            elif cleaned.startswith("tasks/"):
+                pass
+            elif cleaned in (POLL_STATE_FILENAME, SCHEDULE_STATE_FILENAME):
+                if is_dir:
+                    log(f"Warning: skipping {cleaned!r}, it is not bot state.")
+                    continue
+            else:
+                log(f"Warning: skipping {cleaned!r}, it is not bot state.")
+                continue
+            if (info.external_attr >> 16) & 0o170000 == 0o120000:
+                raise BotError(f"bad entry {name!r} in the export: it is a symlink")
+            planned.append((info, cleaned))
+        try:
+            ensure_dir(base_dir)
+        except SystemExit as error:
+            raise BotError(f"cannot prepare {base_dir}") from error
+        tasks_root = os.path.join(base_dir, "tasks")
+        try:
+            if os.path.isdir(tasks_root) and not os.path.islink(tasks_root):
+                shutil.rmtree(tasks_root)
+            for name in (POLL_STATE_FILENAME, SCHEDULE_STATE_FILENAME):
+                try:
+                    if os.path.islink(os.path.join(base_dir, name)):
+                        os.remove(os.path.join(base_dir, name))
+                    else:
+                        try:
+                            os.remove(os.path.join(base_dir, name))
+                        except FileNotFoundError:
+                            pass
+                except OSError as error:
+                    raise BotError(
+                        f"cannot clear {os.path.join(base_dir, name)}: {error}"
+                    ) from error
+        except BotError:
+            raise
+        except OSError as error:
+            raise BotError(f"cannot clear {base_dir}: {error}") from error
+        count = 0
+        for info, cleaned in planned:
+            target = os.path.realpath(os.path.join(base_dir, cleaned))
+            root = os.path.realpath(base_dir)
+            if target != root and not target.startswith(root + os.sep):
+                raise BotError(f"bad entry {cleaned!r} in the export")
+            try:
+                if info.is_dir():
+                    os.makedirs(target, mode=0o700, exist_ok=True)
+                    os.chmod(target, 0o700)
+                    continue
+                os.makedirs(os.path.dirname(target) or base_dir, mode=0o700, exist_ok=True)
+                with archive.open(info) as source, open(target, "wb") as handle:
+                    shutil.copyfileobj(source, handle, length=1024 * 64)
+                os.chmod(target, 0o600)
+                count += 1
+            except (OSError, ValueError) as error:
+                raise BotError(
+                    f"cannot restore {cleaned!r} from {src_path}: {error}"
+                ) from error
+        return count
 
 
 # --------------------------------------------------------------------------------------
