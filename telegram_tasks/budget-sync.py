@@ -21,10 +21,21 @@
 # amounts, then looks each part up in YNAB by account, date, and amount and
 # offers its payee and memo first.
 # YNAB gains missing copies and loses surplus copies of bank entries after
-# one confirmation. Deletion happens only there. The chat gets the new
-# transactions and the ignored YNAB transactions in each account, one line
-# each with the full payee, plus short confirmations, balance lines, and a
-# count of the transactions without a memo.
+# one confirmation. Deletion happens only there. Before that, the task syncs
+# every recognized YNAB transaction with the database: entries with the same
+# account, date, and amount compare payees and memos as multisets, so several
+# transactions of one amount with different memos each need a match, either
+# whole or split into parts. A mismatch asks whether YNAB or the database
+# wins, then makes both sides match, after one confirmation of its own. Each
+# side of a transfer between managed accounts checks its payee on its own.
+# The pair shares its memo: the first side asked sets it, and the other side
+# is offered that memo with a yes or no question instead of retyping it,
+# while any leftover mismatch asks once for the pair. Both legs and both
+# database sides hold the same memo once all is done, as YNAB requires. New
+# transfers still send only one side, since the other side may live in an
+# account this task does not manage. The chat gets the new transactions and the ignored
+# account, one line each with the full payee, plus short confirmations,
+# balance lines, and a count of the transactions without a memo.
 
 DESCRIPTION = "Sync new BMO and Wise transactions and BMO, Wise, and Questrade balances to YNAB."
 # Banking with user questions can take a while. This is the budget for one
@@ -175,23 +186,28 @@ def run(ctx, args=None):
     transactions = apply_decisions(ctx, transactions, decisions, ynab_api_key, start_date)
     ctx.log(f"Decided transactions: {len(transactions)} after expansion")
 
-    matched, added_count, cleared_count, deleted_count, memo_count = save_to_ynab(
-        ctx,
-        transactions,
-        decisions,
-        start_date,
-        balances,
-        questrade_balance,
-        ynab_api_key,
-        upload=not no_upload,
+    matched, added_count, cleared_count, deleted_count, memo_count, sync_count = (
+        save_to_ynab(
+            ctx,
+            transactions,
+            decisions,
+            start_date,
+            balances,
+            questrade_balance,
+            ynab_api_key,
+            upload=not no_upload,
+        )
     )
     if not matched:
         summary = "Done, preview only. YNAB unchanged."
     else:
         summary = (
             f"Done: {added_count} added, {cleared_count} cleared, "
-            f"{deleted_count} deleted, {memo_count} memos updated."
+            f"{deleted_count} deleted, {memo_count} memos updated"
         )
+        if sync_count:
+            summary += f", {sync_count} payees and memos synced"
+        summary += "."
     record_last_run(ctx)
     _say(summary)
     return summary
@@ -2234,14 +2250,14 @@ def save_to_ynab(
     # Brings YNAB up to date with the statements, then compares the cleared
     # balances with `bank_balances`, then brings the YNAB account of
     # Questrade to `questrade_balance`. Returns whether YNAB matches the
-    # statements, with the counts of added, cleared, deleted, and updated
-    # transactions. Because of `--no-download`, `bank_balances` and
+    # statements, with the counts of added, cleared, deleted, memo-updated,
+    # and synced transactions. Because of `--no-download`, `bank_balances` and
     # `questrade_balance` can be `None`, and the step of each one does not
     # run. Without `upload`, the task reads YNAB and reports the changes,
-    # but changes nothing.
+    # but writes nothing to YNAB.
     with ynab.ApiClient(ynab.Configuration(access_token=api_key)) as api_client:
         plan = load_ynab_plan(api_client)
-        matched, added_count, cleared_count, deleted_count, memo_count = (
+        matched, added_count, cleared_count, deleted_count, memo_count, sync_count = (
             update_from_statements(ctx, plan, transactions, decisions, start_date, upload)
         )
         if bank_balances is None:
@@ -2252,19 +2268,21 @@ def save_to_ynab(
             _say("Questrade skipped.")
         else:
             reconcile_questrade(plan, questrade_balance, matched, upload)
-    return matched, added_count, cleared_count, deleted_count, memo_count
+    return matched, added_count, cleared_count, deleted_count, memo_count, sync_count
 
 
 def update_from_statements(ctx, plan, transactions, decisions, start_date, upload):
-    # Adds to YNAB the statement transactions that it does not have, clears
-    # the YNAB transactions that match a statement transaction but are not
-    # cleared, and deletes the surplus YNAB copies of bank entries. The only
-    # deletions in the task happen here. Leaves the YNAB transactions that no
-    # statement holds as they are. Every read and check happens before the
-    # first change, and a problem stops the task before any change. Without
-    # `upload`, the task reads YNAB and reports the changes, but changes
-    # nothing. Returns whether YNAB matches the statements at the end, with
-    # the counts of added, cleared, and deleted transactions.
+    # Syncs the recognized YNAB transactions with the database, then adds to
+    # YNAB the statement transactions that it does not have, clears the YNAB
+    # transactions that match a statement transaction but are not cleared,
+    # and deletes the surplus YNAB copies of bank entries. The only deletions
+    # in the task happen here. Leaves the YNAB transactions that no statement
+    # holds as they are. Every read and check happens before the first change
+    # of each phase, and a problem stops the task before any change of that
+    # phase. Without `upload`, the task reads YNAB and reports the changes,
+    # but writes nothing to YNAB. Returns whether YNAB matches the statements
+    # at the end, with the counts of added, cleared, deleted, memo-updated,
+    # and synced transactions.
     comparison = compare_with_ynab(plan, transactions, start_date)
     report_ignored_counts(comparison)
     transactions_to_send, problems = plan_additions(
@@ -2279,6 +2297,53 @@ def update_from_statements(ctx, plan, transactions, decisions, start_date, uploa
     doomed_ids = {
         victim.id for victims in victims_by_account.values() for victim in victims
     }
+    # Syncs the recognized payees and memos first. Entries with the same
+    # account, date, and amount compare as multisets, so the add/delete flow
+    # below never sees a mere payee or memo edit as missing plus extra.
+    sync_mismatches, transfer_pairs = find_sync_mismatches(
+        expected_sync_groups(decisions, start_date),
+        actual_sync_groups(comparison, start_date, doomed_ids),
+    )
+    sync_pushes, sync_adopted = resolve_sync_mismatches(
+        ctx, plan, decisions, transactions, sync_mismatches, transfer_pairs
+    )
+    sync_count = 0
+    if sync_pushes or sync_adopted:
+        if sync_pushes:
+            say_sync_updates(sync_pushes)
+        if not upload:
+            _say("Preview only. YNAB unchanged.")
+            report_memo_count(comparison, start_date)
+            return False, 0, 0, 0, 0, 0
+        if sync_pushes:
+            if not ask_yes(f"In YNAB, update {len(sync_pushes)} payees and memos?"):
+                _say("Cancelled. YNAB unchanged.")
+                report_memo_count(comparison, start_date)
+                return False, 0, 0, 0, 0, 0
+            update_ynab_payees_memos(plan, sync_pushes)
+            sync_count = len(sync_pushes)
+            _say(f"Updated {sync_count} payees and memos.")
+            if any(item["transfer_change"] for item in sync_pushes):
+                _say("A transfer changed. Check the other side.")
+        # The sync changes keys, so the plan below starts from fresh state.
+        comparison = compare_with_ynab(plan, transactions, start_date)
+        transactions_to_send, problems = plan_additions(
+            plan, comparison.missing_transactions
+        )
+        if problems:
+            _say("Blocked:\n" + "\n".join(problems))
+            _say("Fix the names in YNAB or in `transactions.json` and rerun.")
+            report_memo_count(comparison, start_date)
+            if sync_count:
+                raise TaskError(
+                    f"YNAB updated with {sync_count} payees and memos, but "
+                    "blocked on the rest. Fix and rerun."
+                )
+            raise TaskError("YNAB unchanged. Fix and rerun.")
+        victims_by_account = deletable_transactions(comparison)
+        doomed_ids = {
+            victim.id for victims in victims_by_account.values() for victim in victims
+        }
     memo_pushes = resolve_memo_mismatches(
         ctx,
         find_memo_mismatches(
@@ -2294,7 +2359,7 @@ def update_from_statements(ctx, plan, transactions, decisions, start_date, uploa
     if not missing_count and not uncleared_count and not delete_count and not memo_count:
         _say("YNAB already matches.")
         report_memo_count(comparison, start_date)
-        return True, 0, 0, 0, 0
+        return True, 0, 0, 0, 0, sync_count
 
     if missing_count:
         say_new_transactions(comparison.missing_transactions)
@@ -2315,7 +2380,7 @@ def update_from_statements(ctx, plan, transactions, decisions, start_date, uploa
     if not upload:
         _say("Preview only. YNAB unchanged.")
         report_memo_count(comparison, start_date)
-        return False, 0, 0, 0, 0
+        return False, 0, 0, 0, 0, sync_count
     changes = []
     if missing_count:
         changes.append(f"add {missing_count}")
@@ -2326,9 +2391,12 @@ def update_from_statements(ctx, plan, transactions, decisions, start_date, uploa
     if memo_count:
         changes.append(f"update {memo_count} memos")
     if not ask_yes(f"In YNAB, {' and '.join(changes)}?"):
-        _say("Cancelled. YNAB unchanged.")
+        if sync_count:
+            _say(f"Cancelled the rest. YNAB keeps {sync_count} payees and memos.")
+        else:
+            _say("Cancelled. YNAB unchanged.")
         report_memo_count(comparison, start_date)
-        return False, 0, 0, 0, 0
+        return False, 0, 0, 0, 0, sync_count
 
     if missing_count:
         send_transactions(ctx, plan, transactions_to_send, decisions)
@@ -2357,12 +2425,16 @@ def update_from_statements(ctx, plan, transactions, decisions, start_date, uploa
         _say("YNAB still differs. Check YNAB.")
         report_memo_count(result, start_date)
         raise TaskError("YNAB differs after the changes.")
+    if sync_count:
+        synced_part = f", synced {sync_count} payees and memos"
+    else:
+        synced_part = ""
     _say(
         f"Added {missing_count}, cleared {uncleared_count}, "
-        f"deleted {delete_count}, updated {memo_count} memos."
+        f"deleted {delete_count}, updated {memo_count} memos{synced_part}."
     )
     report_memo_count(result, start_date)
-    return True, missing_count, uncleared_count, delete_count, memo_count
+    return True, missing_count, uncleared_count, delete_count, memo_count, sync_count
 
 
 def remaining_extra_keys(result, comparison, deleted_keys_by_account):
@@ -2999,9 +3071,9 @@ def delete_ynab_transactions(plan, victims_by_account):
 
 
 def expected_memo_map(decisions):
-    # Returns the expected YNAB memo by statement key, with the decision row
-    # and part index behind each one. Skips rows without a stored memo and
-    # keys with more than one memo, which need no check.
+    # Returns the expected YNAB memo by statement key, with the decision row,
+    # part index, and account behind each one. Skips rows without a stored
+    # memo and keys with more than one memo, which need no check.
     memo_map = {}
     ambiguous_keys = set()
     for decision in decisions:
@@ -3028,6 +3100,7 @@ def expected_memo_map(decisions):
                     "memo": memo,
                     "row": decision,
                     "part": part_index,
+                    "account": account,
                 }
     for key in ambiguous_keys:
         del memo_map[key]
@@ -3041,11 +3114,14 @@ def normalize_memo(memo):
 
 def find_memo_mismatches(comparison, memo_map, doomed_ids):
     # Returns one item per statement key whose YNAB copies hold a different
-    # memo than the decision stores. Skips doomed copies, which leave YNAB.
+    # memo than the decision stores. Skips doomed copies, which leave YNAB,
+    # and entries of other accounts, which never match here.
     mismatches = []
     for account in YNAB_ACCOUNT_NAMES:
         ynab_by_key = comparison.ynab_by_key_by_account.get(account, {})
         for key, entry in memo_map.items():
+            if entry["account"] != account:
+                continue
             copies = [
                 candidate
                 for candidate in ynab_by_key.get(key, [])
@@ -3173,6 +3249,885 @@ def say_memo_updates(push_items):
         )
     if len(groups) > REPORT_LINE_LIMIT:
         lines.append(f"+{len(groups) - REPORT_LINE_LIMIT} more")
+    _say("\n".join(lines))
+
+
+def canonical_expected_payee(payee):
+    # Returns the payee for comparison: a transfer in canonical
+    # `Transfer: <account name>` form, anything else as stored.
+    target_name = transfer_target(payee)
+    if target_name is None:
+        return payee
+    return transfer_payee(target_name)
+
+
+def expected_sync_groups(decisions, start_date):
+    # Returns the expected (payee, memo) items by (account, date, milliunits)
+    # for every decision row dated on or after `start_date`. A single counts
+    # `count` times; each split part counts `count` times. Singles without a
+    # stored memo keep their payee with the memo marked unknown.
+    groups = collections.defaultdict(list)
+    for decision in decisions:
+        source, date_iso, bank_payee, bank_amount = decision["key"]
+        account = ACCOUNTS_BY_SOURCE[source]
+        date = datetime.date.fromisoformat(date_iso)
+        if date < start_date:
+            continue
+        if decision["kind"] == "single":
+            candidates = [
+                (
+                    decision["payee"],
+                    bank_amount,
+                    decision.get("memo"),
+                    decision["memo_ready"],
+                    None,
+                )
+            ]
+        else:
+            candidates = [
+                (part["payee"], part["amount"], part["memo"], True, part_index)
+                for part_index, part in enumerate(decision["parts"])
+            ]
+        for payee, amount, memo, memo_known, part_index in candidates:
+            milliunits = to_milliunits(amount)
+            item = {
+                "payee": payee,
+                "payee_c": canonical_expected_payee(payee),
+                "memo": memo,
+                "memo_known": memo_known,
+                "row": decision,
+                "part": part_index,
+                "bank_payee": bank_payee,
+            }
+            for _ in range(decision["count"]):
+                groups[(account, date, milliunits)].append(item)
+    return groups
+
+
+def actual_sync_groups(comparison, start_date, doomed_ids):
+    # Returns the YNAB (payee, memo) items by (account, date, milliunits),
+    # leaving out doomed copies, which leave YNAB through deletion, and
+    # anything before `start_date`.
+    groups = collections.defaultdict(list)
+    for account in YNAB_ACCOUNT_NAMES:
+        entries = comparison.ynab_by_key_by_account.get(account, {})
+        for (date, payee_c, milliunits), txns in entries.items():
+            if date < start_date:
+                continue
+            for txn in txns:
+                if txn.id in doomed_ids:
+                    continue
+                groups[(account, date, milliunits)].append(
+                    {
+                        "payee_c": payee_c,
+                        "memo_n": normalize_memo(txn.memo),
+                        "txn": txn,
+                    }
+                )
+    return groups
+
+
+def find_sync_mismatches(expected_groups, actual_groups):
+    # Returns one item per recognized YNAB transaction whose (payee, memo)
+    # has no match in the database, with the transfer pairs in scope. Only
+    # groups with equal counts on both sides pair up; groups with missing or
+    # surplus copies stay with the add/delete flow. Identical pairs match
+    # first, so several transactions of one amount with different memos each
+    # find their own match, and singles without a stored memo match any memo
+    # on their payee. Each mismatch carries its transfer link, when the other
+    # leg is also here: its transaction, account, pairing-time payee, and
+    # paired database item, if that leg paired. Each pair lists both legs the
+    # same way, so a later pass can still sync pairs whose sides each match
+    # locally but disagree with each other.
+    mismatches = []
+    paired_expected = {}
+    by_txn_id = {}
+    for group_key, actual in actual_groups.items():
+        for item in actual:
+            by_txn_id[item["txn"].id] = (group_key, item)
+    for group_key in sorted(expected_groups):
+        account, date, milliunits = group_key
+        expected = expected_groups[group_key]
+        actual = actual_groups.get(group_key, [])
+        if not expected or len(expected) != len(actual):
+            continue
+        by_tuple = collections.defaultdict(collections.deque)
+        unknown_by_payee = collections.defaultdict(collections.deque)
+        for index, item in enumerate(expected):
+            if item["memo_known"]:
+                by_tuple[(item["payee_c"], normalize_memo(item["memo"]))].append(
+                    index
+                )
+            else:
+                unknown_by_payee[item["payee_c"]].append(index)
+        matched_exp = set()
+        matched_act = set()
+        for other, item in enumerate(actual):
+            pair_key = (item["payee_c"], item["memo_n"])
+            if by_tuple.get(pair_key):
+                index = by_tuple[pair_key].popleft()
+                matched_exp.add(index)
+                matched_act.add(other)
+                paired_expected[item["txn"].id] = expected[index]
+        for other, item in enumerate(actual):
+            if other in matched_act:
+                continue
+            if unknown_by_payee.get(item["payee_c"]):
+                index = unknown_by_payee[item["payee_c"]].popleft()
+                matched_exp.add(index)
+                matched_act.add(other)
+                paired_expected[item["txn"].id] = expected[index]
+        remaining_exp = [
+            index for index in range(len(expected)) if index not in matched_exp
+        ]
+        remaining_act = [
+            other for other in range(len(actual)) if other not in matched_act
+        ]
+        if not remaining_exp:
+            continue
+        remaining_exp.sort(
+            key=lambda index: (
+                expected[index]["payee_c"],
+                normalize_memo(expected[index]["memo"])
+                if expected[index]["memo_known"]
+                else "",
+            )
+        )
+        remaining_act.sort(
+            key=lambda other: (actual[other]["payee_c"], actual[other]["memo_n"])
+        )
+        for index, other in zip(remaining_exp, remaining_act):
+            paired_expected[actual[other]["txn"].id] = expected[index]
+            mismatches.append(
+                {
+                    "account": account,
+                    "date": date,
+                    "milliunits": milliunits,
+                    "expected": expected[index],
+                    "actual": actual[other],
+                    "transfer": None,
+                }
+            )
+    transfer_pairs = {}
+    for txn_id, (group_key, item) in by_txn_id.items():
+        account, date, milliunits = group_key
+        txn = item["txn"]
+        other_id = txn.transfer_transaction_id
+        if other_id is None or other_id == txn_id:
+            continue
+        found = by_txn_id.get(other_id)
+        if found is None:
+            continue
+        pair_id = tuple(sorted([txn_id, other_id]))
+        if pair_id in transfer_pairs:
+            continue
+        other_group_key, other_item = found
+        other_account, other_date, other_milliunits = other_group_key
+        transfer_pairs[pair_id] = {
+            "id": pair_id,
+            "sides": [
+                {
+                    "account": account,
+                    "date": date,
+                    "milliunits": milliunits,
+                    "txn": txn,
+                    "payee_c": item["payee_c"],
+                    "expected": paired_expected.get(txn_id),
+                },
+                {
+                    "account": other_account,
+                    "date": other_date,
+                    "milliunits": other_milliunits,
+                    "txn": other_item["txn"],
+                    "payee_c": other_item["payee_c"],
+                    "expected": paired_expected.get(other_id),
+                },
+            ],
+        }
+    for item in mismatches:
+        txn = item["actual"]["txn"]
+        other_id = txn.transfer_transaction_id
+        if other_id is None or other_id == txn.id:
+            continue
+        pair = transfer_pairs.get(tuple(sorted([txn.id, other_id])))
+        if pair is None:
+            continue
+        if pair["sides"][0]["txn"].id == txn.id:
+            other_side = pair["sides"][1]
+        else:
+            other_side = pair["sides"][0]
+        item["transfer"] = {
+            "pair_id": pair["id"],
+            "txn": other_side["txn"],
+            "account": other_side["account"],
+            "date": other_side["date"],
+            "milliunits": other_side["milliunits"],
+            "payee_c": other_side["payee_c"],
+            "expected": other_side["expected"],
+        }
+    return mismatches, list(transfer_pairs.values())
+
+
+def ask_sync_direction(
+    ctx,
+    account,
+    date,
+    milliunits,
+    bank_payee,
+    stored_payee,
+    stored_memo,
+    stored_known,
+    actual_payee_c,
+    actual_memo_n,
+):
+    # Asks whether one recognized pair takes the payee and memo of the
+    # database or of YNAB. Returns True for YNAB.
+    if stored_known:
+        database_memo = display_memo(stored_memo)
+    else:
+        database_memo = "(not set)"
+    lines = [
+        f"{date.strftime('%m-%d')} {ACCOUNT_TAGS[account]} "
+        f"{format_amount(from_milliunits(milliunits))} {stored_payee}",
+        f"Bank: {bank_payee}",
+        f'Database: payee "{canonical_expected_payee(stored_payee)}" '
+        f"memo {database_memo}",
+        f'YNAB: payee "{actual_payee_c}" memo {display_memo(actual_memo_n)}',
+        "Update YNAB or the database? Reply `ynab` or `db`.",
+    ]
+    return (
+        ctx.ask("\n".join(lines), pattern=r"(?i:ynab|db)", timeout=300).casefold()
+        == "ynab"
+    )
+
+
+def plan_payee_update(plan, account, payee):
+    # Returns the (payee_id, payee_name, problem) for writing `payee` to a
+    # YNAB transaction in `account`. A problem explains why the payee cannot
+    # go to YNAB; None means it can.
+    target_name = transfer_target(payee)
+    if target_name is None:
+        return (
+            plan.payees.ids_by_name.get(payee),
+            payee,
+            find_payee_problem(plan.payees, payee),
+        )
+    if target_name == YNAB_ACCOUNT_NAMES[account]:
+        return None, None, "transfer to its own account"
+    if target_name not in plan.transfer_payee_ids:
+        return None, None, f"no open YNAB account {target_name!r}"
+    return plan.transfer_payee_ids[target_name], None, None
+
+
+def ynab_payee_for_database(plan, txn):
+    # Returns the database form of the payee of a YNAB transaction:
+    # transfers in canonical form, anything else stripped as stored.
+    if txn.transfer_account_id is None:
+        return (txn.payee_name or "").strip()
+    return transfer_payee(
+        plan.account_names.get(txn.transfer_account_id, str(txn.transfer_account_id))
+    )
+
+
+def database_payee_problem(payee):
+    # Returns why the YNAB payee `payee` cannot go to the database, or None
+    # when it can.
+    clean = payee.strip() if isinstance(payee, str) else ""
+    if not clean:
+        return "has no payee"
+    if len(clean) > YNAB_PAYEE_NAME_LIMIT:
+        return "is over the YNAB payee limit"
+    return None
+
+
+def apply_adopt_to_transactions(
+    transactions,
+    account,
+    date,
+    milliunits,
+    old_payee_c,
+    old_memo_n,
+    memo_known,
+    new_payee,
+    new_memo,
+    cap,
+    update_memo=True,
+):
+    # Writes an adopted payee and memo into the statement transactions that
+    # produced the old pair, up to `cap` copies, so the add/delete flow below
+    # plans on the new values. Twins from distinct rows share one pair form,
+    # so the cap keeps each adoption to its own row. Without `update_memo`
+    # only the payee changes, for transfer sides whose memo settled apart.
+    updated = 0
+    for transaction in transactions:
+        if updated >= cap:
+            break
+        if transaction.account != account or transaction.date != date:
+            continue
+        if to_milliunits(transaction.amount) != milliunits:
+            continue
+        if canonical_expected_payee(transaction.payee) != old_payee_c:
+            continue
+        if memo_known and normalize_memo(transaction.memo) != old_memo_n:
+            continue
+        transaction.payee = new_payee
+        if update_memo:
+            transaction.memo = new_memo
+            transaction.memo_ready = True
+        updated += 1
+
+
+def current_expected_values(row, part_index):
+    # Returns the (payee, memo, memo_known) that the decision row or split
+    # part stores now. Reads live, so earlier answers in the same run show.
+    if part_index is None:
+        return row.get("payee"), row.get("memo"), bool(row.get("memo_ready"))
+    part = row["parts"][part_index]
+    return part["payee"], part["memo"], True
+
+
+def decision_part_milliunits(row, part_index):
+    # Returns the milliunits of one database side: the bank amount for a
+    # whole, the part amount for a split.
+    if part_index is None:
+        return to_milliunits(row["key"][3])
+    return to_milliunits(row["parts"][part_index]["amount"])
+
+
+def append_sync_push(
+    push_items,
+    account,
+    txn,
+    old_payee_c,
+    old_memo_n,
+    memo,
+    new_payee=None,
+    payee_id=None,
+    payee_name=None,
+    transfer_change=False,
+):
+    # Stages a YNAB update and mirrors the memo in memory, so later questions
+    # read decided values. Old values stay on the item for the chat. Without
+    # a new payee the item updates the memo only, leaving the payee alone.
+    item = {
+        "account": account,
+        "txn": txn,
+        "memo": memo,
+        "new_payee": new_payee,
+        "old_payee_c": old_payee_c,
+        "old_memo_n": old_memo_n,
+        "transfer_change": transfer_change,
+    }
+    if new_payee is not None:
+        item["payee_id"] = payee_id
+        item["payee_name"] = payee_name
+    push_items.append(item)
+    txn.memo = memo
+
+
+def ask_sync_payee_direction(
+    ctx, account, date, milliunits, bank_payee, stored_payee, actual_payee_c
+):
+    # Asks whether one transfer side takes the payee of the database or of
+    # YNAB. Memos go through the pair question. Returns True for YNAB.
+    lines = [
+        f"{date.strftime('%m-%d')} {ACCOUNT_TAGS[account]} "
+        f"{format_amount(from_milliunits(milliunits))} {stored_payee}",
+        f"Bank: {bank_payee}",
+        f'Database payee: "{canonical_expected_payee(stored_payee)}"',
+        f'YNAB payee: "{actual_payee_c}"',
+        "Update YNAB or the database? Reply `ynab` or `db`.",
+    ]
+    return ctx.ask("\n".join(lines), pattern=r"(?i:ynab|db)", timeout=300).casefold() == "ynab"
+
+
+def transfer_memo_lines(date, milliunits, sides):
+    # Returns the chat lines for one transfer pair memo question. Each side
+    # holds its account with its database and YNAB memo display strings.
+    # Sorts by account, so every question about the pair matches.
+    ordered = sorted(sides, key=lambda side: side[0].value)
+    lines = [
+        f"{date.strftime('%m-%d')} Transfer "
+        f"{' <-> '.join(ACCOUNT_TAGS[account] for account, _, _ in ordered)} "
+        f"{format_amount(from_milliunits(milliunits))}"
+    ]
+    for account, db_disp, _ in ordered:
+        lines.append(f"Database {ACCOUNT_TAGS[account]}: {db_disp}")
+    for account, _, ynab_disp in ordered:
+        lines.append(f"YNAB {ACCOUNT_TAGS[account]}: {ynab_disp}")
+    return lines
+
+
+def ask_pair_memo_value(ctx, lines):
+    # Asks for one typed memo for a transfer pair, so both sides converge
+    # without retyping anything from memory. Returns it normalized, or None.
+    reply = ctx.ask(
+        "\n".join(lines + ["Reply with the memo for both sides, or - for none."]),
+        pattern=r"[\s\S]+",
+        timeout=300,
+    ).strip()
+    return normalize_memo(reply) or None
+
+
+def apply_pair_memo(transactions, push_items, legs, db_refs, value):
+    # Writes one memo across a transfer pair: both YNAB legs, skipping legs
+    # already there, and every given database side with its statement
+    # transactions. `value` is normalized, or None for none. Returns whether
+    # the database changed.
+    stored = value or None
+    for account, txn, old_payee_c in legs:
+        if normalize_memo(txn.memo) == normalize_memo(value):
+            continue
+        append_sync_push(
+            push_items, account, txn, old_payee_c, normalize_memo(txn.memo), stored
+        )
+    changed = False
+    for row, part, account in db_refs:
+        payee, memo, known = current_expected_values(row, part)
+        if known and normalize_memo(memo) == normalize_memo(value):
+            continue
+        if part is None:
+            row["memo"] = stored
+            row["memo_ready"] = True
+        else:
+            row["parts"][part]["memo"] = stored
+        apply_adopt_to_transactions(
+            transactions,
+            account,
+            datetime.date.fromisoformat(row["key"][1]),
+            decision_part_milliunits(row, part),
+            canonical_expected_payee(payee),
+            normalize_memo(memo) if known else None,
+            known,
+            payee,
+            stored,
+            row["count"],
+        )
+        changed = True
+    return changed
+
+
+def ask_transfer_reuse(ctx, item, recorded):
+    # Asks whether one transfer side takes the memo the other side already
+    # set, instead of retyping it. Returns True for yes.
+    account = item["account"]
+    expected = item["expected"]
+    stored_payee, _, _ = current_expected_values(expected["row"], expected["part"])
+    lines = [
+        f"{item['date'].strftime('%m-%d')} {ACCOUNT_TAGS[account]} "
+        f"{format_amount(from_milliunits(item['milliunits']))} {stored_payee}",
+        f"Bank: {expected['bank_payee']}",
+        f"The other side uses memo {display_memo(recorded)}. Use it here too?",
+    ]
+    return ask_yes("\n".join(lines))
+
+
+def pair_memo_parts(sides):
+    # Splits transfer pair `sides` into legs for staging, database refs for
+    # adopting, display tuples, and the distinct memo set, all read live.
+    # Each side holds its account, transaction, pairing-time payee, and paired
+    # database item, if that leg paired.
+    legs = []
+    db_refs = []
+    displays = []
+    values = set()
+    for side in sides:
+        account = side["account"]
+        txn = side["txn"]
+        live = normalize_memo(txn.memo)
+        values.add(live)
+        legs.append((account, txn, side["payee_c"]))
+        if side["expected"] is None:
+            db_disp = "(no decision)"
+        else:
+            row = side["expected"]["row"]
+            _, memo, known = current_expected_values(
+                row, side["expected"]["part"]
+            )
+            if known:
+                values.add(normalize_memo(memo))
+                db_disp = display_memo(memo)
+            else:
+                db_disp = "(not set)"
+            db_refs.append((row, side["expected"]["part"], account))
+        displays.append((account, db_disp, display_memo(live)))
+    return legs, db_refs, displays, values
+
+
+def resolve_joint_mismatch(ctx, plan, transactions, push_items, item):
+    # Asks one ynab/db question covering the payee and memo of a pair, stages
+    # a YNAB push or adopts into the decision row and its statement
+    # transactions at once. Reads every value fresh. Returns (adopted,
+    # decided memo for the pair, normalized).
+    account = item["account"]
+    expected = item["expected"]
+    txn = item["actual"]["txn"]
+    row = expected["row"]
+    stored_payee, stored_memo, stored_known = current_expected_values(
+        row, expected["part"]
+    )
+    stored_c = canonical_expected_payee(stored_payee)
+    actual_payee_c = item["actual"]["payee_c"]
+    actual_memo_n = normalize_memo(txn.memo)
+    if stored_c == actual_payee_c and (
+        not stored_known or normalize_memo(stored_memo) == actual_memo_n
+    ):
+        return False, None
+    if ask_sync_direction(
+        ctx,
+        account,
+        item["date"],
+        item["milliunits"],
+        expected["bank_payee"],
+        stored_payee,
+        stored_memo,
+        stored_known,
+        actual_payee_c,
+        actual_memo_n,
+    ):
+        payee_id, payee_name, problem = plan_payee_update(
+            plan, account, stored_payee
+        )
+        if problem is not None:
+            raise TaskError(
+                f"Cannot write payee {stored_payee!r} to YNAB: {problem}. "
+                "Fix the names in YNAB or in `transactions.json` and rerun."
+            )
+        if stored_known:
+            new_memo = stored_memo
+            decided = normalize_memo(stored_memo)
+        else:
+            # No stored memo exists, so only the payee changes.
+            new_memo = txn.memo
+            decided = actual_memo_n
+        append_sync_push(
+            push_items,
+            account,
+            txn,
+            actual_payee_c,
+            actual_memo_n,
+            new_memo,
+            new_payee=stored_payee,
+            payee_id=payee_id,
+            payee_name=payee_name,
+            transfer_change=transfer_target(actual_payee_c)
+            != transfer_target(stored_payee),
+        )
+        return False, decided
+    new_payee = ynab_payee_for_database(plan, txn)
+    problem = database_payee_problem(new_payee)
+    if problem is not None:
+        raise TaskError(
+            f"YNAB payee {actual_payee_c!r} {problem}, so the database "
+            "cannot adopt it. Fix it in YNAB and rerun."
+        )
+    new_memo = actual_memo_n or None
+    if expected["part"] is None:
+        row["payee"] = new_payee
+        row["memo"] = new_memo
+        row["memo_ready"] = True
+    else:
+        row["parts"][expected["part"]]["payee"] = new_payee
+        row["parts"][expected["part"]]["memo"] = new_memo
+    apply_adopt_to_transactions(
+        transactions,
+        account,
+        item["date"],
+        item["milliunits"],
+        stored_c,
+        normalize_memo(stored_memo) if stored_known else None,
+        stored_known,
+        new_payee,
+        new_memo,
+        row["count"],
+    )
+    return True, actual_memo_n
+
+
+def handle_transfer_memo(ctx, transactions, push_items, pair_memos, item):
+    # Syncs the memo of one transfer side with its pair. Offers the memo the
+    # other side already set instead of retyping it; asks the pair for one
+    # typed value when nothing decided fits; flags a joint payee-and-memo
+    # question when this side carries a known differing memo. Reads every
+    # value fresh. Returns (adopted, recorded memo or None, joint needed).
+    link = item["transfer"]
+    pair_id = link["pair_id"]
+    account = item["account"]
+    expected = item["expected"]
+    txn = item["actual"]["txn"]
+    row = expected["row"]
+    stored_payee, stored_memo, stored_known = current_expected_values(
+        row, expected["part"]
+    )
+    actual_memo_n = normalize_memo(txn.memo)
+    recorded = pair_memos.get(pair_id)
+    if recorded is not None:
+        if actual_memo_n == recorded and (
+            not stored_known or normalize_memo(stored_memo) == recorded
+        ):
+            return False, None, False
+        if ask_transfer_reuse(ctx, item, recorded):
+            changed = apply_pair_memo(
+                transactions,
+                push_items,
+                [(account, txn, item["actual"]["payee_c"])],
+                [(row, expected["part"], account)],
+                recorded,
+            )
+            return changed, None, False
+        sides = [
+            {
+                "account": account,
+                "txn": txn,
+                "payee_c": item["actual"]["payee_c"],
+                "expected": expected,
+            },
+            {
+                "account": link["account"],
+                "txn": link["txn"],
+                "payee_c": link["payee_c"],
+                "expected": link["expected"],
+            },
+        ]
+        legs, db_refs, displays, _values = pair_memo_parts(sides)
+        value = ask_pair_memo_value(
+            ctx, transfer_memo_lines(item["date"], item["milliunits"], displays)
+        )
+        return (
+            apply_pair_memo(transactions, push_items, legs, db_refs, value),
+            value,
+            False,
+        )
+    if stored_known and actual_memo_n != normalize_memo(stored_memo):
+        return False, None, True
+    sides = [
+        {
+            "account": account,
+            "txn": txn,
+            "payee_c": item["actual"]["payee_c"],
+            "expected": expected,
+        },
+        {
+            "account": link["account"],
+            "txn": link["txn"],
+            "payee_c": link["payee_c"],
+            "expected": link["expected"],
+        },
+    ]
+    legs, db_refs, displays, values = pair_memo_parts(sides)
+    if len(values) <= 1:
+        return False, None, False
+    value = ask_pair_memo_value(
+        ctx, transfer_memo_lines(item["date"], item["milliunits"], displays)
+    )
+    return (
+        apply_pair_memo(transactions, push_items, legs, db_refs, value),
+        value,
+        False,
+    )
+
+
+def handle_transfer_payee(ctx, plan, transactions, push_items, item):
+    # Asks for one transfer side's payee after its memo settled. Stages a
+    # YNAB push with the live memo, or adopts only the payee into the row.
+    # Reads every value fresh. Returns whether the database changed.
+    account = item["account"]
+    expected = item["expected"]
+    txn = item["actual"]["txn"]
+    row = expected["row"]
+    stored_payee, _, _ = current_expected_values(row, expected["part"])
+    stored_c = canonical_expected_payee(stored_payee)
+    actual_payee_c = item["actual"]["payee_c"]
+    if stored_c == actual_payee_c:
+        return False
+    if ask_sync_payee_direction(
+        ctx,
+        account,
+        item["date"],
+        item["milliunits"],
+        expected["bank_payee"],
+        stored_payee,
+        actual_payee_c,
+    ):
+        payee_id, payee_name, problem = plan_payee_update(
+            plan, account, stored_payee
+        )
+        if problem is not None:
+            raise TaskError(
+                f"Cannot write payee {stored_payee!r} to YNAB: {problem}. "
+                "Fix the names in YNAB or in `transactions.json` and rerun."
+            )
+        append_sync_push(
+            push_items,
+            account,
+            txn,
+            actual_payee_c,
+            normalize_memo(txn.memo),
+            txn.memo,
+            new_payee=stored_payee,
+            payee_id=payee_id,
+            payee_name=payee_name,
+            transfer_change=transfer_target(actual_payee_c)
+            != transfer_target(stored_payee),
+        )
+        return False
+    new_payee = ynab_payee_for_database(plan, txn)
+    problem = database_payee_problem(new_payee)
+    if problem is not None:
+        raise TaskError(
+            f"YNAB payee {actual_payee_c!r} {problem}, so the database "
+            "cannot adopt it. Fix it in YNAB and rerun."
+        )
+    if expected["part"] is None:
+        row["payee"] = new_payee
+    else:
+        row["parts"][expected["part"]]["payee"] = new_payee
+    _, fresh_memo, fresh_known = current_expected_values(row, expected["part"])
+    apply_adopt_to_transactions(
+        transactions,
+        account,
+        item["date"],
+        item["milliunits"],
+        stored_c,
+        normalize_memo(fresh_memo) if fresh_known else None,
+        fresh_known,
+        new_payee,
+        None,
+        row["count"],
+        update_memo=False,
+    )
+    return True
+
+
+def reconcile_transfer_pairs(ctx, transactions, push_items, transfer_pairs):
+    # Asks once per still-diverged transfer pair for one memo for both sides,
+    # covering pairs no side question settled. Reads every value fresh.
+    # Returns whether the database changed.
+    adopted = False
+    ordered = sorted(
+        transfer_pairs,
+        key=lambda pair: (
+            min(side["account"].value for side in pair["sides"]),
+            max(side["account"].value for side in pair["sides"]),
+            pair["id"],
+        ),
+    )
+    for pair in ordered:
+        legs, db_refs, displays, values = pair_memo_parts(pair["sides"])
+        if len(values) <= 1:
+            continue
+        first = sorted(pair["sides"], key=lambda side: side["account"].value)[0]
+        value = ask_pair_memo_value(
+            ctx,
+            transfer_memo_lines(
+                first["date"], first["milliunits"], displays
+            ),
+        )
+        if apply_pair_memo(transactions, push_items, legs, db_refs, value):
+            adopted = True
+    return adopted
+
+
+def resolve_sync_mismatches(
+    ctx, plan, decisions, transactions, mismatches, transfer_pairs
+):
+    # Asks about each recognized pair and returns the YNAB transactions to
+    # update with their new payee and memo, with whether the database took
+    # any YNAB values. Each transfer side checks its payee on its own, while
+    # the pair shares its memo: the second side is offered the first side's
+    # memo instead of retyping it, and any leftover mismatch asks once for
+    # the pair. A database answer adopts into the decision row at once, and
+    # into the matching statement transactions. Raises before any change when
+    # the chosen side cannot win.
+    push_items = []
+    adopted = False
+    pair_memos = {}
+    for item in mismatches:
+        transfer = item.get("transfer")
+        if transfer is None:
+            adopted_now, _ = resolve_joint_mismatch(
+                ctx, plan, transactions, push_items, item
+            )
+            adopted = adopted_now or adopted
+            continue
+        pair_id = transfer["pair_id"]
+        adopted_now, recorded_now, joint_needed = handle_transfer_memo(
+            ctx, transactions, push_items, pair_memos, item
+        )
+        if recorded_now is not None:
+            pair_memos[pair_id] = recorded_now
+        adopted = adopted_now or adopted
+        if joint_needed:
+            adopted_now, recorded_now = resolve_joint_mismatch(
+                ctx, plan, transactions, push_items, item
+            )
+            if recorded_now is not None:
+                pair_memos[pair_id] = recorded_now
+            adopted = adopted_now or adopted
+            continue
+        adopted = (
+            handle_transfer_payee(ctx, plan, transactions, push_items, item)
+            or adopted
+        )
+    adopted = (
+        reconcile_transfer_pairs(ctx, transactions, push_items, transfer_pairs)
+        or adopted
+    )
+    if adopted:
+        save_decisions(ctx, decisions)
+    return push_items, adopted
+
+
+def update_ynab_payees_memos(plan, push_items):
+    # Sets the stored payee and memo on the given YNAB transactions in one
+    # call. Items without a new payee update the memo only, leaving the payee
+    # alone.
+    updates = []
+    for item in push_items:
+        data = {"id": item["txn"].id, "memo": item["memo"]}
+        if item.get("new_payee") is not None:
+            data["payee_id"] = item["payee_id"]
+            data["payee_name"] = item["payee_name"]
+        updates.append(ynab.SaveTransactionWithIdOrImportId(**data))
+    try:
+        ynab.TransactionsApi(plan.api_client).update_transactions(
+            plan.plan_id, ynab.PatchTransactionsWrapper(transactions=updates)
+        )
+    except YNAB_ERRORS as error:
+        raise TaskError(
+            f"cannot update the payees and memos in YNAB: {error}"
+        ) from error
+
+
+def say_sync_updates(push_items):
+    # Reports the recognized YNAB payees and memos that the run updates, one
+    # line each with the full payee.
+    lines = [f"Update recognized ({len(push_items)}):"]
+    for item in push_items[:REPORT_LINE_LIMIT]:
+        txn = item["txn"]
+        new_payee = item.get("new_payee")
+        if new_payee is None:
+            payee_part = f'"{item["old_payee_c"]}"'
+        else:
+            new_c = canonical_expected_payee(new_payee)
+            if new_c == item["old_payee_c"]:
+                payee_part = f'"{new_c}"'
+            else:
+                payee_part = f"\"{item['old_payee_c']}\" -> \"{new_c}\""
+        memo_arrow = ""
+        if item["old_memo_n"] != normalize_memo(item["memo"]):
+            memo_arrow = (
+                f" memo {display_memo(item['old_memo_n'])} -> "
+                f"{display_memo(item['memo'])}"
+            )
+        lines.append(
+            f"{txn.var_date.strftime('%m-%d')} "
+            f"{ACCOUNT_TAGS[item['account']]} "
+            f"{format_amount(from_milliunits(txn.amount))} "
+            f"{payee_part}{memo_arrow}"
+        )
+    if len(push_items) > REPORT_LINE_LIMIT:
+        lines.append(f"+{len(push_items) - REPORT_LINE_LIMIT} more")
     _say("\n".join(lines))
 
 
