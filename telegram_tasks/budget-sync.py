@@ -2249,20 +2249,35 @@ def save_to_ynab(
 ):
     # Brings YNAB up to date with the statements, then compares the cleared
     # balances with `bank_balances`, then brings the YNAB account of
-    # Questrade to `questrade_balance`. Returns whether YNAB matches the
-    # statements, with the counts of added, cleared, deleted, memo-updated,
-    # and synced transactions. Because of `--no-download`, `bank_balances` and
-    # `questrade_balance` can be `None`, and the step of each one does not
-    # run. Without `upload`, the task reads YNAB and reports the changes,
-    # but writes nothing to YNAB.
+    # Questrade to `questrade_balance`. Pre-reads the YNAB cleared balances of
+    # each managed account before any write when `bank_balances` exists,
+    # passes the pre-reads with the statement deltas to `report_balances` so
+    # the YNAB sides hold this run's writes, and reports again after a
+    # Questrade add so the final message holds all writes. Returns whether
+    # YNAB matches the statements, with the counts of added, cleared,
+    # deleted, memo-updated, and synced transactions. Because of
+    # `--no-download`, `bank_balances` and `questrade_balance` can be `None`,
+    # and the step of each one does not run. Without `upload`, the task reads
+    # YNAB and reports the changes, but writes nothing to YNAB.
     with ynab.ApiClient(ynab.Configuration(access_token=api_key)) as api_client:
         plan = load_ynab_plan(api_client)
-        matched, added_count, cleared_count, deleted_count, memo_count, sync_count = (
+        if bank_balances is None:
+            pre_balances = None
+        else:
+            pre_balances = {
+                account: from_milliunits(
+                    read_ynab_account(plan, plan.account_ids[account]).cleared_balance
+                )
+                for account in YNAB_ACCOUNT_NAMES
+            }
+        matched, added_count, cleared_count, deleted_count, memo_count, sync_count, deltas = (
             update_from_statements(ctx, plan, transactions, decisions, start_date, upload)
         )
-        questrade_state = report_balances(plan, bank_balances, questrade_balance, matched)
+        questrade_state = report_balances(
+            plan, bank_balances, questrade_balance, matched, pre_balances, deltas
+        )
         if questrade_state is not None:
-            reconcile_questrade(
+            questrade_added = reconcile_questrade(
                 plan,
                 questrade_balance,
                 matched,
@@ -2270,18 +2285,28 @@ def save_to_ynab(
                 difference=questrade_state[0],
                 ynab_balance=questrade_state[1],
             )
+            if questrade_added:
+                report_balances(
+                    plan, bank_balances, questrade_balance, matched,
+                    pre_balances, deltas,
+                )
     return matched, added_count, cleared_count, deleted_count, memo_count, sync_count
 
 
-def report_balances(plan, bank_balances, questrade_balance, ynab_matches_statements):
+def report_balances(plan, bank_balances, questrade_balance, ynab_matches_statements, pre_balances=None, deltas=None):
     # Sends the bank and Questrade balances in one message, then returns the
     # Questrade difference and YNAB balance for `reconcile_questrade`, or
-    # None when Questrade is skipped.
+    # None when Questrade is skipped. The YNAB sides hold this run's statement
+    # writes: `pre_balances` with `deltas` go to `build_bank_balance_lines`,
+    # which shows expected on a stale read. The caller reports again after a
+    # Questrade add, so the final message holds everything.
     if bank_balances is None:
         bank_block = "Bank balances skipped."
         bank_differences = 0
     else:
-        bank_lines, bank_differences = build_bank_balance_lines(plan, bank_balances)
+        bank_lines, bank_differences = build_bank_balance_lines(
+            plan, bank_balances, pre_balances, deltas
+        )
         bank_block = "Bank / YNAB:\n" + "\n".join(bank_lines)
     if questrade_balance is None:
         questrade_block = "Questrade skipped."
@@ -2311,7 +2336,11 @@ def update_from_statements(ctx, plan, transactions, decisions, start_date, uploa
     # phase. Without `upload`, the task reads YNAB and reports the changes,
     # but writes nothing to YNAB. Returns whether YNAB matches the statements
     # at the end, with the counts of added, cleared, deleted, memo-updated,
-    # and synced transactions.
+    # and synced transactions, plus the cleared-balance deltas by account from
+    # the final comparison used for writes: added sums the missing statement
+    # amounts, cleared sums the uncleared YNAB amounts moved to cleared, and
+    # deleted subtracts the cleared victim amounts. Paths that write nothing
+    # return zero deltas for every account in `YNAB_ACCOUNT_NAMES`.
     comparison = compare_with_ynab(plan, transactions, start_date)
     report_ignored_counts(comparison)
     transactions_to_send, problems = plan_additions(
@@ -2343,12 +2372,12 @@ def update_from_statements(ctx, plan, transactions, decisions, start_date, uploa
         if not upload:
             _say("Preview only. YNAB unchanged.")
             report_memo_count(comparison, start_date)
-            return False, 0, 0, 0, 0, 0
+            return False, 0, 0, 0, 0, 0, {account: decimal.Decimal("0") for account in YNAB_ACCOUNT_NAMES}
         if sync_pushes:
             if not ask_yes(f"In YNAB, update {len(sync_pushes)} payees and memos?"):
                 _say("Cancelled. YNAB unchanged.")
                 report_memo_count(comparison, start_date)
-                return False, 0, 0, 0, 0, 0
+                return False, 0, 0, 0, 0, 0, {account: decimal.Decimal("0") for account in YNAB_ACCOUNT_NAMES}
             update_ynab_payees_memos(plan, sync_pushes)
             sync_count = len(sync_pushes)
             _say(f"Updated {sync_count} payees and memos.")
@@ -2388,7 +2417,7 @@ def update_from_statements(ctx, plan, transactions, decisions, start_date, uploa
     if not missing_count and not uncleared_count and not delete_count and not memo_count:
         _say("YNAB already matches.")
         report_memo_count(comparison, start_date)
-        return True, 0, 0, 0, 0, sync_count
+        return True, 0, 0, 0, 0, sync_count, {account: decimal.Decimal("0") for account in YNAB_ACCOUNT_NAMES}
 
     if missing_count:
         say_new_transactions(comparison.missing_transactions)
@@ -2409,7 +2438,7 @@ def update_from_statements(ctx, plan, transactions, decisions, start_date, uploa
     if not upload:
         _say("Preview only. YNAB unchanged.")
         report_memo_count(comparison, start_date)
-        return False, 0, 0, 0, 0, sync_count
+        return False, 0, 0, 0, 0, sync_count, {account: decimal.Decimal("0") for account in YNAB_ACCOUNT_NAMES}
     changes = []
     if missing_count:
         changes.append(f"add {missing_count}")
@@ -2425,7 +2454,7 @@ def update_from_statements(ctx, plan, transactions, decisions, start_date, uploa
         else:
             _say("Cancelled. YNAB unchanged.")
         report_memo_count(comparison, start_date)
-        return False, 0, 0, 0, 0, sync_count
+        return False, 0, 0, 0, 0, sync_count, {account: decimal.Decimal("0") for account in YNAB_ACCOUNT_NAMES}
 
     if missing_count:
         send_transactions(ctx, plan, transactions_to_send, decisions)
@@ -2463,7 +2492,20 @@ def update_from_statements(ctx, plan, transactions, decisions, start_date, uploa
         f"deleted {delete_count}, updated {memo_count} memos{synced_part}."
     )
     report_memo_count(result, start_date)
-    return True, missing_count, uncleared_count, delete_count, memo_count, sync_count
+    deltas = {account: decimal.Decimal("0") for account in YNAB_ACCOUNT_NAMES}
+    for transaction in comparison.missing_transactions:
+        deltas[transaction.account] += transaction.amount
+    for ynab_transaction in comparison.uncleared_transactions:
+        cleared_account = ACCOUNTS_BY_YNAB_NAME.get(
+            getattr(ynab_transaction, "account_name", None)
+        )
+        if cleared_account is not None:
+            deltas[cleared_account] += from_milliunits(ynab_transaction.amount)
+    for account, victims in victims_by_account.items():
+        for victim in victims:
+            if victim.cleared != ynab.TransactionClearedStatus.UNCLEARED:
+                deltas[account] -= from_milliunits(victim.amount)
+    return True, missing_count, uncleared_count, delete_count, memo_count, sync_count, deltas
 
 
 def remaining_extra_keys(result, comparison, deleted_keys_by_account):
@@ -2538,17 +2580,37 @@ def say_deleted_transactions(victims_by_account):
     _say("\n".join(lines))
 
 
-def build_bank_balance_lines(plan, bank_balances):
+def build_bank_balance_lines(plan, bank_balances, pre_balances=None, deltas=None):
     # Returns one short line per account with the balance at the bank and the
     # cleared balance in YNAB, with how many of them differ.
     # `bank_balances` maps each account to its balance at the bank, or to
-    # `None` when the task could not read it.
+    # `None` when the task could not read it. `pre_balances` holds the YNAB
+    # cleared balances from before this run wrote, and `deltas` holds this
+    # run's cleared-balance changes by account, so expected holds pre plus
+    # delta. A fresh read follows, and when it differs from expected the task
+    # logs a warning and shows expected, which holds this run's writes by
+    # construction, else it shows the fresh read. The line format and the DIFF
+    # count stay the same.
     lines = []
     differences = 0
     for account, ynab_name in YNAB_ACCOUNT_NAMES.items():
         tag = ACCOUNT_TAGS[account]
         ynab_account = read_ynab_account(plan, plan.account_ids[account])
-        ynab_balance = from_milliunits(ynab_account.cleared_balance)
+        fresh_balance = from_milliunits(ynab_account.cleared_balance)
+        ynab_balance = fresh_balance
+        if pre_balances is not None and deltas is not None:
+            pre = pre_balances.get(account) if isinstance(pre_balances, dict) else None
+            delta = deltas.get(account) if isinstance(deltas, dict) else None
+            if pre is not None and delta is not None:
+                expected = pre + delta
+                if fresh_balance != expected:
+                    _log(
+                        f"Warning: YNAB cleared balance for {ynab_name} "
+                        f"reads {format_amount(fresh_balance)} but expected "
+                        f"{format_amount(expected)} with this run's writes. "
+                        "Showing expected."
+                    )
+                    ynab_balance = expected
         bank_balance = bank_balances.get(account)
         if bank_balance is None:
             lines.append(f"{tag} bank ? / {format_amount(ynab_balance)}")
@@ -2592,7 +2654,8 @@ def reconcile_questrade(
     # today, the task reports the difference, but changes nothing. The
     # combined balances message already reported the balances, so this only
     # sends the follow-ups. `difference` and `ynab_balance` reuse the values
-    # from that report; when missing, this reads YNAB again.
+    # from that report; when missing, this reads YNAB again. Returns True when
+    # it adds the reconciliation transaction, else False.
     if difference is None or ynab_balance is None:
         ynab_account = read_ynab_account(plan, plan.questrade_account_id)
         ynab_balance = from_milliunits(ynab_account.balance)
@@ -2600,19 +2663,19 @@ def reconcile_questrade(
 
     if difference == 0:
         _say("Questrade already matches.")
-        return
+        return False
     if not upload:
         _say("Preview only. YNAB unchanged.")
-        return
+        return False
     if not ynab_matches_statements:
         _say("Skipped: YNAB missed the statement changes.")
-        return
+        return False
     if questrade_reconciled_today(plan):
         _say("Skipped: Questrade already reconciled today.")
-        return
+        return False
     if not ask_yes(f"Add QT {format_amount(difference)}?"):
         _say("Cancelled. YNAB unchanged.")
-        return
+        return False
 
     send_reconciliation(plan, difference)
     ynab_account = read_ynab_account(plan, plan.questrade_account_id)
@@ -2621,6 +2684,7 @@ def reconcile_questrade(
         _say("QT differs after the change. Check YNAB.")
         raise TaskError("Questrade differs after the reconciliation.")
     _say(f"QT {format_amount(difference)} added.")
+    return True
 
 
 def questrade_reconciled_today(plan):
