@@ -1,4 +1,5 @@
-# Task that downloads the bank statements and syncs new transactions to YNAB.
+# Task that downloads the bank statements and syncs new transactions and
+# balances to YNAB.
 #
 # Run it with `/run budget-sync` from the allowlisted chat. Optional words
 # after the name are `--from-date YYYY-MM-DD`, `--no-download`, and
@@ -10,20 +11,21 @@
 # fetch, same as it reuses the last BMO statements.
 #
 # Every bank entry needs a decision in `transactions.json` in the task state:
-# its YNAB payee, or its split parts with payee, amount, and memo each. The
-# task asks in date order and remembers. One decision covers every identical
-# entry of one day. When YNAB already holds the same account, date, and
-# amount, the task offers its payee and memo first, and an accepted offer
+# its YNAB payee and memo, or its split parts with payee, amount, and memo
+# each. The task asks in date order and remembers. One decision covers every
+# identical entry of one day. When YNAB already holds the same account, date,
+# and amount, the task offers its payee and memo first, and an accepted offer
 # becomes the decision with nothing else to ask. A declined offer keeps the
 # entry in the regular pool: the task asks whether to split like any other
-# entry. A split asks only for the part amounts, then looks each part up in
-# YNAB by account, date, and amount and offers its payee and memo first.
+# entry, then asks for the payee and the memo. A split asks only for the part
+# amounts, then looks each part up in YNAB by account, date, and amount and
+# offers its payee and memo first.
 # YNAB gains missing copies and loses surplus copies of bank entries after
 # one confirmation. Deletion happens only there. The chat only gets the new
-# transactions, one short line each, plus short confirmations, balance lines,
-# and a count of the transactions without a memo.
+# transactions, one line each with the full payee, plus short confirmations,
+# balance lines, and a count of the transactions without a memo.
 
-DESCRIPTION = "Sync new BMO and Wise transactions to YNAB."
+DESCRIPTION = "Sync new BMO and Wise transactions and BMO, Wise, and Questrade balances to YNAB."
 # Banking with user questions can take a while. This is the budget for one
 # run, in seconds.
 TIMEOUT = 7200
@@ -345,8 +347,8 @@ def read_config_text(path):
 @dataclass
 class SessionPaths:
     # Every path sits in the task state directory. The statements, the Wise
-    # cache, the bank session, the Questrade token, the payee map, and the
-    # error screenshot all persist there across runs.
+    # cache, the bank session, the Questrade token, the transaction database,
+    # and the error screenshot all persist there across runs.
     session_dir: str
     session_file: str
     chequing_file: str
@@ -691,14 +693,14 @@ class Transaction:
     # entry expands into split parts with their own payees.
     payee: str
     account: Account
-    # The memo for YNAB. None means no memo. The chat asks for it before the
-    # transaction goes to YNAB, unless a stored decision already holds it.
+    # The memo for YNAB. None means no memo. The chat asks for it with the
+    # payee, unless a YNAB offer or a stored decision already holds it.
     memo: str = None
     # The payee name of the bank, as the statement gave it. The decision key
     # uses it, so it never changes.
     bank_payee: str = ""
-    # Whether a stored decision already holds the memo. When False, the chat
-    # asks for the memo before the transaction goes to YNAB.
+    # Whether the decision already holds the memo. Older singles without a
+    # stored memo still ask for it before the transaction goes to YNAB.
     memo_ready: bool = False
 
 
@@ -815,8 +817,10 @@ def parse_statement_amount(value):
 # A decision row is a dict with a `key` of (source, date ISO, bank payee,
 # bank amount), a `count` of bank entries with that key, and either kind
 # `single` with a `payee` and a memo, or kind `split` with `parts` of payee,
-# amount, and memo. A single without a `memo` entry still needs its memo
-# from the chat. A part always holds its memo, None for none.
+# amount, and memo. Each row holds its own payee. There is no payee database,
+# only this transaction database. A single always holds its memo, None for
+# none. A single from before the memo question without a `memo` entry still
+# needs its memo from the chat. A part always holds its memo, None for none.
 
 
 def load_decisions(ctx):
@@ -1002,10 +1006,10 @@ def apply_decisions(ctx, transactions, decisions, ynab_api_key=None, start_date=
     # and amount offers its payee and memo first. An accepted offer becomes a
     # single decision with its memo stored, so nothing else asks. A declined
     # offer stays in the regular pool: the group asks whether to split like
-    # any other group. A split asks only for the part amounts, then each part
-    # looks itself up in YNAB and offers its payee and memo first. Stores each
-    # new decision at once. Returns the expanded list, with every split
-    # replaced by its parts.
+    # any other group, then asks for the payee and the memo. A split asks
+    # only for the part amounts, then each part looks itself up in YNAB and
+    # offers its payee and memo first. Stores each new decision at once.
+    # Returns the expanded list, with every split replaced by its parts.
     lookup = {decision["key"]: decision for decision in decisions}
     groups = {}
     for transaction in sorted(transactions, key=lambda item: (item.date, item.amount)):
@@ -1149,8 +1153,9 @@ def ask_decision(ctx, members, suggestions=None, all_suggestions=None):
     # YNAB payee and memo offers for the whole entry, if any. An accepted
     # offer becomes a single decision with its memo stored, so nothing else
     # asks. A declined offer stays in the regular pool: the group asks whether
-    # to split like any other group. The parts then look themselves up in
-    # `all_suggestions` by account, date, and amount.
+    # to split like any other group, then asks for the payee and the memo.
+    # The parts then look themselves up in `all_suggestions` by account, date,
+    # and amount.
     adopted = ask_ynab_suggestion(ctx, members, suggestions)
     if adopted is not None:
         return adopted
@@ -1163,13 +1168,22 @@ def ask_decision(ctx, members, suggestions=None, all_suggestions=None):
             ctx, representative, len(members), all_suggestions or {}
         )
     payee = ask_single_payee(ctx, representative, len(members))
+    memo = ask_memo(
+        Transaction(
+            date=representative.date,
+            amount=representative.amount,
+            payee=payee,
+            account=representative.account,
+            bank_payee=representative.bank_payee,
+        )
+    )
     return {
         "key": transaction_decision_key(representative),
         "count": len(members),
         "kind": "single",
         "payee": payee,
-        "memo": None,
-        "memo_ready": False,
+        "memo": memo,
+        "memo_ready": True,
     }
 
 
@@ -1235,21 +1249,18 @@ def ask_ynab_choice(ctx, members, suggestions):
 
 
 def decision_line(transaction):
-    # One short line with the bank payee, for the decision questions.
-    payee = transaction.bank_payee
-    if len(payee) > 20:
-        payee = payee[:19] + "…"
+    # One line with the full bank payee, for the decision questions.
     return (
         f"{transaction.date.strftime('%m-%d')} "
         f"{ACCOUNT_TAGS[transaction.account]} "
-        f"{format_amount(transaction.amount)} {payee}"
+        f"{format_amount(transaction.amount)} {transaction.bank_payee}"
     )
 
 
 def ask_single_payee(ctx, transaction, count):
     # Returns the YNAB payee for one undecided bank entry. Asks until the
     # reply holds a name within the YNAB limit.
-    lines = ["New payee:", decision_line(transaction)]
+    lines = ["Payee:", decision_line(transaction)]
     if count > 1:
         lines.append(f"Applies to {count} identical entries.")
     lines.append("Reply with the name to use.")
@@ -1509,14 +1520,11 @@ def format_details(date, amount, *texts):
 
 
 def compact_line(transaction):
-    # One short line for a narrow screen: date, account tag, amount, payee.
-    payee = transaction.payee
-    if len(payee) > 20:
-        payee = payee[:19] + "…"
+    # One line for a narrow screen: date, account tag, amount, full payee.
     return (
         f"{transaction.date.strftime('%m-%d')} "
         f"{ACCOUNT_TAGS[transaction.account]} "
-        f"{format_amount(transaction.amount)} {payee}"
+        f"{format_amount(transaction.amount)} {transaction.payee}"
     )
 
 
@@ -1929,9 +1937,10 @@ def wise_to_transaction(item):
 
 
 def wise_payee(item):
-    # Returns the bank payee name of one Wise statement item. The payee map
-    # replaces it with the name of the user, same as for BMO. Prefers the
-    # human description, then the merchant name, then the sender name.
+    # Returns the bank payee name of one Wise statement item. The transaction
+    # database replaces it with the payee of the user, same as for BMO.
+    # Prefers the human description, then the merchant name, then the sender
+    # name.
     details = item.get("details")
     if not isinstance(details, dict):
         details = {}
@@ -2414,8 +2423,6 @@ def say_deleted_transactions(victims_by_account):
     lines = [f"Delete ({len(victims)}):"]
     for victim in victims[:REPORT_LINE_LIMIT]:
         payee = victim.payee_name or ""
-        if len(payee) > 20:
-            payee = payee[:19] + "…"
         lines.append(
             f"{victim.var_date.strftime('%m-%d')} "
             f"{format_amount(from_milliunits(victim.amount))} {payee}"
@@ -2805,7 +2812,7 @@ def find_payee_problem(payees, payee):
     # Returns why a transaction with `payee` cannot go to YNAB, or `None` when
     # it can.
     if len(payee) > YNAB_PAYEE_NAME_LIMIT:
-        return f"{payee[:40]}… is over the YNAB payee limit"
+        return f"{payee!r} is over the YNAB payee limit"
     if payee in payees.ids_by_name:
         return None
     other_names = payees.names_by_folded_name.get(payee.casefold(), set()) - {payee}
@@ -2819,7 +2826,7 @@ def ask_memo(transaction):
     # Asks for the memo of `transaction`, and returns it. Returns None when
     # the reply is a dash, which means no memo.
     reply = _CTX.ask(
-        f"{compact_line(transaction)}\nReply with the memo, or - for none.",
+        f"Memo:\n{compact_line(transaction)}\nReply with the memo, or - for none.",
         pattern=r"[\s\S]+",
         timeout=300,
     )
@@ -2829,10 +2836,10 @@ def ask_memo(transaction):
 
 def send_transactions(ctx, plan, transactions, decisions):
     # Asks for a memo for each of `transactions` without a stored memo, then
-    # adds them to YNAB. Stores the new single memos in `decisions`. Split
-    # parts always hold their memos already. The Questrade reconciliation
-    # keeps its own memo, so it does not come through here. See
-    # `send_reconciliation`.
+    # adds them to YNAB. Only singles from before the memo question lack a
+    # stored memo. Stores those memos in `decisions`. The Questrade
+    # reconciliation keeps its own memo, so it does not come through here.
+    # See `send_reconciliation`.
     for transaction in sorted(transactions, key=report_order):
         if not transaction.memo_ready:
             transaction.memo = ask_memo(transaction)
@@ -3113,8 +3120,6 @@ def ask_memo_direction(ctx, account, key, stored, copies):
     # Asks whether the memo of one statement key goes to YNAB or to the
     # database. Returns True for YNAB.
     date, payee, milliunits = key
-    if len(payee) > 20:
-        payee = payee[:19] + "…"
     ynab_options = sorted({normalize_memo(copy.memo) for copy in copies})
     lines = [
         f"{date.strftime('%m-%d')} {ACCOUNT_TAGS[account]} "
@@ -3127,12 +3132,10 @@ def ask_memo_direction(ctx, account, key, stored, copies):
 
 
 def display_memo(memo):
-    # Returns the memo for the chat: quoted text, or `(none)` for none.
+    # Returns the full memo for the chat: quoted text, or `(none)` for none.
     text = normalize_memo(memo)
     if not text:
         return "(none)"
-    if len(text) > 30:
-        text = text[:29] + "…"
     return f'"{text}"'
 
 
@@ -3158,8 +3161,6 @@ def say_memo_updates(push_items):
     lines = [f"Update memos ({len(push_items)}):"]
     for (account, key), items in list(groups.items())[:REPORT_LINE_LIMIT]:
         date, payee, milliunits = key
-        if len(payee) > 20:
-            payee = payee[:19] + "…"
         lines.append(
             f"{date.strftime('%m-%d')} {ACCOUNT_TAGS[account]} "
             f"{format_amount(from_milliunits(milliunits))} {payee} "
@@ -3222,11 +3223,8 @@ def report_other_sides(transfers):
     if other_sides:
         lines = ["YNAB also adds:"]
         for side in other_sides:
-            payee = side.payee
-            if len(payee) > 20:
-                payee = payee[:19] + "…"
             lines.append(
-                f"{side.date.strftime('%m-%d')} {format_amount(side.amount)} {payee}"
+                f"{side.date.strftime('%m-%d')} {format_amount(side.amount)} {side.payee}"
             )
         lines.append("Check for doubles.")
         _say("\n".join(lines))
