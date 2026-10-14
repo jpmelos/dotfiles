@@ -21,9 +21,10 @@
 # amounts, then looks each part up in YNAB by account, date, and amount and
 # offers its payee and memo first.
 # YNAB gains missing copies and loses surplus copies of bank entries after
-# one confirmation. Deletion happens only there. The chat only gets the new
-# transactions, one line each with the full payee, plus short confirmations,
-# balance lines, and a count of the transactions without a memo.
+# one confirmation. Deletion happens only there. The chat gets the new
+# transactions and the ignored YNAB transactions in each account, one line
+# each with the full payee, plus short confirmations, balance lines, and a
+# count of the transactions without a memo.
 
 DESCRIPTION = "Sync new BMO and Wise transactions and BMO, Wise, and Questrade balances to YNAB."
 # Banking with user questions can take a while. This is the budget for one
@@ -3234,10 +3235,21 @@ def report_other_sides(transfers):
         _say("\n".join(lines))
 
 
+def ynab_ignored_compact_line(account, key):
+    # One compact line for a YNAB transaction that no statement holds, from
+    # its comparison key. Same format as `compact_line`.
+    date, payee, milliunits = key
+    return (
+        f"{date.strftime('%m-%d')} "
+        f"{ACCOUNT_TAGS[account]} "
+        f"{format_amount(from_milliunits(milliunits))} {payee}"
+    )
+
+
 def report_ignored_counts(comparison):
-    # Sends, for each account, how many YNAB transactions that no statement
-    # holds the task leaves as they are. Surplus copies of bank entries are
-    # deletions, not ignored entries.
+    # Sends, for each account, the YNAB transactions that no statement holds
+    # and the task leaves as they are, one compact line each. Surplus copies
+    # of bank entries are deletions, not ignored entries.
     for account, ynab_name in YNAB_ACCOUNT_NAMES.items():
         expected = comparison.expected_keys_by_account.get(account, set())
         ignored = [
@@ -3245,9 +3257,21 @@ def report_ignored_counts(comparison):
             for key in comparison.extra_keys_by_account.get(account, [])
             if key not in expected
         ]
-        if ignored:
-            _log(f"Ignored {len(ignored)} in {ynab_name}, not in its statement")
-            _say(f"Ignored {len(ignored)} in {ynab_name}, not in its statement.")
+        if not ignored:
+            continue
+        # By date, then by amount, then by payee, like `report_order`.
+        ignored = sorted(ignored, key=lambda key: (key[0], key[2], key[1]))
+        _log(f"Ignored {len(ignored)} in {ynab_name}, not in its statement")
+        for key in ignored:
+            _log(f"  ignored: {ynab_ignored_compact_line(account, key)}")
+        lines = [f"Ignored in {ynab_name} ({len(ignored)}), not in its statement:"]
+        lines += [
+            ynab_ignored_compact_line(account, key)
+            for key in ignored[:REPORT_LINE_LIMIT]
+        ]
+        if len(ignored) > REPORT_LINE_LIMIT:
+            lines.append(f"+{len(ignored) - REPORT_LINE_LIMIT} more")
+        _say("\n".join(lines))
 
 
 def ynab_memo_missing(ynab_transaction):
