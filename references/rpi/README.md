@@ -107,14 +107,14 @@ The Telegram bot is the process that uses this bypass. Its unit
 
 ## 7. Configure iptables
 
-Copy iptables rules from dotfiles (`references/iptables-rpi/rules.v{4,6}`).
+Copy iptables rules from dotfiles (`references/rpi/iptables/rules.v{4,6}`).
 Adjust IP address of VPN server as necessary. Keep the endpoint in step with
 the `Endpoint` in `/etc/wireguard/wg0.conf`. A stale address drops the
 handshake and kills the tunnel.
 
 ```bash
-sudo cp references/iptables-rpi/rules.v4 /etc/iptables/rules.v4
-sudo cp references/iptables-rpi/rules.v6 /etc/iptables/rules.v6
+sudo cp references/rpi/iptables/rules.v4 /etc/iptables/rules.v4
+sudo cp references/rpi/iptables/rules.v6 /etc/iptables/rules.v6
 ```
 
 Apply the rules:
