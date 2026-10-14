@@ -242,13 +242,16 @@ def shutdown(ctx, reason):
 
 def parse_task_args(args):
     # Returns the from date, no-download, and no-upload from `args`, the
-    # words after the task name.
+    # words after the task name. Telegram replaces `--` with an n-dash or an
+    # m-dash, so leading `-`, `–` (U+2013), and `—` (U+2014) all count as `--`.
     from_date = DEFAULT_FROM_DATE
     no_download = False
     no_upload = False
     index = 0
     while index < len(args):
         argument = args[index]
+        if argument.startswith(("-", "–", "—")):
+            argument = "--" + argument.lstrip("-–—")
         if argument == "--from-date":
             index += 1
             if index >= len(args):
