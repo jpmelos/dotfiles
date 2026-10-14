@@ -32,7 +32,7 @@ TIMEOUT = 7200
 
 # Requirement strings that the bot installs with `uv` into the venv of the
 # task on every run.
-DEPENDENCIES = ("ynab>=4.4.0,<5", "urllib3>=2,<3")
+DEPENDENCIES = ("ynab>=4.4.0,<5", "urllib3>=2,<3", "click>=8,<9")
 
 import collections
 import contextlib
@@ -52,6 +52,7 @@ import urllib.parse
 import uuid
 from dataclasses import dataclass
 
+import click
 import urllib3
 import ynab
 
@@ -240,40 +241,40 @@ def shutdown(ctx, reason):
         ctx.log(f"browser close failed: {error}")
 
 
+@click.command(context_settings={"help_option_names": []}, no_args_is_help=False)
+@click.option(
+    "--from-date",
+    type=click.DateTime(formats=[OPTION_DATE_FORMAT]),
+    default=None,
+)
+@click.option("--no-download", is_flag=True, default=False)
+@click.option("--no-upload", is_flag=True, default=False)
+def _budget_sync_options(from_date, no_download, no_upload):
+    # Holds the CLI options. `parse_task_args` runs it without exiting, so
+    # its errors raise instead.
+    return from_date, no_download, no_upload
+
+
 def parse_task_args(args):
     # Returns the from date, no-download, and no-upload from `args`, the
-    # words after the task name. Telegram replaces `--` with an n-dash or an
-    # m-dash, so leading `-`, `–` (U+2013), and `—` (U+2014) all count as `--`.
-    from_date = DEFAULT_FROM_DATE
-    no_download = False
-    no_upload = False
-    index = 0
-    while index < len(args):
-        argument = args[index]
+    # words after the task name, with the same rules as a regular CLI.
+    # Telegram replaces `--` with an n-dash or an m-dash, so leading `-`,
+    # `–` (U+2013), and `—` (U+2014) all count as `--`.
+    normalized = []
+    for argument in args:
         if argument.startswith(("-", "–", "—")):
             argument = "--" + argument.lstrip("-–—")
-        if argument == "--from-date":
-            index += 1
-            if index >= len(args):
-                raise TaskError("Usage: /run budget-sync [--from-date YYYY-MM-DD]")
-            try:
-                from_date = datetime.datetime.strptime(
-                    args[index], OPTION_DATE_FORMAT
-                ).date()
-            except ValueError:
-                raise TaskError(
-                    f"Invalid --from-date {args[index]!r}, expected YYYY-MM-DD"
-                ) from None
-        elif argument == "--no-download":
-            no_download = True
-        elif argument == "--no-upload":
-            no_upload = True
-        else:
-            raise TaskError(
-                "Usage: /run budget-sync [--from-date YYYY-MM-DD] "
-                "[--no-download] [--no-upload]"
-            )
-        index += 1
+        normalized.append(argument)
+    try:
+        from_date, no_download, no_upload = _budget_sync_options.main(
+            normalized, standalone_mode=False
+        )
+    except click.ClickException as error:
+        raise TaskError(str(error)) from error
+    if from_date is None:
+        from_date = DEFAULT_FROM_DATE
+    else:
+        from_date = from_date.date()
     return from_date, no_download, no_upload
 
 
