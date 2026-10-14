@@ -14,11 +14,14 @@
 # task asks in date order and remembers. One decision covers every identical
 # entry of one day. When YNAB already holds the same account, date, and
 # amount, the task offers its payee and memo first, and an accepted offer
-# becomes the decision with nothing else to ask. YNAB gains missing copies
-# and loses surplus copies of bank entries after one confirmation. Deletion
-# happens only there. The chat only gets the new transactions, one short line
-# each, plus short confirmations, balance lines, and a count of the
-# transactions without a memo.
+# becomes the decision with nothing else to ask. A declined offer keeps the
+# entry in the regular pool: the task asks whether to split like any other
+# entry. A split asks only for the part amounts, then looks each part up in
+# YNAB by account, date, and amount and offers its payee and memo first.
+# YNAB gains missing copies and loses surplus copies of bank entries after
+# one confirmation. Deletion happens only there. The chat only gets the new
+# transactions, one short line each, plus short confirmations, balance lines,
+# and a count of the transactions without a memo.
 
 DESCRIPTION = "Sync new BMO and Wise transactions to YNAB."
 # Banking with user questions can take a while. This is the budget for one
@@ -997,10 +1000,12 @@ def apply_decisions(ctx, transactions, decisions, ynab_api_key=None, start_date=
     # Walks `transactions` in date order. A stored decision applies silently.
     # For a group without one, a YNAB transaction with the same account, date,
     # and amount offers its payee and memo first. An accepted offer becomes a
-    # single decision with its memo stored, so nothing else asks. Any other
-    # group asks whether to split, then asks for the payee or the parts, and
-    # stores the new decision at once. Returns the expanded list, with every
-    # split replaced by its parts.
+    # single decision with its memo stored, so nothing else asks. A declined
+    # offer stays in the regular pool: the group asks whether to split like
+    # any other group. A split asks only for the part amounts, then each part
+    # looks itself up in YNAB and offers its payee and memo first. Stores each
+    # new decision at once. Returns the expanded list, with every split
+    # replaced by its parts.
     lookup = {decision["key"]: decision for decision in decisions}
     groups = {}
     for transaction in sorted(transactions, key=lambda item: (item.date, item.amount)):
@@ -1012,7 +1017,12 @@ def apply_decisions(ctx, transactions, decisions, ynab_api_key=None, start_date=
     for key, members in groups.items():
         decision = lookup.get(key)
         if decision is None:
-            decision = ask_decision(ctx, members, suggestions.get(suggestion_key(members[0])))
+            decision = ask_decision(
+                ctx,
+                members,
+                suggestions.get(suggestion_key(members[0])),
+                suggestions,
+            )
             decision["count"] = len(members)
             decisions.append(decision)
             lookup[key] = decision
@@ -1133,11 +1143,14 @@ def decision_transactions(decision, template):
     ]
 
 
-def ask_decision(ctx, members, suggestions=None):
+def ask_decision(ctx, members, suggestions=None, all_suggestions=None):
     # Asks how one group of identical bank entries splits, and returns the
     # new decision row. `members` holds the entries. `suggestions` holds the
-    # YNAB payee and memo offers for the group, if any. An accepted offer
-    # becomes a single decision with its memo stored, so nothing else asks.
+    # YNAB payee and memo offers for the whole entry, if any. An accepted
+    # offer becomes a single decision with its memo stored, so nothing else
+    # asks. A declined offer stays in the regular pool: the group asks whether
+    # to split like any other group. The parts then look themselves up in
+    # `all_suggestions` by account, date, and amount.
     adopted = ask_ynab_suggestion(ctx, members, suggestions)
     if adopted is not None:
         return adopted
@@ -1146,7 +1159,9 @@ def ask_decision(ctx, members, suggestions=None):
     if len(members) > 1:
         lines.append(f"Applies to {len(members)} identical entries.")
     if ask_yes("\n".join(lines) + "\nSplit this entry?"):
-        return ask_split_decision(ctx, representative, len(members))
+        return ask_split_decision(
+            ctx, representative, len(members), all_suggestions or {}
+        )
     payee = ask_single_payee(ctx, representative, len(members))
     return {
         "key": transaction_decision_key(representative),
@@ -1248,31 +1263,32 @@ def ask_single_payee(ctx, transaction, count):
         return payee
 
 
-def ask_split_decision(ctx, transaction, count):
+def ask_split_decision(ctx, transaction, count, suggestions):
     # Returns the split decision row for one group of identical bank entries.
-    # Asks the part count, then the payee, amount, and memo of each part but
-    # the last. The last amount is the remainder, confirmed in the chat. A
-    # rejected remainder restarts the parts from the first, with the same
-    # count, since an earlier part holds the mistake.
+    # Asks only for the part amounts first: the amounts of each part but the
+    # last, then the remainder as the last amount, confirmed in the chat. A
+    # rejected remainder restarts the amounts from the first, with the same
+    # count, since an earlier amount holds the mistake. Each part amount then
+    # looks itself up in YNAB by account, date, and amount: an accepted offer
+    # takes the YNAB payee and memo with nothing else to ask, and any other
+    # part asks for its payee and memo.
     if transaction.amount == 0:
         raise TaskError("cannot split a zero amount")
     key = transaction_decision_key(transaction)
     part_count = ask_part_count(ctx)
-    while True:
-        parts = [
-            ask_split_part(ctx, transaction, part_number, part_count)
-            for part_number in range(1, part_count)
-        ]
-        last_part = ask_split_last_part(ctx, transaction, parts, part_count)
-        if last_part is None:
-            continue
-        parts.append(last_part)
-        return {
-            "key": key,
-            "count": count,
-            "kind": "split",
-            "parts": parts,
-        }
+    amounts = ask_split_amounts(ctx, transaction, part_count)
+    parts = [
+        resolve_split_part(
+            ctx, transaction, amount, part_number, part_count, suggestions
+        )
+        for part_number, amount in enumerate(amounts, start=1)
+    ]
+    return {
+        "key": key,
+        "count": count,
+        "kind": "split",
+        "parts": parts,
+    }
 
 
 def ask_part_count(ctx):
@@ -1307,14 +1323,40 @@ def ask_split_payee(ctx, label):
         return payee
 
 
-def ask_split_part(ctx, transaction, part_number, part_count):
-    # Returns one split part with its payee, amount, and memo. Restarts the
-    # part when the payee or the amount cannot go to YNAB.
+def ask_split_amounts(ctx, transaction, part_count):
+    # Returns the amounts of a split: the typed amounts of each part but the
+    # last, plus the remainder as the last amount. Restarts from the first
+    # part when the remainder cannot work or the chat rejects it.
+    while True:
+        amounts = [
+            ask_split_amount(ctx, transaction, part_number, part_count)
+            for part_number in range(1, part_count)
+        ]
+        entered = sum(amounts, decimal.Decimal("0"))
+        remaining = transaction.amount - entered
+        label = f"Part {part_count} of {part_count} for {decision_line(transaction)}"
+        if remaining == 0 or (remaining > 0) != (transaction.amount > 0):
+            _say(
+                f"Parts so far add to {format_amount(entered)}, "
+                f"leaving {format_amount(remaining)}. Start over from part 1."
+            )
+            continue
+        if not ask_yes(
+            f"{label}\nCalculated amount {format_amount(remaining)}. "
+            "Is that right?"
+        ):
+            _say("Start over from part 1.")
+            continue
+        return [*amounts, remaining]
+
+
+def ask_split_amount(ctx, transaction, part_number, part_count):
+    # Returns the typed amount of one split part. Asks until the reply holds
+    # a nonzero amount with the sign of the whole entry.
     label = f"Part {part_number} of {part_count} for {decision_line(transaction)}"
-    payee = ask_split_payee(ctx, label)
     while True:
         reply = ctx.ask(
-            f"{label}\n{payee}\nReply with the signed amount "
+            f"{label}\nReply with the signed amount "
             "(negative for money lost).",
             pattern=r"[\s\S]+",
             timeout=300,
@@ -1328,7 +1370,35 @@ def ask_split_part(ctx, transaction, part_number, part_count):
         if (amount > 0) != (transaction.amount > 0):
             _say("The amount has the wrong sign.")
             continue
-        break
+        return amount
+
+
+def part_suggestion_key(transaction, amount):
+    # Returns the YNAB lookup key of one split part amount: account, date, and
+    # amount in milliunits. Returns None when the amount cannot go to YNAB,
+    # so the part gets no offer.
+    try:
+        milliunits = to_milliunits(amount)
+    except TaskError:
+        return None
+    return (transaction.account, transaction.date, milliunits)
+
+
+def resolve_split_part(ctx, transaction, amount, part_number, part_count, suggestions):
+    # Returns one split part with its payee, amount, and memo. A YNAB
+    # transaction with the same account, date, and amount offers its payee
+    # and memo first. An accepted offer becomes the part with nothing else to
+    # ask. Any other part asks for its payee and memo.
+    adopted = ask_part_ynab_offer(
+        ctx, transaction, amount, part_number, part_count, suggestions
+    )
+    if adopted is not None:
+        return {"payee": adopted["payee"], "amount": amount, "memo": adopted["memo"]}
+    label = (
+        f"Part {part_number} of {part_count} for {decision_line(transaction)}\n"
+        f"Amount {format_amount(amount)}"
+    )
+    payee = ask_split_payee(ctx, label)
     memo = ask_memo(
         Transaction(
             date=transaction.date,
@@ -1340,36 +1410,60 @@ def ask_split_part(ctx, transaction, part_number, part_count):
     return {"payee": payee, "amount": amount, "memo": memo}
 
 
-def ask_split_last_part(ctx, transaction, parts, part_count):
-    # Returns the last split part with its payee, calculated amount, and
-    # memo. The amount is the remainder after `parts`. Returns None when the
-    # remainder cannot work or the chat rejects it, so the caller restarts
-    # the parts from the first.
-    label = f"Part {part_count} of {part_count} for {decision_line(transaction)}"
-    payee = ask_split_payee(ctx, label)
-    entered = sum((part["amount"] for part in parts), decimal.Decimal("0"))
-    remaining = transaction.amount - entered
-    if remaining == 0 or (remaining > 0) != (transaction.amount > 0):
-        _say(
-            f"Parts so far add to {format_amount(entered)}, "
-            f"leaving {format_amount(remaining)}. Start over from part 1."
-        )
+def ask_part_ynab_offer(
+    ctx, transaction, amount, part_number, part_count, suggestions
+):
+    # Returns the payee and memo of a YNAB offer for one split part amount
+    # that the chat accepts, or None when there is no offer or the chat
+    # declines. `suggestions` maps YNAB lookup keys to payee and memo offers.
+    key = part_suggestion_key(transaction, amount)
+    offers = suggestions.get(key) if key is not None else None
+    if not offers:
         return None
-    if not ask_yes(
-        f"{label}\n{payee}\nCalculated amount {format_amount(remaining)}. "
-        "Is that right?"
-    ):
-        _say("Start over from part 1.")
-        return None
-    memo = ask_memo(
-        Transaction(
-            date=transaction.date,
-            amount=remaining,
-            payee=payee,
-            account=transaction.account,
+    if len(offers) > 1:
+        return ask_part_ynab_choice(
+            ctx, transaction, amount, part_number, part_count, offers
         )
+    offer = offers[0]
+    lines = [
+        part_line(transaction, amount, part_number, part_count),
+        f'YNAB has payee "{offer["payee"]}" memo {display_memo(offer["memo"])}.',
+    ]
+    if ask_yes("\n".join(lines) + "\nTake payee and memo from YNAB?"):
+        return {"payee": offer["payee"], "memo": offer["memo"]}
+    return None
+
+
+def ask_part_ynab_choice(
+    ctx, transaction, amount, part_number, part_count, offers
+):
+    # Returns the payee and memo of one of several YNAB offers for a split
+    # part amount, or None when the chat declines them all.
+    lines = [part_line(transaction, amount, part_number, part_count), "YNAB has:"]
+    for index, offer in enumerate(offers, start=1):
+        lines.append(
+            f'{index}. payee "{offer["payee"]}" memo {display_memo(offer["memo"])}'
+        )
+    lines.append("Reply with the number to take, or n for none.")
+    while True:
+        reply = ctx.ask("\n".join(lines), pattern=r"(?i:n|\d+)", timeout=300).strip()
+        if reply.casefold() == "n":
+            return None
+        try:
+            choice = int(reply)
+        except ValueError:
+            continue
+        if 1 <= choice <= len(offers):
+            offer = offers[choice - 1]
+            return {"payee": offer["payee"], "memo": offer["memo"]}
+
+
+def part_line(transaction, amount, part_number, part_count):
+    # One short line with the part number and amount, for the split questions.
+    return (
+        f"Part {part_number} of {part_count} for {decision_line(transaction)}: "
+        f"{format_amount(amount)}"
     )
-    return {"payee": payee, "amount": remaining, "memo": memo}
 
 
 def parse_user_amount(text):
