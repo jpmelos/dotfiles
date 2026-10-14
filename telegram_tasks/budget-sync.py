@@ -35,7 +35,7 @@
 # transfers still send only one side, since the other side may live in an
 # account this task does not manage. The chat gets the new transactions and the ignored
 # account, one line each with the full payee, plus short confirmations,
-# balance lines, and a count of the transactions without a memo.
+# one combined balance message, and a count of the transactions without a memo.
 
 DESCRIPTION = "Sync new BMO and Wise transactions and BMO, Wise, and Questrade balances to YNAB."
 # Banking with user questions can take a while. This is the budget for one
@@ -2260,15 +2260,44 @@ def save_to_ynab(
         matched, added_count, cleared_count, deleted_count, memo_count, sync_count = (
             update_from_statements(ctx, plan, transactions, decisions, start_date, upload)
         )
-        if bank_balances is None:
-            _say("Bank balances skipped.")
-        else:
-            compare_bank_balances(plan, bank_balances, matched)
-        if questrade_balance is None:
-            _say("Questrade skipped.")
-        else:
-            reconcile_questrade(plan, questrade_balance, matched, upload)
+        questrade_state = report_balances(plan, bank_balances, questrade_balance, matched)
+        if questrade_state is not None:
+            reconcile_questrade(
+                plan,
+                questrade_balance,
+                matched,
+                upload,
+                difference=questrade_state[0],
+                ynab_balance=questrade_state[1],
+            )
     return matched, added_count, cleared_count, deleted_count, memo_count, sync_count
+
+
+def report_balances(plan, bank_balances, questrade_balance, ynab_matches_statements):
+    # Sends the bank and Questrade balances in one message, then returns the
+    # Questrade difference and YNAB balance for `reconcile_questrade`, or
+    # None when Questrade is skipped.
+    if bank_balances is None:
+        bank_block = "Bank balances skipped."
+        bank_differences = 0
+    else:
+        bank_lines, bank_differences = build_bank_balance_lines(plan, bank_balances)
+        bank_block = "Bank / YNAB:\n" + "\n".join(bank_lines)
+    if questrade_balance is None:
+        questrade_block = "Questrade skipped."
+        questrade_state = None
+    else:
+        questrade_line, questrade_difference, questrade_ynab_balance = (
+            build_questrade_balance_line(plan, questrade_balance)
+        )
+        questrade_block = questrade_line
+        questrade_state = (questrade_difference, questrade_ynab_balance)
+    message = bank_block + "\n" + questrade_block
+    if bank_balances is not None and bank_differences and not ynab_matches_statements:
+        message += "\nPending changes can cause the diffs."
+    _say(message)
+    _log(f"bank balance differences: {bank_differences}")
+    return questrade_state
 
 
 def update_from_statements(ctx, plan, transactions, decisions, start_date, upload):
@@ -2509,12 +2538,11 @@ def say_deleted_transactions(victims_by_account):
     _say("\n".join(lines))
 
 
-def compare_bank_balances(plan, bank_balances, ynab_matches_statements):
-    # Sends one short line per account with the balance at the bank and the
-    # cleared balance in YNAB, plus one line per difference.
+def build_bank_balance_lines(plan, bank_balances):
+    # Returns one short line per account with the balance at the bank and the
+    # cleared balance in YNAB, with how many of them differ.
     # `bank_balances` maps each account to its balance at the bank, or to
-    # `None` when the task could not read it. `ynab_matches_statements`
-    # tells whether YNAB has every statement transaction, as cleared.
+    # `None` when the task could not read it.
     lines = []
     differences = 0
     for account, ynab_name in YNAB_ACCOUNT_NAMES.items():
@@ -2533,13 +2561,27 @@ def compare_bank_balances(plan, bank_balances, ynab_matches_statements):
             f"{tag} {format_amount(bank_balance)} / "
             f"{format_amount(ynab_balance)} {mark}"
         )
-    _say("Bank / YNAB:\n" + "\n".join(lines))
-    if differences and not ynab_matches_statements:
-        _say("Pending changes can cause the diffs.")
-    _log(f"bank balance differences: {differences}")
+    return lines, differences
 
 
-def reconcile_questrade(plan, questrade_balance, ynab_matches_statements, upload):
+def build_questrade_balance_line(plan, questrade_balance):
+    # Returns the balance line of Questrade with the difference to YNAB and
+    # the YNAB balance, so the combined report can reuse them without reading
+    # YNAB twice.
+    ynab_account = read_ynab_account(plan, plan.questrade_account_id)
+    ynab_balance = from_milliunits(ynab_account.balance)
+    difference = questrade_balance - ynab_balance
+    mark = "OK" if difference == 0 else "DIFF"
+    line = (
+        f"QT {format_amount(questrade_balance)} / {format_amount(ynab_balance)} {mark}"
+    )
+    return line, difference, ynab_balance
+
+
+def reconcile_questrade(
+    plan, questrade_balance, ynab_matches_statements, upload,
+    difference=None, ynab_balance=None,
+):
     # Adds a transaction to the YNAB account of Questrade that brings its
     # balance to `questrade_balance`. The YNAB balance includes the side of
     # each transfer from a statement, cleared or not. So the transaction
@@ -2547,14 +2589,14 @@ def reconcile_questrade(plan, questrade_balance, ynab_matches_statements, upload
     # `ynab_matches_statements` tells. Without `upload`, the task reports the
     # difference, but changes nothing. The balance goes to YNAB only once a
     # day: when the account already has a reconciliation transaction dated
-    # today, the task reports the difference, but changes nothing.
-    ynab_account = read_ynab_account(plan, plan.questrade_account_id)
-    ynab_balance = from_milliunits(ynab_account.balance)
-    difference = questrade_balance - ynab_balance
-    mark = "OK" if difference == 0 else "DIFF"
-    _say(
-        f"QT {format_amount(questrade_balance)} / {format_amount(ynab_balance)} {mark}"
-    )
+    # today, the task reports the difference, but changes nothing. The
+    # combined balances message already reported the balances, so this only
+    # sends the follow-ups. `difference` and `ynab_balance` reuse the values
+    # from that report; when missing, this reads YNAB again.
+    if difference is None or ynab_balance is None:
+        ynab_account = read_ynab_account(plan, plan.questrade_account_id)
+        ynab_balance = from_milliunits(ynab_account.balance)
+        difference = questrade_balance - ynab_balance
 
     if difference == 0:
         _say("Questrade already matches.")
