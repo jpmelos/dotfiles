@@ -68,6 +68,20 @@ import click
 import urllib3
 import ynab
 
+# YNAB guesses a category when the create payload omits `category_id`. The
+# SDK drops an explicit `category_id=None`, so send an explicit null instead.
+_original_new_transaction_to_dict = ynab.NewTransaction.to_dict
+
+
+def _new_transaction_to_dict_with_null_category(self):
+    data = _original_new_transaction_to_dict(self)
+    if self.category_id is None and "category_id" in self.model_fields_set:
+        data["category_id"] = None
+    return data
+
+
+ynab.NewTransaction.to_dict = _new_transaction_to_dict_with_null_category
+
 LOGIN_URL = "https://www1.bmo.com/banking/digital/"
 # The `agent-browser` session of this task. A session of its own keeps the
 # task from sharing a browser with other uses of `agent-browser`.
@@ -3060,6 +3074,8 @@ def send_transactions(ctx, plan, transactions, decisions):
                 amount=to_milliunits(transaction.amount),
                 payee_id=payee_id,
                 payee_name=payee_name,
+                # An explicit null keeps YNAB from guessing a category.
+                category_id=None,
                 memo=transaction.memo,
                 cleared=ynab.TransactionClearedStatus.CLEARED,
                 approved=False,
@@ -3078,6 +3094,8 @@ def send_reconciliation(plan, amount):
         amount=to_milliunits(amount),
         payee_id=plan.payees.ids_by_name.get(RECONCILIATION_PAYEE),
         payee_name=RECONCILIATION_PAYEE,
+        # An explicit null keeps YNAB from guessing a category.
+        category_id=None,
         memo=RECONCILIATION_MEMO,
         cleared=ynab.TransactionClearedStatus.CLEARED,
         approved=False,
