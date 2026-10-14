@@ -1788,7 +1788,7 @@ WISE_TIMEOUT_SECONDS = 30
 # Wise holds each currency in a balance of its own. Transactions and the
 # balance come from the CAD STANDARD balance, the chequing account. SAVINGS
 # balances, the jars, and other currencies stay out. That balance maps to the
-# "Wise" account in YNAB. The profile and the balance come from
+# "Wise Chequing" account in YNAB. The profile and the balance come from
 # `wise.profile_id` and `wise.balance_id` in the configuration, as strings.
 WISE_CURRENCY = "CAD"
 
@@ -1842,7 +1842,7 @@ def read_wise_id(path):
 def fetch_wise_data(api_token, profile_id, balance_id, from_date, to_date):
     # Returns the transactions between `from_date` and `to_date` and the
     # current balance of the configured chequing account. That account maps
-    # to the "Wise" account in YNAB.
+    # to the "Wise Chequing" account in YNAB.
     record = wise_get_balance(api_token, profile_id, balance_id)
     if not isinstance(record, dict):
         raise TaskError("Wise returned a bad balance")
@@ -2149,7 +2149,7 @@ def describe_wise_failure(response):
 YNAB_ACCOUNT_NAMES = {
     Account.CHEQUING: "BMO Chequing",
     Account.CREDIT_CARD: "BMO MasterCard",
-    Account.WISE: "Wise",
+    Account.WISE: "Wise Chequing",
 }
 ACCOUNTS_BY_YNAB_NAME = {name: account for account, name in YNAB_ACCOUNT_NAMES.items()}
 # The YNAB account of all the Questrade accounts.
