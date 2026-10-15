@@ -13,7 +13,8 @@
 # /   --profile <name>  Profile to run as. Selects the `~/.claude-<name>`
 # /                     directory, with its own login, history, and
 # /                     credentials, and the `api_key`, `model`,
-# /                     `effortLevel`, `mcp_servers`, and `permissions`
+# /                     `effortLevel`, `mcp_servers`, `permissions`, and
+# /                     `fast_permissions`
 # /                     of that profile in `~/config.json` (default: the
 # /                     organization directory of the project, such as
 # /                     `orgname` for `~/devel/orgname/project`, or the
@@ -59,6 +60,8 @@
 # /   - `--effort` with the `effortLevel` of the profile, if any.
 # /   - `--add-dir` with `~/devel`.
 # /   - `--add-dir` with the target of each `--add-volume` mount.
+# /   - `--plugin-dir` with the fast permissions mod, when the origin
+# /     holds it.
 # /   A `--setting-sources`, `--model`, or `--effort` that you pass
 # /   wins. An `--add-dir` that you pass adds to the list.
 # /
@@ -116,7 +119,10 @@
 # /           "mcp_servers": {
 # /             "server-name": {"command": "...", "args": ["..."]}
 # /           },
-# /           "permissions": ["mcp__server-name__tool-name"]
+# /           "permissions": ["mcp__server-name__tool-name"],
+# /           "fast_permissions": [
+# /             {"name": "GitHub search", "permission": "mcp__github__search_repositories"}
+# /           ]
 # /         },
 # /         "orgname": {
 # /           "api_key": "sk-..."
@@ -148,7 +154,13 @@
 # /   The `mcp_servers` object of a profile replaces the `mcpServers` key
 # /   in that profile's `.claude.json`. The `permissions` list of a
 # /   profile holds extra entries for `permissions.allow` in that
-# /   profile's `settings.json`, after the entries of the origin file.
+# /   profile's `settings.json`, after the entries of the origin file. The
+# /   `fast_permissions` list of a profile holds toggle entries for the
+# /   `jpenv.fast_permissions` list in that profile's `settings.json`,
+# /   after the entries of the origin file. Each entry names a full Claude
+# /   Code permission rule in `permission`, such as
+# /   `mcp__github__search_repositories`. The `/fp` skill flips that rule
+# /   between `permissions.allow` and `permissions.deny` for the run.
 # /
 # /   An `ANTHROPIC_API_KEY` variable in the environment takes precedence
 # /   over the `api_key` of the profile. The launcher names the source of
@@ -530,6 +542,9 @@ def main():
         model,
         effort,
         [volume.target for volume in extra_volumes],
+        plugin_dirs=[f"{paths.home}/.claude/mods/fp"]
+        if os.path.isdir(f"{paths.origin_dir}/mods/fp")
+        else [],
     )
 
     run_config = RunConfig(
@@ -1810,6 +1825,17 @@ def copy_tree_into(source, destination_fd, destination_path, *, mirror, skip=())
             target_path = os.path.join(destination_path, entry.name)
             target_stat = lstat_entry(entry.name, destination_fd)
             if entry.is_symlink():
+                # A link to a file is copied as the file it points to, so the
+                # profile holds real content. The mod loader refuses files
+                # that resolve outside the plugin directory.
+                link_content = os.path.realpath(entry.path)
+                if os.path.isfile(link_content):
+                    if target_stat is not None and stat.S_ISLNK(target_stat.st_mode):
+                        remove_entry(entry.name, destination_fd)
+                    copy_file_atomically(
+                        link_content, entry.name, destination_fd, target_path
+                    )
+                    continue
                 # A link that already points to the same place is left alone,
                 # so that a reader that watches the directory sees no change.
                 link_target = os.readlink(entry.path)
@@ -2142,7 +2168,9 @@ def expand_dependencies_marker(claude_md, marker, dependency_names):
 def sync_settings_json(origin_path, profile_path, profile_prep):
     # Writes the profile `settings.json` as the origin file with the
     # `permissions` of the profile added to `permissions.allow`, after the
-    # entries of the origin file. Returns whether the origin file exists.
+    # entries of the origin file, and the `fast_permissions` of the profile
+    # added to the `jpenv.fast_permissions` list, after the entries of the
+    # origin file. Returns whether the origin file exists.
     try:
         with open(origin_path, "rb") as handle:
             origin_config = json.load(handle)
@@ -2169,6 +2197,27 @@ def sync_settings_json(origin_path, profile_path, profile_prep):
     ):
         if extra not in allow:
             allow.append(extra)
+    extra_fast_permissions = resolve_profile_fast_permissions(
+        profile_prep.profile_config, profile_prep.profile
+    )
+    if extra_fast_permissions:
+        section = origin_config.get("jpenv")
+        if not isinstance(section, dict):
+            section = {}
+            origin_config["jpenv"] = section
+        existing_fast_permissions = section.get("fast_permissions")
+        if existing_fast_permissions is None:
+            existing_fast_permissions = []
+            section["fast_permissions"] = existing_fast_permissions
+        if not isinstance(existing_fast_permissions, list):
+            log(
+                f"Warning: {origin_path} has no `fast_permissions` list, "
+                "fast permissions not set"
+            )
+        else:
+            for entry in extra_fast_permissions:
+                if entry not in existing_fast_permissions:
+                    existing_fast_permissions.append(entry)
 
     content = json.dumps(origin_config, indent=2, ensure_ascii=False) + "\n"
 
@@ -2227,6 +2276,47 @@ def resolve_profile_permissions(profile_config, profile):
         if entry not in extra_permissions:
             extra_permissions.append(entry)
     return extra_permissions
+
+
+def resolve_profile_fast_permissions(profile_config, profile):
+    # Returns the fast permission entries of the profile, in the order given,
+    # without duplicates. A profile without `fast_permissions` adds none.
+    # Entries without a non-empty text `name` and a non-empty text
+    # `permission` are skipped with a warning. The `permission` holds a full
+    # Claude Code permission rule, such as `mcp__github__search_repositories`.
+    fast_permissions = profile_config.get("fast_permissions")
+    if fast_permissions is None:
+        return []
+    if not isinstance(fast_permissions, list):
+        log(
+            f"Warning: the `fast_permissions` of profile '{profile}' is not a list, "
+            "fast permissions not set"
+        )
+        return []
+    extra_fast_permissions = []
+    for entry in fast_permissions:
+        if not is_fast_permission_entry(entry):
+            log(
+                f"Warning: the `fast_permissions` of profile '{profile}' holds an entry "
+                "without a non-empty text `name` and a non-empty text `permission`, "
+                "skipping it"
+            )
+            continue
+        if entry not in extra_fast_permissions:
+            extra_fast_permissions.append(entry)
+    return extra_fast_permissions
+
+
+def is_fast_permission_entry(entry):
+    # Whether `entry` is a fast permission entry object with a non-empty text
+    # `name` and a non-empty text `permission`.
+    return (
+        isinstance(entry, dict)
+        and isinstance(entry.get("name"), str)
+        and bool(entry.get("name"))
+        and isinstance(entry.get("permission"), str)
+        and bool(entry.get("permission"))
+    )
 
 
 def create_profile_json(profile_json_path):
@@ -2393,7 +2483,9 @@ def apply_mcp_servers(profile_json, mcp_servers):
 # --------------------------------------------------------------------------------------
 
 
-def build_harness_args(user_harness_args, devel_dir, model, effort, extra_targets=()):
+def build_harness_args(
+    user_harness_args, devel_dir, model, effort, extra_targets=(), plugin_dirs=()
+):
     # Read settings from the profile only. The `project` and `local` sources
     # are files under `.claude` in the repository, and a cloned repository can
     # commit either one with hooks in it. The profile is the one place that
@@ -2425,6 +2517,11 @@ def build_harness_args(user_harness_args, devel_dir, model, effort, extra_target
     # them at these paths inside the container.
     for extra_target in extra_targets:
         harness_args.append(f"--add-dir={extra_target}")
+
+    # Each mod directory loads one plugin for the run. The paths name
+    # directories inside the container.
+    for plugin_dir in plugin_dirs:
+        harness_args.append(f"--plugin-dir={plugin_dir}")
 
     # The arguments of the user come last. A `--` among them ends the options
     # for the harness, so nothing of ours can follow it.

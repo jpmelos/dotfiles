@@ -1,0 +1,4 @@
+{
+  "description": "The fast permissions hooks module",
+  "modules": ["./register.js"]
+}

@@ -3,7 +3,6 @@ name: linear-issue
 description: Create a Linear issue with a concise title, an implementation-ready description, blocking relations, and a milestone.
 argument-hint: what the issue is about [-- team, project, or other hints]
 disable-model-invocation: true
-allowed-tools: mcp__linear__save_issue
 ---
 
 Create or edit a Linear issue according to the current conversation.
