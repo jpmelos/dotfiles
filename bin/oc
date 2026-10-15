@@ -418,8 +418,6 @@ AGENT_BINARIES = (
     "ai_git_add",
     "ai_git_restore",
     "ai_git_commit",
-    "review",
-    "review_diff",
     "pane-state",
     "chime",
     "running",
@@ -2261,7 +2259,9 @@ def sync_opencode_json(origin_path, profile_path, profile_prep):
             mcp = {}
             origin_config["mcp"] = mcp
         mcp["servers"] = mcp_servers
-    extra_permissions = resolve_profile_permissions(profile_config, profile_prep.profile)
+    extra_permissions = resolve_profile_permissions(
+        profile_config, profile_prep.profile
+    )
     if extra_permissions:
         permissions = origin_config.get("permissions")
         if not isinstance(permissions, list):

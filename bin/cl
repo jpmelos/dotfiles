@@ -364,8 +364,6 @@ AGENT_BINARIES = (
     "ai_git_add",
     "ai_git_restore",
     "ai_git_commit",
-    "review",
-    "review_diff",
     "pane-state",
     "chime",
     "running",
