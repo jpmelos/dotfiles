@@ -13,7 +13,8 @@
 # /   --profile <name>  Profile to run as. Selects the
 # /                     `~/.config/opencode-<name>` directory, with its own
 # /                     login, history, and credentials, and the `api_key`,
-# /                     `model`, `agent`, `mcp_servers`, and `permissions`
+# /                     `model`, `agent`, `mcp_servers`, `permissions`, and
+# /                     `fast_permissions`
 # /                     of that profile in `~/config.json` (default: the
 # /                     organization directory of the project, such as
 # /                     `orgname` for `~/devel/orgname/project`, or the
@@ -125,7 +126,18 @@
 # /             "server-name": {"type": "local", "command": ["..."]}
 # /           },
 # /           "permissions": [
-# /             {"action": "server-name_tool-name", "resource": "*", "effect": "allow"}
+# /             {
+# /               "action": "server-name_tool-name",
+# /               "resource": "*",
+# /               "effect": "allow"
+# /             }
+# /           ],
+# /           "fast_permissions": [
+# /             {
+# /               "name": "GitHub search",
+# /               "action": "github_search_repositories",
+# /               "resource": "*"
+# /             }
 # /           ]
 # /         },
 # /         "orgname": {
@@ -160,7 +172,12 @@
 # /   `opencode.json`, after the rules of the origin file. The last
 # /   matching rule wins, so a profile rule overrides an origin rule for
 # /   the same action and resource. Without `permissions`, the profile
-# /   keeps the permissions of the origin file. The profile `AGENTS.md`
+# /   keeps the permissions of the origin file. The `fast_permissions`
+# /   list of a profile holds toggle entries for the
+# /   `jpenv.fast_permissions` list in that profile `opencode.json`, after
+# /   the entries of the origin file. Each entry names an `action` and a
+# /   `resource` for the `/fp` command. Without `fast_permissions`, the
+# /   profile keeps the toggle list of the origin file. The profile `AGENTS.md`
 # /   loads as the global instructions file. Project configurations stay
 # /   disabled (`OPENCODE_CONFIG_PROJECT_DISABLE=1`), so the profile is
 # /   the only configuration source, like `--setting-sources=user` for
@@ -2229,7 +2246,9 @@ def sync_opencode_json(origin_path, profile_path, profile_prep):
     # `default_agent` of the file. The `mcp_servers` object of the profile
     # replaces the `mcp.servers` object of the file. The `permissions` list
     # of the profile adds rules to the `permissions` list of the file, after
-    # the rules of the origin file.
+    # the rules of the origin file. The `fast_permissions` list of the
+    # profile adds entries to the `jpenv.fast_permissions` list of the file,
+    # after the entries of the origin file.
     # The profile `AGENTS.md` sits next to the file, so OpenCode loads it as
     # the global instructions file. A missing origin file leaves a profile
     # copy from an earlier launch in place; `remove_entries_gone_from_origin`
@@ -2273,6 +2292,27 @@ def sync_opencode_json(origin_path, profile_path, profile_prep):
             for rule in extra_permissions:
                 if rule not in permissions:
                     permissions.append(rule)
+    extra_fast_permissions = resolve_profile_fast_permissions(
+        profile_config, profile_prep.profile
+    )
+    if extra_fast_permissions:
+        section = origin_config.get("jpenv")
+        if not isinstance(section, dict):
+            section = {}
+            origin_config["jpenv"] = section
+        existing_fast_permissions = section.get("fast_permissions")
+        if existing_fast_permissions is None:
+            existing_fast_permissions = []
+            section["fast_permissions"] = existing_fast_permissions
+        if not isinstance(existing_fast_permissions, list):
+            log(
+                f"Warning: {origin_path} has no `fast_permissions` list, "
+                "fast permissions not set"
+            )
+        else:
+            for entry in extra_fast_permissions:
+                if entry not in existing_fast_permissions:
+                    existing_fast_permissions.append(entry)
 
     content = json.dumps(origin_config, indent=2, ensure_ascii=False) + "\n"
 
@@ -2361,6 +2401,48 @@ def is_permission_rule(rule):
         and bool(rule.get("action"))
         and isinstance(rule.get("resource"), str)
         and rule.get("effect") in ("allow", "deny", "ask")
+    )
+
+
+def resolve_profile_fast_permissions(profile_config, profile):
+    # Returns the fast permission entries of the profile, in the order given,
+    # without duplicates. A profile without `fast_permissions` adds none.
+    # Entries without a non-empty text `name`, a non-empty text `action`, and
+    # a non-empty text `resource` are skipped with a warning.
+    fast_permissions = profile_config.get("fast_permissions")
+    if fast_permissions is None:
+        return []
+    if not isinstance(fast_permissions, list):
+        log(
+            f"Warning: the `fast_permissions` of profile '{profile}' is not a list, "
+            "fast permissions not set"
+        )
+        return []
+    extra_fast_permissions = []
+    for entry in fast_permissions:
+        if not is_fast_permission_entry(entry):
+            log(
+                f"Warning: the `fast_permissions` of profile '{profile}' holds an entry "
+                "without a non-empty text `name`, a non-empty text `action`, and a "
+                "non-empty text `resource`, skipping it"
+            )
+            continue
+        if entry not in extra_fast_permissions:
+            extra_fast_permissions.append(entry)
+    return extra_fast_permissions
+
+
+def is_fast_permission_entry(entry):
+    # Whether `entry` is a fast permission entry object with a non-empty text
+    # `name`, a non-empty text `action`, and a non-empty text `resource`.
+    return (
+        isinstance(entry, dict)
+        and isinstance(entry.get("name"), str)
+        and bool(entry.get("name"))
+        and isinstance(entry.get("action"), str)
+        and bool(entry.get("action"))
+        and isinstance(entry.get("resource"), str)
+        and bool(entry.get("resource"))
     )
 
 
