@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# Print the size on disk of each given path, or of the entries of the current
+# directory when called with no arguments. The size counts entire blocks.
+#
+# Usage: fs [path...]
+
+if du -b /dev/null > /dev/null 2>&1; then
+    arg=-sbh
+else
+    arg=-sh
+fi
+if [ "$#" -gt 0 ]; then
+    du "$arg" -- "$@"
+else
+    # shellcheck disable=SC2035
+    du "$arg" .[^.]* ./*
+fi

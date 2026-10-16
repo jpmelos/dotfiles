@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# Open a `bash` shell in a running Docker container, picked with `fzf`. Newest
+# containers sort first.
+#
+# Usage: dx
+
+if [ "$#" -ne 0 ]; then
+    echo "usage: dx" >&2
+    exit 1
+fi
+
+container_name=$(
+    docker ps --format '{{.CreatedAt}}\t{{.Names}}' \
+        | sort -r \
+        | cut -f2 \
+        | fzf --prompt="Select container to exec into: " --height=40% --reverse
+)
+
+if [ -z "$container_name" ]; then
+    echo "No container selected." >&2
+    exit 1
+fi
+
+echo "Executing bash in container: $container_name"
+docker exec -it "$container_name" bash

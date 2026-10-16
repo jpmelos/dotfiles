@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# Print the IP address of the interface that carries the default route.
+#
+# Usage: default_if_ip
+
+if [ "$#" -ne 0 ]; then
+    echo "usage: default_if_ip" >&2
+    exit 1
+fi
+
+if [ "$(uname -s)" = "Darwin" ]; then
+    ifconfig "$(default_if)" | grep 'inet ' | awk '{print $2}'
+else
+    echo "Implement for Linux..."
+fi

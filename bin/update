@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# Update the packages of the system.
+#
+# Usage: update
+
+if [ "$#" -ne 0 ]; then
+    echo "usage: update" >&2
+    exit 1
+fi
+
+if [ "$(uname -s)" = "Darwin" ]; then
+    brew update
+    brew upgrade
+    brew cleanup
+else
+    sudo apt-get --allow-releaseinfo-change update
+    sudo apt-get -y --allow-downgrades dist-upgrade
+    sudo apt-get -y autoremove
+    sudo apt-get -y clean
+fi

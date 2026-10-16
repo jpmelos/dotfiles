@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# Print the name of the project that holds the current directory, as
+# `list_project_dirs` reports it. In a linked git worktree, print the name of
+# the main repository, a colon, and the checked-out branch instead. Print
+# nothing when the current directory is inside no project.
+#
+# Usage: current_project_name
+
+if [ "$#" -ne 0 ]; then
+    echo "usage: current_project_name" >&2
+    exit 1
+fi
+
+main() {
+    local devel_dir
+    devel_dir="$(realpath "$HOME/devel" 2> /dev/null)" || return 0
+    local current_dir
+    current_dir="$(pwd -P 2> /dev/null)" || return 0
+    [[ "$current_dir" == "$devel_dir"/* ]] || return 0
+
+    # Walk down from `~/devel`. The first directory with a `.git` entry and no
+    # `.list_project_dirs_ignore` file is the project. Both paths above are
+    # resolved, so no component on the way is a link.
+    local -a components
+    IFS='/' read -r -a components <<< "${current_dir#"$devel_dir"/}"
+    local project_dir=""
+    local candidate="$devel_dir"
+    local component
+    for component in "${components[@]}"; do
+        candidate="$candidate/$component"
+        if [ -e "$candidate/.git" ] && [ ! -e "$candidate/.list_project_dirs_ignore" ]; then
+            project_dir="$candidate"
+            break
+        fi
+    done
+    [ -n "$project_dir" ] || return 0
+
+    local name="${project_dir#"$devel_dir"/}"
+
+    # In a linked worktree, `.git` is a file, and the git directory differs
+    # from the common directory of the main repository. A submodule has a
+    # `.git` file too, but there the two directories are the same.
+    if [ -f "$project_dir/.git" ]; then
+        local -a git_dirs
+        mapfile -t git_dirs < <(
+            git -C "$project_dir" rev-parse --path-format=absolute \
+                --git-dir --git-common-dir 2> /dev/null
+        )
+        if [ "${#git_dirs[@]}" -eq 2 ] && [ "${git_dirs[0]}" != "${git_dirs[1]}" ]; then
+            local main_repo_dir
+            main_repo_dir="$(realpath "${git_dirs[1]}")"
+            main_repo_dir="${main_repo_dir%/.git}"
+            local main_repo_name
+            if [[ "$main_repo_dir" == "$devel_dir"/* ]]; then
+                main_repo_name="${main_repo_dir#"$devel_dir"/}"
+            else
+                main_repo_name="$(basename "$main_repo_dir")"
+            fi
+
+            local branch
+            branch="$(git -C "$project_dir" branch --show-current 2> /dev/null)"
+            if [ -z "$branch" ]; then
+                # Detached HEAD. Show the commit instead.
+                branch="$(git -C "$project_dir" rev-parse --short HEAD 2> /dev/null)"
+            fi
+
+            name="$main_repo_name: $branch"
+        fi
+    fi
+
+    echo "$name"
+}
+
+main

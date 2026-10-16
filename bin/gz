@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# Compare the size of a file with its gzipped size.
+#
+# Usage: gz <file>
+
+if [ "$#" -ne 1 ]; then
+    echo "usage: gz <file>" >&2
+    exit 1
+fi
+
+origsize=$(wc -c < "$1")
+gzipsize=$(gzip -c "$1" | wc -c)
+ratio=$(bc -l <<< "$gzipsize * 100 / $origsize")
+printf "orig: %d bytes\n" "$origsize"
+printf "gzip: %d bytes (%2.2f%%)\n" "$gzipsize" "$ratio"

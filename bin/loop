@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# Run a command again and again until it fails. Wait one second between runs.
+#
+# Usage: loop <command> [args...]
+
+if [ "$#" -eq 0 ]; then
+    echo "usage: loop <command> [args...]" >&2
+    exit 1
+fi
+
+run_count=0
+
+while true; do
+    run_count=$((run_count + 1))
+    echo "Run #$run_count: $*"
+    set +e
+    "$@"
+    exit_code=$?
+    set -e
+    if [ "$exit_code" -ne 0 ]; then
+        echo "Command failed with exit code $exit_code after $run_count runs. Stopping loop." >&2
+        exit "$exit_code"
+    fi
+
+    echo "Command completed ($run_count runs). Restarting..."
+    sleep 1
+done

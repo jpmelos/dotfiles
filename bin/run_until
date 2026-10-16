@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# Run a command until the given deadline, then stop it. The deadline takes
+# `YYYY-MM-DD HH:MM[:SS]` or `HH:MM[:SS]` for today. Seconds default to zero.
+#
+# Usage: run_until <deadline> <command> [args...]
+
+if [ "$#" -lt 2 ]; then
+    echo "usage: run_until <deadline> <command> [args...]" >&2
+    exit 1
+fi
+
+deadline="$1"
+shift
+
+# If only a time is given, prepend today's date.
+if [[ "$deadline" =~ ^[0-9]{2}:[0-9]{2}(:[0-9]{2})?$ ]]; then
+    deadline="$(date '+%Y-%m-%d') $deadline"
+fi
+
+# If seconds are missing, append ":00".
+if [[ "$deadline" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}\ [0-9]{2}:[0-9]{2}$ ]]; then
+    deadline="$deadline:00"
+fi
+
+deadline_epoch=""
+if [ "$(uname -s)" = "Darwin" ]; then
+    deadline_epoch=$(date -j -f "%Y-%m-%d %H:%M:%S" "$deadline" +%s) || {
+        echo "Invalid date format. Use: YYYY-MM-DD HH:MM[:SS] or HH:MM[:SS]" >&2
+        exit 1
+    }
+else
+    deadline_epoch=$(date -d "$deadline" +%s) || {
+        echo "Invalid date format. Use: YYYY-MM-DD HH:MM[:SS] or HH:MM[:SS]" >&2
+        exit 1
+    }
+fi
+
+now_epoch=$(date +%s)
+
+seconds_left=$((deadline_epoch - now_epoch))
+
+if [ "$seconds_left" -le 0 ]; then
+    echo "Deadline already passed" >&2
+    exit 1
+fi
+
+echo "Running for $(format_duration "$seconds_left")..."
+timeout "$seconds_left" "$@"

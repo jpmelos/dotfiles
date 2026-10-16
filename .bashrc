@@ -47,70 +47,6 @@ reset_terminal_title() {
     echo -ne "\033]0;$BASH_TERMINAL_TITLE\007"
 }
 
-# Print the name of the project that holds the current directory, as
-# `list_project_dirs` reports it. In a linked git worktree, print the name of
-# the main repository, a colon, and the checked-out branch instead. Print
-# nothing when the current directory is inside no project.
-current_project_name() {
-    local devel_dir
-    devel_dir="$(realpath "$HOME/devel" 2> /dev/null)" || return 0
-    local current_dir
-    current_dir="$(pwd -P 2> /dev/null)" || return 0
-    [[ "$current_dir" == "$devel_dir"/* ]] || return 0
-
-    # Walk down from `~/devel`. The first directory with a `.git` entry and no
-    # `.list_project_dirs_ignore` file is the project. Both paths above are
-    # resolved, so no component on the way is a link.
-    local -a components
-    IFS='/' read -r -a components <<< "${current_dir#"$devel_dir"/}"
-    local project_dir=""
-    local candidate="$devel_dir"
-    local component
-    for component in "${components[@]}"; do
-        candidate="$candidate/$component"
-        if [ -e "$candidate/.git" ] && [ ! -e "$candidate/.list_project_dirs_ignore" ]; then
-            project_dir="$candidate"
-            break
-        fi
-    done
-    [ -n "$project_dir" ] || return 0
-
-    local name="${project_dir#"$devel_dir"/}"
-
-    # In a linked worktree, `.git` is a file, and the git directory differs
-    # from the common directory of the main repository. A submodule has a
-    # `.git` file too, but there the two directories are the same.
-    if [ -f "$project_dir/.git" ]; then
-        local -a git_dirs
-        mapfile -t git_dirs < <(
-            git -C "$project_dir" rev-parse --path-format=absolute \
-                --git-dir --git-common-dir 2> /dev/null
-        )
-        if [ "${#git_dirs[@]}" -eq 2 ] && [ "${git_dirs[0]}" != "${git_dirs[1]}" ]; then
-            local main_repo_dir
-            main_repo_dir="$(realpath "${git_dirs[1]}")"
-            main_repo_dir="${main_repo_dir%/.git}"
-            local main_repo_name
-            if [[ "$main_repo_dir" == "$devel_dir"/* ]]; then
-                main_repo_name="${main_repo_dir#"$devel_dir"/}"
-            else
-                main_repo_name="$(basename "$main_repo_dir")"
-            fi
-
-            local branch
-            branch="$(git -C "$project_dir" branch --show-current 2> /dev/null)"
-            if [ -z "$branch" ]; then
-                # Detached HEAD. Show the commit instead.
-                branch="$(git -C "$project_dir" rev-parse --short HEAD 2> /dev/null)"
-            fi
-
-            name="$main_repo_name: $branch"
-        fi
-    fi
-
-    echo "$name"
-}
-
 # The project name that this shell last wrote to its tmux window. Empty when
 # the shell was never in a project, or when it left the last one.
 TMUX_WINDOW_PROJECT=""
@@ -187,19 +123,8 @@ alias l='ls -FhAls'
 # Search history.
 alias h="history | grep"
 
-# Copy and paste shortcuts.
-# Strictly, c is not an alias, but it's just a very thin wrapper around
-# `pbcopy` to make it trim leading and trailing whitespaces from the input.
-c() {
-    perl -0777 -pe 's/^\s+|\s+$//g' | pbcopy
-}
+# Paste shortcut.
 alias p="pbpaste"
-
-# Find out what is taking so much space on your drives!
-alias diskspace="du -S | sort -n -r | more"
-
-# Show me the size (sorted) of only the folders in this directory.
-alias folders="find . -maxdepth 1 -type d -print | xargs du -sk | sort -rn"
 
 # Edit Bash configuration files.
 alias erc='nvim -O ~/.bash_profile ~/.bashrc'
@@ -409,101 +334,8 @@ __git_complete gy git_cherry_pick
 #                 #
 ###################
 
-# Find current default interface.
-if [ "$(uname -s)" = "Darwin" ]; then
-    default_if() {
-        route -n get default | grep 'interface:' | awk '{print $2}'
-    }
-else
-    default_if() {
-        echo "Implement for Linux..."
-    }
-fi
-
-# Find the IP of the interface to the default gateway.
-if [ "$(uname -s)" = "Darwin" ]; then
-    default_if_ip() {
-        ifconfig "$(default_if)" | grep 'inet ' | awk '{print $2}'
-    }
-else
-    default_if_ip() {
-        echo "Implement for Linux..."
-    }
-fi
-
-# Updates the system.
-if [ "$(uname -s)" = "Darwin" ]; then
-    update() {
-        brew update
-        brew upgrade
-        brew cleanup
-    }
-else
-    update() {
-        sudo apt-get --allow-releaseinfo-change update
-        sudo apt-get -y --allow-downgrades dist-upgrade
-        sudo apt-get -y autoremove
-        sudo apt-get -y clean
-    }
-fi
-
-# Extract stuff.
-extract() {
-    if [ -f "$1" ]; then
-        case "$1" in
-            *.tar.bz2) tar xjf "$1" ;;
-            *.tar.gz) tar xzf "$1" ;;
-            *.bz2) bunzip2 "$1" ;;
-            *.rar) rar x "$1" ;;
-            *.gz) gunzip "$1" ;;
-            *.tar) tar xf "$1" ;;
-            *.tbz2) tar xjf "$1" ;;
-            *.tgz) tar xzf "$1" ;;
-            *.zip) unzip "$1" ;;
-            *.Z) uncompress "$1" ;;
-            *.7z) 7z x "$1" ;;
-            *) echo "'$1' cannot be extracted via extract()" ;;
-        esac
-    else
-        echo "'$1' is not a valid file"
-    fi
-}
-
-# Determine actual size of a file in disk (considers entire blocks) or total
-# size of a directory.
-fs() {
-    if du -b /dev/null > /dev/null 2>&1; then
-        local arg=-sbh
-    else
-        local arg=-sh
-    fi
-    if [[ -n "$@" ]]; then
-        du $arg -- "$@"
-    else
-        du $arg .[^.]* ./*
-    fi
-}
-
-# Start an HTTP server from a directory, optionally specifying the port.
-server() {
-    local addr="${1:-0.0.0.0}"
-    local port="${2:-8000}"
-
-    sleep 2 && open "http://$addr:$port/" &
-    python3 -m http.server "$port" -b "$addr"
-}
-
-# Compare original and gzipped file size.
-gz() {
-    local origsize=$(wc -c < "$1")
-    local gzipsize=$(gzip -c "$1" | wc -c)
-    local ratio=$(bc -l <<< "$gzipsize * 100 / $origsize")
-    printf "orig: %d bytes\n" "$origsize"
-    printf "gzip: %d bytes (%2.2f%%)\n" "$gzipsize" "$ratio"
-}
-
 # Normalize `open` across Linux, macOS, and Windows.
-# This is needed to make the `o` function (see below) cross-platform.
+# This keeps interactive `open` calls cross-platform.
 if [ "$(uname -s)" != "Darwin" ]; then
     if grep -q Microsoft /proc/version; then
         # Ubuntu on Windows using the Linux subsystem
@@ -513,47 +345,9 @@ if [ "$(uname -s)" != "Darwin" ]; then
     fi
 fi
 
-# `o` with no arguments opens the current directory, otherwise opens the given
-# location.
-o() {
-    if [ $# -eq 0 ]; then
-        open .
-    else
-        open "$@"
-    fi
-}
-
-is_in_path() {
-    builtin type -P "$1" &> /dev/null
-}
-
 # Commands that `j` falls back to when the project has no `jpenv-bin` command
 # with the requested name.
 JPENV_BIN_DEFAULT_DIR="$HOME/devel/dotfiles/jpenv-bin-default"
-
-# Print the name of each regular file in the directory, followed by the
-# documentation block that its `#/` lines hold. Skip files whose names are in
-# the remaining arguments.
-_j_list_commands() {
-    local bin_dir="$1"
-    local suffix="$2"
-    shift 2
-    local -a skipped_names=("$@")
-
-    local command_path
-    for command_path in "$bin_dir"/*; do
-        [ -f "$command_path" ] || continue
-        local command_name
-        command_name="$(basename "$command_path")"
-        local skipped_name
-        for skipped_name in "${skipped_names[@]}"; do
-            [ "$command_name" = "$skipped_name" ] && continue 2
-        done
-        echo "${command_name}:${suffix}"
-        awk '/^#\//{print substr($0,3); found=1; next} found{exit}' "$command_path" \
-            | sed 's/^/  /'
-    done
-}
 
 # Run a `jpenv-bin` command of the project, or a default one when the project
 # has none with that name. With `--default` before the command name, skip the
@@ -583,10 +377,10 @@ j() {
         local listing
         listing="$(
             if [ "$default_only" = false ]; then
-                _j_list_commands "$local_bin_dir" ""
+                j_list_commands "$local_bin_dir" ""
             fi
             # A local command with the same name shadows the default one.
-            _j_list_commands "$default_bin_dir" " (default)" "${local_names[@]}"
+            j_list_commands "$default_bin_dir" " (default)" "${local_names[@]}"
         )"
         if [ -z "$listing" ]; then
             if [ "$default_only" = true ]; then
@@ -656,7 +450,7 @@ je() {
 
     if [ $# -eq 0 ]; then
         local listing
-        listing="$(_j_list_commands "$local_bin_dir" "")"
+        listing="$(j_list_commands "$local_bin_dir" "")"
         if [ -z "$listing" ]; then
             echo "No commands found in $local_bin_dir" >&2
             return 1
@@ -753,111 +547,6 @@ complete -F _j_completion j
 complete -F _j_completion jd
 complete -F _j_completion je
 
-loop() {
-    if [ $# -eq 0 ]; then
-        echo "Usage: loop <command> [args...]"
-        return 1
-    fi
-
-    local run_count=0
-
-    while true; do
-        ((run_count++))
-        echo "Run #$run_count: $*"
-        "$@"
-
-        local exit_code=$?
-        if [ $exit_code -ne 0 ]; then
-            echo "Command failed with exit code $exit_code after $run_count runs. Stopping loop."
-            return $exit_code
-        fi
-
-        echo "Command completed ($run_count runs). Restarting..."
-        sleep 1
-    done
-}
-
-# Pass the date as the first argument, for example: 2026-01-15T14:00:00.
-# Defaults to current date if not provided.
-change_commit_date() {
-    # Check if there are any staged or unstaged changes (excluding untracked files).
-    if ! git diff-index --quiet HEAD --; then
-        echo "Error: Working directory has staged or unstaged changes. Please commit or stash them first." >&2
-        return 1
-    fi
-
-    local date="${1:-$(date '+%Y-%m-%dT%H:%M:%S')}"
-    GIT_COMMITTER_DATE="$date" git commit --amend --no-verify --no-edit --date="$date"
-}
-
-format_duration() {
-    local total_seconds="$1"
-
-    local days=$((total_seconds / 86400))
-    local hours=$(((total_seconds % 86400) / 3600))
-    local minutes=$(((total_seconds % 3600) / 60))
-    local secs=$((total_seconds % 60))
-
-    local duration=""
-    if [ "$days" -gt 0 ]; then
-        duration="${days}d${hours}h${minutes}m${secs}s"
-    elif [ "$hours" -gt 0 ]; then
-        duration="${hours}h${minutes}m${secs}s"
-    elif [ "$minutes" -gt 0 ]; then
-        duration="${minutes}m${secs}s"
-    else
-        duration="${secs}s"
-    fi
-
-    echo "$duration"
-}
-export -f format_duration
-
-# If only a time is given (HH:MM or HH:MM:SS), today is assumed. Seconds are optional.
-run_until() {
-    local deadline="$1"
-    shift
-
-    # If only a time is given, prepend today's date.
-    if [[ "$deadline" =~ ^[0-9]{2}:[0-9]{2}(:[0-9]{2})?$ ]]; then
-        deadline="$(date '+%Y-%m-%d') $deadline"
-    fi
-
-    # If seconds are missing, append ":00".
-    if [[ "$deadline" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}\ [0-9]{2}:[0-9]{2}$ ]]; then
-        deadline="$deadline:00"
-    fi
-
-    local deadline_epoch
-    deadline_epoch=$(date -j -f "%Y-%m-%d %H:%M:%S" "$deadline" +%s) || {
-        echo "Invalid date format. Use: YYYY-MM-DD HH:MM[:SS] or HH:MM[:SS]"
-        return 1
-    }
-
-    local now_epoch
-    now_epoch=$(date +%s)
-
-    local seconds_left=$((deadline_epoch - now_epoch))
-
-    if [ "$seconds_left" -le 0 ]; then
-        echo "Deadline already passed"
-        return 1
-    fi
-
-    echo "Running for $(format_duration "$seconds_left")..."
-    timeout "$seconds_left" "$@"
-}
-
-# Pretty-print the JSON in the clipboard. Prints the formatted JSON to stdout
-# and replaces the clipboard contents with it. If the clipboard does not hold
-# valid JSON, `jq` reports the error and the clipboard is left unchanged.
-pretty_json() {
-    local pretty
-    pretty=$(pbpaste | jq '.') || return
-    echo "$pretty"
-    echo "$pretty" | pbcopy
-}
-
 #########################################
 #                                       #
 #    Project navigation with ~/devel    #
@@ -900,42 +589,3 @@ alias dc='docker compose'
 alias dcps="docker compose ps --format 'table {{.Name}}\t{{.Service}}\t{{.Status}}\t{{.Ports}}'"
 alias dcpsa="docker compose ps -a --format 'table {{.Name}}\t{{.Service}}\t{{.Status}}\t{{.Ports}}'"
 alias dcls="docker compose ls"
-dcrm() { # Drop an active Docker Compose environment.
-    docker compose -p "$1" down
-}
-
-# Docker exec into a container with TUI selection.
-dx() {
-    local container_name=$(
-        docker ps --format '{{.CreatedAt}}\t{{.Names}}' \
-            | sort -r \
-            | cut -f2 \
-            | fzf --prompt="Select container to exec into: " --height=40% --reverse
-    )
-
-    if [ -z "$container_name" ]; then
-        echo "No container selected."
-        return 1
-    fi
-
-    echo "Executing bash in container: $container_name"
-    docker exec -it "$container_name" bash
-}
-
-# Docker kill a container with TUI selection.
-dk() {
-    local container_name=$(
-        docker ps --format '{{.CreatedAt}}\t{{.Names}}' \
-            | sort -r \
-            | cut -f2 \
-            | fzf --prompt="Select container to kill: " --height=40% --reverse
-    )
-
-    if [ -z "$container_name" ]; then
-        echo "No container selected."
-        return 1
-    fi
-
-    echo "Killing container: $container_name"
-    docker kill "$container_name"
-}

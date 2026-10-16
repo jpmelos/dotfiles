@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# Print the name of each regular file in the directory, followed by the
+# documentation block that its `#/` lines hold. Skip files whose names are in
+# the remaining arguments. Used by the `j` and `je` shell functions to list
+# `jpenv-bin` commands.
+#
+# Usage: j_list_commands <bin-dir> <suffix> [skip-name...]
+
+if [ "$#" -lt 2 ]; then
+    echo "usage: j_list_commands <bin-dir> <suffix> [skip-name...]" >&2
+    exit 1
+fi
+
+bin_dir="$1"
+suffix="$2"
+shift 2
+
+for command_path in "$bin_dir"/*; do
+    [ -f "$command_path" ] || continue
+    command_name="$(basename "$command_path")"
+    skip=false
+    for skipped_name in "$@"; do
+        if [ "$command_name" = "$skipped_name" ]; then
+            skip=true
+            break
+        fi
+    done
+    if [ "$skip" = true ]; then
+        continue
+    fi
+    echo "${command_name}:${suffix}"
+    awk '/^#\//{print substr($0,3); found=1; next} found{exit}' "$command_path" \
+        | sed 's/^/  /'
+done

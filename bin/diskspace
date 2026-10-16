@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# Print the space that each directory entry takes, largest first.
+#
+# Usage: diskspace
+
+if [ "$#" -ne 0 ]; then
+    echo "usage: diskspace" >&2
+    exit 1
+fi
+
+du -S | sort -n -r | more

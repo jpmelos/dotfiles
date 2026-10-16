@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# Print a duration in seconds as `XdXhXmXs`, with leading zero units left out.
+#
+# Usage: format_duration <total-seconds>
+
+if [ "$#" -ne 1 ]; then
+    echo "usage: format_duration <total-seconds>" >&2
+    exit 1
+fi
+
+total_seconds="$1"
+
+days=$((total_seconds / 86400))
+hours=$(((total_seconds % 86400) / 3600))
+minutes=$(((total_seconds % 3600) / 60))
+secs=$((total_seconds % 60))
+
+if [ "$days" -gt 0 ]; then
+    echo "${days}d${hours}h${minutes}m${secs}s"
+elif [ "$hours" -gt 0 ]; then
+    echo "${hours}h${minutes}m${secs}s"
+elif [ "$minutes" -gt 0 ]; then
+    echo "${minutes}m${secs}s"
+else
+    echo "${secs}s"
+fi

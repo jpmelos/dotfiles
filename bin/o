@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# Open the given location, or the current directory when called with no
+# arguments. Accepts the same targets as `open` on macOS.
+#
+# Usage: o [path-or-url...]
+
+if [ "$#" -eq 0 ]; then
+    set -- .
+fi
+
+if [ "$(uname -s)" = "Darwin" ]; then
+    open "$@"
+elif grep -q Microsoft /proc/version 2> /dev/null; then
+    explorer.exe "$@"
+else
+    xdg-open "$@"
+fi

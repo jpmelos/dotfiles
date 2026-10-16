@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# Serve the current directory over HTTP and open the URL in a browser.
+#
+# Usage: server [bind-address [port]]
+#   bind-address defaults to `0.0.0.0` and port defaults to `8000`.
+
+if [ "$#" -gt 2 ]; then
+    echo "usage: server [bind-address [port]]" >&2
+    exit 1
+fi
+
+addr="${1:-0.0.0.0}"
+port="${2:-8000}"
+
+open_url() {
+    if [ "$(uname -s)" = "Darwin" ]; then
+        open "$@"
+    elif grep -q Microsoft /proc/version 2> /dev/null; then
+        explorer.exe "$@"
+    else
+        xdg-open "$@"
+    fi
+}
+
+sleep 2 && open_url "http://$addr:$port/" &
+python3 -m http.server "$port" -b "$addr"

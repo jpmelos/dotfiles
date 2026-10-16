@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# Print the size of each directory directly below the current one, largest
+# first.
+#
+# Usage: folders
+
+if [ "$#" -ne 0 ]; then
+    echo "usage: folders" >&2
+    exit 1
+fi
+
+find . -maxdepth 1 -type d -print | xargs du -sk | sort -rn

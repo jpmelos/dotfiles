@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# Tell whether the given command is on `PATH`. Prints its path when it is.
+#
+# Usage: is_in_path <command>
+
+if [ "$#" -ne 1 ]; then
+    echo "usage: is_in_path <command>" >&2
+    exit 1
+fi
+
+# `command -v` works in scripts. The interactive `type -P` check of the old
+# shell function does not.
+command -v "$1" &> /dev/null

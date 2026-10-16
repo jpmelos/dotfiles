@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# Amend the date of the most recent commit. Takes an ISO date such as
+# `2026-01-15T14:00:00` and defaults to the current date. Refuses to run with
+# staged or unstaged changes, untracked files excluded.
+#
+# Usage: change_commit_date [date]
+
+if [ "$#" -gt 1 ]; then
+    echo "usage: change_commit_date [date]" >&2
+    exit 1
+fi
+
+# Check if there are any staged or unstaged changes (excluding untracked files).
+if ! git diff-index --quiet HEAD --; then
+    echo "Error: Working directory has staged or unstaged changes. Please commit or stash them first." >&2
+    exit 1
+fi
+
+date_arg="${1:-$(date '+%Y-%m-%dT%H:%M:%S')}"
+GIT_COMMITTER_DATE="$date_arg" git commit --amend --no-verify --no-edit --date="$date_arg"

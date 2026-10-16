@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# Stop and remove the Docker Compose environment with the given project name.
+#
+# Usage: dcrm <project-name>
+
+if [ "$#" -ne 1 ]; then
+    echo "usage: dcrm <project-name>" >&2
+    exit 1
+fi
+
+docker compose -p "$1" down

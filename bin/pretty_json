@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# Pretty-print the JSON in the clipboard. Prints the formatted JSON to stdout
+# and replaces the clipboard contents with it. If the clipboard does not hold
+# valid JSON, `jq` reports the error and the clipboard is left unchanged.
+#
+# Usage: pretty_json
+
+if [ "$#" -ne 0 ]; then
+    echo "usage: pretty_json" >&2
+    exit 1
+fi
+
+pretty=$(pbpaste | jq '.') || exit "$?"
+echo "$pretty"
+echo "$pretty" | pbcopy

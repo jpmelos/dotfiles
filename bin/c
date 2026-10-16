@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# Trim leading and trailing whitespace from stdin and copy the result to the
+# clipboard with `pbcopy`.
+#
+# Usage: <command> | c
+#        c < input.txt
+
+if [ "$#" -ne 0 ]; then
+    echo "usage: c (reads stdin, writes to clipboard)" >&2
+    exit 1
+fi
+
+perl -0777 -pe 's/^\s+|\s+$//g' | pbcopy
