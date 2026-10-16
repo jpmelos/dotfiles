@@ -13,7 +13,7 @@
 # /   --profile <name>  Profile to run as. Selects the
 # /                     `~/.config/opencode-<name>` directory, with its own
 # /                     login, history, and credentials, and the `api_key`,
-# /                     `model`, `agent`, `mcp_servers`, `permissions`, and
+# /                     `model`, `mcp_servers`, `permissions`, and
 # /                     `fast_permissions`
 # /                     of that profile in `~/config.json` (default: the
 # /                     organization directory of the project, such as
@@ -58,16 +58,15 @@
 # /   `--standalone` for a private server inside the container. Anything
 # /   else runs headless through `run`: the launcher puts
 # /   `run --standalone` before the arguments, plus `--model` with the
-# /   `model` of the profile and `--agent` with the `agent` of the
-# /   profile, if any. File tools may read or edit anywhere inside the
-# /   container: the profile `opencode.json` allows
+# /   `model` of the profile, if any. File tools may read or edit anywhere
+# /   inside the container: the profile `opencode.json` allows
 # /   every `external_directory` request, and the host trees the
 # /   container sees read-write are `~/devel` and the read-write
 # /   `--add-volume` mounts.
-# /   A `--model`, `--agent`, `--standalone`, or `--server` that you pass
+# /   A `--model`, `--standalone`, or `--server` that you pass
 # /   wins. A first argument that names another subcommand (`serve`,
 # /   `auth`, `mcp`, and the rest) passes through verbatim, except that
-# /   `run` still gets `--standalone`, `--model`, and `--agent` as above.
+# /   `run` still gets `--standalone` and `--model` as above.
 # /   A prompt that starts with one of those words needs an explicit
 # /   `run` first.
 # /
@@ -121,7 +120,6 @@
 # /         "username": {
 # /           "api_key": "ok-...",
 # /           "model": "anthropic/claude-opus-4-6",
-# /           "agent": "build",
 # /           "mcp_servers": {
 # /             "server-name": {"type": "local", "command": ["..."]}
 # /           },
@@ -162,8 +160,7 @@
 # /   launcher passes it to `run` with `--model` and writes it into the
 # /   profile `opencode.json`, so the interactive interface uses it too.
 # /   Give the full reference in `provider/model#variant` form, such as
-# /   `anthropic/claude-opus-4-6#xhigh`. `agent` works the same way, with
-# /   `--agent` and `default_agent`. Without `mcp_servers`, the profile
+# /   `anthropic/claude-opus-4-6#xhigh`. Without `mcp_servers`, the profile
 # /   keeps the `mcp.servers` object of the origin file.
 # /
 # /   The `mcp_servers` object of a profile replaces the `mcp.servers`
@@ -529,7 +526,6 @@ def main():
         profile_config = {}
     opencode_api_key = resolve_opencode_api_key(profile_config, profile)
     model = resolve_profile_text_setting(profile_config, profile, "model")
-    agent = resolve_profile_text_setting(profile_config, profile, "agent")
 
     # Every directory of the user is private. The names of the profile
     # directories are the names of the organizations, the shared directory
@@ -588,12 +584,11 @@ def main():
             profile_config=profile_config,
             profile=profile,
             model=model,
-            agent=agent,
             dependency_dirs=dependency_dirs,
         )
     )
 
-    harness_args = build_harness_args(options.harness_args, model, agent)
+    harness_args = build_harness_args(options.harness_args, model)
 
     run_config = RunConfig(
         paths=paths,
@@ -1729,11 +1724,9 @@ class ProfilePrep:
     # no entry, or when there is no such file.
     profile_config: dict
     profile: str
-    # The `model` and `agent` of the profile, or `None` when the profile sets
-    # neither. Both go into the profile `opencode.json` and onto the `run`
-    # command line.
+    # The `model` of the profile, or `None` when the profile sets none. It
+    # goes into the profile `opencode.json` and onto the `run` command line.
     model: str | None
-    agent: str | None
     # The visible projects besides the one under work, for the dependencies
     # list in the profile `AGENTS.md`.
     dependency_dirs: list
@@ -2242,9 +2235,9 @@ def sync_opencode_json(origin_path, profile_path, profile_prep):
     # Writes the profile `opencode.json` as the origin file with the settings
     # of the profile applied. Returns whether the origin file exists.
     #
-    # The `model` and the `agent` of the profile become the `model` and the
-    # `default_agent` of the file. The `mcp_servers` object of the profile
-    # replaces the `mcp.servers` object of the file. The `permissions` list
+    # The `model` of the profile becomes the `model` of the file. The
+    # `mcp_servers` object of the profile replaces the `mcp.servers`
+    # object of the file. The `permissions` list
     # of the profile adds rules to the `permissions` list of the file, after
     # the rules of the origin file. The `fast_permissions` list of the
     # profile adds entries to the `jpenv.fast_permissions` list of the file,
@@ -2269,8 +2262,6 @@ def sync_opencode_json(origin_path, profile_path, profile_prep):
     profile_config = profile_prep.profile_config
     if profile_prep.model is not None:
         origin_config["model"] = profile_prep.model
-    if profile_prep.agent is not None:
-        origin_config["default_agent"] = profile_prep.agent
     mcp_servers = resolve_mcp_servers(profile_config, profile_prep.profile)
     if mcp_servers is not None:
         mcp = origin_config.get("mcp")
@@ -2451,7 +2442,7 @@ def is_fast_permission_entry(entry):
 # --------------------------------------------------------------------------------------
 
 
-def build_harness_args(user_harness_args, model, agent):
+def build_harness_args(user_harness_args, model):
     # Without harness arguments, the launcher runs the interactive TUI with a
     # private in-process server, so that any number of containers can run at
     # once. A managed background service registers one file per profile below
@@ -2478,15 +2469,13 @@ def build_harness_args(user_harness_args, model, agent):
     ):
         harness_args.append("--standalone")
 
-    # The `model` and the `agent` of the profile, if any. A `--model` or an
-    # `--agent` in the harness arguments comes later on the command line and
-    # wins. That is on purpose: an explicit value from the user is respected.
-    # Every option here uses the `--option=value` form, so that a following
-    # positional prompt is never swallowed as an option value.
+    # The `model` of the profile, if any. A `--model` in the harness
+    # arguments comes later on the command line and wins. That is on purpose:
+    # an explicit value from the user is respected. The option here uses the
+    # `--option=value` form, so that a following positional prompt is never
+    # swallowed as an option value.
     if model is not None and not has_cli_option(rest, ("--model", "-m")):
         harness_args.append(f"--model={model}")
-    if agent is not None and not has_cli_option(rest, ("--agent",)):
-        harness_args.append(f"--agent={agent}")
 
     # The arguments of the user come last. A `--` among them ends the options
     # for the harness, so nothing of ours can follow it.
