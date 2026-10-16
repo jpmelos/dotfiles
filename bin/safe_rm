@@ -2,8 +2,111 @@
 set -euo pipefail
 trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 
-# This is just to allow AI agents to delete files. Since they always run inside
-# a Docker container and they only have access to things that are under version
-# control, this is fine.
+# Delete files only inside the current repository and outside `jpenv-bin`.
+# Links are not resolved because the operation applies to the link itself.
+
+repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+if [ -z "${repo_root:-}" ]; then
+    echo "Error: not inside a git repository." >&2
+    exit 1
+fi
+if [ "$repo_root" != "/" ]; then
+    repo_root="${repo_root%/}"
+fi
+
+canonical_abs_path() {
+    local input_path="${1:-}"
+    local combined_path
+    local rest
+    local -a path_stack=()
+    local component
+    local result
+    local part
+    if [ -z "$input_path" ]; then
+        echo "Error: empty path." >&2
+        return 1
+    fi
+    if [[ "$input_path" == /* ]]; then
+        combined_path="$input_path"
+    else
+        combined_path="${PWD:-$(pwd)}/$input_path"
+    fi
+    if [ "$combined_path" != "/" ]; then
+        combined_path="${combined_path%/}"
+    fi
+    rest="${combined_path#/}"
+    while [ -n "$rest" ]; do
+        if [[ "$rest" == */* ]]; then
+            component="${rest%%/*}"
+            rest="${rest#*/}"
+        else
+            component="$rest"
+            rest=""
+        fi
+        case "$component" in
+            ""|".")
+                continue
+                ;;
+            "..")
+                if [ "${#path_stack[@]}" -gt 0 ]; then
+                    unset "path_stack[$((${#path_stack[@]}-1))]"
+                fi
+                ;;
+            *)
+                path_stack+=("$component")
+                ;;
+        esac
+    done
+    if [ "${#path_stack[@]}" -eq 0 ]; then
+        printf '/\n'
+    else
+        result=""
+        for part in "${path_stack[@]}"; do
+            result="$result/$part"
+        done
+        printf '%s\n' "$result"
+    fi
+}
+
+check_path() {
+    local original_path="${1:-}"
+    local absolute_path
+    absolute_path="$(canonical_abs_path "$original_path")" || exit 1
+    if [ "$absolute_path" = "$repo_root" ]; then
+        echo "Error: refusing to operate on repository root: $original_path" >&2
+        exit 1
+    fi
+    if [ "$repo_root" != "/" ]; then
+        if [[ "$absolute_path" != "$repo_root"/* ]]; then
+            echo "Error: refusing to operate outside repository ($repo_root): $original_path" >&2
+            exit 1
+        fi
+    fi
+    local forbidden_prefix="$repo_root/jpenv-bin"
+    if [ "$repo_root" = "/" ]; then
+        forbidden_prefix="/jpenv-bin"
+    fi
+    if [ "$absolute_path" = "$forbidden_prefix" ] || [[ "$absolute_path" == "$forbidden_prefix"/* ]]; then
+        echo "Error: refusing to operate inside jpenv-bin: $original_path" >&2
+        exit 1
+    fi
+}
+
+end_of_options=false
+if [ $# -gt 0 ]; then
+    for original_arg in "$@"; do
+        if [ "$end_of_options" = true ]; then
+            check_path "$original_arg"
+        elif [ "$original_arg" = "--" ]; then
+            end_of_options=true
+        elif [ "$original_arg" = "-" ]; then
+            check_path "$original_arg"
+        elif [[ "$original_arg" == -* ]]; then
+            continue
+        else
+            check_path "$original_arg"
+        fi
+    done
+fi
 
 exec rm "$@"
