@@ -2,8 +2,7 @@
 # balances to YNAB.
 #
 # Run it with `/run budget-sync` from the allowlisted chat. Optional words
-# after the name are `--from-date YYYY-MM-DD`, `--no-download`, and
-# `--no-upload`, with the same meaning as in `bin/budget_imports`.
+# after the name are `--no-download` and `--no-upload`.
 #
 # BMO comes from `agent-browser` downloads. Wise comes from the Wise API with
 # the token in `wise.api_key`, without a browser. The Wise cache lives in
@@ -89,14 +88,11 @@ BROWSER_SESSION = "budget-sync"
 # How long to wait for a page to load, and for a download to finish.
 PAGE_WAIT_SECONDS = 5
 DOWNLOAD_WAIT_SECONDS = 10
-# How many days back the task looks. The chequing download covers these
-# days, and the task ignores the transactions before them, in the statements
-# and in YNAB.
+# How many days back the task looks. The task ignores the transactions before
+# the start date, in the statements and in YNAB.
 HISTORY_DAYS = 30
-# The first date of the transactions to process, without `--from-date`.
+# The first date of the transactions to process.
 DEFAULT_FROM_DATE = datetime.date(2026, 10, 1)
-# The format of the date that `--from-date` takes.
-OPTION_DATE_FORMAT = "%Y-%m-%d"
 # The forms take dates as MM/DD/YYYY.
 FORM_DATE_FORMAT = "%m/%d/%Y"
 # The bank gives this name to every statement that it sends.
@@ -152,7 +148,7 @@ def run(ctx, args=None):
     a short summary for the chat."""
     global _CTX
     _CTX = ctx
-    from_date, no_download, no_upload = parse_task_args(list(args or []))
+    no_download, no_upload = parse_task_args(list(args or []))
     ctx.say("Budget sync started.")
     try:
         ynab_api_key = read_config_text("ynab.api_key")
@@ -160,6 +156,11 @@ def run(ctx, args=None):
         _say(f"Cannot start: {error}")
         raise TaskError("YNAB API key is missing.") from error
     paths = resolve_state_files(ctx)
+    # The task works only on the transactions from this date on, in the
+    # statements and in YNAB.
+    start_date = max(
+        DEFAULT_FROM_DATE, datetime.date.today() - datetime.timedelta(days=HISTORY_DAYS)
+    )
     if no_download:
         use_last_statements(paths)
         balances = None
@@ -170,15 +171,9 @@ def run(ctx, args=None):
         questrade_balance = sum(questrade_balances.values())
         ctx.log(f"Questrade total {format_amount(questrade_balance)}")
         _say(f"Got Questrade balance {format_amount(questrade_balance)}.")
-        wise_balance = run_wise_download(ctx, paths)
-        balances = run_download(ctx, paths)
+        wise_balance = run_wise_download(ctx, paths, start_date)
+        balances = run_download(ctx, paths, start_date)
         balances[Account.WISE] = wise_balance
-
-    # The task works only on the transactions from this date on, in the
-    # statements and in YNAB.
-    start_date = max(
-        from_date, datetime.date.today() - datetime.timedelta(days=HISTORY_DAYS)
-    )
 
     ctx.log("Reading the statements")
     statement_transactions = [
@@ -273,22 +268,17 @@ def shutdown(ctx, reason):
 
 
 @click.command(context_settings={"help_option_names": []}, no_args_is_help=False)
-@click.option(
-    "--from-date",
-    type=click.DateTime(formats=[OPTION_DATE_FORMAT]),
-    default=None,
-)
 @click.option("--no-download", is_flag=True, default=False)
 @click.option("--no-upload", is_flag=True, default=False)
-def _budget_sync_options(from_date, no_download, no_upload):
+def _budget_sync_options(no_download, no_upload):
     # Holds the CLI options. `parse_task_args` runs it without exiting, so
     # its errors raise instead.
-    return from_date, no_download, no_upload
+    return no_download, no_upload
 
 
 def parse_task_args(args):
-    # Returns the from date, no-download, and no-upload from `args`, the
-    # words after the task name, with the same rules as a regular CLI.
+    # Returns no-download and no-upload from `args`, the words after the task
+    # name, with the same rules as a regular CLI.
     # Telegram replaces `--` with an n-dash or an m-dash, so leading `-`,
     # `–` (U+2013), and `—` (U+2014) all count as `--`.
     normalized = []
@@ -297,16 +287,12 @@ def parse_task_args(args):
             argument = "--" + argument.lstrip("-–—")
         normalized.append(argument)
     try:
-        from_date, no_download, no_upload = _budget_sync_options.main(
+        no_download, no_upload = _budget_sync_options.main(
             normalized, standalone_mode=False
         )
     except click.ClickException as error:
         raise TaskError(str(error)) from error
-    if from_date is None:
-        from_date = DEFAULT_FROM_DATE
-    else:
-        from_date = from_date.date()
-    return from_date, no_download, no_upload
+    return no_download, no_upload
 
 
 # --------------------------------------------------------------------------------------
@@ -430,7 +416,7 @@ def record_last_run(ctx):
 # --------------------------------------------------------------------------------------
 
 
-def run_download(ctx, paths):
+def run_download(ctx, paths, start_date):
     # Downloads the statements from the bank, and returns the balances that
     # `download_statements` returns.
     try:
@@ -443,7 +429,7 @@ def run_download(ctx, paths):
     os.environ["AGENT_BROWSER_SESSION"] = BROWSER_SESSION
     browser = Browser()
     try:
-        balances = download_statements(browser, paths, username, password)
+        balances = download_statements(browser, paths, username, password, start_date)
     except StepError as error:
         # Before the browser opens, there is no page to show.
         if browser.opened:
@@ -467,13 +453,13 @@ def use_last_statements(paths):
             raise TaskError("No downloaded statements. Run without --no-download first")
 
 
-def download_statements(browser, paths, username, password):
+def download_statements(browser, paths, username, password, start_date):
     # Returns the current balance of each account. See `read_balance`.
     open_login_page(browser, paths)
     accept_cookies(browser)
     log_in(browser, username, password)
     pass_verification(browser)
-    chequing_balance = download_chequing_statement(browser, paths)
+    chequing_balance = download_chequing_statement(browser, paths, start_date)
     credit_card_balance = download_credit_card_statement(browser, paths)
     save_session(browser, paths)
     return {
@@ -543,8 +529,9 @@ def pass_verification(browser):
     time.sleep(PAGE_WAIT_SECONDS)
 
 
-def download_chequing_statement(browser, paths):
+def download_chequing_statement(browser, paths, start_date):
     # Returns the current balance of the account. See `read_balance`.
+    # Fetches from one day before `start_date` to cover boundary postings.
     _log("Selecting the chequing account")
     browser.find_role("link", "click", "Chequing")
     time.sleep(PAGE_WAIT_SECONDS)
@@ -555,8 +542,8 @@ def download_chequing_statement(browser, paths):
     browser.find_role("link", "click", "DOWNLOAD")
     browser.find_role("radio", "click", "Transactions between these dates:")
     to_date = datetime.date.today()
-    from_date = to_date - datetime.timedelta(days=HISTORY_DAYS)
-    browser.find_role("textbox", "fill", "From", from_date.strftime(FORM_DATE_FORMAT))
+    fetch_from_date = start_date - datetime.timedelta(days=1)
+    browser.find_role("textbox", "fill", "From", fetch_from_date.strftime(FORM_DATE_FORMAT))
     browser.find_role("textbox", "fill", "To", to_date.strftime(FORM_DATE_FORMAT))
     browser.run("select", 'select[name="format"]', CSV_FORMAT)
     browser.run("click", "#ba-tx-download-submit")
@@ -1836,10 +1823,11 @@ WISE_TIMEOUT_SECONDS = 30
 WISE_CURRENCY = "CAD"
 
 
-def run_wise_download(ctx, paths):
+def run_wise_download(ctx, paths, start_date):
     # Fetches the Wise transactions and balance through the API, saves the
     # transactions to the Wise cache, and returns the balance. Same role as
-    # `run_download` for BMO, but without a browser.
+    # `run_download` for BMO, but without a browser. Fetches from one day
+    # before `start_date` to cover boundary postings.
     try:
         api_token = read_config_text("wise.api_key")
     except TaskError as error:
@@ -1853,9 +1841,9 @@ def run_wise_download(ctx, paths):
         raise
 
     to_date = datetime.date.today()
-    from_date = to_date - datetime.timedelta(days=HISTORY_DAYS)
+    fetch_from_date = start_date - datetime.timedelta(days=1)
     transactions, balance = fetch_wise_data(
-        api_token, profile_id, balance_id, from_date, to_date
+        api_token, profile_id, balance_id, fetch_from_date, to_date
     )
     save_wise_transactions(paths.wise_file, transactions)
     ctx.log(f"Wise transactions: {len(transactions)}, balance {format_amount(balance)}")
