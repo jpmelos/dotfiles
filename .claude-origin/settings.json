@@ -113,7 +113,6 @@
     ],
     "defaultMode": "dontAsk"
   },
-  "model": "sonnet",
   "disableBundledSkills": true,
   "hooks": {
     "SessionStart": [
@@ -190,7 +189,6 @@
     ]
   },
   "alwaysThinkingEnabled": true,
-  "effortLevel": "xhigh",
   "theme": "light",
   "terminalProgressBarEnabled": false,
   "disableBypassPermissionsMode": true
