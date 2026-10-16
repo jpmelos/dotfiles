@@ -619,6 +619,14 @@ pending_devel() {
                     pull_output=$(printf "%s" "$pull_output" | sed 's/^/    /')
                     findings+=("$(printf "* \033[1m%s\033[0m\n    git pull failed:\n%s" \
                         "$repo_path" "$pull_output")")
+                elif [ "$current_branch" != "$main_branch" ]; then
+                    if [ -z "$main_branch" ]; then
+                        findings+=("$(printf "* \033[1m%s\033[0m\n    pulled %s (checked-out branch, main branch unknown)" \
+                            "$repo_path" "$current_branch")")
+                    else
+                        findings+=("$(printf "* \033[1m%s\033[0m\n    pulled %s (checked-out branch, main branch is %s)" \
+                            "$repo_path" "$current_branch" "$main_branch")")
+                    fi
                 fi
             fi
         fi
