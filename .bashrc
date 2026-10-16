@@ -601,8 +601,6 @@ pending_devel() {
             fi
 
             if [ "$current_branch" != "$main_branch" ]; then
-                should_pull=false
-
                 local main_upstream
                 main_upstream=$(git for-each-ref --format='%(upstream:short)' refs/heads/"$main_branch" 2> /dev/null)
                 if [ -n "$main_upstream" ]; then
