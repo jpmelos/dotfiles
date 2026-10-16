@@ -1,20 +1,17 @@
 ---
-description: Review the current diff.
+description: Review uncommitted changes.
 argument-hint: [additional instructions]
 disable-model-invocation: true
 ---
 
-Review the current diff.
+Review uncommitted changes.
 
 Obtain the changes first.
 
-- Run `git diff`. If the output is not empty, review it.
-- If the output is empty, run `git diff --cached`. If the output is not empty,
-  review it.
-- If the output is still empty, run `git main-branch` to find the main branch.
-- Then run `git diff <main>...`. Review that diff.
-- Also run `git log <main>... --oneline` for commit context.
-- If all outputs are empty, state that there is nothing to review. Stop there.
+- Run `git diff`. Keep the output.
+- Run `git diff --cached`. Keep the output.
+- Review both outputs together as one change.
+- If both outputs are empty, state that there is nothing to review. Stop there.
 
 Provide a detailed explanation about what the changes are about, and if you can
 figure it out, also explain why the changes would be desirable. Feel free to

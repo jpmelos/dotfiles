@@ -1,12 +1,23 @@
 ---
-description: Review the last commit.
-argument-hint: [additional instructions]
+description: Review changes since a ref.
+argument-hint: [<ref> -- additional instructions]
 disable-model-invocation: true
 ---
 
-Review the last commit.
+Review everything that changed since the given ref.
 
-Obtain the commit first. Run `git show HEAD`.
+The ref appears at the end of this message. A "--" separator can come after the ref. If the separator is there, the text after it gives additional instructions from the user. If the ref is empty or missing, use the default branch.
+
+Find the default branch first. The default branch is the result of `git main-branch`.
+
+- Run `git main-branch`. If the output names a branch, use it as the default branch.
+- If that command fails or the output is empty, run `git branch --list` and guess the default from the names. Prefer `main` over `master`, and `master` over the rest. Names such as `dev` are also common defaults.
+
+Obtain the changes next.
+
+- Run `git diff <ref>...` for the ref in effect. Review that diff.
+- Also run `git log <ref>... --oneline` for commit context.
+- If both outputs are empty, state that there is nothing to review. Stop there.
 
 Provide a detailed explanation about what the changes are about, and if you can
 figure it out, also explain why the changes would be desirable. Feel free to
@@ -23,8 +34,8 @@ description, and the additional instructions.
 
 Finally, provide your own version of:
 
-- A commit title, at most 50 characters.
-- A commit description that is concise and to the point, without excluding any
+- A PR title, at most 50 characters.
+- A PR description that is concise and to the point, without excluding any
   important topics that need to be covered.
 
 Emit the title and the description as raw Markdown, ready to paste into GitHub.
@@ -65,13 +76,14 @@ the fix.
 
 Do not run compilers, linters, or tests.
 
-This message ends with additional instructions from the user. The additional
-instructions can be empty.
+This message ends with the ref. A "--" separator can come after the ref. If
+the separator is there, the text after it gives additional instructions from
+the user.
 
 If there are additional instructions, follow them. If the additional
 instructions conflict with the instructions above, the additional instructions
 have priority.
 
-Additional instructions:
+Ref to review since (additional instructions after "--"):
 
 $ARGUMENTS
