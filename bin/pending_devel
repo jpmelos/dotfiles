@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# Check each project under `~/devel` for work that is not pushed, and pull
+# the rest. Report repositories with uncommitted changes, with commits that
+# need a push, and with a failed pull. Skip linked worktrees. The main
+# repository holds the same state, so a worktree adds nothing to the report.
+#
+# Usage: pending_devel
+
+devel_dir="$HOME/devel"
+
+if [ ! -d "$devel_dir" ]; then
+    echo "Error: $devel_dir does not exist." >&2
+    exit 1
+fi
+
+projects=()
+mapfile -t projects < <(list_project_dirs)
+total="${#projects[@]}"
+
+if [ "$total" -eq 0 ]; then
+    echo -e "No projects found in \e[1m~/devel\e[0m."
+    exit 0
+fi
+
+echo -e "Checking for uncommitted changes in \e[1m~/devel\e[0m repositories ($total projects)..."
+
+bar_width=40
+index=0
+findings=()
+for repo_path in "${projects[@]}"; do
+    index=$((index + 1))
+
+    filled=$((index * bar_width / total))
+    bar=""
+    for ((i = 0; i < filled; i++)); do bar+="="; done
+    for ((i = filled; i < bar_width; i++)); do bar+=" "; done
+    printf "\r[%s] %d/%d" "$bar" "$index" "$total"
+
+    cd "$devel_dir/$repo_path" || continue
+
+    # Skip linked worktrees. There, the git directory differs from the
+    # common directory of the main repository. The main repository holds
+    # the same state, so the worktree adds nothing to the report.
+    mapfile -t git_dirs < <(
+        git rev-parse --path-format=absolute --git-dir --git-common-dir 2> /dev/null
+    )
+    if [ "${#git_dirs[@]}" -eq 2 ] && [ "${git_dirs[0]}" != "${git_dirs[1]}" ]; then
+        continue
+    fi
+
+    main_branch="$(git main-branch 2> /dev/null || true)"
+
+    if [ "$(git status --porcelain | wc -l)" -gt 0 ]; then
+        status_output="$(git status --porcelain | head -n 10 | sed 's/^/    /' || true)"
+        findings+=("$(printf "* \033[1m%s\033[0m\n\n%s" "$repo_path" "$status_output")")
+    else
+        should_pull=true
+
+        current_branch="$(git rev-parse --abbrev-ref HEAD 2> /dev/null || true)"
+        upstream="$(git rev-parse --abbrev-ref --symbolic-full-name @{upstream} 2> /dev/null || true)"
+
+        if [ -n "$upstream" ]; then
+            ahead="$(git rev-list --count @{upstream}..HEAD 2> /dev/null || echo 0)"
+            if [ "$ahead" -gt 0 ]; then
+                should_pull=false
+                findings+=("$(printf "* \033[1m%s\033[0m\n    %s needs to be pushed, %d commit(s) ahead" \
+                    "$repo_path" "$current_branch" "$ahead")")
+            fi
+        fi
+
+        if [ "$current_branch" != "$main_branch" ]; then
+            main_upstream="$(git for-each-ref --format='%(upstream:short)' refs/heads/"$main_branch" 2> /dev/null || true)"
+            if [ -n "$main_upstream" ]; then
+                main_ahead="$(git rev-list --count "$main_upstream".."$main_branch" 2> /dev/null || echo 0)"
+                if [ "$main_ahead" -gt 0 ]; then
+                    findings+=("$(printf "* \033[1m%s\033[0m\n    %s needs to be pushed, %d commit(s) ahead" \
+                        "$repo_path" "$main_branch" "$main_ahead")")
+                fi
+            fi
+        fi
+
+        if [ "$should_pull" = true ]; then
+            if ! pull_output="$(git pull --quiet 2>&1)"; then
+                pull_output="$(printf "%s" "$pull_output" | sed 's/^/    /')"
+                findings+=("$(printf "* \033[1m%s\033[0m\n    git pull failed:\n%s" \
+                    "$repo_path" "$pull_output")")
+            elif [ "$current_branch" != "$main_branch" ]; then
+                if [ -z "$main_branch" ]; then
+                    findings+=("$(printf "* \033[1m%s\033[0m\n    pulled %s (checked-out branch, main branch unknown)" \
+                        "$repo_path" "$current_branch")")
+                else
+                    findings+=("$(printf "* \033[1m%s\033[0m\n    pulled %s (checked-out branch, main branch is %s)" \
+                        "$repo_path" "$current_branch" "$main_branch")")
+                fi
+            fi
+        fi
+    fi
+done
+
+echo ""
+for finding in "${findings[@]}"; do
+    echo ""
+    printf "%s\n" "$finding"
+done
