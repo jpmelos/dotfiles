@@ -112,8 +112,8 @@ export function register(on) {
           label: rowLabel(entry, isEnabled(state, entry)),
           onPress: async () => {
             const enabled = await flipRule($, entry);
+            await $.ui.close({ id: PANE });
             $.ui.toast(rowLabel(entry, enabled));
-            $.ui.invalidate("ui.render");
           },
         };
         const hotkey = hotkeyFor(index);
