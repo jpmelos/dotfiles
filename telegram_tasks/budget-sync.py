@@ -13,7 +13,8 @@
 # its YNAB payee and memo, or its split parts with payee, amount, and memo
 # each. The task lists new entries and asks for splits first, then asks
 # payees in date order and remembers. One decision covers every identical
-# entry of one day. When YNAB already holds the same account, date, and
+# entry of one day. Decision rows older than 90 days go away automatically.
+# When YNAB already holds the same account, date, and
 # amount, the task offers its payee and memo first, and an accepted offer
 # becomes the decision with nothing else to ask. A transfer looks for its
 # other end within 7 days and shares one memo. Unpaired managed transfers
@@ -90,6 +91,9 @@ DOWNLOAD_WAIT_SECONDS = 10
 # How many days back the task looks. The task ignores the transactions before
 # the start date, in the statements and in YNAB.
 HISTORY_DAYS = 30
+# How many days a decision row stays in `transactions.json`. Older rows go
+# away automatically on every run.
+DECISION_RETENTION_DAYS = 90
 # How many days apart the two ends of a transfer may appear. The task looks
 # for the other end in the same day and this many days before and after.
 TRANSFER_MATCH_DAYS = 7
@@ -194,6 +198,7 @@ def run(ctx, args=None):
 
     ctx.log("Recording the decisions")
     decisions = load_decisions(ctx)
+    prune_decisions(ctx, decisions)
     transactions = apply_decisions(ctx, transactions, decisions, ynab_api_key, start_date)
     ctx.log(f"Decided transactions: {len(transactions)} after expansion")
 
@@ -1011,6 +1016,25 @@ def save_decisions(ctx, decisions):
         ctx.save_state(TRANSACTIONS_ID, data)
     except (OSError, TypeError, ValueError) as error:
         raise TaskError(f"cannot save {TRANSACTIONS_ID}: {error}") from error
+
+
+def prune_decisions(ctx, decisions):
+    # Removes the rows older than 90 days from `decisions` in place, and
+    # saves the database when anything went away.
+    cutoff = datetime.date.today() - datetime.timedelta(days=DECISION_RETENTION_DAYS)
+    kept = [
+        decision
+        for decision in decisions
+        if datetime.date.fromisoformat(decision["key"][1]) >= cutoff
+    ]
+    pruned = len(decisions) - len(kept)
+    if not pruned:
+        return 0
+    decisions[:] = kept
+    save_decisions(ctx, decisions)
+    ctx.log(f"Pruned {pruned} decision rows older than {cutoff.isoformat()}.")
+    ctx.say(f"Pruned {pruned} transactions older than 90 days.")
+    return pruned
 
 
 def transaction_decision_key(transaction):
