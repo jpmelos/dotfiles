@@ -16,9 +16,14 @@
 # entry of one day. Decision rows older than 90 days go away automatically.
 # When YNAB already holds the same account, date, and
 # amount, the task offers its payee and memo first, and an accepted offer
-# becomes the decision with nothing else to ask. A transfer looks for its
-# other end within 7 days and shares one memo. Unpaired managed transfers
-# stay stored but leave YNAB alone this run.
+# becomes the decision with nothing else to ask. Nearby managed transfers
+# within 7 days also offer, since YNAB keeps both legs on the earliest bank
+# date. A transfer looks for its other end within 7 days and shares one
+# memo. Unpaired managed transfers stay stored but leave YNAB alone this run.
+# YNAB keeps both legs of a transfer on one date: the earliest bank date of
+# the pair. Bank pairs on different days still match that single YNAB date,
+# in the flow to register new transactions and in future runs. Pairs dated
+# after the early leg move to the earliest date after one confirmation.
 # YNAB gains missing copies and loses surplus copies of bank entries after
 # one confirmation. Deletion happens only there. Before that, the task syncs
 # every recognized YNAB transaction with the database: entries with the same
@@ -1321,7 +1326,7 @@ def offer_ynab_for_side(ctx, side, groups, sides, suggestions):
             suggestions,
         )
     adopted = ask_ynab_suggestion(
-        ctx, [representative], suggestions.get(suggestion_key(representative))
+        ctx, [representative], suggestions_for_transaction(suggestions, representative)
     )
     if adopted is None:
         return None
@@ -1609,6 +1614,221 @@ def is_mutual_transfer_pair(first, second):
     )
 
 
+def transfer_early_dates(transactions):
+    # Returns the YNAB date by index for paired managed transfers.
+    # YNAB keeps both legs on one date, so both legs use the earliest bank
+    # date of the pair. Unpaired entries are not here.
+    pairs, _deferred = find_managed_transfer_pairs(transactions)
+    early_by_index = {}
+    for first_index, second_index in pairs:
+        early = min(
+            transactions[first_index].date, transactions[second_index].date
+        )
+        early_by_index[first_index] = early
+        early_by_index[second_index] = early
+    return early_by_index
+
+
+def decision_transfer_early_dates(decisions):
+    # Returns the YNAB date by decision reference for paired managed
+    # transfers. The reference holds the decision key with the part index,
+    # or None for singles. Both sides of a pair share the earliest bank
+    # date, which is the date that YNAB holds. Unpaired entries are absent.
+    legs = []
+    for decision in decisions:
+        source, date_iso, _bank_payee, bank_amount = decision["key"]
+        account = ACCOUNTS_BY_SOURCE[source]
+        bank_date = datetime.date.fromisoformat(date_iso)
+        if decision["kind"] == "single":
+            payee = decision["payee"]
+            if transfer_target(payee) in ACCOUNTS_BY_YNAB_NAME:
+                legs.append(
+                    {
+                        "account": account,
+                        "date": bank_date,
+                        "amount": bank_amount,
+                        "payee": payee,
+                        "ref": (decision["key"], None),
+                    }
+                )
+        else:
+            for part_index, part in enumerate(decision["parts"]):
+                payee = part["payee"]
+                if transfer_target(payee) in ACCOUNTS_BY_YNAB_NAME:
+                    legs.append(
+                        {
+                            "account": account,
+                            "date": bank_date,
+                            "amount": part["amount"],
+                            "payee": payee,
+                            "ref": (decision["key"], part_index),
+                        }
+                    )
+    synthetic = [
+        Transaction(
+            date=leg["date"],
+            amount=leg["amount"],
+            payee=leg["payee"],
+            account=leg["account"],
+        )
+        for leg in legs
+    ]
+    pairs, _deferred = find_managed_transfer_pairs(synthetic)
+    early_by_ref = {}
+    for first_index, second_index in pairs:
+        early = min(synthetic[first_index].date, synthetic[second_index].date)
+        early_by_ref[legs[first_index]["ref"]] = early
+        early_by_ref[legs[second_index]["ref"]] = early
+    return early_by_ref
+
+
+def find_transfer_date_corrections(transactions, comparison, plan):
+    # Returns YNAB transfer pairs that need a date move to the earliest bank
+    # date of the matching bank pair. YNAB keeps both legs on one date, so a
+    # pair dated after the early leg still refers to the same two bank
+    # entries. Each correction holds the YNAB legs, the current YNAB date,
+    # and the early date. Only managed pairs with both legs visible qualify.
+    expected_pairs, _deferred = find_managed_transfer_pairs(transactions)
+    if not expected_pairs:
+        return []
+    by_id = {}
+    for account in YNAB_ACCOUNT_NAMES:
+        for txns in comparison.ynab_by_key_by_account.get(account, {}).values():
+            for txn in txns:
+                by_id[str(txn.id)] = (account, txn)
+    seen_pair_keys = set()
+    actual_pairs = []
+    for account, txn in by_id.values():
+        if txn.transfer_account_id is None or txn.transfer_transaction_id is None:
+            continue
+        other_name = plan.account_names.get(
+            txn.transfer_account_id, str(txn.transfer_account_id)
+        )
+        if other_name not in ACCOUNTS_BY_YNAB_NAME:
+            continue
+        other_id = str(txn.transfer_transaction_id)
+        if other_id not in by_id:
+            continue
+        pair_key = tuple(sorted([str(txn.id), other_id]))
+        if pair_key in seen_pair_keys:
+            continue
+        seen_pair_keys.add(pair_key)
+        other_account, other_txn = by_id[other_id]
+        if other_txn.transfer_account_id is None:
+            continue
+        actual_pairs.append(((account, txn), (other_account, other_txn)))
+    corrections = []
+    used_actual = set()
+    for first_index, second_index in expected_pairs:
+        first = transactions[first_index]
+        second = transactions[second_index]
+        early = min(first.date, second.date)
+        expected_legs = {
+            (
+                first.account,
+                to_milliunits(first.amount),
+                canonical_expected_payee(first.payee),
+            ),
+            (
+                second.account,
+                to_milliunits(second.amount),
+                canonical_expected_payee(second.payee),
+            ),
+        }
+        best = None
+        best_diff = None
+        best_key = None
+        for pair_index, ((account_a, txn_a), (account_b, txn_b)) in enumerate(
+            actual_pairs
+        ):
+            if pair_index in used_actual:
+                continue
+            try:
+                actual_legs = {
+                    (
+                        account_a,
+                        txn_a.amount,
+                        canonical_expected_payee(
+                            transfer_payee(
+                                plan.account_names.get(
+                                    txn_a.transfer_account_id,
+                                    str(txn_a.transfer_account_id),
+                                )
+                            )
+                        ),
+                    ),
+                    (
+                        account_b,
+                        txn_b.amount,
+                        canonical_expected_payee(
+                            transfer_payee(
+                                plan.account_names.get(
+                                    txn_b.transfer_account_id,
+                                    str(txn_b.transfer_account_id),
+                                )
+                            )
+                        ),
+                    ),
+                }
+            except TaskError:
+                continue
+            if actual_legs != expected_legs:
+                continue
+            current = txn_a.var_date
+            if txn_b.var_date != current:
+                current = min(current, txn_b.var_date)
+            if current == early:
+                best = None
+                best_key = None
+                break
+            if abs((current - early).days) > TRANSFER_MATCH_DAYS:
+                continue
+            diff = abs((current - early).days)
+            if best is None or diff < best_diff:
+                best = ((account_a, txn_a), (account_b, txn_b), current)
+                best_diff = diff
+                best_key = pair_index
+        if best is None:
+            continue
+        (_account_a, txn_a), (_account_b, txn_b), current = best
+        used_actual.add(best_key)
+        corrections.append(
+            {
+                "txns": [txn_a, txn_b],
+                "current": current,
+                "early": early,
+                "label": (
+                    f"{early.strftime('%m-%d')} Transfer "
+                    f"{ACCOUNT_TAGS[_account_a]} <-> "
+                    f"{ACCOUNT_TAGS[_account_b]} "
+                    f"{format_amount(from_milliunits(txn_a.amount))}"
+                ),
+            }
+        )
+    return corrections
+
+
+def apply_transfer_date_corrections(plan, corrections):
+    # Moves each YNAB transfer pair in `corrections` to its early date.
+    # Moving one leg moves the other leg with it, but both legs update to
+    # the same date for safety. Preserves clearing and approval by only
+    # sending the identifier and the date.
+    updates = []
+    for correction in corrections:
+        for txn in correction["txns"]:
+            updates.append(
+                ynab.SaveTransactionWithIdOrImportId(
+                    id=txn.id, var_date=correction["early"]
+                )
+            )
+    try:
+        ynab.TransactionsApi(plan.api_client).update_transactions(
+            plan.plan_id, ynab.PatchTransactionsWrapper(transactions=updates)
+        )
+    except YNAB_ERRORS as error:
+        raise TaskError(f"cannot move the transfer dates in YNAB: {error}") from error
+
+
 def suggestion_key(transaction):
     # Returns the YNAB lookup key of `transaction`: account, date, and amount
     # in milliunits. Returns None when the amount cannot go to YNAB, so the
@@ -1618,6 +1838,50 @@ def suggestion_key(transaction):
     except TaskError:
         return None
     return (transaction.account, transaction.date, milliunits)
+
+
+def suggestions_for_transaction(suggestions, transaction):
+    # Returns YNAB payee and memo offers for `transaction`: exact matches on
+    # account, date, and amount, plus nearby managed transfers on the same
+    # account and amount within 7 days. YNAB keeps both legs of a transfer
+    # on the earliest bank date, so the later bank leg still finds the
+    # transfer offer dated on the early leg.
+    key = suggestion_key(transaction)
+    if key is None:
+        return None
+    found = list(suggestions.get(key, []))
+    try:
+        milliunits = to_milliunits(transaction.amount)
+    except TaskError:
+        return found or None
+    for (account, date, amount), entries in suggestions.items():
+        if account != transaction.account or amount != milliunits:
+            continue
+        if date == transaction.date:
+            continue
+        if abs((date - transaction.date).days) > TRANSFER_MATCH_DAYS:
+            continue
+        for entry in entries:
+            if transfer_target(entry["payee"]) not in ACCOUNTS_BY_YNAB_NAME:
+                continue
+            if (entry["payee"], entry["memo"]) not in {
+                (item["payee"], item["memo"]) for item in found
+            }:
+                found.append(entry)
+    return found or None
+
+
+def part_suggestions_for_amount(suggestions, transaction, amount):
+    # Returns YNAB offers for one split part amount: exact matches plus
+    # nearby managed transfers, like `suggestions_for_transaction`.
+    probe = Transaction(
+        date=transaction.date,
+        amount=amount,
+        payee=transaction.payee,
+        account=transaction.account,
+        bank_payee=transaction.bank_payee,
+    )
+    return suggestions_for_transaction(suggestions, probe)
 
 
 def load_ynab_suggestions(ctx, groups, lookup, ynab_api_key, start_date):
@@ -2097,8 +2361,9 @@ def ask_part_ynab_offer(
     # Returns the payee and memo of a YNAB offer for one split part amount
     # that the chat accepts, or None when there is no offer or the chat
     # declines. `suggestions` maps YNAB lookup keys to payee and memo offers.
-    key = part_suggestion_key(transaction, amount)
-    offers = suggestions.get(key) if key is not None else None
+    # Nearby managed transfers within 7 days also offer, since YNAB keeps
+    # both legs on the earliest bank date.
+    offers = part_suggestions_for_amount(suggestions, transaction, amount)
     if not offers:
         return None
     if len(offers) > 1:
@@ -2992,8 +3257,35 @@ def update_from_statements(ctx, plan, transactions, decisions, start_date, uploa
     # deleted subtracts the cleared victim amounts. Paths that write nothing
     # return zero deltas for every account in `YNAB_ACCOUNT_NAMES`.
     comparison = compare_with_ynab(plan, transactions, start_date)
+    date_corrections = find_transfer_date_corrections(
+        transactions, comparison, plan
+    )
+    if date_corrections:
+        lines = [f"Move transfers to earliest date ({len(date_corrections)}):"]
+        for correction in date_corrections[:REPORT_LINE_LIMIT]:
+            lines.append(
+                f"{correction['current'].strftime('%m-%d')} -> "
+                f"{correction['early'].strftime('%m-%d')} "
+                f"{correction['label']}"
+            )
+        if len(date_corrections) > REPORT_LINE_LIMIT:
+            lines.append(f"+{len(date_corrections) - REPORT_LINE_LIMIT} more")
+        _say("\n".join(lines))
+        if not upload:
+            _say("Preview only. YNAB unchanged.")
+            report_memo_count(comparison, start_date)
+            return False, 0, 0, 0, 0, 0, {account: decimal.Decimal("0") for account in YNAB_ACCOUNT_NAMES}
+        if not ask_yes(
+            f"In YNAB, move {len(date_corrections)} transfer(s) to earliest dates?"
+        ):
+            _say("Cancelled. YNAB unchanged.")
+            report_memo_count(comparison, start_date)
+            return False, 0, 0, 0, 0, 0, {account: decimal.Decimal("0") for account in YNAB_ACCOUNT_NAMES}
+        apply_transfer_date_corrections(plan, date_corrections)
+        _say(f"Moved {len(date_corrections)} transfer(s) to earliest dates.")
+        comparison = compare_with_ynab(plan, transactions, start_date)
     report_ignored_counts(comparison)
-    transactions_to_send, problems, transfer_other_dates = plan_additions(
+    transactions_to_send, problems, transfer_early_dates = plan_additions(
         plan, comparison.missing_transactions
     )
     if problems:
@@ -3035,7 +3327,7 @@ def update_from_statements(ctx, plan, transactions, decisions, start_date, uploa
                 _say("A transfer changed. Check the other side.")
         # The sync changes keys, so the plan below starts from fresh state.
         comparison = compare_with_ynab(plan, transactions, start_date)
-        transactions_to_send, problems, transfer_other_dates = plan_additions(
+        transactions_to_send, problems, transfer_early_dates = plan_additions(
             plan, comparison.missing_transactions
         )
         if problems:
@@ -3077,7 +3369,10 @@ def update_from_statements(ctx, plan, transactions, decisions, start_date, uploa
             if transfer_target(transaction.payee) is not None
         ]
         if transfers:
-            _say(f"{len(transfers)} transfer(s). YNAB adds each other side by itself.")
+            _say(
+                f"{len(transfers)} transfer(s). YNAB adds each other side by "
+                "itself on the earliest date."
+            )
         report_other_sides(transfers)
     if uncleared_count:
         _say(f"Clear {uncleared_count} in YNAB.")
@@ -3108,7 +3403,7 @@ def update_from_statements(ctx, plan, transactions, decisions, start_date, uploa
 
     if missing_count:
         send_transactions(
-            ctx, plan, transactions_to_send, decisions, transfer_other_dates
+            ctx, plan, transactions_to_send, decisions, transfer_early_dates
         )
     if uncleared_count:
         clear_ynab_transactions(plan, comparison.uncleared_transactions)
@@ -3445,6 +3740,15 @@ def compare_with_ynab(plan, transactions, start_date):
     expected_keys_by_account = {}
     ynab_by_key_by_account = {}
     ynab_without_memo_count = 0
+    # Paired managed transfers use one YNAB date for both legs: the
+    # earliest bank date of the pair. The map holds that date by object,
+    # so each leg compares on the YNAB date while reports keep bank dates.
+    early_by_index = transfer_early_dates(transactions)
+    early_by_id = {
+        id(transaction): early_by_index[index]
+        for index, transaction in enumerate(transactions)
+        if index in early_by_index
+    }
     for account, account_id in plan.account_ids.items():
         ynab_transactions = call_ynab(
             "read the YNAB transactions",
@@ -3473,6 +3777,7 @@ def compare_with_ynab(plan, transactions, start_date):
             plan,
             statement_transactions,
             visible_transactions,
+            early_by_id,
         )
         missing_transactions += missing
         if extra_keys:
@@ -3490,14 +3795,24 @@ def compare_with_ynab(plan, transactions, start_date):
     )
 
 
-def compare_account(plan, statement_transactions, ynab_transactions):
+def compare_account(plan, statement_transactions, ynab_transactions, early_by_id=None):
     # Returns the statement transactions that YNAB does not have, the keys of
     # the YNAB transactions that the statement does not have, the YNAB
     # transactions that match a statement transaction but are not cleared,
     # the keys that the statements expect, and the YNAB transactions by key.
     # Each key counts as many times as it appears, so two equal transactions
-    # on a date need two in YNAB.
-    statement_counts = collections.Counter(map(statement_key, statement_transactions))
+    # on a date need two in YNAB. Paired managed transfers compare on the
+    # earliest bank date of the pair, which is the single date that YNAB
+    # holds, while the returned statement objects keep their bank dates.
+    def effective_key(transaction):
+        early = None
+        if early_by_id is not None:
+            early = early_by_id.get(id(transaction))
+        return statement_key(transaction, early)
+
+    statement_counts = collections.Counter(
+        map(effective_key, statement_transactions)
+    )
     ynab_keys = [
         ynab_key(plan, ynab_transaction) for ynab_transaction in ynab_transactions
     ]
@@ -3509,7 +3824,7 @@ def compare_account(plan, statement_transactions, ynab_transactions):
     missing_counts = statement_counts - ynab_counts
     missing_transactions = []
     for transaction in statement_transactions:
-        key = statement_key(transaction)
+        key = effective_key(transaction)
         if missing_counts[key] > 0:
             missing_counts[key] -= 1
             missing_transactions.append(transaction)
@@ -3538,13 +3853,16 @@ def compare_account(plan, statement_transactions, ynab_transactions):
     )
 
 
-def statement_key(transaction):
+def statement_key(transaction, effective_date=None):
     # The date, the payee, and the amount in milliunits. The payee of a
     # transfer is `Transfer: <account name>`, whatever its spacing in the
-    # decision.
+    # decision. `effective_date` overrides the bank date: paired managed
+    # transfers use the earliest bank date of the pair, which is the single
+    # date that YNAB holds for both legs.
     target_name = transfer_target(transaction.payee)
     payee = transaction.payee if target_name is None else transfer_payee(target_name)
-    return (transaction.date, payee, to_milliunits(transaction.amount))
+    date = effective_date if effective_date is not None else transaction.date
+    return (date, payee, to_milliunits(transaction.amount))
 
 
 def ynab_key(plan, ynab_transaction):
@@ -3573,14 +3891,16 @@ def transfer_payee(account_name):
 
 
 def plan_additions(plan, missing_transactions):
-    # Returns the transactions to send, problems, and other-side dates for
+    # Returns the transactions to send, problems, and YNAB dates for
     # cross-day transfers. YNAB adds the other side by itself, so only one
-    # side goes per managed pair. Pairs allow dates within 7 days with
-    # mutual payees. Unpaired managed transfers defer without error.
-    # A transfer to an account without a statement has only the one side.
+    # side goes per managed pair, on the earliest bank date of the pair,
+    # since YNAB keeps both legs on one date. Pairs allow dates within 7
+    # days with mutual payees. Unpaired managed transfers defer without
+    # error. A transfer to an account without a statement has only the one
+    # side, on its bank date.
     transactions_to_send = []
     problems = []
-    other_dates_by_id = {}
+    early_dates_by_id = {}
     managed_candidates = []
     for transaction in missing_transactions:
         target_name = transfer_target(transaction.payee)
@@ -3606,20 +3926,21 @@ def plan_additions(plan, missing_transactions):
         managed_candidates.append(transaction)
     if managed_candidates:
         pairs, _deferred = find_managed_transfer_pairs(managed_candidates)
-        paired_ids = set()
         for first_index, second_index in pairs:
-            paired_ids.add(first_index)
-            paired_ids.add(second_index)
             first = managed_candidates[first_index]
             second = managed_candidates[second_index]
-            if first.account.value <= second.account.value:
-                sent, other = first, second
+            if (second.date, second.account.value) < (
+                first.date,
+                first.account.value,
+            ):
+                sent = second
             else:
-                sent, other = second, first
+                sent = first
             transactions_to_send.append(sent)
-            if sent.date != other.date:
-                other_dates_by_id[id(sent)] = other.date
-    return transactions_to_send, problems, other_dates_by_id
+            early = min(first.date, second.date)
+            if sent.date != early:
+                early_dates_by_id[id(sent)] = early
+    return transactions_to_send, problems, early_dates_by_id
 
 
 def describe_unpaired_transfers(key, first_count, second_count):
@@ -3666,13 +3987,13 @@ def ask_memo(transaction):
     return None if memo == "-" or not memo else memo
 
 
-def send_transactions(ctx, plan, transactions, decisions, transfer_other_dates=None):
+def send_transactions(ctx, plan, transactions, decisions, transfer_early_dates=None):
     # Asks for a memo for each of `transactions` without a stored memo, then
     # adds them to YNAB. Only singles from before the memo question lack a
     # stored memo. Stores those memos in `decisions`. The Questrade
     # reconciliation keeps its own memo, so it does not come through here.
-    # See `send_reconciliation`. Cross-day transfers move the other side to
-    # its bank date.
+    # See `send_reconciliation`. Managed transfers go on the earliest bank
+    # date of the pair, since YNAB keeps both legs on one date.
     for transaction in sorted(transactions, key=report_order):
         if not transaction.memo_ready:
             transaction.memo = ask_memo(transaction)
@@ -3691,7 +4012,6 @@ def send_transactions(ctx, plan, transactions, decisions, transfer_other_dates=N
     if changed:
         save_decisions(ctx, decisions)
     new_transactions = []
-    other_dates = []
     for transaction in transactions:
         target_name = transfer_target(transaction.payee)
         if target_name is None:
@@ -3704,10 +4024,14 @@ def send_transactions(ctx, plan, transactions, decisions, transfer_other_dates=N
             # transaction a transfer.
             payee_id = plan.transfer_payee_ids[target_name]
             payee_name = None
+        if transfer_early_dates is None:
+            ynab_date = transaction.date
+        else:
+            ynab_date = transfer_early_dates.get(id(transaction), transaction.date)
         new_transactions.append(
             ynab.NewTransaction(
                 account_id=plan.account_ids[transaction.account],
-                var_date=transaction.date,
+                var_date=ynab_date,
                 amount=to_milliunits(transaction.amount),
                 payee_id=payee_id,
                 payee_name=payee_name,
@@ -3718,11 +4042,7 @@ def send_transactions(ctx, plan, transactions, decisions, transfer_other_dates=N
                 approved=False,
             )
         )
-        if transfer_other_dates is None:
-            other_dates.append(None)
-        else:
-            other_dates.append(transfer_other_dates.get(id(transaction)))
-    create_ynab_transactions(plan, new_transactions, other_dates)
+    create_ynab_transactions(plan, new_transactions)
 
 
 def send_reconciliation(plan, amount):
@@ -3744,13 +4064,14 @@ def send_reconciliation(plan, amount):
     create_ynab_transactions(plan, [transaction])
 
 
-def create_ynab_transactions(plan, new_transactions, other_dates=None):
+def create_ynab_transactions(plan, new_transactions):
     # Adds `new_transactions` to YNAB. Each one must be cleared and not
-    # approved. YNAB adds the other side of each transfer by itself, with a
-    # status of its own, so each other side then becomes cleared and not
-    # approved too. Cross-day transfers also move the other side to its bank
-    # date. Last, raises when YNAB holds any of these transactions as
-    # approved or not cleared.
+    # approved. YNAB adds the other side of each transfer by itself on the
+    # same date, with a status of its own, so each other side then becomes
+    # cleared and not approved too. YNAB keeps both legs of a transfer on
+    # one date, so cross-day bank pairs go on the earliest bank date and no
+    # leg moves afterwards. Last, raises when YNAB holds any of these
+    # transactions as approved or not cleared.
     transactions_api = ynab.TransactionsApi(plan.api_client)
     try:
         response = transactions_api.create_transaction(
@@ -3769,38 +4090,15 @@ def create_ynab_transactions(plan, new_transactions, other_dates=None):
     ]
     if None in other_side_ids:
         raise TaskError("YNAB returned a transfer without its other side")
-    other_date_by_side_id = {}
-    if other_dates is not None:
-        for index, other_date in enumerate(other_dates):
-            if other_date is None or index >= len(saved_list):
-                continue
-            sent_saved = saved_list[index]
-            if sent_saved.transfer_account_id is None:
-                continue
-            auto_id = sent_saved.transfer_transaction_id
-            if auto_id is not None:
-                other_date_by_side_id[auto_id] = other_date
     if other_side_ids:
-        updates = []
-        for transaction_id in other_side_ids:
-            other_date = other_date_by_side_id.get(transaction_id)
-            if other_date is None:
-                updates.append(
-                    ynab.SaveTransactionWithIdOrImportId(
-                        id=transaction_id,
-                        cleared=ynab.TransactionClearedStatus.CLEARED,
-                        approved=False,
-                    )
-                )
-            else:
-                updates.append(
-                    ynab.SaveTransactionWithIdOrImportId(
-                        id=transaction_id,
-                        cleared=ynab.TransactionClearedStatus.CLEARED,
-                        approved=False,
-                        var_date=other_date,
-                    )
-                )
+        updates = [
+            ynab.SaveTransactionWithIdOrImportId(
+                id=transaction_id,
+                cleared=ynab.TransactionClearedStatus.CLEARED,
+                approved=False,
+            )
+            for transaction_id in other_side_ids
+        ]
         try:
             response = transactions_api.update_transactions(
                 plan.plan_id, ynab.PatchTransactionsWrapper(transactions=updates)
@@ -3861,13 +4159,16 @@ def delete_ynab_transactions(plan, victims_by_account):
 def expected_memo_map(decisions):
     # Returns the expected YNAB memo by statement key, with the decision row,
     # part index, and account behind each one. Skips rows without a stored
-    # memo and keys with more than one memo, which need no check.
+    # memo and keys with more than one memo, which need no check. Paired
+    # managed transfers use the earliest bank date of the pair, which is the
+    # single date that YNAB holds.
     memo_map = {}
     ambiguous_keys = set()
+    early_by_ref = decision_transfer_early_dates(decisions)
     for decision in decisions:
         source, date_iso, _bank_payee, bank_amount = decision["key"]
         account = ACCOUNTS_BY_SOURCE[source]
-        date = datetime.date.fromisoformat(date_iso)
+        bank_date = datetime.date.fromisoformat(date_iso)
         if decision["kind"] == "single":
             if not decision["memo_ready"]:
                 continue
@@ -3878,8 +4179,16 @@ def expected_memo_map(decisions):
                 for part_index, part in enumerate(decision["parts"])
             ]
         for payee, amount, memo, part_index in candidates:
+            effective_date = early_by_ref.get(
+                (decision["key"], part_index), bank_date
+            )
             key = statement_key(
-                Transaction(date=date, amount=amount, payee=payee, account=account)
+                Transaction(
+                    date=effective_date,
+                    amount=amount,
+                    payee=payee,
+                    account=account,
+                )
             )
             if key in memo_map:
                 ambiguous_keys.add(key)
@@ -4053,13 +4362,17 @@ def expected_sync_groups(decisions, start_date):
     # Returns the expected (payee, memo) items by (account, date, milliunits)
     # for every decision row dated on or after `start_date`. A single counts
     # `count` times; each split part counts `count` times. Singles without a
-    # stored memo keep their payee with the memo marked unknown.
+    # stored memo keep their payee with the memo marked unknown. Paired
+    # managed transfers group on the earliest bank date of the pair, which
+    # is the single date that YNAB holds. The start filter uses the bank
+    # date, so a later leg still counts while its bank date is in scope.
     groups = collections.defaultdict(list)
+    early_by_ref = decision_transfer_early_dates(decisions)
     for decision in decisions:
         source, date_iso, bank_payee, bank_amount = decision["key"]
         account = ACCOUNTS_BY_SOURCE[source]
-        date = datetime.date.fromisoformat(date_iso)
-        if date < start_date:
+        bank_date = datetime.date.fromisoformat(date_iso)
+        if bank_date < start_date:
             continue
         if decision["kind"] == "single":
             candidates = [
@@ -4078,6 +4391,9 @@ def expected_sync_groups(decisions, start_date):
             ]
         for payee, amount, memo, memo_known, part_index in candidates:
             milliunits = to_milliunits(amount)
+            effective_date = early_by_ref.get(
+                (decision["key"], part_index), bank_date
+            )
             item = {
                 "payee": payee,
                 "payee_c": canonical_expected_payee(payee),
@@ -4088,7 +4404,7 @@ def expected_sync_groups(decisions, start_date):
                 "bank_payee": bank_payee,
             }
             for _ in range(decision["count"]):
-                groups[(account, date, milliunits)].append(item)
+                groups[(account, effective_date, milliunits)].append(item)
     return groups
 
 
