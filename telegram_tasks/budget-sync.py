@@ -1036,7 +1036,9 @@ def apply_decisions(ctx, transactions, decisions, ynab_api_key=None, start_date=
     groups = {}
     for transaction in sorted(transactions, key=lambda item: (item.date, item.amount)):
         groups.setdefault(transaction_decision_key(transaction), []).append(transaction)
-    suggestions = load_ynab_suggestions(ctx, groups, lookup, ynab_api_key, start_date)
+    suggestions, transfer_accounts = load_ynab_suggestions(
+        ctx, groups, lookup, ynab_api_key, start_date
+    )
     remembered_count = 0
     new_count = 0
     dirty = False
@@ -1048,6 +1050,7 @@ def apply_decisions(ctx, transactions, decisions, ynab_api_key=None, start_date=
                 members,
                 suggestions.get(suggestion_key(members[0])),
                 suggestions,
+                transfer_accounts,
             )
             decision["count"] = len(members)
             decisions.append(decision)
@@ -1082,26 +1085,28 @@ def suggestion_key(transaction):
 
 
 def load_ynab_suggestions(ctx, groups, lookup, ynab_api_key, start_date):
-    # Returns the YNAB payee and memo offers by suggestion key, for the groups
-    # without a stored decision. Fetches YNAB once. Returns an empty map when
-    # nothing is undecided, when the caller gives no API key or start date, or
-    # when the fetch fails, so the run falls back to the manual questions.
+    # Returns the YNAB payee and memo offers by suggestion key, with the
+    # sorted transfer account names, for the groups without a stored decision.
+    # Fetches YNAB once. Returns empty values when nothing is undecided, when
+    # the caller gives no API key or start date, or when the fetch fails, so
+    # the run falls back to the manual questions.
     undecided = any(key not in lookup for key in groups)
     if not undecided or ynab_api_key is None or start_date is None:
-        return {}
+        return {}, []
     ctx.log("Checking YNAB for payee suggestions")
     try:
         return fetch_ynab_suggestions(ynab_api_key, start_date)
     except Exception as error:
         ctx.log(f"YNAB suggestion lookup skipped: {error}")
-        return {}
+        return {}, []
 
 
 def fetch_ynab_suggestions(api_key, start_date):
-    # Returns the distinct YNAB payee and memo pairs by suggestion key, from
-    # the transactions since `start_date`. Skips deleted transactions and ones
-    # without a usable payee. Transfer payees use the canonical `Transfer:
-    # <account name>` form, so an adopted payee matches `statement_key` later.
+    # Returns the distinct YNAB payee and memo pairs by suggestion key, with
+    # the sorted transfer account names, from the transactions since
+    # `start_date`. Skips deleted transactions and ones without a usable
+    # payee. Transfer payees use the canonical `Transfer: <account name>`
+    # form, so an adopted payee matches `statement_key` later.
     suggestions = {}
     with ynab.ApiClient(ynab.Configuration(access_token=api_key)) as api_client:
         plan = load_ynab_plan(api_client)
@@ -1136,7 +1141,8 @@ def fetch_ynab_suggestions(api_key, start_date):
                     (entry["payee"], entry["memo"]) for entry in entries
                 }:
                     entries.append({"payee": payee, "memo": memo})
-    return suggestions
+        transfer_accounts = sorted(plan.transfer_payee_ids, key=str.casefold)
+    return suggestions, transfer_accounts
 
 
 def decision_transactions(decision, template):
@@ -1169,7 +1175,9 @@ def decision_transactions(decision, template):
     ]
 
 
-def ask_decision(ctx, members, suggestions=None, all_suggestions=None):
+def ask_decision(
+    ctx, members, suggestions=None, all_suggestions=None, transfer_accounts=None
+):
     # Asks how one group of identical bank entries splits, and returns the
     # new decision row. `members` holds the entries. `suggestions` holds the
     # YNAB payee and memo offers for the whole entry, if any. An accepted
@@ -1177,7 +1185,8 @@ def ask_decision(ctx, members, suggestions=None, all_suggestions=None):
     # asks. A declined offer stays in the regular pool: the group asks whether
     # to split like any other group, then asks for the payee and the memo.
     # The parts then look themselves up in `all_suggestions` by account, date,
-    # and amount.
+    # and amount. `transfer_accounts` holds the sorted YNAB account names for
+    # the transfer menu.
     adopted = ask_ynab_suggestion(ctx, members, suggestions)
     if adopted is not None:
         return adopted
@@ -1187,9 +1196,9 @@ def ask_decision(ctx, members, suggestions=None, all_suggestions=None):
         lines.append(f"Applies to {len(members)} identical entries.")
     if ask_yes("\n".join(lines) + "\nSplit this entry?"):
         return ask_split_decision(
-            ctx, representative, len(members), all_suggestions or {}
+            ctx, representative, len(members), all_suggestions or {}, transfer_accounts
         )
-    payee = ask_single_payee(ctx, representative, len(members))
+    payee = ask_single_payee(ctx, representative, len(members), transfer_accounts)
     memo = ask_memo(
         Transaction(
             date=representative.date,
@@ -1279,13 +1288,68 @@ def decision_line(transaction):
     )
 
 
-def ask_single_payee(ctx, transaction, count):
+def resolve_typed_payee(ctx, typed, transfer_accounts=None):
+    # Returns the YNAB payee for `typed`, with transfer help. A lone `t`
+    # means a transfer. A `Transfer:` prefix with an empty or unknown account
+    # shows the account menu. A valid transfer returns in canonical
+    # `Transfer: <account name>` form. Any other name returns as typed. Needs
+    # `transfer_target` and `transfer_payee`, which the YNAB section defines.
+    # Without account names, every name returns as typed.
+    if not transfer_accounts:
+        return typed.strip()
+    cleaned = typed.strip()
+    if cleaned.casefold() == "t":
+        return ask_transfer_account(ctx, transfer_accounts)
+    target = transfer_target(cleaned)
+    if target is not None:
+        if target in transfer_accounts:
+            return transfer_payee(target)
+        return ask_transfer_account(ctx, transfer_accounts, target)
+    if cleaned.casefold().startswith("transfer:"):
+        _, _, after = cleaned.partition(":")
+        candidate = after.strip()
+        if candidate in transfer_accounts:
+            return transfer_payee(candidate)
+        return ask_transfer_account(ctx, transfer_accounts, candidate or None)
+    return cleaned
+
+
+def ask_transfer_account(ctx, account_names, attempted=None):
+    # Returns the canonical `Transfer: <account name>` payee for the YNAB
+    # account chosen by number. `account_names` holds the open YNAB accounts.
+    # The menu sorts alphabetically. `attempted` holds the unknown name for
+    # the message, or None for the `t` shortcut and empty names.
+    ordered = sorted(account_names, key=str.casefold)
+    lines = []
+    if attempted:
+        lines.append(
+            f'No YNAB account named "{attempted}". Choose the transfer account:'
+        )
+    else:
+        lines.append("Choose the transfer account:")
+    for index, name in enumerate(ordered, start=1):
+        lines.append(f"{index}. {name}")
+    lines.append("Reply with the number.")
+    prompt = "\n".join(lines)
+    while True:
+        reply = ctx.ask(prompt, pattern=r"\d+", timeout=300).strip()
+        try:
+            choice = int(reply)
+        except ValueError:
+            continue
+        if 1 <= choice <= len(ordered):
+            return transfer_payee(ordered[choice - 1])
+
+
+def ask_single_payee(ctx, transaction, count, transfer_accounts=None):
     # Returns the YNAB payee for one undecided bank entry. Asks until the
-    # reply holds a name within the YNAB limit.
+    # reply holds a name within the YNAB limit. A lone `t` or a `Transfer:`
+    # prefix with an empty or unknown account shows the transfer menu and
+    # returns the canonical `Transfer: <account name>` form.
     lines = ["Payee:", decision_line(transaction)]
     if count > 1:
         lines.append(f"Applies to {count} identical entries.")
-    lines.append("Reply with the name to use.")
+    lines.append("Reply with the name to use, or t for a transfer.")
     while True:
         payee = ctx.ask("\n".join(lines), pattern=r"[\s\S]+", timeout=600).strip()
         if not payee:
@@ -1293,10 +1357,14 @@ def ask_single_payee(ctx, transaction, count):
         if len(payee) > YNAB_PAYEE_NAME_LIMIT:
             _say(f"That name is over the YNAB payee limit of {YNAB_PAYEE_NAME_LIMIT}.")
             continue
-        return payee
+        resolved = resolve_typed_payee(ctx, payee, transfer_accounts)
+        if len(resolved) > YNAB_PAYEE_NAME_LIMIT:
+            _say(f"That name is over the YNAB payee limit of {YNAB_PAYEE_NAME_LIMIT}.")
+            continue
+        return resolved
 
 
-def ask_split_decision(ctx, transaction, count, suggestions):
+def ask_split_decision(ctx, transaction, count, suggestions, transfer_accounts=None):
     # Returns the split decision row for one group of identical bank entries.
     # Asks only for the part amounts first: the amounts of each part but the
     # last, then the remainder as the last amount, confirmed in the chat. A
@@ -1312,7 +1380,8 @@ def ask_split_decision(ctx, transaction, count, suggestions):
     amounts = ask_split_amounts(ctx, transaction, part_count)
     parts = [
         resolve_split_part(
-            ctx, transaction, amount, part_number, part_count, suggestions
+            ctx, transaction, amount, part_number, part_count, suggestions,
+            transfer_accounts,
         )
         for part_number, amount in enumerate(amounts, start=1)
     ]
@@ -1341,19 +1410,27 @@ def ask_part_count(ctx):
             return count
 
 
-def ask_split_payee(ctx, label):
+def ask_split_payee(ctx, label, transfer_accounts=None):
     # Returns the YNAB payee for one split part. Asks until the reply holds
-    # a name within the YNAB limit.
+    # a name within the YNAB limit. A lone `t` or a `Transfer:` prefix with
+    # an empty or unknown account shows the transfer menu and returns the
+    # canonical `Transfer: <account name>` form.
     while True:
         payee = ctx.ask(
-            f"{label}\nReply with the payee.", pattern=r"[\s\S]+", timeout=600
+            f"{label}\nReply with the payee, or t for a transfer.",
+            pattern=r"[\s\S]+",
+            timeout=600,
         ).strip()
         if not payee:
             continue
         if len(payee) > YNAB_PAYEE_NAME_LIMIT:
             _say(f"That name is over the YNAB payee limit of {YNAB_PAYEE_NAME_LIMIT}.")
             continue
-        return payee
+        resolved = resolve_typed_payee(ctx, payee, transfer_accounts)
+        if len(resolved) > YNAB_PAYEE_NAME_LIMIT:
+            _say(f"That name is over the YNAB payee limit of {YNAB_PAYEE_NAME_LIMIT}.")
+            continue
+        return resolved
 
 
 def ask_split_amounts(ctx, transaction, part_count):
@@ -1417,7 +1494,10 @@ def part_suggestion_key(transaction, amount):
     return (transaction.account, transaction.date, milliunits)
 
 
-def resolve_split_part(ctx, transaction, amount, part_number, part_count, suggestions):
+def resolve_split_part(
+    ctx, transaction, amount, part_number, part_count, suggestions,
+    transfer_accounts=None,
+):
     # Returns one split part with its payee, amount, and memo. A YNAB
     # transaction with the same account, date, and amount offers its payee
     # and memo first. An accepted offer becomes the part with nothing else to
@@ -1431,7 +1511,7 @@ def resolve_split_part(ctx, transaction, amount, part_number, part_count, sugges
         f"Part {part_number} of {part_count} for {decision_line(transaction)}\n"
         f"Amount {format_amount(amount)}"
     )
-    payee = ask_split_payee(ctx, label)
+    payee = ask_split_payee(ctx, label, transfer_accounts)
     memo = ask_memo(
         Transaction(
             date=transaction.date,
