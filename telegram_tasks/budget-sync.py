@@ -1336,7 +1336,9 @@ def ask_payee_for_side(ctx, side, groups, transfer_accounts):
             f"Part {(side['part'] or 0) + 1} for {decision_line(representative)}\n"
             f"Amount {format_amount(side['amount'])}"
         )
-        return ask_split_payee(ctx, label, transfer_accounts)
+        return ask_split_payee(
+            ctx, label, transfer_accounts, YNAB_ACCOUNT_NAMES[side["account"]]
+        )
     return ask_single_payee(ctx, representative, side["count"], transfer_accounts)
 
 
@@ -1822,40 +1824,63 @@ def decision_line(transaction):
     )
 
 
-def resolve_typed_payee(ctx, typed, transfer_accounts=None):
+def resolve_typed_payee(ctx, typed, transfer_accounts=None, excluded_account=None):
     # Returns the YNAB payee for `typed`, with transfer help. A lone `t`
-    # means a transfer. A `Transfer:` prefix with an empty or unknown account
-    # shows the account menu. A valid transfer returns in canonical
-    # `Transfer: <account name>` form. Any other name returns as typed. Needs
-    # `transfer_target` and `transfer_payee`, which the YNAB section defines.
-    # Without account names, every name returns as typed.
+    # means a transfer. A `Transfer:` prefix with an empty, unknown, or
+    # excluded account shows the account menu. A valid transfer returns in
+    # canonical `Transfer: <account name>` form. Any other name returns as
+    # typed. Needs `transfer_target` and `transfer_payee`, which the YNAB
+    # section defines. Without account names, every name returns as typed.
+    # Returns None when no other account exists for a transfer, so the
+    # caller asks for the payee again.
     if not transfer_accounts:
         return typed.strip()
     cleaned = typed.strip()
     if cleaned.casefold() == "t":
-        return ask_transfer_account(ctx, transfer_accounts)
+        return ask_transfer_account(
+            ctx, transfer_accounts, excluded_account=excluded_account
+        )
     target = transfer_target(cleaned)
     if target is not None:
-        if target in transfer_accounts:
+        if target in transfer_accounts and target != excluded_account:
             return transfer_payee(target)
-        return ask_transfer_account(ctx, transfer_accounts, target)
+        return ask_transfer_account(
+            ctx, transfer_accounts, target, excluded_account=excluded_account
+        )
     if cleaned.casefold().startswith("transfer:"):
         _, _, after = cleaned.partition(":")
         candidate = after.strip()
-        if candidate in transfer_accounts:
+        if candidate in transfer_accounts and candidate != excluded_account:
             return transfer_payee(candidate)
-        return ask_transfer_account(ctx, transfer_accounts, candidate or None)
+        return ask_transfer_account(
+            ctx, transfer_accounts, candidate or None,
+            excluded_account=excluded_account,
+        )
     return cleaned
 
 
-def ask_transfer_account(ctx, account_names, attempted=None):
+def ask_transfer_account(ctx, account_names, attempted=None, excluded_account=None):
     # Returns the canonical `Transfer: <account name>` payee for the YNAB
     # account chosen by number. `account_names` holds the open YNAB accounts.
-    # The menu sorts alphabetically. `attempted` holds the unknown name for
-    # the message, or None for the `t` shortcut and empty names.
-    ordered = sorted(account_names, key=str.casefold)
+    # The menu sorts alphabetically and leaves out `excluded_account`, the
+    # account of the current transaction, since a transfer needs another
+    # account. `attempted` holds the unknown name for the message, or None
+    # for the `t` shortcut and empty names. Returns None when no other
+    # account exists, so the caller asks for the payee again.
+    ordered = sorted(
+        (name for name in account_names if name != excluded_account),
+        key=str.casefold,
+    )
+    if not ordered:
+        _say("No other YNAB account exists for a transfer. Use a regular payee.")
+        return None
     lines = []
-    if attempted:
+    if attempted is not None and attempted == excluded_account:
+        lines.append(
+            f'A transfer to "{attempted}" is not possible. '
+            "Choose the other account:"
+        )
+    elif attempted:
         lines.append(
             f'No YNAB account named "{attempted}". Choose the transfer account:'
         )
@@ -1879,7 +1904,9 @@ def ask_single_payee(ctx, transaction, count, transfer_accounts=None):
     # Returns the YNAB payee for one undecided bank entry. Asks until the
     # reply holds a name within the YNAB limit. A lone `t` or a `Transfer:`
     # prefix with an empty or unknown account shows the transfer menu and
-    # returns the canonical `Transfer: <account name>` form.
+    # returns the canonical `Transfer: <account name>` form. The menu
+    # leaves out the account of the entry itself.
+    excluded_account = YNAB_ACCOUNT_NAMES[transaction.account]
     lines = ["Payee:", decision_line(transaction)]
     if count > 1:
         lines.append(f"Applies to {count} identical entries.")
@@ -1891,7 +1918,9 @@ def ask_single_payee(ctx, transaction, count, transfer_accounts=None):
         if len(payee) > YNAB_PAYEE_NAME_LIMIT:
             _say(f"That name is over the YNAB payee limit of {YNAB_PAYEE_NAME_LIMIT}.")
             continue
-        resolved = resolve_typed_payee(ctx, payee, transfer_accounts)
+        resolved = resolve_typed_payee(ctx, payee, transfer_accounts, excluded_account)
+        if resolved is None:
+            continue
         if len(resolved) > YNAB_PAYEE_NAME_LIMIT:
             _say(f"That name is over the YNAB payee limit of {YNAB_PAYEE_NAME_LIMIT}.")
             continue
@@ -1944,11 +1973,12 @@ def ask_part_count(ctx):
             return count
 
 
-def ask_split_payee(ctx, label, transfer_accounts=None):
+def ask_split_payee(ctx, label, transfer_accounts=None, excluded_account=None):
     # Returns the YNAB payee for one split part. Asks until the reply holds
     # a name within the YNAB limit. A lone `t` or a `Transfer:` prefix with
     # an empty or unknown account shows the transfer menu and returns the
-    # canonical `Transfer: <account name>` form.
+    # canonical `Transfer: <account name>` form. The menu leaves out
+    # `excluded_account`, the account of the current transaction.
     while True:
         payee = ctx.ask(
             f"{label}\nReply with the payee, or t for a transfer.",
@@ -1960,7 +1990,9 @@ def ask_split_payee(ctx, label, transfer_accounts=None):
         if len(payee) > YNAB_PAYEE_NAME_LIMIT:
             _say(f"That name is over the YNAB payee limit of {YNAB_PAYEE_NAME_LIMIT}.")
             continue
-        resolved = resolve_typed_payee(ctx, payee, transfer_accounts)
+        resolved = resolve_typed_payee(ctx, payee, transfer_accounts, excluded_account)
+        if resolved is None:
+            continue
         if len(resolved) > YNAB_PAYEE_NAME_LIMIT:
             _say(f"That name is over the YNAB payee limit of {YNAB_PAYEE_NAME_LIMIT}.")
             continue
@@ -2045,7 +2077,9 @@ def resolve_split_part(
         f"Part {part_number} of {part_count} for {decision_line(transaction)}\n"
         f"Amount {format_amount(amount)}"
     )
-    payee = ask_split_payee(ctx, label, transfer_accounts)
+    payee = ask_split_payee(
+        ctx, label, transfer_accounts, YNAB_ACCOUNT_NAMES[transaction.account]
+    )
     memo = ask_memo(
         Transaction(
             date=transaction.date,
