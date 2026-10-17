@@ -1,4 +1,4 @@
-// Name the session from the full transcript on each prompt.
+// Name the session from the full transcript after each response.
 // The title model and the length cap come from `jpenv.auto_title` in the
 // profile config. A failure leaves the current title alone.
 // Subagent child sessions stay silent.
@@ -100,8 +100,8 @@ function normalizeTitle(value, maxLength) {
   return title.replace(/[.,;:!?-]+$/, "").trim();
 }
 
-// This renames the session from its history plus the latest prompt.
-async function renameFromHistory(ctx, sessionID, currentPrompt) {
+// This renames the session from its history, latest response included.
+async function renameFromHistory(ctx, sessionID) {
   const config = await loadAutoTitle();
   if (config.enabled === false) return;
   let info;
@@ -127,7 +127,8 @@ async function renameFromHistory(ctx, sessionID, currentPrompt) {
     if (!text) continue;
     lines.push(role + ": " + text);
   }
-  lines.push("user: " + currentPrompt.trim());
+  // An empty history carries no name.
+  if (lines.length === 0) return;
   let history = lines.join("\n\n");
   if (history.length > HISTORY_LIMIT) history = history.slice(-HISTORY_LIMIT);
   const model = parseModelRef(config.model) ?? modelFromSession(info) ?? parseModelRef(FALLBACK_MODEL);
@@ -156,11 +157,19 @@ async function renameFromHistory(ctx, sessionID, currentPrompt) {
 export default {
   id: "auto-title",
   setup: async (ctx) => {
-    // A submitted prompt starts the rename and its admission proceeds at once.
-    await ctx.session.hook("prompt", (event) => {
-      const current = event.prompt?.text;
-      if (typeof current !== "string" || current.trim() === "") return;
-      void renameFromHistory(ctx, event.sessionID, current).catch(() => {});
-    });
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        for await (const event of ctx.event.subscribe({ signal: controller.signal })) {
+          if (event.type !== "session.execution.succeeded") continue;
+          void renameFromHistory(ctx, event.data.sessionID).catch(() => {});
+        }
+      } catch {
+        // The subscription ends on unload. Nothing to report.
+      }
+    })();
+    return () => {
+      controller.abort();
+    };
   },
 };

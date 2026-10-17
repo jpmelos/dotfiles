@@ -145,10 +145,6 @@
           {
             "type": "command",
             "command": "running"
-          },
-          {
-            "type": "command",
-            "command": "bash ~/.claude/scripts/auto-title.sh"
           }
         ]
       }
@@ -169,6 +165,10 @@
           {
             "type": "command",
             "command": "ready"
+          },
+          {
+            "type": "command",
+            "command": "bash ~/.claude/scripts/auto-title.sh"
           }
         ]
       }
