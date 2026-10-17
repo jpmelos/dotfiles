@@ -15,17 +15,17 @@ sudo apt-get -y clean
 sudo apt install curl wget git iptables-persistent openresolv wireguard transmission-daemon ca-certificates gpg jq starship stow fzf tmux npm chromium-browser sqlite3 libsqlite3-dev delta ffmpeg
 git clone https://github.com/hyperupcall/autoenv ~/.autoenv
 curl -LsSf https://astral.sh/uv/install.sh | sh
-curl -sS https://downloads.1password.com/linux/keys/1password.asc \
-    | sudo gpg --dearmor --output /usr/share/keyrings/1password-archive-keyring.gpg \
-    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/$(dpkg --print-architecture) stable main" \
-    | sudo tee /etc/apt/sources.list.d/1password.list \
-    && sudo mkdir -p /etc/debsig/policies/AC2D62742012EA22/ \
-    && curl -sS https://downloads.1password.com/linux/debian/debsig/1password.pol \
-    | sudo tee /etc/debsig/policies/AC2D62742012EA22/1password.pol \
-    && sudo mkdir -p /usr/share/debsig/keyrings/AC2D62742012EA22 \
-    && curl -sS https://downloads.1password.com/linux/keys/1password.asc \
-    | sudo gpg --dearmor --output /usr/share/debsig/keyrings/AC2D62742012EA22/debsig.gpg \
-    && sudo apt update && sudo apt install 1password-cli
+curl -sS https://downloads.1password.com/linux/keys/1password.asc |
+	sudo gpg --dearmor --output /usr/share/keyrings/1password-archive-keyring.gpg &&
+	echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/$(dpkg --print-architecture) stable main" |
+	sudo tee /etc/apt/sources.list.d/1password.list &&
+	sudo mkdir -p /etc/debsig/policies/AC2D62742012EA22/ &&
+	curl -sS https://downloads.1password.com/linux/debian/debsig/1password.pol |
+	sudo tee /etc/debsig/policies/AC2D62742012EA22/1password.pol &&
+	sudo mkdir -p /usr/share/debsig/keyrings/AC2D62742012EA22 &&
+	curl -sS https://downloads.1password.com/linux/keys/1password.asc |
+	sudo gpg --dearmor --output /usr/share/debsig/keyrings/AC2D62742012EA22/debsig.gpg &&
+	sudo apt update && sudo apt install 1password-cli
 curl -LsSf https://repo.plex.tv/scripts/setupRepo.sh | sudo bash
 sudo npm install -g agent-browser
 ```
@@ -62,9 +62,9 @@ eval $(op signin)
 ## 4. Get GPG Key from 1Password
 
 ```bash
-op item get "PGP/GPG Key" --fields notesPlain --reveal --format json \
-    | jq -r .value \
-    | gpg --import
+op item get "PGP/GPG Key" --fields notesPlain --reveal --format json |
+	jq -r .value |
+	gpg --import
 gpg --list-secret-keys
 ```
 
@@ -120,8 +120,8 @@ sudo cp references/rpi/iptables/rules.v6 /etc/iptables/rules.v6
 Apply the rules:
 
 ```bash
-sudo iptables-restore < /etc/iptables/rules.v4
-sudo ip6tables-restore < /etc/iptables/rules.v6
+sudo iptables-restore </etc/iptables/rules.v4
+sudo ip6tables-restore </etc/iptables/rules.v6
 ```
 
 ## 8. Mount External Volume

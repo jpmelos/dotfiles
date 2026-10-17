@@ -6,12 +6,18 @@ disable-model-invocation: true
 
 Review everything that changed since the given ref.
 
-The ref appears at the end of this message. A "--" separator can come after the ref. If the separator is there, the text after it gives additional instructions from the user. If the ref is empty or missing, use the default branch.
+The ref appears at the end of this message. A "--" separator can come after the
+ref. If the separator is there, the text after it gives additional instructions
+from the user. If the ref is empty or missing, use the default branch.
 
-Find the default branch first. The default branch is the result of `git main-branch`.
+Find the default branch first. The default branch is the result of
+`git main-branch`.
 
-- Run `git main-branch`. If the output names a branch, use it as the default branch.
-- If that command fails or the output is empty, run `git branch --list` and guess the default from the names. Prefer `main` over `master`, and `master` over the rest. Names such as `dev` are also common defaults.
+- Run `git main-branch`. If the output names a branch, use it as the default
+  branch.
+- If that command fails or the output is empty, run `git branch --list` and
+  guess the default from the names. Prefer `main` over `master`, and `master`
+  over the rest. Names such as `dev` are also common defaults.
 
 Obtain the changes next.
 
@@ -68,6 +74,9 @@ W1..Wn, S1..Sn:
 
 Include specific examples of how to fix issues.
 
+If you fix a problem from the review, always report the fix. If the fix changes
+the PR description, present an updated PR description.
+
 If a problem you find is already scheduled to be fixed by future work in the
 tracker (a follow-up issue, a later milestone, a later step in the project),
 still report it, but tag it as such. Add "\[Scheduled: <reference>\]" after the
@@ -76,9 +85,9 @@ the fix.
 
 Do not run compilers, linters, or tests.
 
-This message ends with the ref. A "--" separator can come after the ref. If
-the separator is there, the text after it gives additional instructions from
-the user.
+This message ends with the ref. A "--" separator can come after the ref. If the
+separator is there, the text after it gives additional instructions from the
+user.
 
 If there are additional instructions, follow them. If the additional
 instructions conflict with the instructions above, the additional instructions

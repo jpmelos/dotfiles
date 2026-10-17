@@ -65,6 +65,9 @@ W1..Wn, S1..Sn:
 
 Include specific examples of how to fix issues.
 
+If you fix a problem from the review, always report the fix. If the fix changes
+the PR description, present an updated PR description.
+
 If a problem you find is already scheduled to be fixed by future work in the
 tracker (a follow-up issue, a later milestone, a later step in the project),
 still report it, but tag it as such. Add "\[Scheduled: <reference>\]" after the

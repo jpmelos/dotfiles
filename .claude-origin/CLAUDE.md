@@ -84,9 +84,13 @@
 
 # Browser
 
-`agent-browser` controls a real Chromium browser. It opens pages, reads content, and performs input actions. It works with dynamic pages and logged-in sessions.
+`agent-browser` controls a real Chromium browser. It opens pages, reads
+content, and performs input actions. It works with dynamic pages and logged-in
+sessions.
 
-`WebSearch` finds pages. `WebFetch` reads simple static pages. `agent-browser` handles pages that `WebFetch` cannot read and tasks that need clicks, text entry, or login.
+`WebSearch` finds pages. `WebFetch` reads simple static pages. `agent-browser`
+handles pages that `WebFetch` cannot read and tasks that need clicks, text
+entry, or login.
 
 `agent-browser -h` lists the current commands and options.
 
