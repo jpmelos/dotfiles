@@ -399,5 +399,12 @@
     }
   ],
   "mcp": {},
-  "references": {}
+  "references": {},
+  "jpenv": {
+    "auto_title": {
+      "enabled": true,
+      "model": "opencode-go/claude-haiku-5-5",
+      "max_length": 60
+    }
+  }
 }
