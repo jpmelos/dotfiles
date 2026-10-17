@@ -11,14 +11,13 @@
 #
 # Every bank entry needs a decision in `transactions.json` in the task state:
 # its YNAB payee and memo, or its split parts with payee, amount, and memo
-# each. The task asks in date order and remembers. One decision covers every
-# identical entry of one day. When YNAB already holds the same account, date,
-# and amount, the task offers its payee and memo first, and an accepted offer
-# becomes the decision with nothing else to ask. A declined offer keeps the
-# entry in the regular pool: the task asks whether to split like any other
-# entry, then asks for the payee and the memo. A split asks only for the part
-# amounts, then looks each part up in YNAB by account, date, and amount and
-# offers its payee and memo first.
+# each. The task lists new entries and asks for splits first, then asks
+# payees in date order and remembers. One decision covers every identical
+# entry of one day. When YNAB already holds the same account, date, and
+# amount, the task offers its payee and memo first, and an accepted offer
+# becomes the decision with nothing else to ask. A transfer looks for its
+# other end within 7 days and shares one memo. Unpaired managed transfers
+# stay stored but leave YNAB alone this run.
 # YNAB gains missing copies and loses surplus copies of bank entries after
 # one confirmation. Deletion happens only there. Before that, the task syncs
 # every recognized YNAB transaction with the database: entries with the same
@@ -91,6 +90,9 @@ DOWNLOAD_WAIT_SECONDS = 10
 # How many days back the task looks. The task ignores the transactions before
 # the start date, in the statements and in YNAB.
 HISTORY_DAYS = 30
+# How many days apart the two ends of a transfer may appear. The task looks
+# for the other end in the same day and this many days before and after.
+TRANSFER_MATCH_DAYS = 7
 # The first date of the transactions to process.
 DEFAULT_FROM_DATE = datetime.date(2026, 10, 1)
 # The forms take dates as MM/DD/YYYY.
@@ -1023,15 +1025,11 @@ def transaction_decision_key(transaction):
 
 
 def apply_decisions(ctx, transactions, decisions, ynab_api_key=None, start_date=None):
-    # Walks `transactions` in date order. A stored decision applies silently.
-    # For a group without one, a YNAB transaction with the same account, date,
-    # and amount offers its payee and memo first. An accepted offer becomes a
-    # single decision with its memo stored, so nothing else asks. A declined
-    # offer stays in the regular pool: the group asks whether to split like
-    # any other group, then asks for the payee and the memo. A split asks
-    # only for the part amounts, then each part looks itself up in YNAB and
-    # offers its payee and memo first. Stores each new decision at once.
-    # Returns the expanded list, with every split replaced by its parts.
+    # Asks splits first for every undecided group, then payees with transfer
+    # matching. A split replaces its entry with parts, and parts never split
+    # again. A transfer looks for its other end within 7 days and shares one
+    # memo. Unpaired managed transfers stay stored but leave YNAB alone this
+    # run. Returns the expanded list without deferred copies.
     lookup = {decision["key"]: decision for decision in decisions}
     groups = {}
     for transaction in sorted(transactions, key=lambda item: (item.date, item.amount)):
@@ -1039,38 +1037,550 @@ def apply_decisions(ctx, transactions, decisions, ynab_api_key=None, start_date=
     suggestions, transfer_accounts = load_ynab_suggestions(
         ctx, groups, lookup, ynab_api_key, start_date
     )
-    remembered_count = 0
-    new_count = 0
+    undecided_keys = [key for key in groups if key not in lookup]
     dirty = False
     for key, members in groups.items():
         decision = lookup.get(key)
-        if decision is None:
-            decision = ask_decision(
-                ctx,
-                members,
-                suggestions.get(suggestion_key(members[0])),
-                suggestions,
-                transfer_accounts,
-            )
-            decision["count"] = len(members)
-            decisions.append(decision)
-            lookup[key] = decision
-            save_decisions(ctx, decisions)
-            new_count += 1
-        elif decision["count"] != len(members):
+        if decision is not None and decision["count"] != len(members):
             decision["count"] = len(members)
             dirty = True
-        else:
-            remembered_count += 1
-    if dirty:
+    split_amounts_by_key = ask_all_splits(ctx, undecided_keys, groups)
+    sides = build_all_sides(groups, lookup, split_amounts_by_key)
+    paired_ids, updated_keys = ask_all_payees(
+        ctx, sides, groups, lookup, suggestions, transfer_accounts
+    )
+    new_count = 0
+    for key in undecided_keys:
+        decision = decision_from_sides(key, sides, groups)
+        decision["count"] = len(groups[key])
+        decisions.append(decision)
+        lookup[key] = decision
+        new_count += 1
+    if undecided_keys or updated_keys or dirty:
         save_decisions(ctx, decisions)
+    remembered_count = len(groups) - len(undecided_keys)
     expanded = []
     for key, members in groups.items():
         for member in members:
             expanded.extend(decision_transactions(lookup[key], member))
+    kept = exclude_deferred_transfers(expanded)
     ctx.log(f"decisions: {remembered_count} remembered, {new_count} new")
     _say(f"Decisions done, {new_count} new.")
-    return expanded
+    return kept
+
+
+def ask_all_splits(ctx, undecided_keys, groups):
+    # Returns part amounts by group key for undecided groups. Presents the
+    # numbered list and asks for splits until none remain. Parts replace
+    # their entry and never split again.
+    split_amounts = {}
+    pending = list(undecided_keys)
+    while True:
+        if not pending:
+            return split_amounts
+        display = build_split_display(pending, split_amounts, groups)
+        lines = [f"New transactions ({len(display)}):"]
+        for index, entry in enumerate(display, start=1):
+            lines.append(f"{index}. {entry['text']}")
+        _say("\n".join(lines))
+        if not ask_yes("Any splits to be made?"):
+            return split_amounts
+        choice = ask_split_choice(ctx, display)
+        entry = display[choice - 1]
+        if entry["is_part"]:
+            _say("Parts cannot be split again.")
+            continue
+        key = entry["key"]
+        representative = groups[key][0]
+        if representative.amount == 0:
+            _say("Cannot split a zero amount.")
+            continue
+        part_count = ask_part_count(ctx)
+        amounts = ask_split_amounts(ctx, representative, part_count)
+        split_amounts[key] = amounts
+        pending.remove(key)
+
+
+def build_split_display(pending, split_amounts, groups):
+    # Returns display entries for pending groups and already split parts.
+    display = []
+    for key in pending:
+        representative = groups[key][0]
+        text = decision_line(representative)
+        if len(groups[key]) > 1:
+            text += f" Applies to {len(groups[key])} identical entries."
+        display.append({"text": text, "is_part": False, "key": key})
+    for key, amounts in split_amounts.items():
+        representative = groups[key][0]
+        for part_number, amount in enumerate(amounts, start=1):
+            text = (
+                f"Part {part_number} of {len(amounts)} for "
+                f"{decision_line(representative)}: {format_amount(amount)}"
+            )
+            display.append(
+                {
+                    "text": text,
+                    "is_part": True,
+                    "key": key,
+                    "part": part_number - 1,
+                }
+            )
+    return display
+
+
+def ask_split_choice(ctx, display):
+    # Returns the chosen display number. Asks until the reply holds one.
+    while True:
+        reply = ctx.ask(
+            "Which entry to split?\nReply with the number.",
+            pattern=r"\d+",
+            timeout=300,
+        ).strip()
+        try:
+            choice = int(reply)
+        except ValueError:
+            continue
+        if 1 <= choice <= len(display):
+            return choice
+
+
+def build_all_sides(groups, lookup, split_amounts_by_key):
+    # Returns sides by side id for every group. A side id holds the group
+    # key with the part index, or None for singles. Remembered sides carry
+    # stored payees, and undecided sides still need them.
+    sides = {}
+    for key, members in groups.items():
+        representative = members[0]
+        decision = lookup.get(key)
+        if decision is not None:
+            if decision["kind"] == "single":
+                sides[(key, None)] = {
+                    "key": key,
+                    "part": None,
+                    "account": representative.account,
+                    "date": representative.date,
+                    "amount": representative.amount,
+                    "bank_payee": representative.bank_payee,
+                    "count": len(members),
+                    "payee": decision["payee"],
+                    "memo": decision["memo"],
+                    "needs_payee": False,
+                    "paired_with": None,
+                    "is_part": False,
+                }
+            else:
+                for part_index, part in enumerate(decision["parts"]):
+                    sides[(key, part_index)] = {
+                        "key": key,
+                        "part": part_index,
+                        "account": representative.account,
+                        "date": representative.date,
+                        "amount": part["amount"],
+                        "bank_payee": representative.bank_payee,
+                        "count": len(members),
+                        "payee": part["payee"],
+                        "memo": part["memo"],
+                        "needs_payee": False,
+                        "paired_with": None,
+                        "is_part": True,
+                    }
+            continue
+        amounts = split_amounts_by_key.get(key)
+        if not amounts:
+            sides[(key, None)] = {
+                "key": key,
+                "part": None,
+                "account": representative.account,
+                "date": representative.date,
+                "amount": representative.amount,
+                "bank_payee": representative.bank_payee,
+                "count": len(members),
+                "payee": None,
+                "memo": None,
+                "needs_payee": True,
+                "paired_with": None,
+                "is_part": False,
+            }
+        else:
+            for part_index, amount in enumerate(amounts):
+                sides[(key, part_index)] = {
+                    "key": key,
+                    "part": part_index,
+                    "account": representative.account,
+                    "date": representative.date,
+                    "amount": amount,
+                    "bank_payee": representative.bank_payee,
+                    "count": len(members),
+                    "payee": None,
+                    "memo": None,
+                    "needs_payee": True,
+                    "paired_with": None,
+                    "is_part": True,
+                }
+    return sides
+
+
+def ask_all_payees(ctx, sides, groups, lookup, suggestions, transfer_accounts):
+    # Asks payees for sides still needing them, with transfer matching.
+    # Returns paired side ids with updated remembered keys.
+    paired_ids = set()
+    updated_keys = set()
+    ordered = sorted(
+        [side_id for side_id, side in sides.items() if side["needs_payee"]],
+        key=lambda side_id: (
+            sides[side_id]["date"],
+            sides[side_id]["amount"],
+        ),
+    )
+    for side_id in ordered:
+        if side_id in paired_ids:
+            continue
+        side = sides[side_id]
+        adopted = offer_ynab_for_side(ctx, side, groups, sides, suggestions)
+        if adopted is not None:
+            side["payee"] = adopted["payee"]
+            side["memo"] = adopted["memo"]
+            side["needs_payee"] = False
+            if is_managed_transfer_side(side):
+                match_id = pair_transfer_side(
+                    ctx, side_id, sides, paired_ids, groups
+                )
+                if match_id is not None:
+                    paired_ids.add(side_id)
+                    paired_ids.add(match_id)
+                    updated_keys.update(
+                        write_paired_decisions(sides, lookup, side_id, match_id)
+                    )
+                else:
+                    side["deferred"] = True
+            continue
+        payee = ask_payee_for_side(ctx, side, groups, transfer_accounts)
+        side["payee"] = payee
+        if not is_managed_transfer_side(side):
+            side["memo"] = ask_memo_for_side(side)
+            side["needs_payee"] = False
+            continue
+        match_id = pair_transfer_side(ctx, side_id, sides, paired_ids, groups)
+        if match_id is not None:
+            paired_ids.add(side_id)
+            paired_ids.add(match_id)
+            updated_keys.update(
+                write_paired_decisions(sides, lookup, side_id, match_id)
+            )
+        else:
+            side["memo"] = ask_memo_for_side(side)
+            side["needs_payee"] = False
+            side["deferred"] = True
+    return paired_ids, updated_keys
+
+
+def offer_ynab_for_side(ctx, side, groups, sides, suggestions):
+    # Returns an adopted YNAB payee and memo for one side, or None.
+    representative = groups[side["key"]][0]
+    if side["is_part"]:
+        transaction = Transaction(
+            date=side["date"],
+            amount=side["amount"],
+            payee=side["bank_payee"],
+            account=side["account"],
+            bank_payee=side["bank_payee"],
+        )
+        part_total = sum(
+            1 for (key, _part) in sides if key == side["key"]
+        )
+        return ask_part_ynab_offer(
+            ctx,
+            transaction,
+            side["amount"],
+            (side["part"] or 0) + 1,
+            max(part_total, 2),
+            suggestions,
+        )
+    adopted = ask_ynab_suggestion(
+        ctx, [representative], suggestions.get(suggestion_key(representative))
+    )
+    if adopted is None:
+        return None
+    return {"payee": adopted["payee"], "memo": adopted["memo"]}
+
+
+def ask_payee_for_side(ctx, side, groups, transfer_accounts):
+    # Returns the typed payee for one side, with transfer help.
+    representative = groups[side["key"]][0]
+    if side["is_part"]:
+        label = (
+            f"Part {(side['part'] or 0) + 1} for {decision_line(representative)}\n"
+            f"Amount {format_amount(side['amount'])}"
+        )
+        return ask_split_payee(ctx, label, transfer_accounts)
+    return ask_single_payee(ctx, representative, side["count"], transfer_accounts)
+
+
+def ask_memo_for_side(side):
+    # Returns the memo for one side entered alone.
+    transaction = Transaction(
+        date=side["date"],
+        amount=side["amount"],
+        payee=side["payee"],
+        account=side["account"],
+        bank_payee=side["bank_payee"],
+    )
+    return ask_memo(transaction)
+
+
+def is_managed_transfer_side(side):
+    # Returns whether one side holds a transfer to a managed account.
+    if not side.get("payee"):
+        return False
+    target = transfer_target(side["payee"])
+    if target is None:
+        return False
+    return target in ACCOUNTS_BY_YNAB_NAME
+
+
+def pair_transfer_side(ctx, side_id, sides, paired_ids, groups):
+    # Pairs one managed transfer side with its other end. Returns the match
+    # side id, or None when the other end has not appeared yet.
+    current = sides[side_id]
+    candidates = find_transfer_candidates(side_id, sides, paired_ids)
+    if not candidates:
+        _say("No possible other ends found.")
+        return None
+    lines = [f"Possible other ends for {transfer_side_line(current)}:"]
+    for index, candidate_id in enumerate(candidates, start=1):
+        lines.append(f"{index}. {transfer_side_line(sides[candidate_id])}")
+    lines.append("Reply with the number, or n for none.")
+    while True:
+        reply = ctx.ask("\n".join(lines), pattern=r"(?i:n|\d+)", timeout=300).strip()
+        if reply.casefold() == "n":
+            return None
+        try:
+            choice = int(reply)
+        except ValueError:
+            continue
+        if 1 <= choice <= len(candidates):
+            match_id = candidates[choice - 1]
+            complete_transfer_pair(ctx, side_id, match_id, sides, groups)
+            return match_id
+
+
+def find_transfer_candidates(side_id, sides, paired_ids):
+    # Returns candidate side ids for one transfer side. Candidates hold the
+    # opposite amount in another account within 7 days, and await pairing.
+    current = sides[side_id]
+    candidates = []
+    for other_id, other in sides.items():
+        if other_id == side_id:
+            continue
+        if other_id in paired_ids or other.get("paired_with"):
+            continue
+        if other["account"] == current["account"]:
+            continue
+        if other["amount"] != -current["amount"]:
+            continue
+        if abs((other["date"] - current["date"]).days) > TRANSFER_MATCH_DAYS:
+            continue
+        if other.get("payee") is not None:
+            if not is_managed_transfer_side(other):
+                continue
+            if other_id in paired_ids:
+                continue
+        candidates.append(other_id)
+    candidates.sort(
+        key=lambda other_id: (
+            abs((sides[other_id]["date"] - current["date"]).days),
+            sides[other_id]["date"],
+            sides[other_id]["account"].value,
+            sides[other_id]["bank_payee"],
+        )
+    )
+    return candidates
+
+
+def transfer_side_line(side):
+    # Returns one line for a transfer side in candidate lists.
+    text = (
+        f"{side['date'].strftime('%m-%d')} "
+        f"{ACCOUNT_TAGS[side['account']]} "
+        f"{format_amount(side['amount'])} {side['bank_payee']}"
+    )
+    if side["count"] > 1:
+        text += f" Applies to {side['count']} identical entries."
+    return text
+
+
+def complete_transfer_pair(ctx, first_id, second_id, sides, groups):
+    # Sets mutual transfer payees from actual accounts and asks one memo.
+    first = sides[first_id]
+    second = sides[second_id]
+    first["payee"] = transfer_payee(YNAB_ACCOUNT_NAMES[second["account"]])
+    second["payee"] = transfer_payee(YNAB_ACCOUNT_NAMES[first["account"]])
+    first_transaction = Transaction(
+        date=first["date"],
+        amount=first["amount"],
+        payee=first["payee"],
+        account=first["account"],
+        bank_payee=first["bank_payee"],
+    )
+    second_transaction = Transaction(
+        date=second["date"],
+        amount=second["amount"],
+        payee=second["payee"],
+        account=second["account"],
+        bank_payee=second["bank_payee"],
+    )
+    reply = ctx.ask(
+        "Memo for transfer:\n"
+        f"{compact_line(first_transaction)}\n"
+        f"{compact_line(second_transaction)}\n"
+        "Reply with the memo, or - for none.",
+        pattern=r"[\s\S]+",
+        timeout=300,
+    )
+    memo = reply.strip()
+    shared = None if memo == "-" or not memo else memo
+    first["memo"] = shared
+    second["memo"] = shared
+    first["needs_payee"] = False
+    second["needs_payee"] = False
+    first["paired_with"] = second_id
+    second["paired_with"] = first_id
+    first.pop("deferred", None)
+    second.pop("deferred", None)
+
+
+def write_paired_decisions(sides, lookup, first_id, second_id):
+    # Writes paired payees and memos into remembered decisions.
+    # Returns remembered group keys that changed.
+    changed = set()
+    for side_id in (first_id, second_id):
+        side = sides[side_id]
+        decision = lookup.get(side["key"])
+        if decision is None:
+            continue
+        if side["part"] is None:
+            if decision.get("payee") != side["payee"]:
+                decision["payee"] = side["payee"]
+                changed.add(side["key"])
+            if decision.get("memo") != side["memo"]:
+                decision["memo"] = side["memo"]
+                decision["memo_ready"] = True
+                changed.add(side["key"])
+        else:
+            part = decision["parts"][side["part"]]
+            if part["payee"] != side["payee"]:
+                part["payee"] = side["payee"]
+                changed.add(side["key"])
+            if part["memo"] != side["memo"]:
+                part["memo"] = side["memo"]
+                changed.add(side["key"])
+    return changed
+
+
+def decision_from_sides(key, sides, groups):
+    # Returns the new decision row for one undecided group from its sides.
+    key_sides = sorted(
+        [side for (side_key, _part), side in sides.items() if side_key == key],
+        key=lambda side: side["part"] or 0,
+    )
+    if len(key_sides) == 1 and not key_sides[0]["is_part"]:
+        side = key_sides[0]
+        return {
+            "key": key,
+            "count": len(groups[key]),
+            "kind": "single",
+            "payee": side["payee"],
+            "memo": side["memo"],
+            "memo_ready": True,
+        }
+    return {
+        "key": key,
+        "count": len(groups[key]),
+        "kind": "split",
+        "parts": [
+            {
+                "payee": side["payee"],
+                "amount": side["amount"],
+                "memo": side["memo"],
+            }
+            for side in key_sides
+        ],
+    }
+
+
+def exclude_deferred_transfers(expanded):
+    # Returns expanded transactions without unpaired managed transfers.
+    pairs, deferred_indices = find_managed_transfer_pairs(expanded)
+    if not deferred_indices:
+        return expanded
+    return [
+        transaction
+        for index, transaction in enumerate(expanded)
+        if index not in deferred_indices
+    ]
+
+
+def find_managed_transfer_pairs(transactions):
+    # Returns paired indices with deferred indices for managed transfers.
+    # Two copies pair with mutual payees, opposite amounts, and dates
+    # within 7 days. Pairing is greedy by date closeness.
+    managed_indices = [
+        index
+        for index, transaction in enumerate(transactions)
+        if is_managed_transfer_transaction(transaction)
+    ]
+    paired = set()
+    pairs = []
+    for index in sorted(
+        managed_indices,
+        key=lambda position: (
+            transactions[position].date,
+            transactions[position].account.value,
+        ),
+    ):
+        if index in paired:
+            continue
+        current = transactions[index]
+        best = None
+        best_diff = None
+        for other in managed_indices:
+            if other == index or other in paired:
+                continue
+            candidate = transactions[other]
+            if candidate.account == current.account:
+                continue
+            if candidate.amount != -current.amount:
+                continue
+            if abs((candidate.date - current.date).days) > TRANSFER_MATCH_DAYS:
+                continue
+            if not is_mutual_transfer_pair(current, candidate):
+                continue
+            diff = abs((candidate.date - current.date).days)
+            if best is None or diff < best_diff:
+                best = other
+                best_diff = diff
+        if best is not None:
+            paired.add(index)
+            paired.add(best)
+            pairs.append((index, best))
+    deferred = set(managed_indices) - paired
+    return pairs, deferred
+
+
+def is_managed_transfer_transaction(transaction):
+    # Returns whether one transaction holds a transfer to a managed account.
+    target = transfer_target(transaction.payee)
+    if target is None:
+        return False
+    return target in ACCOUNTS_BY_YNAB_NAME
+
+
+def is_mutual_transfer_pair(first, second):
+    # Returns whether two transactions point at each other as transfers.
+    return (
+        transfer_target(first.payee) == YNAB_ACCOUNT_NAMES[second.account]
+        and transfer_target(second.payee) == YNAB_ACCOUNT_NAMES[first.account]
+    )
 
 
 def suggestion_key(transaction):
@@ -2425,7 +2935,7 @@ def update_from_statements(ctx, plan, transactions, decisions, start_date, uploa
     # return zero deltas for every account in `YNAB_ACCOUNT_NAMES`.
     comparison = compare_with_ynab(plan, transactions, start_date)
     report_ignored_counts(comparison)
-    transactions_to_send, problems = plan_additions(
+    transactions_to_send, problems, transfer_other_dates = plan_additions(
         plan, comparison.missing_transactions
     )
     if problems:
@@ -2467,7 +2977,7 @@ def update_from_statements(ctx, plan, transactions, decisions, start_date, uploa
                 _say("A transfer changed. Check the other side.")
         # The sync changes keys, so the plan below starts from fresh state.
         comparison = compare_with_ynab(plan, transactions, start_date)
-        transactions_to_send, problems = plan_additions(
+        transactions_to_send, problems, transfer_other_dates = plan_additions(
             plan, comparison.missing_transactions
         )
         if problems:
@@ -2539,7 +3049,9 @@ def update_from_statements(ctx, plan, transactions, decisions, start_date, uploa
         return False, 0, 0, 0, 0, sync_count, {account: decimal.Decimal("0") for account in YNAB_ACCOUNT_NAMES}
 
     if missing_count:
-        send_transactions(ctx, plan, transactions_to_send, decisions)
+        send_transactions(
+            ctx, plan, transactions_to_send, decisions, transfer_other_dates
+        )
     if uncleared_count:
         clear_ynab_transactions(plan, comparison.uncleared_transactions)
     if memo_count:
@@ -3003,18 +3515,15 @@ def transfer_payee(account_name):
 
 
 def plan_additions(plan, missing_transactions):
-    # Returns the transactions to send to YNAB, and the problems that stop
-    # every addition. YNAB adds the other side of a transfer by itself, on the
-    # same date, so only one side goes to YNAB. A transfer between two
-    # accounts with statements needs both of its sides among the missing
-    # transactions, and the side of the first account in the order of
-    # `Account` goes to YNAB. A transfer to an account without a statement
-    # has only the one side.
+    # Returns the transactions to send, problems, and other-side dates for
+    # cross-day transfers. YNAB adds the other side by itself, so only one
+    # side goes per managed pair. Pairs allow dates within 7 days with
+    # mutual payees. Unpaired managed transfers defer without error.
+    # A transfer to an account without a statement has only the one side.
     transactions_to_send = []
     problems = []
-    # The missing sides of the transfers, by date, the two accounts in the
-    # order of `Account`, and the amount for the first account.
-    transfer_sides = collections.defaultdict(lambda: ([], []))
+    other_dates_by_id = {}
+    managed_candidates = []
     for transaction in missing_transactions:
         target_name = transfer_target(transaction.payee)
         if target_name is None:
@@ -3024,7 +3533,6 @@ def plan_additions(plan, missing_transactions):
             elif problem not in problems:
                 problems.append(problem)
             continue
-
         own_name = YNAB_ACCOUNT_NAMES[transaction.account]
         if target_name == own_name or target_name not in plan.transfer_payee_ids:
             if target_name == own_name:
@@ -3033,26 +3541,27 @@ def plan_additions(plan, missing_transactions):
                 reason = f"no open YNAB account {target_name!r}"
             problems.append(f"{compact_line(transaction)}: {reason}")
             continue
-
         target_account = ACCOUNTS_BY_YNAB_NAME.get(target_name)
         if target_account is None:
             transactions_to_send.append(transaction)
             continue
-        if transaction.account < target_account:
-            key = (transaction.date, transaction.account, target_account)
-            transfer_sides[(*key, transaction.amount)][0].append(transaction)
-        else:
-            key = (transaction.date, target_account, transaction.account)
-            transfer_sides[(*key, -transaction.amount)][1].append(transaction)
-
-    for key, (first_sides, second_sides) in transfer_sides.items():
-        pair_count = min(len(first_sides), len(second_sides))
-        transactions_to_send += first_sides[:pair_count]
-        if len(first_sides) != len(second_sides):
-            problems.append(
-                describe_unpaired_transfers(key, len(first_sides), len(second_sides))
-            )
-    return transactions_to_send, problems
+        managed_candidates.append(transaction)
+    if managed_candidates:
+        pairs, _deferred = find_managed_transfer_pairs(managed_candidates)
+        paired_ids = set()
+        for first_index, second_index in pairs:
+            paired_ids.add(first_index)
+            paired_ids.add(second_index)
+            first = managed_candidates[first_index]
+            second = managed_candidates[second_index]
+            if first.account.value <= second.account.value:
+                sent, other = first, second
+            else:
+                sent, other = second, first
+            transactions_to_send.append(sent)
+            if sent.date != other.date:
+                other_dates_by_id[id(sent)] = other.date
+    return transactions_to_send, problems, other_dates_by_id
 
 
 def describe_unpaired_transfers(key, first_count, second_count):
@@ -3099,12 +3608,13 @@ def ask_memo(transaction):
     return None if memo == "-" or not memo else memo
 
 
-def send_transactions(ctx, plan, transactions, decisions):
+def send_transactions(ctx, plan, transactions, decisions, transfer_other_dates=None):
     # Asks for a memo for each of `transactions` without a stored memo, then
     # adds them to YNAB. Only singles from before the memo question lack a
     # stored memo. Stores those memos in `decisions`. The Questrade
     # reconciliation keeps its own memo, so it does not come through here.
-    # See `send_reconciliation`.
+    # See `send_reconciliation`. Cross-day transfers move the other side to
+    # its bank date.
     for transaction in sorted(transactions, key=report_order):
         if not transaction.memo_ready:
             transaction.memo = ask_memo(transaction)
@@ -3123,6 +3633,7 @@ def send_transactions(ctx, plan, transactions, decisions):
     if changed:
         save_decisions(ctx, decisions)
     new_transactions = []
+    other_dates = []
     for transaction in transactions:
         target_name = transfer_target(transaction.payee)
         if target_name is None:
@@ -3149,7 +3660,11 @@ def send_transactions(ctx, plan, transactions, decisions):
                 approved=False,
             )
         )
-    create_ynab_transactions(plan, new_transactions)
+        if transfer_other_dates is None:
+            other_dates.append(None)
+        else:
+            other_dates.append(transfer_other_dates.get(id(transaction)))
+    create_ynab_transactions(plan, new_transactions, other_dates)
 
 
 def send_reconciliation(plan, amount):
@@ -3171,11 +3686,12 @@ def send_reconciliation(plan, amount):
     create_ynab_transactions(plan, [transaction])
 
 
-def create_ynab_transactions(plan, new_transactions):
+def create_ynab_transactions(plan, new_transactions, other_dates=None):
     # Adds `new_transactions` to YNAB. Each one must be cleared and not
     # approved. YNAB adds the other side of each transfer by itself, with a
     # status of its own, so each other side then becomes cleared and not
-    # approved too. Last, raises when YNAB holds any of these transactions as
+    # approved too. Cross-day transfers also move the other side to its bank
+    # date. Last, raises when YNAB holds any of these transactions as
     # approved or not cleared.
     transactions_api = ynab.TransactionsApi(plan.api_client)
     try:
@@ -3185,9 +3701,8 @@ def create_ynab_transactions(plan, new_transactions):
     except YNAB_ERRORS as error:
         raise TaskError(f"cannot add the transactions to YNAB: {error}") from error
     # The last state of each transaction, by its ID.
-    saved_transactions = {
-        transaction.id: transaction for transaction in saved_transactions_of(response)
-    }
+    saved_list = saved_transactions_of(response)
+    saved_transactions = {transaction.id: transaction for transaction in saved_list}
 
     other_side_ids = [
         transaction.transfer_transaction_id
@@ -3196,15 +3711,38 @@ def create_ynab_transactions(plan, new_transactions):
     ]
     if None in other_side_ids:
         raise TaskError("YNAB returned a transfer without its other side")
+    other_date_by_side_id = {}
+    if other_dates is not None:
+        for index, other_date in enumerate(other_dates):
+            if other_date is None or index >= len(saved_list):
+                continue
+            sent_saved = saved_list[index]
+            if sent_saved.transfer_account_id is None:
+                continue
+            auto_id = sent_saved.transfer_transaction_id
+            if auto_id is not None:
+                other_date_by_side_id[auto_id] = other_date
     if other_side_ids:
-        updates = [
-            ynab.SaveTransactionWithIdOrImportId(
-                id=transaction_id,
-                cleared=ynab.TransactionClearedStatus.CLEARED,
-                approved=False,
-            )
-            for transaction_id in other_side_ids
-        ]
+        updates = []
+        for transaction_id in other_side_ids:
+            other_date = other_date_by_side_id.get(transaction_id)
+            if other_date is None:
+                updates.append(
+                    ynab.SaveTransactionWithIdOrImportId(
+                        id=transaction_id,
+                        cleared=ynab.TransactionClearedStatus.CLEARED,
+                        approved=False,
+                    )
+                )
+            else:
+                updates.append(
+                    ynab.SaveTransactionWithIdOrImportId(
+                        id=transaction_id,
+                        cleared=ynab.TransactionClearedStatus.CLEARED,
+                        approved=False,
+                        var_date=other_date,
+                    )
+                )
         try:
             response = transactions_api.update_transactions(
                 plan.plan_id, ynab.PatchTransactionsWrapper(transactions=updates)
