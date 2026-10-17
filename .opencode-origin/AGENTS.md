@@ -8,6 +8,8 @@
 
 # General
 
+- When you report work, describe only what the user can now do. Never mention
+  code changes, files, functions, or implementation details.
 - *Never* use tools to ask questions. Instead, ask directly in the chat and
   expect a response in the user's turn.
 - When unsure about the codebase, ask for clarification rather than guessing.
