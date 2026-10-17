@@ -198,7 +198,8 @@ def main(
     \b
     Chat commands:
       /list - show the available tasks
-      /run <name> ... - start a task; only one task runs at a time
+      /run <name> ... - start a task; a shorthand works too; only one
+      task runs at a time
       /status - show uptime, the running task, and the last result
       /cancel - stop the running task; its shutdown hook still runs
       /help - show the commands
@@ -212,7 +213,12 @@ def main(
       The bot loads the file fresh on every /run, so edits apply to the
       next run without a restart. The file name is the task name in /list,
       /run, /status, and the state directory. A task module may define
-      DESCRIPTION, TIMEOUT, SCHEDULE, SCHEDULE_ARGS, run and shutdown.
+      DESCRIPTION, TIMEOUT, SCHEDULE, SCHEDULE_ARGS, SHORTHAND, SHORTHANDS,
+      run and shutdown. SHORTHAND holds one shorthand string such as "bs",
+      and SHORTHANDS holds a tuple or list of them; a shorthand works
+      everywhere the task name works, while messages that list tasks show
+      the task name with its shorthands in parentheses and all other
+      messages show just the task name.
       run is required as run(ctx)
       or run(ctx, args) and may be async. shutdown is optional as
       shutdown(ctx) or shutdown(ctx, reason) and runs once after every
@@ -226,7 +232,8 @@ def main(
       and runs shutdown with reason timeout. ctx.load_state, ctx.save_state,
       ctx.state_path, ctx.delete_state and ctx.list_states manage files at
       STATE_DIR/tasks/<task>/<id>. ctx.load_state and ctx.list_states take
-      an optional task_name to read another task's state; tasks can read
+      an optional task_name to read another task's state; a shorthand works
+      there too; tasks can read
       each other's states but only write their own. ctx.check raises when
       the task must stop. ctx.log writes to the bot log.
 
@@ -780,11 +787,12 @@ class TaskSpec:
     name: str
     path: str
     description: str
+    shorthands: tuple = ()
 
 
 def discover_tasks(tasks_dir):
-    # Lists the tasks without executing their code. DESCRIPTION comes
-    # from a syntax tree scan, so listing never runs task code.
+    # Lists the tasks without executing their code. DESCRIPTION, SHORTHAND and
+    # SHORTHANDS come from a syntax tree scan, so listing never runs task code.
     specs = {}
     if not os.path.isdir(tasks_dir):
         return specs
@@ -803,10 +811,40 @@ def discover_tasks(tasks_dir):
         path = os.path.join(tasks_dir, entry)
         if not os.path.isfile(path):
             continue
+        shorthands = tuple(
+            item for item in read_task_shorthands(path) if item != stem
+        )
         specs[stem] = TaskSpec(
-            name=stem, path=path, description=read_task_description(path)
+            name=stem,
+            path=path,
+            description=read_task_description(path),
+            shorthands=shorthands,
         )
     return specs
+
+
+def resolve_task_spec(specs, name):
+    # Returns the task for a full name or a shorthand. A full name always
+    # wins over a shorthand, so a shorthand never hides a task. A shorthand
+    # shared by several tasks goes to the first task in sorted order, so the
+    # choice stays deterministic. Returns None when nothing matches.
+    spec = specs.get(name)
+    if spec is not None:
+        return spec
+    for canonical in sorted(specs):
+        candidate = specs[canonical]
+        if name in candidate.shorthands:
+            return candidate
+    return None
+
+
+def display_task_name(spec):
+    # Returns the name shown in messages that list tasks: the task name
+    # followed by its shorthands in parentheses, or just the task name when
+    # it defines none. All other messages show just the task name.
+    if spec.shorthands:
+        return f"{spec.name} ({', '.join(spec.shorthands)})"
+    return spec.name
 
 
 def read_task_description(path):
@@ -828,6 +866,60 @@ def read_task_description(path):
         if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
             return node.value.value.strip()
     return ""
+
+
+def read_task_shorthands(path):
+    # Returns the shorthand tuple of the task file, or an empty tuple when
+    # the file defines none. SHORTHAND holds one shorthand string, and
+    # SHORTHANDS holds a tuple or list of them. A plain string also counts
+    # for SHORTHANDS. Only values that match TASK_NAME_PATTERN count, so an
+    # invalid entry never becomes a shorthand. Read from the syntax tree, so
+    # no task code runs. Never raises, so listing stays quiet on bad values.
+    try:
+        with open(path, encoding="utf-8") as handle:
+            tree = ast.parse(handle.read(), filename=path)
+    except (OSError, SyntaxError, ValueError):
+        return ()
+    found = []
+    for node in tree.body:
+        if not (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id in ("SHORTHAND", "SHORTHANDS")
+        ):
+            continue
+        value = node.value
+        if isinstance(value, ast.Constant) and isinstance(value.value, str):
+            candidates = [value.value]
+        elif isinstance(value, (ast.List, ast.Tuple)):
+            candidates = []
+            valid = True
+            for element in value.elts:
+                if not isinstance(element, ast.Constant) or not isinstance(
+                    element.value, str
+                ):
+                    valid = False
+                    break
+                candidates.append(element.value)
+            if not valid:
+                continue
+        else:
+            continue
+        for candidate in candidates:
+            text = candidate.strip()
+            if not text:
+                continue
+            if not TASK_NAME_PATTERN.fullmatch(text):
+                continue
+            found.append(text)
+    seen = set()
+    result = []
+    for item in found:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return tuple(result)
 
 
 def read_task_timeout(path, default):
@@ -1305,15 +1397,22 @@ class TaskContext:
 
     def _resolve_state_task(self, task_name):
         # Returns the task whose state a read targets: the running task when
-        # task_name is None, else the named task. Writes always target the
-        # running task, so a task can read another task's state but never
-        # write it.
+        # task_name is None, else the named task. A shorthand counts as its
+        # task name. Writes always target the running task, so a task can
+        # read another task's state but never write it.
         if task_name is None:
             return self._record.name
         if not isinstance(task_name, str) or not TASK_NAME_PATTERN.fullmatch(
             task_name
         ):
             raise ValueError(f"invalid task name {task_name!r}")
+        try:
+            specs = discover_tasks(self._bot.tasks_dir)
+        except Exception:
+            return task_name
+        spec = resolve_task_spec(specs, task_name)
+        if spec is not None:
+            return spec.name
         return task_name
 
     def _check(self):
@@ -1714,6 +1813,7 @@ class Bot:
         lines = ["Tasks:"]
         for name in sorted(specs):
             spec = specs[name]
+            shown = display_task_name(spec)
             try:
                 expr, _args = read_task_schedule(spec.path)
             except TaskLoadError:
@@ -1721,9 +1821,9 @@ class Bot:
             else:
                 suffix = f" [scheduled: {expr}]" if expr else ""
             if spec.description:
-                lines.append(f"/run {name} - {spec.description}{suffix}")
+                lines.append(f"/run {shown} - {spec.description}{suffix}")
             else:
-                lines.append(f"/run {name}{suffix}")
+                lines.append(f"/run {shown}{suffix}")
         return "\n".join(lines)
 
     def status_text(self):
@@ -1760,31 +1860,32 @@ class Bot:
         entries = []
         for name in sorted(specs):
             spec = specs[name]
+            shown = display_task_name(spec)
             try:
                 expr, _args = read_task_schedule(spec.path)
             except TaskLoadError:
-                entries.append((None, f"Scheduled: {name}: bad schedule"))
+                entries.append((None, f"Scheduled: {shown}: bad schedule"))
                 continue
             if expr is None:
                 continue
             last = last_map.get(name)
             if last is None:
                 entries.append(
-                    (None, f"Scheduled: {name}: waits for the first tick ({expr})")
+                    (None, f"Scheduled: {shown}: waits for the first tick ({expr})")
                 )
                 continue
             try:
                 next_at = cron_next_after(expr, last)
             except Exception:
-                entries.append((None, f"Scheduled: {name}: bad schedule ({expr})"))
+                entries.append((None, f"Scheduled: {shown}: bad schedule ({expr})"))
                 continue
             if next_at <= now:
-                entries.append((0.0, f"Scheduled: {name}: due now ({expr})"))
+                entries.append((0.0, f"Scheduled: {shown}: due now ({expr})"))
             else:
                 entries.append(
                     (
                         next_at - now,
-                        f"Scheduled: {name}: in "
+                        f"Scheduled: {shown}: in "
                         f"{format_duration(next_at - now)} ({expr})",
                     )
                 )
@@ -1808,9 +1909,11 @@ class Bot:
                 )
                 return
         specs = discover_tasks(self.tasks_dir)
-        spec = specs.get(name)
+        spec = resolve_task_spec(specs, name)
         if spec is None:
-            hint = ", ".join(sorted(specs)) or "none"
+            hint = ", ".join(
+                display_task_name(specs[item]) for item in sorted(specs)
+            ) or "none"
             self.try_send(chat_id, f"Unknown task {name!r}. Available: {hint}.")
             return
         run_timeout = read_task_timeout(spec.path, self.default_run_timeout)

@@ -5,6 +5,7 @@
 # yet today. A manual run counts: any finished budget-sync run stores today.
 
 DESCRIPTION = "Remind to run budget-sync when it hasn't run today."
+SHORTHAND = "br"
 SCHEDULE = "0 12-23 * * *"
 TIMEOUT = 120
 

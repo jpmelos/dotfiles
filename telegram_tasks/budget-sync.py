@@ -42,6 +42,7 @@
 # one combined balance message, and a count of the transactions without a memo.
 
 DESCRIPTION = "Sync new BMO and Wise transactions and BMO, Wise, and Questrade balances to YNAB."
+SHORTHAND = "b"
 # Banking with user questions can take a while. This is the budget for one
 # run, in seconds.
 TIMEOUT = 7200
