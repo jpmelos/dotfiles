@@ -14,16 +14,12 @@ fi
 # A detached worker performs the slow title request.
 if [ -n "${AUTO_TITLE_WORKER:-}" ]; then
   sleep 5
-  history_text=$(jq -r 'select(.type == "user" or .type == "assistant") | .message.content? // empty | if type == "array" then .[] | select(type == "object" and .type == "text") | .text? // empty elif type == "string" then . else empty end' "$AUTO_TITLE_TRANSCRIPT" 2> /dev/null || true)
+  history_text=$(jq -r 'if .type == "summary" then .summary? // empty elif .type == "user" or .type == "assistant" then .message.content? // empty | if type == "array" then .[] | select(type == "object" and .type == "text") | .text? // empty elif type == "string" then . else empty end else empty end' "$AUTO_TITLE_TRANSCRIPT" 2> /dev/null || true)
   # An empty history carries no name.
   if [ -z "$history_text" ]; then
     exit 0
   fi
   combined="$history_text"
-  # This bound keeps a long session answer fast.
-  if [ "${#combined}" -gt 24000 ]; then
-    combined=$(tail -c 24000 <<< "$combined")
-  fi
   instructions="Write a short session title in lowercase kebab-case, 3 to 6 words and at most 50 characters, that describes the whole session below. Reply with the title only and no quotes."
   raw_title=$(claude -p --model haiku --max-turns 1 --output-format text "$instructions
 

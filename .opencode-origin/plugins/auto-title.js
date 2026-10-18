@@ -6,8 +6,6 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 
-// This bound caps the history text in the title request.
-const HISTORY_LIMIT = 24000;
 const FALLBACK_MODEL = "opencode-go/claude-haiku-5-5";
 const FALLBACK_MAX_LENGTH = 60;
 
@@ -129,8 +127,7 @@ async function renameFromHistory(ctx, sessionID) {
   }
   // An empty history carries no name.
   if (lines.length === 0) return;
-  let history = lines.join("\n\n");
-  if (history.length > HISTORY_LIMIT) history = history.slice(-HISTORY_LIMIT);
+  const history = lines.join("\n\n");
   const model = parseModelRef(config.model) ?? modelFromSession(info) ?? parseModelRef(FALLBACK_MODEL);
   let answer;
   try {
