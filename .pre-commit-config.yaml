@@ -1,0 +1,76 @@
+default_stages:
+  - pre-commit
+  - post-rewrite
+
+repos:
+  - repo: local
+    hooks:
+      - name: All executables should be shebang scripts
+        id: check-executables-have-shebangs
+        entry: ./scripts/check_executables_have_shebangs.sh
+        language: system
+
+      - name: All shebang scripts should be executable
+        id: check-shebang-scripts-are-executable
+        entry: ./scripts/check_shebang_scripts_are_executable.sh
+        language: system
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - name: All non-empty files should end with a newline
+        id: end-of-file-fixer
+
+      - name: No files should have trailing whitespaces
+        id: trailing-whitespace
+
+  - repo: local
+    hooks:
+      - name: Check file line lengths
+        id: check-line-lengths
+        entry: ./scripts/check_line_lengths.sh
+        language: system
+        types_or:
+          - python
+          - shell
+
+  - repo: https://github.com/hukkin/mdformat
+    rev: 1.0.0
+    hooks:
+      - name: Format Markdown files
+        id: mdformat
+        additional_dependencies:
+          - mdformat-config
+          - mdformat-ruff
+          - mdformat-shfmt
+          - mdformat-frontmatter
+          - mdformat-gfm
+          - mdformat-gfm-alerts
+
+  - repo: https://github.com/rbubley/mirrors-prettier
+    rev: v3.7.4
+    hooks:
+      - name: Format YAML files
+        id: prettier
+        types:
+          - yaml
+
+  - repo: https://github.com/ComPWA/taplo-pre-commit
+    rev: v0.9.3
+    hooks:
+      - name: Format TOML files
+        id: taplo-format
+
+  - repo: local
+    hooks:
+      - name: Format Python files
+        id: ruff-format
+        entry: uv run --no-active -- ruff format
+        language: python
+        types: [python]
+
+      - name: Lint Python files
+        id: ruff-check
+        entry: uv run --no-active -- ruff check
+        language: python
+        types: [python]
