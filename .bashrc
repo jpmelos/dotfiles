@@ -557,16 +557,17 @@ complete -F _j_completion je
 x() {
     local project
     project=$(
-        list_project_dirs \
-            | fzf --prompt="Select project: " --height=40% --reverse --query="$*"
+        {
+            echo "Projects Root"
+            list_project_dirs
+        } | fzf --prompt="Select project: " --height=40% --reverse --query="$*"
     )
 
-    if [ -z "$project" ]; then
-        echo "No project selected."
-        return 1
+    if [ "$project" = "Projects Root" ] || [ -z "$project" ]; then
+        cd "$HOME/devel"
+    else
+        cd "$HOME/devel/$project"
     fi
-
-    cd "$HOME/devel/$project"
 }
 
 ################
