@@ -6,9 +6,9 @@ metadata:
 ---
 
 Edit `~/devel/dotfiles/.opencode-origin/AGENTS.md` and
-`~/devel/dotfiles/.claude-origin/CLAUDE.md` to learn the new things
-named in the user message after this skill block. Apply the same learning
-to both files, with identical wording except for tool-specific paths.
+`~/devel/dotfiles/.claude-origin/CLAUDE.md` to learn the new things named in
+the user message after this skill block. Apply the same learning to both files,
+with identical wording except for tool-specific paths.
 
 You do not need to use those exact words. If the thing to be learned can be
 better expressed with different words or in a shorter way, feel free to rewrite
