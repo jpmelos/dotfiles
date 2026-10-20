@@ -30,9 +30,11 @@ repos:
         id: check-line-lengths
         entry: ./scripts/check_line_lengths.sh
         language: system
+        types: [text]
         types_or:
           - python
           - shell
+          - executable
 
   - repo: https://github.com/hukkin/mdformat
     rev: 1.0.0

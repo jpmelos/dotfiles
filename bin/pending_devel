@@ -1,107 +1,313 @@
-#!/usr/bin/env bash
-set -euo pipefail
-trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["click>=8.1,<9"]
+# ///
 
-# Check each project under `~/devel` for work that is not pushed, and pull
-# the rest. Report repositories with uncommitted changes, with commits that
-# need a push, and with a failed pull. Skip linked worktrees. The main
-# repository holds the same state, so a worktree adds nothing to the report.
-#
-# Usage: pending_devel
+# vim: ft=python
 
-devel_dir="$HOME/devel"
+# Help comes from `pending_devel --help`. The main command below holds the
+# text.
 
-if [ ! -d "$devel_dir" ]; then
-    echo "Error: $devel_dir does not exist." >&2
-    exit 1
-fi
+import os
+import subprocess
+import sys
 
-projects=()
-mapfile -t projects < <(list_project_dirs)
-total="${#projects[@]}"
+import click
 
-if [ "$total" -eq 0 ]; then
-    echo -e "No projects found in \e[1m~/devel\e[0m."
-    exit 0
-fi
+BAR_WIDTH = 40
+MAX_STATUS_LINES = 10
 
-echo -e "Checking for uncommitted changes in \e[1m~/devel\e[0m repositories ($total projects)..."
 
-bar_width=40
-index=0
-findings=()
-for repo_path in "${projects[@]}"; do
-    index=$((index + 1))
+def list_project_dirs(devel_dir):
+    # Returns the sorted relative paths of projects under `devel_dir`.
+    # A project holds `.git` and lacks `.list_project_dirs_ignore`.
+    # The scan skips a link that lacks both markers.
+    # The scan enters other directories to find nested projects.
+    projects = []
 
-    filled=$((index * bar_width / total))
-    bar=""
-    for ((i = 0; i < filled; i++)); do bar+="="; done
-    for ((i = filled; i < bar_width; i++)); do bar+=" "; done
-    printf "\r[%s] %d/%d" "$bar" "$index" "$total"
+    def walk(current_dir):
+        try:
+            names = os.listdir(current_dir)
+        except OSError:
+            return
+        for name in names:
+            full_path = os.path.join(current_dir, name)
+            try:
+                if not os.path.isdir(full_path):
+                    continue
+            except OSError:
+                continue
+            git_marker = os.path.join(full_path, ".git")
+            ignore_marker = os.path.join(
+                full_path, ".list_project_dirs_ignore"
+            )
+            if os.path.exists(git_marker) and not os.path.exists(
+                ignore_marker
+            ):
+                projects.append(os.path.relpath(full_path, devel_dir))
+            elif os.path.islink(full_path):
+                continue
+            else:
+                walk(full_path)
 
-    cd "$devel_dir/$repo_path" || continue
+    walk(devel_dir)
+    projects.sort()
+    return projects
 
-    # Skip linked worktrees. There, the git directory differs from the
-    # common directory of the main repository. The main repository holds
-    # the same state, so the worktree adds nothing to the report.
-    mapfile -t git_dirs < <(
-        git rev-parse --path-format=absolute --git-dir --git-common-dir 2> /dev/null
+
+def git_text(arguments, repo_full_path):
+    # Runs `git` with `arguments` in `repo_full_path`.
+    # Returns stdout stripped.
+    # Returns an empty string when `git` fails or cannot start.
+    try:
+        result = subprocess.run(
+            ["git", *arguments],
+            cwd=repo_full_path,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            encoding="utf-8",
+            errors="replace",
+        )
+    except OSError:
+        return ""
+    if result.returncode != 0:
+        return ""
+    return result.stdout.strip()
+
+
+def git_count(arguments, repo_full_path):
+    # Runs `git rev-list --count` with `arguments` in `repo_full_path`.
+    # Returns the count, or 0 when `git` fails or the output is not a number.
+    text = git_text(arguments, repo_full_path)
+    try:
+        return int(text.strip())
+    except ValueError:
+        return 0
+
+
+def is_linked_worktree(repo_full_path):
+    # Returns true when `repo_full_path` is a linked worktree.
+    # A linked worktree has a git directory distinct from the common directory.
+    try:
+        result = subprocess.run(
+            [
+                "git",
+                "rev-parse",
+                "--path-format=absolute",
+                "--git-dir",
+                "--git-common-dir",
+            ],
+            cwd=repo_full_path,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            encoding="utf-8",
+            errors="replace",
+        )
+    except OSError:
+        return False
+    if result.returncode != 0:
+        return False
+    git_dirs = result.stdout.splitlines()
+    return len(git_dirs) == 2 and git_dirs[0] != git_dirs[1]
+
+
+def read_main_branch(repo_full_path):
+    # Returns the main branch name of `repo_full_path`, or an empty string.
+    # The name is the last non-empty line of `git main-branch`.
+    text = git_text(["main-branch"], repo_full_path)
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if not lines:
+        return text.strip()
+    return lines[-1]
+
+
+def read_status_lines(repo_full_path):
+    # Returns the porcelain status lines of `repo_full_path`.
+    # Returns an empty list when the tree is clean or `git` fails.
+    text = git_text(["status", "--porcelain"], repo_full_path)
+    if not text:
+        return []
+    return text.splitlines()
+
+
+def indent_lines(lines):
+    # Prefixes each line in `lines` with four spaces and joins them.
+    return "\n".join(f"    {line}" for line in lines)
+
+
+def run_pull(repo_full_path):
+    # Runs `git pull --quiet` in `repo_full_path`.
+    # Returns success and combined output with no final newline.
+    try:
+        result = subprocess.run(
+            ["git", "pull", "--quiet"],
+            cwd=repo_full_path,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            encoding="utf-8",
+            errors="replace",
+        )
+    except OSError as error:
+        return False, str(error)
+    return result.returncode == 0, result.stdout.strip("\n")
+
+
+@click.command(context_settings={"help_option_names": ["-h", "--help"]})
+def main():
+    """Check each project under `~/devel` for work that is not pushed, and pull
+    the rest. Report repositories with uncommitted changes, with commits that
+    need a push, and with a failed pull. Skip linked worktrees. The main
+    repository holds the same state, so a worktree adds nothing to the report.
+    """
+    home = os.environ.get("HOME")
+    if not home:
+        raise click.ClickException("HOME is not set")
+    devel_dir = os.path.join(home, "devel")
+    resolved_devel_dir = os.path.realpath(devel_dir)
+    if not os.path.isdir(resolved_devel_dir):
+        raise click.ClickException(f"{devel_dir} does not exist.")
+
+    projects = list_project_dirs(resolved_devel_dir)
+    total = len(projects)
+    styled_devel = click.style("~/devel", bold=True)
+    if total == 0:
+        click.echo(f"No projects found in {styled_devel}.")
+        return
+
+    label = (
+        f"Checking for uncommitted changes in {styled_devel} "
+        f"repositories ({total} projects)..."
     )
-    if [ "${#git_dirs[@]}" -eq 2 ] && [ "${git_dirs[0]}" != "${git_dirs[1]}" ]; then
-        continue
-    fi
+    findings = []
+    with click.progressbar(
+        projects,
+        label=label,
+        fill_char="=",
+        empty_char=" ",
+        width=BAR_WIDTH,
+        show_eta=False,
+        show_percent=False,
+        show_pos=True,
+        bar_template="%(label)s [%(bar)s] %(info)s",
+    ) as bar:
+        for repo_relative_path in bar:
+            repo_full_path = os.path.join(
+                resolved_devel_dir, repo_relative_path
+            )
+            if not os.path.isdir(repo_full_path):
+                continue
+            if is_linked_worktree(repo_full_path):
+                continue
 
-    main_branch="$(git main-branch 2> /dev/null || true)"
+            styled_repo = click.style(repo_relative_path, bold=True)
+            main_branch = read_main_branch(repo_full_path)
+            status_lines = read_status_lines(repo_full_path)
+            if status_lines:
+                findings.append(
+                    f"* {styled_repo}\n\n"
+                    f"{indent_lines(status_lines[:MAX_STATUS_LINES])}"
+                )
+                continue
 
-    if [ "$(git status --porcelain | wc -l)" -gt 0 ]; then
-        status_output="$(git status --porcelain | head -n 10 | sed 's/^/    /' || true)"
-        findings+=("$(printf "* \033[1m%s\033[0m\n\n%s" "$repo_path" "$status_output")")
-    else
-        should_pull=true
+            should_pull = True
+            current_branch = git_text(
+                ["rev-parse", "--abbrev-ref", "HEAD"], repo_full_path
+            )
+            upstream = git_text(
+                [
+                    "rev-parse",
+                    "--abbrev-ref",
+                    "--symbolic-full-name",
+                    "@{upstream}",
+                ],
+                repo_full_path,
+            )
+            if upstream:
+                ahead = git_count(
+                    ["rev-list", "--count", "@{upstream}..HEAD"],
+                    repo_full_path,
+                )
+                if ahead > 0:
+                    should_pull = False
+                    styled_branch = click.style(current_branch, italic=True)
+                    needs_push = click.style("needs to be pushed", fg="yellow")
+                    findings.append(
+                        f"* {styled_repo}\n"
+                        f"    {styled_branch} {needs_push}, "
+                        f"{ahead} commit(s) ahead"
+                    )
 
-        current_branch="$(git rev-parse --abbrev-ref HEAD 2> /dev/null || true)"
-        upstream="$(git rev-parse --abbrev-ref --symbolic-full-name @{upstream} 2> /dev/null || true)"
+            if current_branch != main_branch and main_branch:
+                main_upstream = git_text(
+                    [
+                        "for-each-ref",
+                        "--format=%(upstream:short)",
+                        f"refs/heads/{main_branch}",
+                    ],
+                    repo_full_path,
+                )
+                if main_upstream:
+                    main_ahead = git_count(
+                        [
+                            "rev-list",
+                            "--count",
+                            f"{main_upstream}..{main_branch}",
+                        ],
+                        repo_full_path,
+                    )
+                    if main_ahead > 0:
+                        styled_main = click.style(main_branch, italic=True)
+                        needs_push = click.style(
+                            "needs to be pushed", fg="yellow"
+                        )
+                        findings.append(
+                            f"* {styled_repo}\n"
+                            f"    {styled_main} {needs_push}, "
+                            f"{main_ahead} commit(s) ahead"
+                        )
 
-        if [ -n "$upstream" ]; then
-            ahead="$(git rev-list --count @{upstream}..HEAD 2> /dev/null || echo 0)"
-            if [ "$ahead" -gt 0 ]; then
-                should_pull=false
-                findings+=("$(printf "* \033[1m%s\033[0m\n    %s needs to be pushed, %d commit(s) ahead" \
-                    "$repo_path" "$current_branch" "$ahead")")
-            fi
-        fi
+            if should_pull:
+                pull_ok, pull_output = run_pull(repo_full_path)
+                if not pull_ok:
+                    failed_label = click.style(
+                        "git pull failed:", fg="red", bold=True
+                    )
+                    findings.append(
+                        f"* {styled_repo}\n"
+                        f"    {failed_label}\n"
+                        f"{indent_lines(pull_output.splitlines())}"
+                    )
+                elif current_branch != main_branch:
+                    if not main_branch:
+                        pulled_detail = (
+                            f"pulled {current_branch} "
+                            "(checked-out branch, main branch unknown)"
+                        )
+                    else:
+                        pulled_detail = (
+                            f"pulled {current_branch} "
+                            f"(checked-out branch, "
+                            f"main branch is {main_branch})"
+                        )
+                    findings.append(
+                        f"* {styled_repo}\n    "
+                        f"{click.style(pulled_detail, fg='green')}"
+                    )
 
-        if [ "$current_branch" != "$main_branch" ]; then
-            main_upstream="$(git for-each-ref --format='%(upstream:short)' refs/heads/"$main_branch" 2> /dev/null || true)"
-            if [ -n "$main_upstream" ]; then
-                main_ahead="$(git rev-list --count "$main_upstream".."$main_branch" 2> /dev/null || echo 0)"
-                if [ "$main_ahead" -gt 0 ]; then
-                    findings+=("$(printf "* \033[1m%s\033[0m\n    %s needs to be pushed, %d commit(s) ahead" \
-                        "$repo_path" "$main_branch" "$main_ahead")")
-                fi
-            fi
-        fi
+    for finding in findings:
+        click.echo()
+        click.echo(finding)
 
-        if [ "$should_pull" = true ]; then
-            if ! pull_output="$(git pull --quiet 2>&1)"; then
-                pull_output="$(printf "%s" "$pull_output" | sed 's/^/    /')"
-                findings+=("$(printf "* \033[1m%s\033[0m\n    git pull failed:\n%s" \
-                    "$repo_path" "$pull_output")")
-            elif [ "$current_branch" != "$main_branch" ]; then
-                if [ -z "$main_branch" ]; then
-                    findings+=("$(printf "* \033[1m%s\033[0m\n    pulled %s (checked-out branch, main branch unknown)" \
-                        "$repo_path" "$current_branch")")
-                else
-                    findings+=("$(printf "* \033[1m%s\033[0m\n    pulled %s (checked-out branch, main branch is %s)" \
-                        "$repo_path" "$current_branch" "$main_branch")")
-                fi
-            fi
-        fi
-    fi
-done
 
-echo ""
-for finding in "${findings[@]}"; do
-    echo ""
-    printf "%s\n" "$finding"
-done
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        # Ctrl-C at a prompt or during a command. The shell convention for a
+        # death by SIGINT is 128 + 2.
+        sys.exit(130)
+    except BrokenPipeError:
+        null_descriptor = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(null_descriptor, sys.stdout.fileno())
+        sys.exit(141)
