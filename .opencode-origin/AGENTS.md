@@ -10,6 +10,9 @@
 
 - When you report work, describe only what the user can now do. Never mention
   code changes, files, functions, or implementation details.
+- When you mention an issue, PR, ticket, or similar by reference (number, code,
+  etc.), always add a short description of what it is about. The user does not
+  remember references from memory.
 - *Never* use tools to ask questions. Instead, ask directly in the chat and
   expect a response in the user's turn.
 - When unsure about the codebase, ask for clarification rather than guessing.
