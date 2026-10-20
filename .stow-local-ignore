@@ -10,5 +10,6 @@
 ^/claude-manager
 ^/jpenv-scratch
 ^/references
+^/ruff.toml
 ^/scripts
 ^/stylua.toml
