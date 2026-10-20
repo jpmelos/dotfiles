@@ -22,13 +22,23 @@ Study the project to understand aspects relevant to the change.
   project.
 - Add these details to ticket descriptions so that work can start at once.
 
-Cite inspected code with paths relative to the repository root. Then proceed
-to the next step.
+Cite inspected code with paths relative to the repository root. Then proceed to
+the next step.
 
-## 2. Clarification questions
+## 2. Study report and clarification questions
 
-With study results in hand, ask clarification questions. Focus on these
-topics:
+Present a report of the study before you ask questions. Include these items:
+
+- Relevant patterns and conventions from the affected area.
+- Definitions of all project-specific terms in full.
+- Cited code paths relative to the repository root.
+- Your current description of the problem that the plan solves.
+
+Explain the problem in full. State why it matters for the user. State what
+remains unclear from the study. Ensure that the user grasps the problem before
+he answers.
+
+Ask clarification questions. Focus on these topics:
 
 - Problem and goal: what problem does this solve.
 - Core functionality: what are the key actions.
@@ -151,10 +161,10 @@ sequences. Keep American spelling.
 
 ## 5. Output
 
-Present the full plan in the chat as readable text. Do not wrap the plan in
-a code block. Do not emit raw Markdown. Do not write the plan to a file. If
-the user requests a save, write the plan as Markdown to the requested location
-at that time.
+Present the full plan in the chat as readable text. Do not wrap the plan in a
+code block. Do not emit raw Markdown. Do not write the plan to a file. If the
+user requests a save, write the plan as Markdown to the requested location at
+that time.
 
 Follow these additional instructions:
 
