@@ -94,6 +94,7 @@ export function register(on) {
       return { text: "Unknown entry " + args + ". Valid names: " + valid };
     }
     const enabled = await flipRule($, found[0]);
+    $.ui.invalidate("ui.render");
     return { text: rowLabel(found[0], enabled) };
   });
 
@@ -112,6 +113,7 @@ export function register(on) {
           label: rowLabel(entry, isEnabled(state, entry)),
           onPress: async () => {
             const enabled = await flipRule($, entry);
+            $.ui.invalidate("ui.render");
             await $.ui.close({ id: PANE });
             $.ui.toast(rowLabel(entry, enabled));
           },
