@@ -9,6 +9,7 @@
 # Help comes from `pending_devel --help`. The main command below holds the
 # text.
 
+import concurrent.futures
 import os
 import subprocess
 import sys
@@ -153,6 +154,114 @@ def run_pull(repo_full_path):
     return result.returncode == 0, result.stdout.strip("\n")
 
 
+def check_project(repo_relative_path, resolved_devel_dir):
+    # Checks one project and returns its findings as a list.
+    # Returns an empty list when the project has no open work.
+    repo_findings = []
+    repo_full_path = os.path.join(resolved_devel_dir, repo_relative_path)
+    if not os.path.isdir(repo_full_path):
+        return repo_findings
+    if is_linked_worktree(repo_full_path):
+        return repo_findings
+
+    styled_repo = click.style(repo_relative_path, bold=True)
+    main_branch = read_main_branch(repo_full_path)
+    status_lines = read_status_lines(repo_full_path)
+    if status_lines:
+        repo_findings.append(
+            f"* {styled_repo}\n\n"
+            f"{indent_lines(status_lines[:MAX_STATUS_LINES])}"
+        )
+        return repo_findings
+
+    should_pull = True
+    current_branch = git_text(
+        ["rev-parse", "--abbrev-ref", "HEAD"], repo_full_path
+    )
+    upstream = git_text(
+        [
+            "rev-parse",
+            "--abbrev-ref",
+            "--symbolic-full-name",
+            "@{upstream}",
+        ],
+        repo_full_path,
+    )
+    if upstream:
+        ahead = git_count(
+            ["rev-list", "--count", "@{upstream}..HEAD"],
+            repo_full_path,
+        )
+        if ahead > 0:
+            should_pull = False
+            styled_branch = click.style(current_branch, italic=True)
+            needs_push = click.style("needs to be pushed", fg="yellow")
+            repo_findings.append(
+                f"* {styled_repo}\n"
+                f"    {styled_branch} {needs_push}, "
+                f"{ahead} commit(s) ahead"
+            )
+
+    if current_branch != main_branch and main_branch:
+        main_upstream = git_text(
+            [
+                "for-each-ref",
+                "--format=%(upstream:short)",
+                f"refs/heads/{main_branch}",
+            ],
+            repo_full_path,
+        )
+        if main_upstream:
+            main_ahead = git_count(
+                [
+                    "rev-list",
+                    "--count",
+                    f"{main_upstream}..{main_branch}",
+                ],
+                repo_full_path,
+            )
+            if main_ahead > 0:
+                styled_main = click.style(main_branch, italic=True)
+                needs_push = click.style(
+                    "needs to be pushed", fg="yellow"
+                )
+                repo_findings.append(
+                    f"* {styled_repo}\n"
+                    f"    {styled_main} {needs_push}, "
+                    f"{main_ahead} commit(s) ahead"
+                )
+
+    if should_pull:
+        pull_ok, pull_output = run_pull(repo_full_path)
+        if not pull_ok:
+            failed_label = click.style(
+                "git pull failed:", fg="red", bold=True
+            )
+            repo_findings.append(
+                f"* {styled_repo}\n"
+                f"    {failed_label}\n"
+                f"{indent_lines(pull_output.splitlines())}"
+            )
+        elif current_branch != main_branch:
+            if not main_branch:
+                pulled_detail = (
+                    f"pulled {current_branch} "
+                    "(checked-out branch, main branch unknown)"
+                )
+            else:
+                pulled_detail = (
+                    f"pulled {current_branch} "
+                    f"(checked-out branch, "
+                    f"main branch is {main_branch})"
+                )
+            repo_findings.append(
+                f"* {styled_repo}\n    "
+                f"{click.style(pulled_detail, fg='green')}"
+            )
+
+    return repo_findings
+
+
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
 def main():
     """Check each project under `~/devel` for work that is not pushed, and pull
@@ -179,9 +288,11 @@ def main():
         f"Checking for uncommitted changes in {styled_devel} "
         f"repositories ({total} projects)..."
     )
-    findings = []
+    # One thread per project, at most four threads per core.
+    worker_count = (os.cpu_count() or 1) * 4
+    findings_by_repo = {}
     with click.progressbar(
-        projects,
+        length=total,
         label=label,
         fill_char="=",
         empty_char=" ",
@@ -191,109 +302,29 @@ def main():
         show_pos=True,
         bar_template="%(label)s [%(bar)s] %(info)s",
     ) as bar:
-        for repo_relative_path in bar:
-            repo_full_path = os.path.join(
-                resolved_devel_dir, repo_relative_path
-            )
-            if not os.path.isdir(repo_full_path):
-                continue
-            if is_linked_worktree(repo_full_path):
-                continue
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=worker_count
+        ) as pool:
+            future_to_repo = {
+                pool.submit(
+                    check_project,
+                    repo_relative_path,
+                    resolved_devel_dir,
+                ): repo_relative_path
+                for repo_relative_path in projects
+            }
+            for future in concurrent.futures.as_completed(
+                future_to_repo
+            ):
+                done_repo = future_to_repo[future]
+                findings_by_repo[done_repo] = future.result()
+                bar.update(1)
 
-            styled_repo = click.style(repo_relative_path, bold=True)
-            main_branch = read_main_branch(repo_full_path)
-            status_lines = read_status_lines(repo_full_path)
-            if status_lines:
-                findings.append(
-                    f"* {styled_repo}\n\n"
-                    f"{indent_lines(status_lines[:MAX_STATUS_LINES])}"
-                )
-                continue
-
-            should_pull = True
-            current_branch = git_text(
-                ["rev-parse", "--abbrev-ref", "HEAD"], repo_full_path
-            )
-            upstream = git_text(
-                [
-                    "rev-parse",
-                    "--abbrev-ref",
-                    "--symbolic-full-name",
-                    "@{upstream}",
-                ],
-                repo_full_path,
-            )
-            if upstream:
-                ahead = git_count(
-                    ["rev-list", "--count", "@{upstream}..HEAD"],
-                    repo_full_path,
-                )
-                if ahead > 0:
-                    should_pull = False
-                    styled_branch = click.style(current_branch, italic=True)
-                    needs_push = click.style("needs to be pushed", fg="yellow")
-                    findings.append(
-                        f"* {styled_repo}\n"
-                        f"    {styled_branch} {needs_push}, "
-                        f"{ahead} commit(s) ahead"
-                    )
-
-            if current_branch != main_branch and main_branch:
-                main_upstream = git_text(
-                    [
-                        "for-each-ref",
-                        "--format=%(upstream:short)",
-                        f"refs/heads/{main_branch}",
-                    ],
-                    repo_full_path,
-                )
-                if main_upstream:
-                    main_ahead = git_count(
-                        [
-                            "rev-list",
-                            "--count",
-                            f"{main_upstream}..{main_branch}",
-                        ],
-                        repo_full_path,
-                    )
-                    if main_ahead > 0:
-                        styled_main = click.style(main_branch, italic=True)
-                        needs_push = click.style(
-                            "needs to be pushed", fg="yellow"
-                        )
-                        findings.append(
-                            f"* {styled_repo}\n"
-                            f"    {styled_main} {needs_push}, "
-                            f"{main_ahead} commit(s) ahead"
-                        )
-
-            if should_pull:
-                pull_ok, pull_output = run_pull(repo_full_path)
-                if not pull_ok:
-                    failed_label = click.style(
-                        "git pull failed:", fg="red", bold=True
-                    )
-                    findings.append(
-                        f"* {styled_repo}\n"
-                        f"    {failed_label}\n"
-                        f"{indent_lines(pull_output.splitlines())}"
-                    )
-                elif current_branch != main_branch:
-                    if not main_branch:
-                        pulled_detail = (
-                            f"pulled {current_branch} "
-                            "(checked-out branch, main branch unknown)"
-                        )
-                    else:
-                        pulled_detail = (
-                            f"pulled {current_branch} "
-                            f"(checked-out branch, "
-                            f"main branch is {main_branch})"
-                        )
-                    findings.append(
-                        f"* {styled_repo}\n    "
-                        f"{click.style(pulled_detail, fg='green')}"
-                    )
+    findings = [
+        finding
+        for repo_relative_path in projects
+        for finding in findings_by_repo.get(repo_relative_path, [])
+    ]
 
     for finding in findings:
         click.echo()
