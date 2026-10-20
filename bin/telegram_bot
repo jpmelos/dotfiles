@@ -11,8 +11,8 @@
 import ast
 import asyncio
 import datetime
-import inspect
 import importlib.util
+import inspect
 import json
 import os
 import re
@@ -53,9 +53,9 @@ EXPORT_VERSION = 1
 SCHEDULE_WARN_INTERVAL = 3600.0
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Entry point.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 @click.group(
@@ -376,9 +376,9 @@ def import_state(ctx, path, state_dir):
     log(f"Imported {count} file(s) from {path} to {base}.")
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Poll state.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 def read_poll_offset(path):
@@ -391,11 +391,18 @@ def read_poll_offset(path):
     except FileNotFoundError:
         return None
     except (OSError, ValueError) as error:
-        log(f"Warning: cannot read {path}: {error}. Starting without a saved offset.")
+        log(
+            f"Warning: cannot read {path}: {error}. "
+            "Starting without a saved offset."
+        )
         return None
     if isinstance(data, dict):
         value = data.get("last_update_id")
-        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+        if (
+            isinstance(value, int)
+            and not isinstance(value, bool)
+            and value > 0
+        ):
             return value
     return None
 
@@ -404,7 +411,9 @@ def write_poll_offset(path, update_id):
     # Atomically stores the last processed update identifier. Raises OSError
     # on failure. The caller logs and goes on, so persistence never stops
     # the bot.
-    raw = (json.dumps({"last_update_id": update_id}, indent=2) + "\n").encode("utf-8")
+    raw = (json.dumps({"last_update_id": update_id}, indent=2) + "\n").encode(
+        "utf-8"
+    )
     os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
     descriptor, temp_path = tempfile.mkstemp(
         dir=os.path.dirname(path), prefix=".poll-"
@@ -445,9 +454,9 @@ def message_time(update):
     return None
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Configuration.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 def resolve_token(token):
@@ -473,7 +482,10 @@ def resolve_allowed_chats(chat_ids):
     if not raw_values:
         found = read_jc_value("telegram_bot.chat_id")
         if isinstance(found, bool):
-            die("telegram_bot.chat_id in ~/config.json is not a chat identifier")
+            die(
+                "telegram_bot.chat_id in ~/config.json "
+                "is not a chat identifier"
+            )
         if isinstance(found, int):
             return [found]
         if isinstance(found, float) and found.is_integer():
@@ -505,14 +517,18 @@ def resolve_allowed_chats(chat_ids):
 
 
 def resolve_tasks_dir(tasks_dir):
-    value = (tasks_dir or "").strip() or os.environ.get("TELEGRAM_TASKS_DIR", "").strip()
+    value = (tasks_dir or "").strip() or os.environ.get(
+        "TELEGRAM_TASKS_DIR", ""
+    ).strip()
     if not value:
         value = os.path.join(os.getcwd(), "telegram_tasks")
     return os.path.abspath(value)
 
 
 def resolve_state_base(state_dir):
-    value = (state_dir or "").strip() or os.environ.get("TELEGRAM_STATE_DIR", "").strip()
+    value = (state_dir or "").strip() or os.environ.get(
+        "TELEGRAM_STATE_DIR", ""
+    ).strip()
     if value:
         return os.path.abspath(value)
     home_base = os.environ.get("XDG_STATE_HOME", "").strip()
@@ -566,9 +582,9 @@ def ensure_dir(path, mode=0o700):
         die(f"cannot prepare {path}: {error}")
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Errors.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 class BotError(Exception):
@@ -603,9 +619,9 @@ class TaskLoadError(BotError):
     pass
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Telegram API.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 class TelegramApi:
@@ -627,7 +643,12 @@ class TelegramApi:
                 payload = json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as error:
             raise self.http_error(method, error) from error
-        except (urllib.error.URLError, TimeoutError, OSError, ValueError) as error:
+        except (
+            urllib.error.URLError,
+            TimeoutError,
+            OSError,
+            ValueError,
+        ) as error:
             raise NetworkError(f"{method} failed: {error}") from error
         if not isinstance(payload, dict) or not payload.get("ok"):
             description = "unknown error"
@@ -638,7 +659,9 @@ class TelegramApi:
 
     def http_error(self, method, error):
         try:
-            payload = json.loads(error.read().decode("utf-8", errors="replace"))
+            payload = json.loads(
+                error.read().decode("utf-8", errors="replace")
+            )
         except (OSError, ValueError):
             payload = None
         if isinstance(payload, dict):
@@ -648,7 +671,9 @@ class TelegramApi:
             parameters = payload.get("parameters")
             if isinstance(parameters, dict):
                 retry_after = parameters.get("retry_after")
-            return ApiError(code, f"{method} failed: {description}", retry_after)
+            return ApiError(
+                code, f"{method} failed: {description}", retry_after
+            )
         return ApiError(error.code, f"{method} failed: {error.reason}")
 
 
@@ -673,9 +698,9 @@ def truncate(text, limit):
     return text[:limit] + " [truncated]"
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # State store.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 class StateStore:
@@ -691,7 +716,11 @@ class StateStore:
         return path
 
     def resolve(self, task_name, identifier):
-        if not isinstance(identifier, str) or not identifier or len(identifier) > 200:
+        if (
+            not isinstance(identifier, str)
+            or not identifier
+            or len(identifier) > 200
+        ):
             raise ValueError(f"invalid state identifier {identifier!r}")
         if "\0" in identifier or identifier.startswith("/"):
             raise ValueError(f"invalid state identifier {identifier!r}")
@@ -699,7 +728,9 @@ class StateStore:
         if any(part in ("", ".", "..") for part in parts):
             raise ValueError(f"invalid state identifier {identifier!r}")
         full = os.path.realpath(os.path.join(self.task_dir(task_name), *parts))
-        root = os.path.realpath(os.path.join(self.base_dir, "tasks", task_name))
+        root = os.path.realpath(
+            os.path.join(self.base_dir, "tasks", task_name)
+        )
         if full != root and not full.startswith(root + os.sep):
             raise ValueError(f"invalid state identifier {identifier!r}")
         return full
@@ -715,7 +746,9 @@ class StateStore:
         except FileNotFoundError:
             return default
         except OSError as error:
-            raise BotError(f"cannot read state {identifier!r}: {error}") from error
+            raise BotError(
+                f"cannot read state {identifier!r}: {error}"
+            ) from error
 
     def save(self, task_name, identifier, data):
         if isinstance(data, str):
@@ -723,9 +756,9 @@ class StateStore:
         elif isinstance(data, (bytes, bytearray)):
             raw = bytes(data)
         elif isinstance(data, (dict, list)):
-            raw = (json.dumps(data, indent=2, ensure_ascii=False) + "\n").encode(
-                "utf-8"
-            )
+            raw = (
+                json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+            ).encode("utf-8")
         else:
             raise TypeError("state data must be str, bytes, or a JSON value")
         path = self.resolve(task_name, identifier)
@@ -743,7 +776,9 @@ class StateStore:
             os.replace(temp_path, path)
             replaced = True
         except OSError as error:
-            raise BotError(f"cannot write state {identifier!r}: {error}") from error
+            raise BotError(
+                f"cannot write state {identifier!r}: {error}"
+            ) from error
         finally:
             if not replaced:
                 try:
@@ -753,7 +788,9 @@ class StateStore:
         try:
             os.chmod(path, 0o600)
         except OSError as error:
-            raise BotError(f"cannot set the mode of {identifier!r}: {error}") from error
+            raise BotError(
+                f"cannot set the mode of {identifier!r}: {error}"
+            ) from error
 
     def delete(self, task_name, identifier):
         path = self.resolve(task_name, identifier)
@@ -762,7 +799,9 @@ class StateStore:
         except FileNotFoundError:
             return False
         except OSError as error:
-            raise BotError(f"cannot delete state {identifier!r}: {error}") from error
+            raise BotError(
+                f"cannot delete state {identifier!r}: {error}"
+            ) from error
         return True
 
     def list(self, task_name):
@@ -777,9 +816,9 @@ class StateStore:
         return sorted(found)
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Tasks.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 @dataclass
@@ -863,7 +902,9 @@ def read_task_description(path):
         target = node.targets[0]
         if not isinstance(target, ast.Name) or target.id != "DESCRIPTION":
             continue
-        if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+        if isinstance(node.value, ast.Constant) and isinstance(
+            node.value.value, str
+        ):
             return node.value.value.strip()
     return ""
 
@@ -1012,7 +1053,9 @@ def read_task_schedule(path):
                 if not isinstance(element, ast.Constant) or not isinstance(
                     element.value, str
                 ):
-                    raise TaskLoadError(f"task file {path} has bad SCHEDULE_ARGS")
+                    raise TaskLoadError(
+                        f"task file {path} has bad SCHEDULE_ARGS"
+                    )
                 entries.append(element.value)
             args = entries
     return expr, args
@@ -1028,7 +1071,10 @@ def read_schedule_state(path):
     except FileNotFoundError:
         return {}
     except (OSError, ValueError) as error:
-        log(f"Warning: cannot read {path}: {error}. Starting with no schedule state.")
+        log(
+            f"Warning: cannot read {path}: {error}. "
+            "Starting with no schedule state."
+        )
         return {}
     if not isinstance(data, dict):
         return {}
@@ -1176,13 +1222,19 @@ def load_task_module(spec):
         raise TaskLoadError(f"task {spec.name} defines no callable run")
     shutdown_fn = getattr(module, "shutdown", None)
     if shutdown_fn is not None and not callable(shutdown_fn):
-        raise TaskLoadError(f"task {spec.name} defines a shutdown that is not callable")
+        raise TaskLoadError(
+            f"task {spec.name} defines a shutdown that is not callable"
+        )
     timeout = getattr(module, "TIMEOUT", None)
     if timeout is not None:
         if isinstance(timeout, bool) or not isinstance(timeout, (int, float)):
-            raise TaskLoadError(f"task {spec.name} defines a TIMEOUT that is not a number")
+            raise TaskLoadError(
+                f"task {spec.name} defines a TIMEOUT that is not a number"
+            )
         if not timeout > 0:
-            raise TaskLoadError(f"task {spec.name} defines a TIMEOUT that is not positive")
+            raise TaskLoadError(
+                f"task {spec.name} defines a TIMEOUT that is not positive"
+            )
         timeout = float(timeout)
     return module, shutdown_fn, timeout
 
@@ -1216,9 +1268,9 @@ def call_task_function(fn, ctx, extra):
     return fn(*arguments)
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Task context.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 class RunRecord:
@@ -1230,7 +1282,8 @@ class RunRecord:
         self.start_mono = time.monotonic()
         self.overall_deadline = self.start_mono + run_timeout
         self.thread = None
-        # Abort reason, one of None, cancelled, timeout, shutdown. First set wins.
+        # Abort reason, one of None, cancelled, timeout, shutdown.
+        # First set wins.
         self.abort = None
         self.pending = None
         self.phase = "starting"
@@ -1284,7 +1337,9 @@ class TaskContext:
             try:
                 compiled = re.compile(pattern)
             except re.error as error:
-                raise ValueError(f"invalid pattern {pattern!r}: {error}") from error
+                raise ValueError(
+                    f"invalid pattern {pattern!r}: {error}"
+                ) from error
         if timeout is None:
             timeout = self._bot.default_ask_timeout
         try:
@@ -1312,14 +1367,20 @@ class TaskContext:
             bot.send_text(record.chat_id, prompt)
         except Exception:
             with bot.lock:
-                if record.pending is not None and record.pending["serial"] == serial:
+                if (
+                    record.pending is not None
+                    and record.pending["serial"] == serial
+                ):
                     record.pending = None
                     bot.cond.notify_all()
             raise
         try:
             while True:
                 with bot.lock:
-                    if record.pending is None or record.pending["serial"] != serial:
+                    if (
+                        record.pending is None
+                        or record.pending["serial"] != serial
+                    ):
                         raise TaskKilled("the wait was superseded")
                     abort = record.abort
                     if abort == "cancelled":
@@ -1334,7 +1395,10 @@ class TaskContext:
                     reply = record.pending["reply"]
                     if reply is not None:
                         record.pending["reply"] = None
-                        if compiled is not None and compiled.fullmatch(reply) is None:
+                        if (
+                            compiled is not None
+                            and compiled.fullmatch(reply) is None
+                        ):
                             need_retry = True
                         else:
                             record.pending = None
@@ -1354,8 +1418,7 @@ class TaskContext:
                             )
                         wait_for = record.pending["deadline"] - now
                         left_overall = record.overall_deadline - now
-                        if left_overall < wait_for:
-                            wait_for = left_overall
+                        wait_for = min(wait_for, left_overall)
                         bot.cond.wait(timeout=wait_for)
                         continue
                 if need_retry:
@@ -1368,13 +1431,18 @@ class TaskContext:
                             "Try again.",
                         )
                     except BotError as error:
-                        log(f"task {record.name}: retry notice failed: {error}")
+                        log(
+                            f"task {record.name}: retry notice failed: {error}"
+                        )
         finally:
             with bot.lock:
                 # No exit path may leave a stale prompt behind. Every normal
                 # path clears pending already, so this only covers abrupt
                 # exits such as interpreter shutdown.
-                if record.pending is not None and record.pending["serial"] == serial:
+                if (
+                    record.pending is not None
+                    and record.pending["serial"] == serial
+                ):
                     record.pending = None
                     bot.cond.notify_all()
 
@@ -1434,9 +1502,9 @@ class TaskContext:
                 raise TaskTimeout("the run budget is exhausted")
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Bot.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 class Bot:
@@ -1474,7 +1542,9 @@ class Bot:
         self.schedule_last = {}
         # Monotonic time of the last bad-schedule warning per task.
         self.schedule_warned_at = {}
-        self.poll_state_path = os.path.join(self.store.base_dir, POLL_STATE_FILENAME)
+        self.poll_state_path = os.path.join(
+            self.store.base_dir, POLL_STATE_FILENAME
+        )
         # Last saved offset, the first update identifier still wanted at the
         # time of the save. None when nothing was saved yet.
         self.saved_offset = None
@@ -1534,20 +1604,26 @@ class Bot:
                     )
                 except ApiError as error:
                     if error.code == 401:
-                        log("Error: Telegram rejected the token (401). Stopping.")
+                        log(
+                            "Error: Telegram rejected "
+                            "the token (401). Stopping."
+                        )
                         self.stopping.set()
                         return 1
                     if error.code == 409:
                         log(
                             "Warning: another process polls this bot (409). "
-                                "Waiting 15 seconds."
+                            "Waiting 15 seconds."
                         )
                         if self.stopping.wait(15.0):
                             break
                         continue
                     if error.code == 429:
                         wait_for = error.retry_after or 30.0
-                        log(f"Warning: rate limited. Waiting {wait_for} seconds.")
+                        log(
+                            "Warning: rate limited. "
+                            f"Waiting {wait_for} seconds."
+                        )
                         if self.stopping.wait(float(wait_for)):
                             break
                         continue
@@ -1589,7 +1665,8 @@ class Bot:
                         traceback.print_exc()
                 if stale:
                     log(
-                        f"Discarded {stale} stale update(s) from before the start."
+                        f"Discarded {stale} stale update(s) "
+                        "from before the start."
                     )
                 self.save_offset(offset)
                 self.check_overall_deadline()
@@ -1709,7 +1786,9 @@ class Bot:
             result = self.api.call(
                 "sendMessage", {"chat_id": chat_id, "text": chunk}
             )
-            if isinstance(result, dict) and isinstance(result.get("message_id"), int):
+            if isinstance(result, dict) and isinstance(
+                result.get("message_id"), int
+            ):
                 last_id = result["message_id"]
         return last_id
 
@@ -1750,7 +1829,9 @@ class Bot:
         if self.deliver_to_task(chat_id, text):
             return
         with self.lock:
-            running = self.current if self.is_alive_locked(self.current) else None
+            running = (
+                self.current if self.is_alive_locked(self.current) else None
+            )
             waiting = running is not None and running.pending is not None
         if running is not None:
             if waiting:
@@ -1767,7 +1848,9 @@ class Bot:
 
     def handle_non_text(self, chat_id):
         with self.lock:
-            running = self.current if self.is_alive_locked(self.current) else None
+            running = (
+                self.current if self.is_alive_locked(self.current) else None
+            )
             waiting = running is not None and running.pending is not None
         if waiting:
             self.try_send(chat_id, "The task waits for a text reply.")
@@ -1808,7 +1891,8 @@ class Bot:
         specs = discover_tasks(self.tasks_dir)
         if not specs:
             return (
-                f"No tasks in {self.tasks_dir}. Add a <name>.py file to add one."
+                f"No tasks in {self.tasks_dir}. "
+                "Add a <name>.py file to add one."
             )
         lines = ["Tasks:"]
         for name in sorted(specs):
@@ -1829,9 +1913,13 @@ class Bot:
     def status_text(self):
         uptime = format_duration(time.monotonic() - self.start_mono)
         with self.lock:
-            running = self.current if self.is_alive_locked(self.current) else None
+            running = (
+                self.current if self.is_alive_locked(self.current) else None
+            )
             if running is not None:
-                elapsed = format_duration(time.monotonic() - running.start_mono)
+                elapsed = format_duration(
+                    time.monotonic() - running.start_mono
+                )
                 phase = (
                     "waiting for a reply"
                     if running.pending is not None
@@ -1871,13 +1959,19 @@ class Bot:
             last = last_map.get(name)
             if last is None:
                 entries.append(
-                    (None, f"Scheduled: {shown}: waits for the first tick ({expr})")
+                    (
+                        None,
+                        f"Scheduled: {shown}: waits "
+                        f"for the first tick ({expr})",
+                    )
                 )
                 continue
             try:
                 next_at = cron_next_after(expr, last)
             except Exception:
-                entries.append((None, f"Scheduled: {shown}: bad schedule ({expr})"))
+                entries.append(
+                    (None, f"Scheduled: {shown}: bad schedule ({expr})")
+                )
                 continue
             if next_at <= now:
                 entries.append((0.0, f"Scheduled: {shown}: due now ({expr})"))
@@ -1911,10 +2005,15 @@ class Bot:
         specs = discover_tasks(self.tasks_dir)
         spec = resolve_task_spec(specs, name)
         if spec is None:
-            hint = ", ".join(
-                display_task_name(specs[item]) for item in sorted(specs)
-            ) or "none"
-            self.try_send(chat_id, f"Unknown task {name!r}. Available: {hint}.")
+            hint = (
+                ", ".join(
+                    display_task_name(specs[item]) for item in sorted(specs)
+                )
+                or "none"
+            )
+            self.try_send(
+                chat_id, f"Unknown task {name!r}. Available: {hint}."
+            )
             return
         run_timeout = read_task_timeout(spec.path, self.default_run_timeout)
         record = RunRecord(
@@ -2020,7 +2119,9 @@ class Bot:
             record = self.current
             if not self.is_alive_locked(record):
                 return
-            self.set_abort_locked(record, "shutdown" if reason == "shutdown" else reason)
+            self.set_abort_locked(
+                record, "shutdown" if reason == "shutdown" else reason
+            )
             self.cond.notify_all()
             thread = record.thread
         grace = self.shutdown_timeout + 15.0
@@ -2089,7 +2190,9 @@ class Bot:
             if self.current is record:
                 self.current = None
             elapsed = time.monotonic() - record.start_mono
-            self.last_summary = f"{record.name} {outcome} in {format_duration(elapsed)}"
+            self.last_summary = (
+                f"{record.name} {outcome} in {format_duration(elapsed)}"
+            )
             self.last_time = time.time()
         if added_path is not None:
             try:
@@ -2103,8 +2206,13 @@ class Bot:
         # sys.path, or None when the task declares none.
         dependencies = read_task_dependencies(spec.path)
         if dependencies:
-            log(f"task {record.name}: ensuring {len(dependencies)} dependencies")
-        site_packages = ensure_task_env(self.store.base_dir, record.name, dependencies)
+            log(
+                f"task {record.name}: ensuring "
+                f"{len(dependencies)} dependencies"
+            )
+        site_packages = ensure_task_env(
+            self.store.base_dir, record.name, dependencies
+        )
         if site_packages is None or site_packages in sys.path:
             return None
         sys.path.insert(0, site_packages)
@@ -2117,9 +2225,8 @@ class Bot:
         if outcome == "error":
             detail = (error_text or "unknown error").splitlines()
             first_line = detail[0] if detail else "unknown error"
-            text = (
-                f"Task {record.name} failed: "
-                + truncate(first_line, ERROR_PREVIEW_LIMIT)
+            text = f"Task {record.name} failed: " + truncate(
+                first_line, ERROR_PREVIEW_LIMIT
             )
         elif outcome == "timeout":
             text = (
@@ -2193,7 +2300,9 @@ class Bot:
             try:
                 expr, args = read_task_schedule(spec.path)
             except TaskLoadError as error:
-                self.warn_schedule(name, f"task {name} has a bad schedule: {error}")
+                self.warn_schedule(
+                    name, f"task {name} has a bad schedule: {error}"
+                )
                 continue
             if expr is None:
                 continue
@@ -2283,9 +2392,9 @@ class Bot:
             self.send_heartbeat()
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # State transfer.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 def collect_export_files(base_dir):
@@ -2338,7 +2447,9 @@ def export_state_dir(base_dir, dest_path, overwrite=False):
     if os.path.isdir(dest_path):
         raise BotError(f"cannot export to {dest_path}: it is a directory")
     if os.path.exists(dest_path) and not overwrite:
-        raise BotError(f"{dest_path} already exists, pass --force to replace it")
+        raise BotError(
+            f"{dest_path} already exists, pass --force to replace it"
+        )
     parent = os.path.dirname(dest_path)
     if parent:
         try:
@@ -2364,14 +2475,16 @@ def export_state_dir(base_dir, dest_path, overwrite=False):
         pass
     try:
         try:
-            with zipfile.ZipFile(temp_path, "w", zipfile.ZIP_DEFLATED) as archive:
+            with zipfile.ZipFile(
+                temp_path, "w", zipfile.ZIP_DEFLATED
+            ) as archive:
                 info = zipfile.ZipInfo(EXPORT_MANIFEST_NAME)
                 info.external_attr = (0o600 & 0xFFFF) << 16
                 archive.writestr(
                     info,
-                    (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode(
-                        "utf-8"
-                    ),
+                    (
+                        json.dumps(manifest, indent=2, sort_keys=True) + "\n"
+                    ).encode("utf-8"),
                 )
                 for name in names:
                     archive.write(os.path.join(base_dir, name), name)
@@ -2427,13 +2540,18 @@ def import_state_dir(base_dir, src_path):
         for info in infos:
             if info.filename == EXPORT_MANIFEST_NAME:
                 try:
-                    manifest = json.loads(archive.read(info.filename).decode("utf-8"))
+                    manifest = json.loads(
+                        archive.read(info.filename).decode("utf-8")
+                    )
                 except (OSError, ValueError, UnicodeDecodeError) as error:
                     raise BotError(
                         f"cannot read {src_path}: bad export manifest: {error}"
                     ) from error
                 break
-        if not isinstance(manifest, dict) or manifest.get("version") != EXPORT_VERSION:
+        if (
+            not isinstance(manifest, dict)
+            or manifest.get("version") != EXPORT_VERSION
+        ):
             raise BotError(f"{src_path} is not a telegram_bot export")
         planned = []
         for info in infos:
@@ -2460,7 +2578,9 @@ def import_state_dir(base_dir, src_path):
                 log(f"Warning: skipping {cleaned!r}, it is not bot state.")
                 continue
             if (info.external_attr >> 16) & 0o170000 == 0o120000:
-                raise BotError(f"bad entry {name!r} in the export: it is a symlink")
+                raise BotError(
+                    f"bad entry {name!r} in the export: it is a symlink"
+                )
             planned.append((info, cleaned))
         try:
             ensure_dir(base_dir)
@@ -2498,8 +2618,15 @@ def import_state_dir(base_dir, src_path):
                     os.makedirs(target, mode=0o700, exist_ok=True)
                     os.chmod(target, 0o700)
                     continue
-                os.makedirs(os.path.dirname(target) or base_dir, mode=0o700, exist_ok=True)
-                with archive.open(info) as source, open(target, "wb") as handle:
+                os.makedirs(
+                    os.path.dirname(target) or base_dir,
+                    mode=0o700,
+                    exist_ok=True,
+                )
+                with (
+                    archive.open(info) as source,
+                    open(target, "wb") as handle,
+                ):
                     shutil.copyfileobj(source, handle, length=1024 * 64)
                 os.chmod(target, 0o600)
                 count += 1
@@ -2510,9 +2637,9 @@ def import_state_dir(base_dir, src_path):
         return count
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Generic helpers.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 def log(message):

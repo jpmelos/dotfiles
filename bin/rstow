@@ -8,7 +8,8 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 # orphaned links behind. Extra arguments go to `stow`.
 
 if [ ! -f .stowrc ]; then
-    echo "Error: no .stowrc in $(pwd). Run this from the root of a stow project." >&2
+    echo "Error: no .stowrc in $(pwd)." \
+        "Run this from the root of a stow project." >&2
     exit 1
 fi
 

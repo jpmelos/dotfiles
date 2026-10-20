@@ -31,7 +31,8 @@ main() {
     local component
     for component in "${components[@]}"; do
         candidate="$candidate/$component"
-        if [ -e "$candidate/.git" ] && [ ! -e "$candidate/.list_project_dirs_ignore" ]; then
+        if [ -e "$candidate/.git" ] \
+            && [ ! -e "$candidate/.list_project_dirs_ignore" ]; then
             project_dir="$candidate"
             break
         fi
@@ -49,7 +50,8 @@ main() {
             git -C "$project_dir" rev-parse --path-format=absolute \
                 --git-dir --git-common-dir 2> /dev/null
         )
-        if [ "${#git_dirs[@]}" -eq 2 ] && [ "${git_dirs[0]}" != "${git_dirs[1]}" ]; then
+        if [ "${#git_dirs[@]}" -eq 2 ] \
+            && [ "${git_dirs[0]}" != "${git_dirs[1]}" ]; then
             local main_repo_dir
             main_repo_dir="$(realpath "${git_dirs[1]}")"
             main_repo_dir="${main_repo_dir%/.git}"
@@ -61,10 +63,12 @@ main() {
             fi
 
             local branch
-            branch="$(git -C "$project_dir" branch --show-current 2> /dev/null)"
+            branch="$(git -C "$project_dir" branch \
+                --show-current 2> /dev/null)"
             if [ -z "$branch" ]; then
                 # Detached HEAD. Show the commit instead.
-                branch="$(git -C "$project_dir" rev-parse --short HEAD 2> /dev/null)"
+                branch="$(git -C "$project_dir" rev-parse \
+                    --short HEAD 2> /dev/null)"
             fi
 
             name="$main_repo_name: $branch"

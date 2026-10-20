@@ -11,7 +11,8 @@ fi
 # Check if `refs/remotes/origin/HEAD` is a symbolic ref.
 # `git symbolic-ref` will exit with nonzero status if it's not symbolic.
 if ! git symbolic-ref refs/remotes/origin/HEAD &> /dev/null; then
-    echo "\`refs/remotes/origin/HEAD\` is not a symbolic ref. Running \`git remote set-head origin --auto\`..."
+    echo "\`refs/remotes/origin/HEAD\` is not a symbolic ref." \
+        "Running \`git remote set-head origin --auto\`..."
     if git remote set-head origin --auto &> /dev/null; then
         echo "Remote HEAD has been updated automatically."
     else

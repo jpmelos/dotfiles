@@ -32,6 +32,7 @@ for command_path in "$bin_dir"/*; do
         continue
     fi
     echo "${command_name}:${suffix}"
-    awk '/^#\//{print substr($0,3); found=1; next} found{exit}' "$command_path" \
+    awk '/^#\//{print substr($0,3); found=1; next} found{exit}' \
+        "$command_path" \
         | sed 's/^/  /'
 done

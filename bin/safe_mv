@@ -73,12 +73,14 @@ check_path() {
     local absolute_path
     absolute_path="$(canonical_abs_path "$original_path")" || exit 1
     if [ "$absolute_path" = "$repo_root" ]; then
-        echo "Error: refusing to operate on repository root: $original_path" >&2
+        echo "Error: refusing to operate on repository" \
+            "root: $original_path" >&2
         exit 1
     fi
     if [ "$repo_root" != "/" ]; then
         if [[ "$absolute_path" != "$repo_root"/* ]]; then
-            echo "Error: refusing to operate outside repository ($repo_root): $original_path" >&2
+            echo "Error: refusing to operate outside" \
+                "repository ($repo_root): $original_path" >&2
             exit 1
         fi
     fi
@@ -86,7 +88,8 @@ check_path() {
     if [ "$repo_root" = "/" ]; then
         forbidden_prefix="/jpenv-bin"
     fi
-    if [ "$absolute_path" = "$forbidden_prefix" ] || [[ "$absolute_path" == "$forbidden_prefix"/* ]]; then
+    if [ "$absolute_path" = "$forbidden_prefix" ] \
+        || [[ "$absolute_path" == "$forbidden_prefix"/* ]]; then
         echo "Error: refusing to operate inside jpenv-bin: $original_path" >&2
         exit 1
     fi

@@ -5,7 +5,8 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 # Function to round cost up to the next cent for display.
 round_up_cents() {
     local value=$1
-    local rounded=$(bc <<< "scale=0; tmp = $value * 100; tmp = tmp / 1; if (tmp < $value * 100) tmp = tmp + 1; scale=2; tmp / 100")
+    local rounded=$(bc <<< "scale=0; tmp = $value * 100; tmp = tmp / 1; "\
+"if (tmp < $value * 100) tmp = tmp + 1; scale=2; tmp / 100")
     printf "%.2f" "$rounded"
 }
 
@@ -16,9 +17,11 @@ COST=$(jq -r '.cost.total_cost_usd' <<< "$input")
 USED_PERCENTAGE=$(jq -r '.context_window.used_percentage // 0' <<< "$input")
 
 # Rate limits: extract percentage and reset time if available.
-FIVE_H_PCT=$(jq -r '.rate_limits.five_hour.used_percentage // empty' <<< "$input")
+FIVE_H_PCT=$(jq -r \
+    '.rate_limits.five_hour.used_percentage // empty' <<< "$input")
 FIVE_H_RESET=$(jq -r '.rate_limits.five_hour.resets_at // empty' <<< "$input")
-SEVEN_D_PCT=$(jq -r '.rate_limits.seven_day.used_percentage // empty' <<< "$input")
+SEVEN_D_PCT=$(jq -r \
+    '.rate_limits.seven_day.used_percentage // empty' <<< "$input")
 SEVEN_D_RESET=$(jq -r '.rate_limits.seven_day.resets_at // empty' <<< "$input")
 
 # Format time remaining until reset as human-readable string.
@@ -49,12 +52,14 @@ format_remaining() {
 LIMITS=""
 if [ -n "$FIVE_H_PCT" ]; then
     LIMITS="5h: $(printf '%.0f' "$FIVE_H_PCT")%"
-    [ -n "$FIVE_H_RESET" ] && LIMITS="$LIMITS ($(format_remaining "$FIVE_H_RESET"))"
+    [ -n "$FIVE_H_RESET" ] \
+        && LIMITS="$LIMITS ($(format_remaining "$FIVE_H_RESET"))"
 fi
 if [ -n "$SEVEN_D_PCT" ]; then
     [ -n "$LIMITS" ] && LIMITS="$LIMITS "
     LIMITS="${LIMITS}7d: $(printf '%.0f' "$SEVEN_D_PCT")%"
-    [ -n "$SEVEN_D_RESET" ] && LIMITS="$LIMITS ($(format_remaining "$SEVEN_D_RESET"))"
+    [ -n "$SEVEN_D_RESET" ] \
+        && LIMITS="$LIMITS ($(format_remaining "$SEVEN_D_RESET"))"
 fi
 
 PROFILE="${AGENT_PROFILE:-unknown}"
@@ -65,6 +70,7 @@ first_line="👤 $PROFILE 📌 $PROJECT"
 [ -n "$BRANCH" ] && first_line="$first_line 🌿 $BRANCH"
 echo "$first_line"
 
-second_line="🤖 $MODEL 💰 \$$(round_up_cents "$COST") 🪟 $(printf "%.0f" "$USED_PERCENTAGE")% used"
+second_line="🤖 $MODEL 💰 \$$(round_up_cents "$COST")"
+second_line="$second_line 🪟 $(printf "%.0f" "$USED_PERCENTAGE")% used"
 [ -n "$LIMITS" ] && second_line="$second_line 📊 $LIMITS"
 echo "$second_line"

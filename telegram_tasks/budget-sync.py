@@ -49,7 +49,10 @@
 # account, one line each with the full payee, plus short confirmations,
 # one combined balance message, and a count of the transactions without a memo.
 
-DESCRIPTION = "Sync new BMO and Wise transactions and BMO, Wise, and Questrade balances to YNAB."
+DESCRIPTION = (
+    "Sync new BMO and Wise transactions and BMO, Wise, and Questrade "
+    "balances to YNAB."
+)
 SHORTHAND = "b"
 # Banking with user questions can take a while. This is the budget for one
 # run, in seconds.
@@ -147,9 +150,9 @@ LAST_RUN_ID = "last_run.json"
 REPORT_LINE_LIMIT = 60
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Task entry points.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 # The context of the current run. Set by `run`, read by the helpers below.
 _CTX = None
@@ -179,7 +182,8 @@ def run(ctx, args=None):
     # The task works only on the transactions from this date on, in the
     # statements and in YNAB.
     start_date = max(
-        DEFAULT_FROM_DATE, datetime.date.today() - datetime.timedelta(days=HISTORY_DAYS)
+        DEFAULT_FROM_DATE,
+        datetime.date.today() - datetime.timedelta(days=HISTORY_DAYS),
     )
     if no_download:
         use_last_statements(paths)
@@ -187,7 +191,9 @@ def run(ctx, args=None):
         questrade_balance = None
     else:
         ctx.log(f"Reading the Questrade balances in {QUESTRADE_CURRENCY}")
-        questrade_balances = read_questrade_balances(paths.questrade_token_file)
+        questrade_balances = read_questrade_balances(
+            paths.questrade_token_file
+        )
         questrade_balance = sum(questrade_balances.values())
         ctx.log(f"Questrade total {format_amount(questrade_balance)}")
         _say(f"Got Questrade balance {format_amount(questrade_balance)}.")
@@ -207,26 +213,38 @@ def run(ctx, args=None):
         if transaction.date >= start_date
     ]
     ignored_count = len(statement_transactions) - len(transactions)
-    ctx.log(f"Ignored transactions before {start_date.isoformat()}: {ignored_count}")
-    _say(f"Read {len(statement_transactions)} transactions from the statements.")
+    ctx.log(
+        f"Ignored transactions before {start_date.isoformat()}: "
+        f"{ignored_count}"
+    )
+    _say(
+        f"Read {len(statement_transactions)} transactions from the statements."
+    )
 
     ctx.log("Recording the decisions")
     decisions = load_decisions(ctx)
     prune_decisions(ctx, decisions)
-    transactions = apply_decisions(ctx, transactions, decisions, ynab_api_key, start_date)
+    transactions = apply_decisions(
+        ctx, transactions, decisions, ynab_api_key, start_date
+    )
     ctx.log(f"Decided transactions: {len(transactions)} after expansion")
 
-    matched, added_count, cleared_count, deleted_count, memo_count, sync_count = (
-        save_to_ynab(
-            ctx,
-            transactions,
-            decisions,
-            start_date,
-            balances,
-            questrade_balance,
-            ynab_api_key,
-            upload=not no_upload,
-        )
+    (
+        matched,
+        added_count,
+        cleared_count,
+        deleted_count,
+        memo_count,
+        sync_count,
+    ) = save_to_ynab(
+        ctx,
+        transactions,
+        decisions,
+        start_date,
+        balances,
+        questrade_balance,
+        ynab_api_key,
+        upload=not no_upload,
     )
     if not matched:
         summary = "Done, preview only. YNAB unchanged."
@@ -288,7 +306,9 @@ def shutdown(ctx, reason):
         ctx.log(f"browser close failed: {error}")
 
 
-@click.command(context_settings={"help_option_names": []}, no_args_is_help=False)
+@click.command(
+    context_settings={"help_option_names": []}, no_args_is_help=False
+)
 @click.option("--no-download", is_flag=True, default=False)
 @click.option("--no-upload", is_flag=True, default=False)
 def _budget_sync_options(no_download, no_upload):
@@ -316,9 +336,9 @@ def parse_task_args(args):
     return no_download, no_upload
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Chat helpers.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 def _say(text):
@@ -333,7 +353,9 @@ def ask_code():
     # Asks for the SMS verification code of the bank. The reply never reaches
     # the log. A timeout stops the task through the bot.
     return _CTX.ask(
-        "BMO sent an SMS code. Reply with the digits.", pattern=r"\d+", timeout=300
+        "BMO sent an SMS code. Reply with the digits.",
+        pattern=r"\d+",
+        timeout=300,
     )
 
 
@@ -347,9 +369,9 @@ def ask_yes(question, timeout=300):
     return answer.casefold() in ("y", "yes")
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Configuration.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 def read_config_text(path):
@@ -373,7 +395,9 @@ def read_config_text(path):
     try:
         value = json.loads(result.stdout)
     except ValueError as error:
-        raise TaskError(f"jc returned invalid JSON for {path}: {error}") from error
+        raise TaskError(
+            f"jc returned invalid JSON for {path}: {error}"
+        ) from error
     if value is None or value == "":
         raise TaskError(f"{path} not found in ~/config.json")
     if not isinstance(value, str):
@@ -381,9 +405,9 @@ def read_config_text(path):
     return value
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # State files.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 @dataclass
@@ -408,7 +432,9 @@ def resolve_state_files(ctx):
     try:
         os.makedirs(session_dir, mode=0o700, exist_ok=True)
     except OSError as error:
-        raise TaskError(f"cannot prepare the state directory: {error}") from error
+        raise TaskError(
+            f"cannot prepare the state directory: {error}"
+        ) from error
     return SessionPaths(
         session_dir=session_dir,
         session_file=ctx.state_path(SESSION_ID),
@@ -432,9 +458,9 @@ def record_last_run(ctx):
         ctx.log(f"Warning: cannot save {LAST_RUN_ID}: {error}")
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Steps.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 def run_download(ctx, paths, start_date):
@@ -450,7 +476,9 @@ def run_download(ctx, paths, start_date):
     os.environ["AGENT_BROWSER_SESSION"] = BROWSER_SESSION
     browser = Browser()
     try:
-        balances = download_statements(browser, paths, username, password, start_date)
+        balances = download_statements(
+            browser, paths, username, password, start_date
+        )
     except StepError as error:
         # Before the browser opens, there is no page to show.
         if browser.opened:
@@ -471,7 +499,9 @@ def use_last_statements(paths):
         paths.wise_file,
     ):
         if not os.path.isfile(statement_path):
-            raise TaskError("No downloaded statements. Run without --no-download first")
+            raise TaskError(
+                "No downloaded statements. Run without --no-download first"
+            )
 
 
 def download_statements(browser, paths, username, password, start_date):
@@ -512,7 +542,8 @@ def accept_cookies(browser):
         count = int(output)
     except ValueError:
         raise StepError(
-            f"`agent-browser get count` printed {output.strip()!r}, expected a number"
+            f"`agent-browser get count` printed {output.strip()!r}, "
+            f"expected a number"
         ) from None
     if count > 0:
         browser.run("click", COOKIE_BUTTON)
@@ -564,8 +595,12 @@ def download_chequing_statement(browser, paths, start_date):
     browser.find_role("radio", "click", "Transactions between these dates:")
     to_date = datetime.date.today()
     fetch_from_date = start_date - datetime.timedelta(days=1)
-    browser.find_role("textbox", "fill", "From", fetch_from_date.strftime(FORM_DATE_FORMAT))
-    browser.find_role("textbox", "fill", "To", to_date.strftime(FORM_DATE_FORMAT))
+    browser.find_role(
+        "textbox", "fill", "From", fetch_from_date.strftime(FORM_DATE_FORMAT)
+    )
+    browser.find_role(
+        "textbox", "fill", "To", to_date.strftime(FORM_DATE_FORMAT)
+    )
     browser.run("select", 'select[name="format"]', CSV_FORMAT)
     browser.run("click", "#ba-tx-download-submit")
     time.sleep(DOWNLOAD_WAIT_SECONDS)
@@ -586,7 +621,9 @@ def download_credit_card_statement(browser, paths):
 
     _log("Downloading the credit card transactions")
     browser.find_role("link", "click", "DOWNLOAD")
-    browser.run("select", 'select[name="period"]', "All Available Transactions")
+    browser.run(
+        "select", 'select[name="period"]', "All Available Transactions"
+    )
     browser.run("select", 'select[name="format"]', CSV_FORMAT)
     browser.find_role("button", "click", "DOWNLOAD")
     time.sleep(DOWNLOAD_WAIT_SECONDS)
@@ -606,7 +643,10 @@ def read_balance(browser, statement_format):
     balance = None if match is None else parse_balance(match["balance"])
     if balance is None:
         account_label = ACCOUNT_LABELS[statement_format.account]
-        _log(f"Warning: cannot read the current balance of the {account_label} page")
+        _log(
+            f"Warning: cannot read the current balance "
+            f"of the {account_label} page"
+        )
         _say(f"Cannot read the current balance of the {account_label} page.")
         return None
     return -balance if statement_format.inverted_amounts else balance
@@ -628,7 +668,9 @@ def save_session(browser, paths):
     try:
         os.chmod(paths.session_file, 0o600)
     except OSError as error:
-        raise StepError(f"cannot set the mode of the session file: {error}") from error
+        raise StepError(
+            f"cannot set the mode of the session file: {error}"
+        ) from error
     _say("Saved the session.")
 
 
@@ -690,9 +732,9 @@ def take_error_screenshot(ctx, browser, screenshot_path):
     ctx.log("Screenshot of the browser saved to the state")
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Transactions.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 class Account(enum.IntEnum):
@@ -722,7 +764,9 @@ SOURCE_BY_ACCOUNT = {
     Account.CREDIT_CARD: "bmo_credit_card",
     Account.WISE: "wise",
 }
-ACCOUNTS_BY_SOURCE = {name: account for account, name in SOURCE_BY_ACCOUNT.items()}
+ACCOUNTS_BY_SOURCE = {
+    name: account for account, name in SOURCE_BY_ACCOUNT.items()
+}
 
 
 @dataclass
@@ -760,7 +804,9 @@ class StatementFormat:
     inverted_amounts: bool = False
 
 
-CHEQUING_STATEMENT = StatementFormat(Account.CHEQUING, date_column="Date Posted")
+CHEQUING_STATEMENT = StatementFormat(
+    Account.CHEQUING, date_column="Date Posted"
+)
 CREDIT_CARD_STATEMENT = StatementFormat(
     Account.CREDIT_CARD, date_column="Transaction Date", inverted_amounts=True
 )
@@ -795,7 +841,8 @@ def read_statement(path, statement_format):
             row = [*row[:payee_index], ",".join(row[payee_index:])]
         if len(row) != len(columns):
             raise TaskError(
-                f"a statement row has {len(row)} values, expected {len(columns)}"
+                f"a statement row has {len(row)} values, "
+                f"expected {len(columns)}"
             )
 
         amount = parse_statement_amount(row[amount_index])
@@ -838,9 +885,13 @@ def find_column(columns, name):
 
 def parse_statement_date(value):
     try:
-        return datetime.datetime.strptime(value.strip(), STATEMENT_DATE_FORMAT).date()
+        return datetime.datetime.strptime(
+            value.strip(), STATEMENT_DATE_FORMAT
+        ).date()
     except ValueError:
-        raise TaskError(f"invalid date {value.strip()!r} in a statement") from None
+        raise TaskError(
+            f"invalid date {value.strip()!r} in a statement"
+        ) from None
 
 
 def parse_statement_amount(value):
@@ -853,9 +904,9 @@ def parse_statement_amount(value):
     return amount
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Transaction decisions.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 # A decision row is a dict with a `key` of (source, date ISO, bank payee,
 # bank amount), a `count` of bank entries with that key, and either kind
@@ -906,13 +957,17 @@ def parse_decision(entry, index):
     try:
         date = datetime.date.fromisoformat(entry.get("date", ""))
     except (TypeError, ValueError):
-        raise TaskError(f"{what} has a bad date {entry.get('date')!r}") from None
+        raise TaskError(
+            f"{what} has a bad date {entry.get('date')!r}"
+        ) from None
     bank_payee = entry.get("bank_payee")
     if not isinstance(bank_payee, str) or bank_payee != bank_payee.strip():
         raise TaskError(f"{what} has a bad bank payee")
     if not bank_payee:
         raise TaskError(f"{what} has a bad bank payee")
-    bank_amount = parse_decision_amount(entry.get("bank_amount"), f"{what} bank amount")
+    bank_amount = parse_decision_amount(
+        entry.get("bank_amount"), f"{what} bank amount"
+    )
     count = entry.get("count")
     if isinstance(count, bool) or not isinstance(count, int) or count < 1:
         raise TaskError(f"{what} has a bad count")
@@ -961,7 +1016,9 @@ def parse_decision_parts(raw_parts, what, bank_amount):
             raise TaskError(f"{part_what} holds no part object")
         payee = raw_part.get("payee")
         check_decision_payee(payee, f"{part_what} payee")
-        amount = parse_decision_amount(raw_part.get("amount"), f"{part_what} amount")
+        amount = parse_decision_amount(
+            raw_part.get("amount"), f"{part_what} amount"
+        )
         if amount == 0:
             raise TaskError(f"{part_what} amount is zero")
         if (amount > 0) != (bank_amount > 0):
@@ -972,7 +1029,10 @@ def parse_decision_parts(raw_parts, what, bank_amount):
         if memo is not None and not isinstance(memo, str):
             raise TaskError(f"{part_what} has a bad memo")
         parts.append({"payee": payee, "amount": amount, "memo": memo})
-    if sum((part["amount"] for part in parts), decimal.Decimal("0")) != bank_amount:
+    if (
+        sum((part["amount"] for part in parts), decimal.Decimal("0"))
+        != bank_amount
+    ):
         raise TaskError(f"{what} parts do not add to the bank amount")
     return parts
 
@@ -1035,7 +1095,9 @@ def save_decisions(ctx, decisions):
 def prune_decisions(ctx, decisions):
     # Removes the rows older than 90 days from `decisions` in place, and
     # saves the database when anything went away.
-    cutoff = datetime.date.today() - datetime.timedelta(days=DECISION_RETENTION_DAYS)
+    cutoff = datetime.date.today() - datetime.timedelta(
+        days=DECISION_RETENTION_DAYS
+    )
     kept = [
         decision
         for decision in decisions
@@ -1062,7 +1124,9 @@ def transaction_decision_key(transaction):
     )
 
 
-def apply_decisions(ctx, transactions, decisions, ynab_api_key=None, start_date=None):
+def apply_decisions(
+    ctx, transactions, decisions, ynab_api_key=None, start_date=None
+):
     # Asks splits first for every undecided group, then matches new entries
     # to YNAB transfers missing a side, then asks payees with transfer
     # matching. A split replaces its entry with parts, and parts never split
@@ -1071,8 +1135,12 @@ def apply_decisions(ctx, transactions, decisions, ynab_api_key=None, start_date=
     # expanded list.
     lookup = {decision["key"]: decision for decision in decisions}
     groups = {}
-    for transaction in sorted(transactions, key=lambda item: (item.date, item.amount)):
-        groups.setdefault(transaction_decision_key(transaction), []).append(transaction)
+    for transaction in sorted(
+        transactions, key=lambda item: (item.date, item.amount)
+    ):
+        groups.setdefault(transaction_decision_key(transaction), []).append(
+            transaction
+        )
     suggestions, transfer_accounts = load_ynab_suggestions(
         ctx, groups, lookup, ynab_api_key, start_date
     )
@@ -1288,7 +1356,9 @@ def ask_all_payees(ctx, sides, groups, lookup, suggestions, transfer_accounts):
                     paired_ids.add(side_id)
                     paired_ids.add(match_id)
                     updated_keys.update(
-                        write_paired_decisions(sides, lookup, side_id, match_id)
+                        write_paired_decisions(
+                            sides, lookup, side_id, match_id
+                        )
                     )
             continue
         payee = ask_payee_for_side(ctx, side, groups, transfer_accounts)
@@ -1321,9 +1391,7 @@ def offer_ynab_for_side(ctx, side, groups, sides, suggestions):
             account=side["account"],
             bank_payee=side["bank_payee"],
         )
-        part_total = sum(
-            1 for (key, _part) in sides if key == side["key"]
-        )
+        part_total = sum(1 for (key, _part) in sides if key == side["key"])
         return ask_part_ynab_offer(
             ctx,
             transaction,
@@ -1333,7 +1401,9 @@ def offer_ynab_for_side(ctx, side, groups, sides, suggestions):
             suggestions,
         )
     adopted = ask_ynab_suggestion(
-        ctx, [representative], suggestions_for_transaction(suggestions, representative)
+        ctx,
+        [representative],
+        suggestions_for_transaction(suggestions, representative),
     )
     if adopted is None:
         return None
@@ -1345,13 +1415,16 @@ def ask_payee_for_side(ctx, side, groups, transfer_accounts):
     representative = groups[side["key"]][0]
     if side["is_part"]:
         label = (
-            f"Part {(side['part'] or 0) + 1} for {decision_line(representative)}\n"
+            f"Part {(side['part'] or 0) + 1} "
+            f"for {decision_line(representative)}\n"
             f"Amount {format_amount(side['amount'])}"
         )
         return ask_split_payee(
             ctx, label, transfer_accounts, YNAB_ACCOUNT_NAMES[side["account"]]
         )
-    return ask_single_payee(ctx, representative, side["count"], transfer_accounts)
+    return ask_single_payee(
+        ctx, representative, side["count"], transfer_accounts
+    )
 
 
 def ask_memo_for_side(side):
@@ -1389,7 +1462,9 @@ def pair_transfer_side(ctx, side_id, sides, paired_ids, groups):
         lines.append(f"{index}. {transfer_side_line(sides[candidate_id])}")
     lines.append("Reply with the number, or n for none.")
     while True:
-        reply = ctx.ask("\n".join(lines), pattern=r"(?i:n|\d+)", timeout=300).strip()
+        reply = ctx.ask(
+            "\n".join(lines), pattern=r"(?i:n|\d+)", timeout=300
+        ).strip()
         if reply.casefold() == "n":
             return None
         try:
@@ -1549,7 +1624,9 @@ def ask_all_transfer_matches(ctx, sides, ynab_api_key, start_date, decisions):
     # split questions, so parts already exist. Sets the payee and the memo
     # from the YNAB transfer, and marks the side as decided. Returns how
     # many sides matched.
-    undecided = [side_id for side_id, side in sides.items() if side["needs_payee"]]
+    undecided = [
+        side_id for side_id, side in sides.items() if side["needs_payee"]
+    ]
     if not undecided or ynab_api_key is None or start_date is None:
         return 0
     half_legs = load_ynab_half_legs(ctx, ynab_api_key, start_date, decisions)
@@ -1594,12 +1671,16 @@ def ask_all_transfer_matches(ctx, sides, ynab_api_key, start_date, decisions):
         if choice is None:
             continue
         leg_index, leg = candidates[choice]
-        side["payee"] = transfer_payee(YNAB_ACCOUNT_NAMES[leg["other_account"]])
+        side["payee"] = transfer_payee(
+            YNAB_ACCOUNT_NAMES[leg["other_account"]]
+        )
         side["memo"] = leg["memo"]
         side["needs_payee"] = False
         used.add(leg_index)
         matched += 1
-        _say(f"Matched to the YNAB transfer on {leg['date'].strftime('%m-%d')}.")
+        _say(
+            f"Matched to the YNAB transfer on {leg['date'].strftime('%m-%d')}."
+        )
     return matched
 
 
@@ -1620,13 +1701,17 @@ def fetch_ynab_managed_pairs(ctx, api_key, fetch_start):
     # Each pair holds ((account, transaction), (account, transaction)).
     # Returns an empty list when the fetch fails.
     try:
-        with ynab.ApiClient(ynab.Configuration(access_token=api_key)) as api_client:
+        with ynab.ApiClient(
+            ynab.Configuration(access_token=api_key)
+        ) as api_client:
             plan = load_ynab_plan(api_client)
             by_id = {}
             for account, account_id in plan.account_ids.items():
                 response = call_ynab(
                     "read the YNAB transactions",
-                    ynab.TransactionsApi(api_client).get_transactions_by_account,
+                    ynab.TransactionsApi(
+                        api_client
+                    ).get_transactions_by_account,
                     plan.plan_id,
                     str(account_id),
                     since_date=fetch_start,
@@ -1638,7 +1723,10 @@ def fetch_ynab_managed_pairs(ctx, api_key, fetch_start):
                         continue
                     if ynab_transaction.transfer_transaction_id is None:
                         continue
-                    by_id[str(ynab_transaction.id)] = (account, ynab_transaction)
+                    by_id[str(ynab_transaction.id)] = (
+                        account,
+                        ynab_transaction,
+                    )
             seen = set()
             pairs = []
             for txn_id, (account, txn) in by_id.items():
@@ -1681,7 +1769,9 @@ def find_half_matched_legs(ynab_pairs, decisions):
                 milliunits = to_milliunits(amount)
             except TaskError:
                 continue
-            effective = early_by_ref.get((decision["key"], part_index), bank_date)
+            effective = early_by_ref.get(
+                (decision["key"], part_index), bank_date
+            )
             key = (
                 account,
                 effective,
@@ -1756,12 +1846,17 @@ def ask_transfer_match_choice(ctx, side, legs):
         if ask_yes("\n".join(lines) + "\nMatch to this YNAB transfer?"):
             return 0
         return None
-    lines = [f"New: {transfer_side_line(side)}", "YNAB transfers missing a side:"]
+    lines = [
+        f"New: {transfer_side_line(side)}",
+        "YNAB transfers missing a side:",
+    ]
     for index, leg in enumerate(legs, start=1):
         lines.append(f"{index}. {half_leg_line(leg)}")
     lines.append("Reply with the number to match, or n for none.")
     while True:
-        reply = ctx.ask("\n".join(lines), pattern=r"(?i:n|\d+)", timeout=300).strip()
+        reply = ctx.ask(
+            "\n".join(lines), pattern=r"(?i:n|\d+)", timeout=300
+        ).strip()
         if reply.casefold() == "n":
             return None
         try:
@@ -1914,13 +2009,18 @@ def find_transfer_date_corrections(transactions, comparison, plan):
         return []
     by_id = {}
     for account in YNAB_ACCOUNT_NAMES:
-        for txns in comparison.ynab_by_key_by_account.get(account, {}).values():
+        for txns in comparison.ynab_by_key_by_account.get(
+            account, {}
+        ).values():
             for txn in txns:
                 by_id[str(txn.id)] = (account, txn)
     seen_pair_keys = set()
     actual_pairs = []
     for account, txn in by_id.values():
-        if txn.transfer_account_id is None or txn.transfer_transaction_id is None:
+        if (
+            txn.transfer_account_id is None
+            or txn.transfer_transaction_id is None
+        ):
             continue
         other_name = plan.account_names.get(
             txn.transfer_account_id, str(txn.transfer_account_id)
@@ -2047,7 +2147,9 @@ def apply_transfer_date_corrections(plan, corrections):
             plan.plan_id, ynab.PatchTransactionsWrapper(transactions=updates)
         )
     except YNAB_ERRORS as error:
-        raise TaskError(f"cannot move the transfer dates in YNAB: {error}") from error
+        raise TaskError(
+            f"cannot move the transfer dates in YNAB: {error}"
+        ) from error
 
 
 def suggestion_key(transaction):
@@ -2129,7 +2231,9 @@ def fetch_ynab_suggestions(api_key, start_date):
     # payee. Transfer payees use the canonical `Transfer: <account name>`
     # form, so an adopted payee matches `statement_key` later.
     suggestions = {}
-    with ynab.ApiClient(ynab.Configuration(access_token=api_key)) as api_client:
+    with ynab.ApiClient(
+        ynab.Configuration(access_token=api_key)
+    ) as api_client:
         plan = load_ynab_plan(api_client)
         for account, account_id in plan.account_ids.items():
             response = call_ynab(
@@ -2156,7 +2260,11 @@ def fetch_ynab_suggestions(api_key, start_date):
                     if len(payee) > YNAB_PAYEE_NAME_LIMIT:
                         continue
                 memo = (ynab_transaction.memo or "").strip() or None
-                key = (account, ynab_transaction.var_date, ynab_transaction.amount)
+                key = (
+                    account,
+                    ynab_transaction.var_date,
+                    ynab_transaction.amount,
+                )
                 entries = suggestions.setdefault(key, [])
                 if (payee, memo) not in {
                     (entry["payee"], entry["memo"]) for entry in entries
@@ -2197,7 +2305,11 @@ def decision_transactions(decision, template):
 
 
 def ask_decision(
-    ctx, members, suggestions=None, all_suggestions=None, transfer_accounts=None
+    ctx,
+    members,
+    suggestions=None,
+    all_suggestions=None,
+    transfer_accounts=None,
 ):
     # Asks how one group of identical bank entries splits, and returns the
     # new decision row. `members` holds the entries. `suggestions` holds the
@@ -2217,9 +2329,15 @@ def ask_decision(
         lines.append(f"Applies to {len(members)} identical entries.")
     if ask_yes("\n".join(lines) + "\nSplit this entry?"):
         return ask_split_decision(
-            ctx, representative, len(members), all_suggestions or {}, transfer_accounts
+            ctx,
+            representative,
+            len(members),
+            all_suggestions or {},
+            transfer_accounts,
         )
-    payee = ask_single_payee(ctx, representative, len(members), transfer_accounts)
+    payee = ask_single_payee(
+        ctx, representative, len(members), transfer_accounts
+    )
     memo = ask_memo(
         Transaction(
             date=representative.date,
@@ -2253,7 +2371,8 @@ def ask_ynab_suggestion(ctx, members, suggestions):
     if len(members) > 1:
         lines.append(f"Applies to {len(members)} identical entries.")
     lines.append(
-        f'YNAB has payee "{offer["payee"]}" memo {display_memo(offer["memo"])}.'
+        f'YNAB has payee "{offer["payee"]}" '
+        f"memo {display_memo(offer['memo'])}."
     )
     if ask_yes("\n".join(lines) + "\nTake payee and memo from YNAB?"):
         return {
@@ -2277,11 +2396,14 @@ def ask_ynab_choice(ctx, members, suggestions):
     lines.append("YNAB has:")
     for index, offer in enumerate(suggestions, start=1):
         lines.append(
-            f'{index}. payee "{offer["payee"]}" memo {display_memo(offer["memo"])}'
+            f'{index}. payee "{offer["payee"]}" '
+            f"memo {display_memo(offer['memo'])}"
         )
     lines.append("Reply with the number to take, or n for none.")
     while True:
-        reply = ctx.ask("\n".join(lines), pattern=r"(?i:n|\d+)", timeout=300).strip()
+        reply = ctx.ask(
+            "\n".join(lines), pattern=r"(?i:n|\d+)", timeout=300
+        ).strip()
         if reply.casefold() == "n":
             return None
         try:
@@ -2309,7 +2431,9 @@ def decision_line(transaction):
     )
 
 
-def resolve_typed_payee(ctx, typed, transfer_accounts=None, excluded_account=None):
+def resolve_typed_payee(
+    ctx, typed, transfer_accounts=None, excluded_account=None
+):
     # Returns the YNAB payee for `typed`, with transfer help. A lone `t`
     # means a transfer. A `Transfer:` prefix with an empty, unknown, or
     # excluded account shows the account menu. A valid transfer returns in
@@ -2338,13 +2462,17 @@ def resolve_typed_payee(ctx, typed, transfer_accounts=None, excluded_account=Non
         if candidate in transfer_accounts and candidate != excluded_account:
             return transfer_payee(candidate)
         return ask_transfer_account(
-            ctx, transfer_accounts, candidate or None,
+            ctx,
+            transfer_accounts,
+            candidate or None,
             excluded_account=excluded_account,
         )
     return cleaned
 
 
-def ask_transfer_account(ctx, account_names, attempted=None, excluded_account=None):
+def ask_transfer_account(
+    ctx, account_names, attempted=None, excluded_account=None
+):
     # Returns the canonical `Transfer: <account name>` payee for the YNAB
     # account chosen by number. `account_names` holds the open YNAB accounts.
     # The menu sorts alphabetically and leaves out `excluded_account`, the
@@ -2357,7 +2485,9 @@ def ask_transfer_account(ctx, account_names, attempted=None, excluded_account=No
         key=str.casefold,
     )
     if not ordered:
-        _say("No other YNAB account exists for a transfer. Use a regular payee.")
+        _say(
+            "No other YNAB account exists for a transfer. Use a regular payee."
+        )
         return None
     lines = []
     if attempted is not None and attempted == excluded_account:
@@ -2367,7 +2497,8 @@ def ask_transfer_account(ctx, account_names, attempted=None, excluded_account=No
         )
     elif attempted:
         lines.append(
-            f'No YNAB account named "{attempted}". Choose the transfer account:'
+            f'No YNAB account named "{attempted}". '
+            "Choose the transfer account:"
         )
     else:
         lines.append("Choose the transfer account:")
@@ -2397,22 +2528,34 @@ def ask_single_payee(ctx, transaction, count, transfer_accounts=None):
         lines.append(f"Applies to {count} identical entries.")
     lines.append("Reply with the name to use, or t for a transfer.")
     while True:
-        payee = ctx.ask("\n".join(lines), pattern=r"[\s\S]+", timeout=600).strip()
+        payee = ctx.ask(
+            "\n".join(lines), pattern=r"[\s\S]+", timeout=600
+        ).strip()
         if not payee:
             continue
         if len(payee) > YNAB_PAYEE_NAME_LIMIT:
-            _say(f"That name is over the YNAB payee limit of {YNAB_PAYEE_NAME_LIMIT}.")
+            _say(
+                f"That name is over the YNAB payee limit "
+                f"of {YNAB_PAYEE_NAME_LIMIT}."
+            )
             continue
-        resolved = resolve_typed_payee(ctx, payee, transfer_accounts, excluded_account)
+        resolved = resolve_typed_payee(
+            ctx, payee, transfer_accounts, excluded_account
+        )
         if resolved is None:
             continue
         if len(resolved) > YNAB_PAYEE_NAME_LIMIT:
-            _say(f"That name is over the YNAB payee limit of {YNAB_PAYEE_NAME_LIMIT}.")
+            _say(
+                f"That name is over the YNAB payee limit "
+                f"of {YNAB_PAYEE_NAME_LIMIT}."
+            )
             continue
         return resolved
 
 
-def ask_split_decision(ctx, transaction, count, suggestions, transfer_accounts=None):
+def ask_split_decision(
+    ctx, transaction, count, suggestions, transfer_accounts=None
+):
     # Returns the split decision row for one group of identical bank entries.
     # Asks only for the part amounts first: the amounts of each part but the
     # last, then the remainder as the last amount, confirmed in the chat. A
@@ -2428,7 +2571,12 @@ def ask_split_decision(ctx, transaction, count, suggestions, transfer_accounts=N
     amounts = ask_split_amounts(ctx, transaction, part_count)
     parts = [
         resolve_split_part(
-            ctx, transaction, amount, part_number, part_count, suggestions,
+            ctx,
+            transaction,
+            amount,
+            part_number,
+            part_count,
+            suggestions,
             transfer_accounts,
         )
         for part_number, amount in enumerate(amounts, start=1)
@@ -2473,13 +2621,21 @@ def ask_split_payee(ctx, label, transfer_accounts=None, excluded_account=None):
         if not payee:
             continue
         if len(payee) > YNAB_PAYEE_NAME_LIMIT:
-            _say(f"That name is over the YNAB payee limit of {YNAB_PAYEE_NAME_LIMIT}.")
+            _say(
+                f"That name is over the YNAB payee limit "
+                f"of {YNAB_PAYEE_NAME_LIMIT}."
+            )
             continue
-        resolved = resolve_typed_payee(ctx, payee, transfer_accounts, excluded_account)
+        resolved = resolve_typed_payee(
+            ctx, payee, transfer_accounts, excluded_account
+        )
         if resolved is None:
             continue
         if len(resolved) > YNAB_PAYEE_NAME_LIMIT:
-            _say(f"That name is over the YNAB payee limit of {YNAB_PAYEE_NAME_LIMIT}.")
+            _say(
+                f"That name is over the YNAB payee limit "
+                f"of {YNAB_PAYEE_NAME_LIMIT}."
+            )
             continue
         return resolved
 
@@ -2495,7 +2651,10 @@ def ask_split_amounts(ctx, transaction, part_count):
         ]
         entered = sum(amounts, decimal.Decimal("0"))
         remaining = transaction.amount - entered
-        label = f"Part {part_count} of {part_count} for {decision_line(transaction)}"
+        label = (
+            f"Part {part_count} of {part_count} "
+            f"for {decision_line(transaction)}"
+        )
         if remaining == 0 or (remaining > 0) != (transaction.amount > 0):
             _say(
                 f"Parts so far add to {format_amount(entered)}, "
@@ -2514,7 +2673,9 @@ def ask_split_amounts(ctx, transaction, part_count):
 def ask_split_amount(ctx, transaction, part_number, part_count):
     # Returns the typed amount of one split part. Asks until the reply holds
     # a nonzero amount with the sign of the whole entry.
-    label = f"Part {part_number} of {part_count} for {decision_line(transaction)}"
+    label = (
+        f"Part {part_number} of {part_count} for {decision_line(transaction)}"
+    )
     while True:
         reply = ctx.ask(
             f"{label}\nReply with the signed amount "
@@ -2546,7 +2707,12 @@ def part_suggestion_key(transaction, amount):
 
 
 def resolve_split_part(
-    ctx, transaction, amount, part_number, part_count, suggestions,
+    ctx,
+    transaction,
+    amount,
+    part_number,
+    part_count,
+    suggestions,
     transfer_accounts=None,
 ):
     # Returns one split part with its payee, amount, and memo. A YNAB
@@ -2557,9 +2723,14 @@ def resolve_split_part(
         ctx, transaction, amount, part_number, part_count, suggestions
     )
     if adopted is not None:
-        return {"payee": adopted["payee"], "amount": amount, "memo": adopted["memo"]}
+        return {
+            "payee": adopted["payee"],
+            "amount": amount,
+            "memo": adopted["memo"],
+        }
     label = (
-        f"Part {part_number} of {part_count} for {decision_line(transaction)}\n"
+        f"Part {part_number} of {part_count} "
+        f"for {decision_line(transaction)}\n"
         f"Amount {format_amount(amount)}"
     )
     payee = ask_split_payee(
@@ -2594,7 +2765,8 @@ def ask_part_ynab_offer(
     offer = offers[0]
     lines = [
         part_line(transaction, amount, part_number, part_count),
-        f'YNAB has payee "{offer["payee"]}" memo {display_memo(offer["memo"])}.',
+        f'YNAB has payee "{offer["payee"]}" '
+        f"memo {display_memo(offer['memo'])}.",
     ]
     if ask_yes("\n".join(lines) + "\nTake payee and memo from YNAB?"):
         return {"payee": offer["payee"], "memo": offer["memo"]}
@@ -2606,14 +2778,20 @@ def ask_part_ynab_choice(
 ):
     # Returns the payee and memo of one of several YNAB offers for a split
     # part amount, or None when the chat declines them all.
-    lines = [part_line(transaction, amount, part_number, part_count), "YNAB has:"]
+    lines = [
+        part_line(transaction, amount, part_number, part_count),
+        "YNAB has:",
+    ]
     for index, offer in enumerate(offers, start=1):
         lines.append(
-            f'{index}. payee "{offer["payee"]}" memo {display_memo(offer["memo"])}'
+            f'{index}. payee "{offer["payee"]}" '
+            f"memo {display_memo(offer['memo'])}"
         )
     lines.append("Reply with the number to take, or n for none.")
     while True:
-        reply = ctx.ask("\n".join(lines), pattern=r"(?i:n|\d+)", timeout=300).strip()
+        reply = ctx.ask(
+            "\n".join(lines), pattern=r"(?i:n|\d+)", timeout=300
+        ).strip()
         if reply.casefold() == "n":
             return None
         try:
@@ -2628,7 +2806,8 @@ def ask_part_ynab_choice(
 def part_line(transaction, amount, part_number, part_count):
     # One short line with the part number and amount, for the split questions.
     return (
-        f"Part {part_number} of {part_count} for {decision_line(transaction)}: "
+        f"Part {part_number} of {part_count} "
+        f"for {decision_line(transaction)}: "
         f"{format_amount(amount)}"
     )
 
@@ -2646,9 +2825,9 @@ def parse_user_amount(text):
     return amount if amount.is_finite() else None
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Narrow chat report.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 def report_order(transaction):
@@ -2690,16 +2869,18 @@ def say_new_transactions(transactions):
         _say("No new transactions.")
         return
     lines = [f"New ({len(transactions)}):"]
-    for transaction in sorted(transactions, key=report_order)[:REPORT_LINE_LIMIT]:
+    for transaction in sorted(transactions, key=report_order)[
+        :REPORT_LINE_LIMIT
+    ]:
         lines.append(compact_line(transaction))
     if len(transactions) > REPORT_LINE_LIMIT:
         lines.append(f"+{len(transactions) - REPORT_LINE_LIMIT} more")
     _say("\n".join(lines))
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Questrade.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 QUESTRADE_TOKEN_URL = "https://login.questrade.com/oauth2/token"
 # The token endpoint answers with one of these statuses when it rejects a
@@ -2723,7 +2904,9 @@ def read_questrade_balances(token_path):
     # Returns the balance of each Questrade account in `QUESTRADE_CURRENCY`,
     # rounded to cents, by the type and the number of the account.
     session = start_questrade_session(token_path)
-    accounts = questrade_get(session, "accounts", "read the Questrade accounts")
+    accounts = questrade_get(
+        session, "accounts", "read the Questrade accounts"
+    )
     accounts = accounts.get("accounts")
     if not isinstance(accounts, list) or not accounts:
         raise TaskError("Questrade returned no accounts")
@@ -2733,7 +2916,9 @@ def read_questrade_balances(token_path):
         number = account.get("number") if isinstance(account, dict) else None
         # The number goes into the URL of the next call.
         if not isinstance(number, str) or not number.isdigit():
-            raise TaskError(f"Questrade returned an account with the number {number!r}")
+            raise TaskError(
+                f"Questrade returned an account with the number {number!r}"
+            )
         account_balances = questrade_get(
             session,
             f"accounts/{number}/balances",
@@ -2762,7 +2947,8 @@ def find_combined_balance(account_balances, account_number):
             total_equity, (int, decimal.Decimal)
         ):
             raise TaskError(
-                f"Questrade returned a bad total equity for account {account_number}"
+                f"Questrade returned a bad total equity for "
+                f"account {account_number}"
             )
         return decimal.Decimal(total_equity).quantize(CENT)
     raise TaskError(
@@ -2780,13 +2966,16 @@ def start_questrade_session(token_path):
     response = None
     saved_token = read_questrade_token(token_path)
     if saved_token is None:
-        _log("No saved Questrade token. The task uses `jc get questrade.api_key`.")
+        _log(
+            "No saved Questrade token. "
+            "The task uses `jc get questrade.api_key`."
+        )
     else:
         response = redeem_questrade_token(saved_token)
         if response is None:
             _log(
-                "Warning: Questrade rejected the saved refresh token. The task "
-                "uses `jc get questrade.api_key`."
+                "Warning: Questrade rejected the saved refresh token. "
+                "The task uses `jc get questrade.api_key`."
             )
     if response is None:
         try:
@@ -2813,7 +3002,9 @@ def start_questrade_session(token_path):
         raise TaskError("Questrade returned no access token")
     # The access token goes to this server, so the connection must be secure.
     api_server = response.get("api_server")
-    if not isinstance(api_server, str) or not api_server.startswith("https://"):
+    if not isinstance(api_server, str) or not api_server.startswith(
+        "https://"
+    ):
         raise TaskError("Questrade returned a bad API server")
     return QuestradeSession(access_token=access_token, api_server=api_server)
 
@@ -2874,7 +3065,9 @@ def redeem_questrade_token(refresh_token):
     if response.status in QUESTRADE_REJECTED_STATUSES:
         return None
     if response.status != 200:
-        raise TaskError(f"cannot {action}: {describe_questrade_failure(response)}")
+        raise TaskError(
+            f"cannot {action}: {describe_questrade_failure(response)}"
+        )
     return parse_questrade_response(action, response)
 
 
@@ -2889,7 +3082,9 @@ def questrade_get(session, path, action):
         headers={"Authorization": f"Bearer {session.access_token}"},
     )
     if response.status != 200:
-        raise TaskError(f"cannot {action}: {describe_questrade_failure(response)}")
+        raise TaskError(
+            f"cannot {action}: {describe_questrade_failure(response)}"
+        )
     return parse_questrade_response(action, response)
 
 
@@ -2940,9 +3135,9 @@ def describe_questrade_failure(response):
     return description
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Wise.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 # The base of the Wise Platform API. The balance calls use `/v4` and the
 # profile and statement calls use `/v1`, as in the Wise docs.
@@ -2980,7 +3175,10 @@ def run_wise_download(ctx, paths, start_date):
         api_token, profile_id, balance_id, fetch_from_date, to_date
     )
     save_wise_transactions(paths.wise_file, transactions)
-    ctx.log(f"Wise transactions: {len(transactions)}, balance {format_amount(balance)}")
+    ctx.log(
+        f"Wise transactions: {len(transactions)}, "
+        f"balance {format_amount(balance)}"
+    )
     _say(
         f"Got Wise balance {format_amount(balance)} "
         f"with {len(transactions)} transactions."
@@ -2998,7 +3196,9 @@ def read_wise_id(path):
     try:
         value = int(text)
     except ValueError:
-        raise TaskError(f"{path} in ~/config.json is not a numeric ID") from None
+        raise TaskError(
+            f"{path} in ~/config.json is not a numeric ID"
+        ) from None
     if value <= 0:
         raise TaskError(f"{path} in ~/config.json is not a numeric ID")
     return value
@@ -3025,7 +3225,8 @@ def fetch_wise_data(api_token, profile_id, balance_id, from_date, to_date):
         api_token, profile_id, balance_id, interval_start, interval_end
     )
     transactions = [
-        wise_to_transaction(item) for item in statement_transactions_of(statement)
+        wise_to_transaction(item)
+        for item in statement_transactions_of(statement)
     ]
     return transactions, balance
 
@@ -3039,7 +3240,9 @@ def wise_get_balance(api_token, profile_id, balance_id):
     )
 
 
-def wise_get_statement(api_token, profile_id, balance_id, interval_start, interval_end):
+def wise_get_statement(
+    api_token, profile_id, balance_id, interval_start, interval_end
+):
     # Returns the statement of one Wise balance between the two UTC instants.
     query = urllib.parse.urlencode(
         {
@@ -3071,7 +3274,9 @@ def wise_balance_value(record):
     if not isinstance(record, dict):
         raise TaskError("Wise returned a bad balance")
     for key in ("cashAmount", "amount", "totalWorth"):
-        amount = wise_amount_value(record.get(key), f"Wise balance field {key}")
+        amount = wise_amount_value(
+            record.get(key), f"Wise balance field {key}"
+        )
         if amount is not None:
             return amount
     raise TaskError("Wise returned a balance without an amount")
@@ -3237,9 +3442,13 @@ def read_wise_transactions(path):
                     f"the Wise cache holds a bad amount {raw_amount!r}"
                 ) from None
         else:
-            raise TaskError(f"the Wise cache holds a bad amount {raw_amount!r}")
+            raise TaskError(
+                f"the Wise cache holds a bad amount {raw_amount!r}"
+            )
         if not amount.is_finite():
-            raise TaskError(f"the Wise cache holds a bad amount {raw_amount!r}")
+            raise TaskError(
+                f"the Wise cache holds a bad amount {raw_amount!r}"
+            )
         payee = entry.get("payee")
         if not isinstance(payee, str) or not payee.strip():
             raise TaskError("the Wise cache holds a bad payee")
@@ -3287,7 +3496,9 @@ def wise_get(action, url, api_token):
             f"cannot {action}: Wise returned invalid JSON: {error}"
         ) from error
     if not isinstance(value, (dict, list)):
-        raise TaskError(f"cannot {action}: Wise returned no JSON object or list")
+        raise TaskError(
+            f"cannot {action}: Wise returned no JSON object or list"
+        )
     return value
 
 
@@ -3307,9 +3518,9 @@ def describe_wise_failure(response):
     return description
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # YNAB.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 # The YNAB account of each statement.
 YNAB_ACCOUNT_NAMES = {
@@ -3317,7 +3528,9 @@ YNAB_ACCOUNT_NAMES = {
     Account.CREDIT_CARD: "BMO MasterCard",
     Account.WISE: "Wise Chequing",
 }
-ACCOUNTS_BY_YNAB_NAME = {name: account for account, name in YNAB_ACCOUNT_NAMES.items()}
+ACCOUNTS_BY_YNAB_NAME = {
+    name: account for account, name in YNAB_ACCOUNT_NAMES.items()
+}
 # The YNAB account of all the Questrade accounts.
 QUESTRADE_YNAB_ACCOUNT_NAME = "Questrade"
 # The payee and the memo of the transaction of a reconciliation.
@@ -3380,8 +3593,14 @@ class YnabComparison:
 
 
 def save_to_ynab(
-    ctx, transactions, decisions, start_date, bank_balances, questrade_balance,
-    api_key, upload
+    ctx,
+    transactions,
+    decisions,
+    start_date,
+    bank_balances,
+    questrade_balance,
+    api_key,
+    upload,
 ):
     # Brings YNAB up to date with the statements, then compares the cleared
     # balances with `bank_balances`, then brings the YNAB account of
@@ -3395,22 +3614,39 @@ def save_to_ynab(
     # `--no-download`, `bank_balances` and `questrade_balance` can be `None`,
     # and the step of each one does not run. Without `upload`, the task reads
     # YNAB and reports the changes, but writes nothing to YNAB.
-    with ynab.ApiClient(ynab.Configuration(access_token=api_key)) as api_client:
+    with ynab.ApiClient(
+        ynab.Configuration(access_token=api_key)
+    ) as api_client:
         plan = load_ynab_plan(api_client)
         if bank_balances is None:
             pre_balances = None
         else:
             pre_balances = {
                 account: from_milliunits(
-                    read_ynab_account(plan, plan.account_ids[account]).cleared_balance
+                    read_ynab_account(
+                        plan, plan.account_ids[account]
+                    ).cleared_balance
                 )
                 for account in YNAB_ACCOUNT_NAMES
             }
-        matched, added_count, cleared_count, deleted_count, memo_count, sync_count, deltas = (
-            update_from_statements(ctx, plan, transactions, decisions, start_date, upload)
+        (
+            matched,
+            added_count,
+            cleared_count,
+            deleted_count,
+            memo_count,
+            sync_count,
+            deltas,
+        ) = update_from_statements(
+            ctx, plan, transactions, decisions, start_date, upload
         )
         questrade_state = report_balances(
-            plan, bank_balances, questrade_balance, matched, pre_balances, deltas
+            plan,
+            bank_balances,
+            questrade_balance,
+            matched,
+            pre_balances,
+            deltas,
         )
         if questrade_state is not None:
             questrade_added = reconcile_questrade(
@@ -3423,13 +3659,31 @@ def save_to_ynab(
             )
             if questrade_added:
                 report_balances(
-                    plan, bank_balances, questrade_balance, matched,
-                    pre_balances, deltas,
+                    plan,
+                    bank_balances,
+                    questrade_balance,
+                    matched,
+                    pre_balances,
+                    deltas,
                 )
-    return matched, added_count, cleared_count, deleted_count, memo_count, sync_count
+    return (
+        matched,
+        added_count,
+        cleared_count,
+        deleted_count,
+        memo_count,
+        sync_count,
+    )
 
 
-def report_balances(plan, bank_balances, questrade_balance, ynab_matches_statements, pre_balances=None, deltas=None):
+def report_balances(
+    plan,
+    bank_balances,
+    questrade_balance,
+    ynab_matches_statements,
+    pre_balances=None,
+    deltas=None,
+):
     # Sends the bank and Questrade balances in one message, then returns the
     # Questrade difference and YNAB balance for `reconcile_questrade`, or
     # None when Questrade is skipped. The YNAB sides hold this run's statement
@@ -3454,14 +3708,20 @@ def report_balances(plan, bank_balances, questrade_balance, ynab_matches_stateme
         questrade_block = questrade_line
         questrade_state = (questrade_difference, questrade_ynab_balance)
     message = bank_block + "\n" + questrade_block
-    if bank_balances is not None and bank_differences and not ynab_matches_statements:
+    if (
+        bank_balances is not None
+        and bank_differences
+        and not ynab_matches_statements
+    ):
         message += "\nPending changes can cause the diffs."
     _say(message)
     _log(f"bank balance differences: {bank_differences}")
     return questrade_state
 
 
-def update_from_statements(ctx, plan, transactions, decisions, start_date, upload):
+def update_from_statements(
+    ctx, plan, transactions, decisions, start_date, upload
+):
     # Syncs the recognized YNAB transactions with the database, then adds to
     # YNAB the statement transactions that it does not have, clears the YNAB
     # transactions that match a statement transaction but are not cleared,
@@ -3495,13 +3755,36 @@ def update_from_statements(ctx, plan, transactions, decisions, start_date, uploa
         if not upload:
             _say("Preview only. YNAB unchanged.")
             report_memo_count(comparison, start_date)
-            return False, 0, 0, 0, 0, 0, {account: decimal.Decimal("0") for account in YNAB_ACCOUNT_NAMES}
+            return (
+                False,
+                0,
+                0,
+                0,
+                0,
+                0,
+                {
+                    account: decimal.Decimal("0")
+                    for account in YNAB_ACCOUNT_NAMES
+                },
+            )
         if not ask_yes(
-            f"In YNAB, move {len(date_corrections)} transfer(s) to earliest dates?"
+            f"In YNAB, move {len(date_corrections)} transfer(s) "
+            "to earliest dates?"
         ):
             _say("Cancelled. YNAB unchanged.")
             report_memo_count(comparison, start_date)
-            return False, 0, 0, 0, 0, 0, {account: decimal.Decimal("0") for account in YNAB_ACCOUNT_NAMES}
+            return (
+                False,
+                0,
+                0,
+                0,
+                0,
+                0,
+                {
+                    account: decimal.Decimal("0")
+                    for account in YNAB_ACCOUNT_NAMES
+                },
+            )
         apply_transfer_date_corrections(plan, date_corrections)
         _say(f"Moved {len(date_corrections)} transfer(s) to earliest dates.")
         comparison = compare_with_ynab(plan, transactions, start_date)
@@ -3516,7 +3799,9 @@ def update_from_statements(ctx, plan, transactions, decisions, start_date, uploa
         raise TaskError("YNAB unchanged. Fix and rerun.")
     victims_by_account = deletable_transactions(comparison)
     doomed_ids = {
-        victim.id for victims in victims_by_account.values() for victim in victims
+        victim.id
+        for victims in victims_by_account.values()
+        for victim in victims
     }
     # Syncs the recognized payees and memos first. Entries with the same
     # account, date, and amount compare as multisets, so the add/delete flow
@@ -3535,12 +3820,36 @@ def update_from_statements(ctx, plan, transactions, decisions, start_date, uploa
         if not upload:
             _say("Preview only. YNAB unchanged.")
             report_memo_count(comparison, start_date)
-            return False, 0, 0, 0, 0, 0, {account: decimal.Decimal("0") for account in YNAB_ACCOUNT_NAMES}
+            return (
+                False,
+                0,
+                0,
+                0,
+                0,
+                0,
+                {
+                    account: decimal.Decimal("0")
+                    for account in YNAB_ACCOUNT_NAMES
+                },
+            )
         if sync_pushes:
-            if not ask_yes(f"In YNAB, update {len(sync_pushes)} payees and memos?"):
+            if not ask_yes(
+                f"In YNAB, update {len(sync_pushes)} payees and memos?"
+            ):
                 _say("Cancelled. YNAB unchanged.")
                 report_memo_count(comparison, start_date)
-                return False, 0, 0, 0, 0, 0, {account: decimal.Decimal("0") for account in YNAB_ACCOUNT_NAMES}
+                return (
+                    False,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    {
+                        account: decimal.Decimal("0")
+                        for account in YNAB_ACCOUNT_NAMES
+                    },
+                )
             update_ynab_payees_memos(plan, sync_pushes)
             sync_count = len(sync_pushes)
             _say(f"Updated {sync_count} payees and memos.")
@@ -3563,7 +3872,9 @@ def update_from_statements(ctx, plan, transactions, decisions, start_date, uploa
             raise TaskError("YNAB unchanged. Fix and rerun.")
         victims_by_account = deletable_transactions(comparison)
         doomed_ids = {
-            victim.id for victims in victims_by_account.values() for victim in victims
+            victim.id
+            for victims in victims_by_account.values()
+            for victim in victims
         }
     memo_pushes = resolve_memo_mismatches(
         ctx,
@@ -3577,10 +3888,23 @@ def update_from_statements(ctx, plan, transactions, decisions, start_date, uploa
     uncleared_count = len(comparison.uncleared_transactions)
     delete_count = sum(len(victims) for victims in victims_by_account.values())
     memo_count = len(memo_pushes)
-    if not missing_count and not uncleared_count and not delete_count and not memo_count:
+    if (
+        not missing_count
+        and not uncleared_count
+        and not delete_count
+        and not memo_count
+    ):
         _say("YNAB already matches.")
         report_memo_count(comparison, start_date)
-        return True, 0, 0, 0, 0, sync_count, {account: decimal.Decimal("0") for account in YNAB_ACCOUNT_NAMES}
+        return (
+            True,
+            0,
+            0,
+            0,
+            0,
+            sync_count,
+            {account: decimal.Decimal("0") for account in YNAB_ACCOUNT_NAMES},
+        )
 
     if missing_count:
         say_new_transactions(comparison.missing_transactions)
@@ -3604,7 +3928,15 @@ def update_from_statements(ctx, plan, transactions, decisions, start_date, uploa
     if not upload:
         _say("Preview only. YNAB unchanged.")
         report_memo_count(comparison, start_date)
-        return False, 0, 0, 0, 0, sync_count, {account: decimal.Decimal("0") for account in YNAB_ACCOUNT_NAMES}
+        return (
+            False,
+            0,
+            0,
+            0,
+            0,
+            sync_count,
+            {account: decimal.Decimal("0") for account in YNAB_ACCOUNT_NAMES},
+        )
     changes = []
     if missing_count:
         changes.append(f"add {missing_count}")
@@ -3616,11 +3948,22 @@ def update_from_statements(ctx, plan, transactions, decisions, start_date, uploa
         changes.append(f"update {memo_count} memos")
     if not ask_yes(f"In YNAB, {' and '.join(changes)}?"):
         if sync_count:
-            _say(f"Cancelled the rest. YNAB keeps {sync_count} payees and memos.")
+            _say(
+                f"Cancelled the rest. "
+                f"YNAB keeps {sync_count} payees and memos."
+            )
         else:
             _say("Cancelled. YNAB unchanged.")
         report_memo_count(comparison, start_date)
-        return False, 0, 0, 0, 0, sync_count, {account: decimal.Decimal("0") for account in YNAB_ACCOUNT_NAMES}
+        return (
+            False,
+            0,
+            0,
+            0,
+            0,
+            sync_count,
+            {account: decimal.Decimal("0") for account in YNAB_ACCOUNT_NAMES},
+        )
 
     if missing_count:
         send_transactions(
@@ -3690,11 +4033,22 @@ def update_from_statements(ctx, plan, transactions, decisions, start_date, uploa
         for victim in victims:
             if victim.cleared != ynab.TransactionClearedStatus.UNCLEARED:
                 deltas[account] -= from_milliunits(victim.amount)
-    return True, missing_count, uncleared_count, delete_count, memo_count, sync_count, deltas
+    return (
+        True,
+        missing_count,
+        uncleared_count,
+        delete_count,
+        memo_count,
+        sync_count,
+        deltas,
+    )
 
 
 def remaining_extra_keys(
-    result, comparison, deleted_keys_by_account, allowed_new_keys_by_account=None
+    result,
+    comparison,
+    deleted_keys_by_account,
+    allowed_new_keys_by_account=None,
 ):
     # Returns whether `result` holds extra YNAB keys beyond the expected
     # ones. Expected ones live outside the statements, come from deletions,
@@ -3713,12 +4067,17 @@ def remaining_extra_keys(
                     allowed_new_keys_by_account.get(account, [])
                 )
             )
-        if collections.Counter(result.extra_keys_by_account.get(account, [])) != expected:
+        if (
+            collections.Counter(result.extra_keys_by_account.get(account, []))
+            != expected
+        ):
             return True
     return False
 
 
-def expected_auto_created_keys(transactions, sent_transactions, early_dates_by_id):
+def expected_auto_created_keys(
+    transactions, sent_transactions, early_dates_by_id
+):
     # Returns the YNAB keys of the other sides that YNAB adds by itself for
     # single-sided managed transfers, by account. Paired transfers already
     # expect both sides. Transfers to accounts without a statement add their
@@ -3775,14 +4134,21 @@ def deletable_transactions(comparison):
             copies = ynab_by_key.get(key, [])
             ordered = sorted(
                 copies,
-                key=lambda item: item.cleared != ynab.TransactionClearedStatus.UNCLEARED,
+                key=lambda item: (
+                    item.cleared != ynab.TransactionClearedStatus.UNCLEARED
+                ),
             )
             victims.extend(ordered[:count])
         transfer_victims = [
-            victim for victim in victims if victim.transfer_account_id is not None
+            victim
+            for victim in victims
+            if victim.transfer_account_id is not None
         ]
         if transfer_victims:
-            lines = [describe_ynab_transaction(victim) for victim in transfer_victims]
+            lines = [
+                describe_ynab_transaction(victim)
+                for victim in transfer_victims
+            ]
             raise TaskError(
                 "YNAB holds surplus transfer legs. Fix them by hand:\n"
                 + "\n".join(lines)
@@ -3810,7 +4176,9 @@ def say_deleted_transactions(victims_by_account):
     _say("\n".join(lines))
 
 
-def build_bank_balance_lines(plan, bank_balances, pre_balances=None, deltas=None):
+def build_bank_balance_lines(
+    plan, bank_balances, pre_balances=None, deltas=None
+):
     # Returns one short line per account with the balance at the bank and the
     # cleared balance in YNAB, with how many of them differ.
     # `bank_balances` maps each account to its balance at the bank, or to
@@ -3829,7 +4197,11 @@ def build_bank_balance_lines(plan, bank_balances, pre_balances=None, deltas=None
         fresh_balance = from_milliunits(ynab_account.cleared_balance)
         ynab_balance = fresh_balance
         if pre_balances is not None and deltas is not None:
-            pre = pre_balances.get(account) if isinstance(pre_balances, dict) else None
+            pre = (
+                pre_balances.get(account)
+                if isinstance(pre_balances, dict)
+                else None
+            )
             delta = deltas.get(account) if isinstance(deltas, dict) else None
             if pre is not None and delta is not None:
                 expected = pre + delta
@@ -3865,14 +4237,19 @@ def build_questrade_balance_line(plan, questrade_balance):
     difference = questrade_balance - ynab_balance
     mark = "OK" if difference == 0 else "DIFF"
     line = (
-        f"QT {format_amount(questrade_balance)} / {format_amount(ynab_balance)} {mark}"
+        f"QT {format_amount(questrade_balance)} "
+        f"/ {format_amount(ynab_balance)} {mark}"
     )
     return line, difference, ynab_balance
 
 
 def reconcile_questrade(
-    plan, questrade_balance, ynab_matches_statements, upload,
-    difference=None, ynab_balance=None,
+    plan,
+    questrade_balance,
+    ynab_matches_statements,
+    upload,
+    difference=None,
+    ynab_balance=None,
 ):
     # Adds a transaction to the YNAB account of Questrade that brings its
     # cleared balance to `questrade_balance`. The cleared YNAB balance leaves
@@ -3940,7 +4317,9 @@ def questrade_reconciled_today(plan):
 
 
 def load_ynab_plan(api_client):
-    plans = call_ynab("read the YNAB plans", ynab.PlansApi(api_client).get_plans)
+    plans = call_ynab(
+        "read the YNAB plans", ynab.PlansApi(api_client).get_plans
+    )
     plans = plans.data.plans
     if len(plans) != 1:
         plan_names = ", ".join(plan.name for plan in plans) or "none"
@@ -3948,14 +4327,20 @@ def load_ynab_plan(api_client):
     plan_id = str(plans[0].id)
 
     accounts = call_ynab(
-        "read the YNAB accounts", ynab.AccountsApi(api_client).get_accounts, plan_id
+        "read the YNAB accounts",
+        ynab.AccountsApi(api_client).get_accounts,
+        plan_id,
     )
-    accounts = [account for account in accounts.data.accounts if not account.deleted]
+    accounts = [
+        account for account in accounts.data.accounts if not account.deleted
+    ]
     account_ids = {
         account: find_open_account_id(accounts, account_name)
         for account, account_name in YNAB_ACCOUNT_NAMES.items()
     }
-    questrade_account_id = find_open_account_id(accounts, QUESTRADE_YNAB_ACCOUNT_NAME)
+    questrade_account_id = find_open_account_id(
+        accounts, QUESTRADE_YNAB_ACCOUNT_NAME
+    )
 
     # A transfer names its other account, so a name that more than one open
     # account has cannot be the other side of a transfer.
@@ -3993,7 +4378,9 @@ def load_ynab_plan(api_client):
         account_names={account.id: account.name for account in accounts},
         payees=YnabPayees(
             ids_by_name={
-                payee.name: payee.id for payee in payees if name_counts[payee.name] == 1
+                payee.name: payee.id
+                for payee in payees
+                if name_counts[payee.name] == 1
             },
             names_by_folded_name=dict(names_by_folded_name),
         ),
@@ -4056,11 +4443,13 @@ def compare_with_ynab(plan, transactions, start_date):
             if ynab_transaction.var_date >= start_date
             and ynab_memo_missing(ynab_transaction)
         )
-        missing, extra_keys, uncleared, expected_keys, ynab_by_key = compare_account(
-            plan,
-            statement_transactions,
-            visible_transactions,
-            early_by_id,
+        missing, extra_keys, uncleared, expected_keys, ynab_by_key = (
+            compare_account(
+                plan,
+                statement_transactions,
+                visible_transactions,
+                early_by_id,
+            )
         )
         missing_transactions += missing
         if extra_keys:
@@ -4078,7 +4467,9 @@ def compare_with_ynab(plan, transactions, start_date):
     )
 
 
-def compare_account(plan, statement_transactions, ynab_transactions, early_by_id=None):
+def compare_account(
+    plan, statement_transactions, ynab_transactions, early_by_id=None
+):
     # Returns the statement transactions that YNAB does not have, the keys of
     # the YNAB transactions that the statement does not have, the YNAB
     # transactions that match a statement transaction but are not cleared,
@@ -4097,7 +4488,8 @@ def compare_account(plan, statement_transactions, ynab_transactions, early_by_id
         map(effective_key, statement_transactions)
     )
     ynab_keys = [
-        ynab_key(plan, ynab_transaction) for ynab_transaction in ynab_transactions
+        ynab_key(plan, ynab_transaction)
+        for ynab_transaction in ynab_transactions
     ]
     ynab_counts = collections.Counter(ynab_keys)
     ynab_by_key = collections.defaultdict(list)
@@ -4120,7 +4512,9 @@ def compare_account(plan, statement_transactions, ynab_transactions, early_by_id
     uncleared_transactions = []
     for key, ynab_transaction in sorted(
         zip(ynab_keys, ynab_transactions),
-        key=lambda pair: pair[1].cleared == ynab.TransactionClearedStatus.UNCLEARED,
+        key=lambda pair: (
+            pair[1].cleared == ynab.TransactionClearedStatus.UNCLEARED
+        ),
     ):
         if unmatched_counts[key] == 0:
             continue
@@ -4143,7 +4537,11 @@ def statement_key(transaction, effective_date=None):
     # transfers use the earliest bank date of the pair, which is the single
     # date that YNAB holds for both legs.
     target_name = transfer_target(transaction.payee)
-    payee = transaction.payee if target_name is None else transfer_payee(target_name)
+    payee = (
+        transaction.payee
+        if target_name is None
+        else transfer_payee(target_name)
+    )
     date = effective_date if effective_date is not None else transaction.date
     return (date, payee, to_milliunits(transaction.amount))
 
@@ -4157,7 +4555,9 @@ def ynab_key(plan, ynab_transaction):
         payee = ynab_transaction.payee_name or ""
     else:
         payee = transfer_payee(
-            plan.account_names.get(transfer_account_id, str(transfer_account_id))
+            plan.account_names.get(
+                transfer_account_id, str(transfer_account_id)
+            )
         )
     return (ynab_transaction.var_date, payee, ynab_transaction.amount)
 
@@ -4195,7 +4595,10 @@ def plan_additions(plan, missing_transactions):
                 problems.append(problem)
             continue
         own_name = YNAB_ACCOUNT_NAMES[transaction.account]
-        if target_name == own_name or target_name not in plan.transfer_payee_ids:
+        if (
+            target_name == own_name
+            or target_name not in plan.transfer_payee_ids
+        ):
             if target_name == own_name:
                 reason = "transfer to its own account"
             else:
@@ -4244,7 +4647,8 @@ def describe_unpaired_transfers(key, first_count, second_count):
     return (
         f"on {date.isoformat()}, {first_name} has {first_count} and "
         f"{second_name} has {second_count} transfers of "
-        f"{format_amount(abs(amount))} from {source_name} to {destination_name}"
+        f"{format_amount(abs(amount))} from {source_name} "
+        f"to {destination_name}"
     )
 
 
@@ -4255,7 +4659,9 @@ def find_payee_problem(payees, payee):
         return f"{payee!r} is over the YNAB payee limit"
     if payee in payees.ids_by_name:
         return None
-    other_names = payees.names_by_folded_name.get(payee.casefold(), set()) - {payee}
+    other_names = payees.names_by_folded_name.get(payee.casefold(), set()) - {
+        payee
+    }
     if other_names:
         quoted_names = ", ".join(f"'{name}'" for name in sorted(other_names))
         return f"{payee!r} differs only in case from {quoted_names}"
@@ -4266,7 +4672,8 @@ def ask_memo(transaction):
     # Asks for the memo of `transaction`, and returns it. Returns None when
     # the reply is a dash, which means no memo.
     reply = _CTX.ask(
-        f"Memo:\n{compact_line(transaction)}\nReply with the memo, or - for none.",
+        f"Memo:\n{compact_line(transaction)}\n"
+        f"Reply with the memo, or - for none.",
         pattern=r"[\s\S]+",
         timeout=300,
     )
@@ -4274,7 +4681,9 @@ def ask_memo(transaction):
     return None if memo == "-" or not memo else memo
 
 
-def send_transactions(ctx, plan, transactions, decisions, transfer_early_dates=None):
+def send_transactions(
+    ctx, plan, transactions, decisions, transfer_early_dates=None
+):
     # Asks for a memo for each of `transactions` without a stored memo, then
     # adds them to YNAB. Only singles from before the memo question lack a
     # stored memo. Stores those memos in `decisions`. The Questrade
@@ -4315,7 +4724,9 @@ def send_transactions(ctx, plan, transactions, decisions, transfer_early_dates=N
         if transfer_early_dates is None:
             ynab_date = transaction.date
         else:
-            ynab_date = transfer_early_dates.get(id(transaction), transaction.date)
+            ynab_date = transfer_early_dates.get(
+                id(transaction), transaction.date
+            )
         new_transactions.append(
             ynab.NewTransaction(
                 account_id=plan.account_ids[transaction.account],
@@ -4364,13 +4775,18 @@ def create_ynab_transactions(plan, new_transactions):
     transactions_api = ynab.TransactionsApi(plan.api_client)
     try:
         response = transactions_api.create_transaction(
-            plan.plan_id, ynab.PostTransactionsWrapper(transactions=new_transactions)
+            plan.plan_id,
+            ynab.PostTransactionsWrapper(transactions=new_transactions),
         )
     except YNAB_ERRORS as error:
-        raise TaskError(f"cannot add the transactions to YNAB: {error}") from error
+        raise TaskError(
+            f"cannot add the transactions to YNAB: {error}"
+        ) from error
     # The last state of each transaction, by its ID.
     saved_list = saved_transactions_of(response)
-    saved_transactions = {transaction.id: transaction for transaction in saved_list}
+    saved_transactions = {
+        transaction.id: transaction for transaction in saved_list
+    }
     sent_ids = set(saved_transactions)
 
     other_side_ids = [
@@ -4391,7 +4807,8 @@ def create_ynab_transactions(plan, new_transactions):
         ]
         try:
             response = transactions_api.update_transactions(
-                plan.plan_id, ynab.PatchTransactionsWrapper(transactions=updates)
+                plan.plan_id,
+                ynab.PatchTransactionsWrapper(transactions=updates),
             )
         except YNAB_ERRORS as error:
             raise TaskError(
@@ -4434,7 +4851,8 @@ def clear_ynab_transactions(plan, ynab_transactions):
     # it is, such as its approval.
     updates = [
         ynab.SaveTransactionWithIdOrImportId(
-            id=ynab_transaction.id, cleared=ynab.TransactionClearedStatus.CLEARED
+            id=ynab_transaction.id,
+            cleared=ynab.TransactionClearedStatus.CLEARED,
         )
         for ynab_transaction in ynab_transactions
     ]
@@ -4443,7 +4861,9 @@ def clear_ynab_transactions(plan, ynab_transactions):
             plan.plan_id, ynab.PatchTransactionsWrapper(transactions=updates)
         )
     except YNAB_ERRORS as error:
-        raise TaskError(f"cannot clear the transactions in YNAB: {error}") from error
+        raise TaskError(
+            f"cannot clear the transactions in YNAB: {error}"
+        ) from error
 
 
 def delete_ynab_transactions(plan, victims_by_account):
@@ -4479,7 +4899,9 @@ def expected_memo_map(decisions):
         if decision["kind"] == "single":
             if not decision["memo_ready"]:
                 continue
-            candidates = [(decision["payee"], bank_amount, decision["memo"], None)]
+            candidates = [
+                (decision["payee"], bank_amount, decision["memo"], None)
+            ]
         else:
             candidates = [
                 (part["payee"], part["amount"], part["memo"], part_index)
@@ -4530,7 +4952,8 @@ def find_memo_mismatches(comparison, memo_map, doomed_ids):
                 candidate
                 for candidate in ynab_by_key.get(key, [])
                 if candidate.id not in doomed_ids
-                and normalize_memo(candidate.memo) != normalize_memo(entry["memo"])
+                and normalize_memo(candidate.memo)
+                != normalize_memo(entry["memo"])
             ]
             if copies:
                 mismatches.append(
@@ -4564,7 +4987,12 @@ def resolve_memo_mismatches(ctx, mismatches, decisions):
             ctx, item["account"], item["key"], stored, copies
         ):
             push_items.extend(
-                {"account": item["account"], "key": item["key"], "txn": copy, "memo": stored}
+                {
+                    "account": item["account"],
+                    "key": item["key"],
+                    "txn": copy,
+                    "memo": stored,
+                }
                 for copy in copies
             )
         else:
@@ -4613,7 +5041,12 @@ def ask_memo_direction(ctx, account, key, stored, copies):
         "YNAB: " + ", ".join(display_memo(option) for option in ynab_options),
         "Update YNAB or the database? Reply `ynab` or `db`.",
     ]
-    return ctx.ask("\n".join(lines), pattern=r"(?i:ynab|db)", timeout=300).casefold() == "ynab"
+    return (
+        ctx.ask(
+            "\n".join(lines), pattern=r"(?i:ynab|db)", timeout=300
+        ).casefold()
+        == "ynab"
+    )
 
 
 def display_memo(memo):
@@ -4627,7 +5060,9 @@ def display_memo(memo):
 def update_ynab_memos(plan, push_items):
     # Sets the stored memo on the given YNAB transactions in one call.
     updates = [
-        ynab.SaveTransactionWithIdOrImportId(id=item["txn"].id, memo=item["memo"])
+        ynab.SaveTransactionWithIdOrImportId(
+            id=item["txn"].id, memo=item["memo"]
+        )
         for item in push_items
     ]
     try:
@@ -4766,9 +5201,9 @@ def find_sync_mismatches(expected_groups, actual_groups):
         unknown_by_payee = collections.defaultdict(collections.deque)
         for index, item in enumerate(expected):
             if item["memo_known"]:
-                by_tuple[(item["payee_c"], normalize_memo(item["memo"]))].append(
-                    index
-                )
+                by_tuple[
+                    (item["payee_c"], normalize_memo(item["memo"]))
+                ].append(index)
             else:
                 unknown_by_payee[item["payee_c"]].append(index)
         matched_exp = set()
@@ -4805,7 +5240,10 @@ def find_sync_mismatches(expected_groups, actual_groups):
             )
         )
         remaining_act.sort(
-            key=lambda other: (actual[other]["payee_c"], actual[other]["memo_n"])
+            key=lambda other: (
+                actual[other]["payee_c"],
+                actual[other]["memo_n"],
+            )
         )
         for index, other in zip(remaining_exp, remaining_act):
             paired_expected[actual[other]["txn"].id] = expected[index]
@@ -4907,7 +5345,9 @@ def ask_sync_direction(
         "Update YNAB or the database? Reply `ynab` or `db`.",
     ]
     return (
-        ctx.ask("\n".join(lines), pattern=r"(?i:ynab|db)", timeout=300).casefold()
+        ctx.ask(
+            "\n".join(lines), pattern=r"(?i:ynab|db)", timeout=300
+        ).casefold()
         == "ynab"
     )
 
@@ -4936,7 +5376,9 @@ def ynab_payee_for_database(plan, txn):
     if txn.transfer_account_id is None:
         return (txn.payee_name or "").strip()
     return transfer_payee(
-        plan.account_names.get(txn.transfer_account_id, str(txn.transfer_account_id))
+        plan.account_names.get(
+            txn.transfer_account_id, str(txn.transfer_account_id)
+        )
     )
 
 
@@ -5049,7 +5491,12 @@ def ask_sync_payee_direction(
         f'YNAB payee: "{actual_payee_c}"',
         "Update YNAB or the database? Reply `ynab` or `db`.",
     ]
-    return ctx.ask("\n".join(lines), pattern=r"(?i:ynab|db)", timeout=300).casefold() == "ynab"
+    return (
+        ctx.ask(
+            "\n".join(lines), pattern=r"(?i:ynab|db)", timeout=300
+        ).casefold()
+        == "ynab"
+    )
 
 
 def transfer_memo_lines(date, milliunits, sides):
@@ -5073,7 +5520,9 @@ def ask_pair_memo_value(ctx, lines):
     # Asks for one typed memo for a transfer pair, so both sides converge
     # without retyping anything from memory. Returns it normalized, or None.
     reply = ctx.ask(
-        "\n".join(lines + ["Reply with the memo for both sides, or - for none."]),
+        "\n".join(
+            lines + ["Reply with the memo for both sides, or - for none."]
+        ),
         pattern=r"[\s\S]+",
         timeout=300,
     ).strip()
@@ -5090,7 +5539,12 @@ def apply_pair_memo(transactions, push_items, legs, db_refs, value):
         if normalize_memo(txn.memo) == normalize_memo(value):
             continue
         append_sync_push(
-            push_items, account, txn, old_payee_c, normalize_memo(txn.memo), stored
+            push_items,
+            account,
+            txn,
+            old_payee_c,
+            normalize_memo(txn.memo),
+            stored,
         )
     changed = False
     for row, part, account in db_refs:
@@ -5123,7 +5577,9 @@ def ask_transfer_reuse(ctx, item, recorded):
     # set, instead of retyping it. Returns True for yes.
     account = item["account"]
     expected = item["expected"]
-    stored_payee, _, _ = current_expected_values(expected["row"], expected["part"])
+    stored_payee, _, _ = current_expected_values(
+        expected["row"], expected["part"]
+    )
     lines = [
         f"{item['date'].strftime('%m-%d')} {ACCOUNT_TAGS[account]} "
         f"{format_amount(from_milliunits(item['milliunits']))} {stored_payee}",
@@ -5302,7 +5758,8 @@ def handle_transfer_memo(ctx, transactions, push_items, pair_memos, item):
         ]
         legs, db_refs, displays, _values = pair_memo_parts(sides)
         value = ask_pair_memo_value(
-            ctx, transfer_memo_lines(item["date"], item["milliunits"], displays)
+            ctx,
+            transfer_memo_lines(item["date"], item["milliunits"], displays),
         )
         return (
             apply_pair_memo(transactions, push_items, legs, db_refs, value),
@@ -5427,12 +5884,12 @@ def reconcile_transfer_pairs(ctx, transactions, push_items, transfer_pairs):
         legs, db_refs, displays, values = pair_memo_parts(pair["sides"])
         if len(values) <= 1:
             continue
-        first = sorted(pair["sides"], key=lambda side: side["account"].value)[0]
+        first = sorted(pair["sides"], key=lambda side: side["account"].value)[
+            0
+        ]
         value = ask_pair_memo_value(
             ctx,
-            transfer_memo_lines(
-                first["date"], first["milliunits"], displays
-            ),
+            transfer_memo_lines(first["date"], first["milliunits"], displays),
         )
         if apply_pair_memo(transactions, push_items, legs, db_refs, value):
             adopted = True
@@ -5524,7 +5981,7 @@ def say_sync_updates(push_items):
             if new_c == item["old_payee_c"]:
                 payee_part = f'"{new_c}"'
             else:
-                payee_part = f"\"{item['old_payee_c']}\" -> \"{new_c}\""
+                payee_part = f'"{item["old_payee_c"]}" -> "{new_c}"'
         memo_arrow = ""
         if item["old_memo_n"] != normalize_memo(item["memo"]):
             memo_arrow = (
@@ -5595,7 +6052,8 @@ def report_other_sides(transfers):
         lines = ["YNAB also adds:"]
         for side in other_sides:
             lines.append(
-                f"{side.date.strftime('%m-%d')} {format_amount(side.amount)} {side.payee}"
+                f"{side.date.strftime('%m-%d')} {format_amount(side.amount)} "
+                f"{side.payee}"
             )
         lines.append("Check for doubles.")
         _say("\n".join(lines))
@@ -5630,7 +6088,9 @@ def report_ignored_counts(comparison):
         _log(f"Ignored {len(ignored)} in {ynab_name}, not in its statement")
         for key in ignored:
             _log(f"  ignored: {ynab_ignored_compact_line(account, key)}")
-        lines = [f"Ignored in {ynab_name} ({len(ignored)}), not in its statement:"]
+        lines = [
+            f"Ignored in {ynab_name} ({len(ignored)}), not in its statement:"
+        ]
         lines += [
             ynab_ignored_compact_line(account, key)
             for key in ignored[:REPORT_LINE_LIMIT]
@@ -5651,8 +6111,12 @@ def report_memo_count(comparison, start_date):
     # count comes from the comparison, so after the changes it already
     # includes the transactions that the current run added.
     count = comparison.ynab_without_memo_count
-    _log(f"transactions without a memo since {start_date.isoformat()}: {count}")
-    _say(f"{count} transactions without a memo since {start_date.isoformat()}.")
+    _log(
+        f"transactions without a memo since {start_date.isoformat()}: {count}"
+    )
+    _say(
+        f"{count} transactions without a memo since {start_date.isoformat()}."
+    )
 
 
 def log_ynab_differences(comparison):
@@ -5679,7 +6143,9 @@ def log_ynab_differences(comparison):
                 )
             )
         for ynab_transaction in uncleared_transactions:
-            _log(f"  not cleared: {describe_ynab_transaction(ynab_transaction)}")
+            _log(
+                f"  not cleared: {describe_ynab_transaction(ynab_transaction)}"
+            )
 
 
 def to_milliunits(amount):
@@ -5707,9 +6173,9 @@ def call_ynab(action, function, *arguments, **keyword_arguments):
         raise TaskError(f"cannot {action}: {error}") from error
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Browser.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 class StepError(TaskError):
@@ -5772,7 +6238,11 @@ def run_agent_browser(arguments, stdout, stderr):
     ]
     try:
         return subprocess.run(
-            command, stdout=stdout, stderr=stderr, encoding="utf-8", errors="replace"
+            command,
+            stdout=stdout,
+            stderr=stderr,
+            encoding="utf-8",
+            errors="replace",
         )
     except OSError as error:
         raise StepError(f"cannot run agent-browser: {error}") from error

@@ -13,11 +13,14 @@ if [ "$#" -gt 1 ]; then
     exit 1
 fi
 
-# Check if there are any staged or unstaged changes (excluding untracked files).
+# Check if there are any staged or unstaged changes (excluding untracked
+# files).
 if ! git diff-index --quiet HEAD --; then
-    echo "Error: Working directory has staged or unstaged changes. Please commit or stash them first." >&2
+    echo "Error: Working directory has staged or unstaged changes. Please" \
+        "commit or stash them first." >&2
     exit 1
 fi
 
 date_arg="${1:-$(date '+%Y-%m-%dT%H:%M:%S')}"
-GIT_COMMITTER_DATE="$date_arg" git commit --amend --no-verify --no-edit --date="$date_arg"
+GIT_COMMITTER_DATE="$date_arg" git commit --amend --no-verify --no-edit \
+    --date="$date_arg"

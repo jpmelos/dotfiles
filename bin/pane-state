@@ -52,7 +52,8 @@ state="$1"
 case "$state" in
     running | waiting | ready | default) ;;
     *)
-        echo "pane-state: unknown state '$state'. Use running, waiting, ready, or default." >&2
+        echo "pane-state: unknown state '$state'. Use running, waiting," \
+            "ready, or default." >&2
         exit 1
         ;;
 esac

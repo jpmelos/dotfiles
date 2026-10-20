@@ -75,9 +75,9 @@ CONFIG_MODE = 0o600
 MISSING_CONFIG_STATUS = 2
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Entry point.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 def main():
@@ -115,9 +115,9 @@ def show_help():
             print(line[4:])
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Subcommands.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 def fetch_config():
@@ -133,7 +133,10 @@ def fetch_config():
         print("Diff (local → 1Password):")
         print(diff_output)
         print()
-        question = f"Overwrite {CONFIG_DISPLAY_PATH} with 1Password content? [y/N] "
+        question = (
+            f"Overwrite {CONFIG_DISPLAY_PATH} with "
+            f"1Password content? [y/N] "
+        )
         if not confirm(question):
             print("Cancelled.")
             return 0
@@ -190,9 +193,9 @@ def get_value(path):
     return 0
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # 1Password.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 def read_note():
@@ -253,9 +256,9 @@ def write_note(config_text):
         die(failure)
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Configuration file.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 def load_config():
@@ -271,10 +274,13 @@ def load_config():
     # open of a directory succeeds, so the type check runs on the descriptor
     # before `fdopen`, which refuses a directory with a less clear message.
     try:
-        descriptor = os.open(CONFIG_PATH, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        descriptor = os.open(
+            CONFIG_PATH, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
+        )
     except FileNotFoundError:
         die(
-            f"{CONFIG_DISPLAY_PATH} does not exist. Run `jc fetch` to create it.",
+            f"{CONFIG_DISPLAY_PATH} does not exist. "
+            f"Run `jc fetch` to create it.",
             MISSING_CONFIG_STATUS,
         )
     except OSError as error:
@@ -289,11 +295,15 @@ def load_config():
     if not stat.S_ISREG(info.st_mode):
         die(f"{CONFIG_DISPLAY_PATH} is not a regular file")
     if info.st_uid != os.getuid():
-        die(f"{CONFIG_DISPLAY_PATH} is owned by user ID {info.st_uid}, not by you")
+        die(
+            f"{CONFIG_DISPLAY_PATH} is owned by user ID "
+            f"{info.st_uid}, not by you"
+        )
     file_mode = stat.S_IMODE(info.st_mode)
     if file_mode & 0o077:
         die(
-            f"{CONFIG_DISPLAY_PATH} has permissions {file_mode:o}, expected no "
+            f"{CONFIG_DISPLAY_PATH} has permissions "
+            f"{file_mode:o}, expected no "
             f"group or other access, as with `chmod {CONFIG_MODE:o}`"
         )
 
@@ -326,7 +336,9 @@ def write_config(text):
         descriptor = os.open(
             CONFIG_PATH, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, CONFIG_MODE
         )
-        with os.fdopen(descriptor, "w", encoding="utf-8", newline="") as handle:
+        with os.fdopen(
+            descriptor, "w", encoding="utf-8", newline=""
+        ) as handle:
             os.fchmod(handle.fileno(), CONFIG_MODE)
             handle.write(text)
     except OSError as error:
@@ -340,9 +352,9 @@ def set_config_mode():
         die(f"Cannot set the mode of {CONFIG_DISPLAY_PATH}: {error}")
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Generic helpers.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 def die(message, status=1):
@@ -361,7 +373,9 @@ def print_json(value):
     try:
         encoded = text.encode("utf-8")
     except UnicodeEncodeError:
-        encoded = json.dumps(value, indent=2, ensure_ascii=True).encode("utf-8")
+        encoded = json.dumps(
+            value, indent=2, ensure_ascii=True
+        ).encode("utf-8")
     sys.stdout.buffer.write(encoded + b"\n")
 
 

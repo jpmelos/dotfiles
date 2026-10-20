@@ -28,12 +28,14 @@ fi
 deadline_epoch=""
 if [ "$(uname -s)" = "Darwin" ]; then
     deadline_epoch=$(date -j -f "%Y-%m-%d %H:%M:%S" "$deadline" +%s) || {
-        echo "Invalid date format. Use: YYYY-MM-DD HH:MM[:SS] or HH:MM[:SS]" >&2
+        echo "Invalid date format. Use: YYYY-MM-DD" \
+            "HH:MM[:SS] or HH:MM[:SS]" >&2
         exit 1
     }
 else
     deadline_epoch=$(date -d "$deadline" +%s) || {
-        echo "Invalid date format. Use: YYYY-MM-DD HH:MM[:SS] or HH:MM[:SS]" >&2
+        echo "Invalid date format. Use: YYYY-MM-DD" \
+            "HH:MM[:SS] or HH:MM[:SS]" >&2
         exit 1
     }
 fi

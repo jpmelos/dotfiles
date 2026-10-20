@@ -26,12 +26,17 @@ defaults_socket="reset-keys-$$"
 # One complete `bind-key` command per binding. The repeat flag and the key note
 # are kept. `q|a` quotes the key string as a tmux argument. Default key notes
 # contain no double quotes.
-bind_format='bind-key #{?key_repeat,-r ,}#{?key_note,-N "#{key_note}" ,}-T #{key_table} #{q|a:key_string} #{key_command}'
+bind_format='bind-key #{?key_repeat,-r ,}'\
+'#{?key_note,-N "#{key_note}" ,}'\
+'-T #{key_table} #{q|a:key_string} #{key_command}'
 
 # Read the defaults before the running server loses anything. If this fails,
 # for example because the installed tmux does not support `list-keys -F`, the
 # script exits here and the running server keeps its bindings.
-defaults="$(tmux -L "$defaults_socket" -f /dev/null start-server \; list-keys -F "$bind_format")"
+defaults="$(\
+    tmux -L "$defaults_socket" -f /dev/null start-server \; \
+    list-keys -F "$bind_format"\
+)"
 tmux -L "$defaults_socket" kill-server 2> /dev/null || true
 
 if [ -z "$defaults" ]; then

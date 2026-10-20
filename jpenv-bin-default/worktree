@@ -25,12 +25,15 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 # deletes it.
 caller_dir="$(pwd -P)"
 
-if ! git_common_dir="$(git rev-parse --path-format=absolute --git-common-dir 2> /dev/null)"; then
+if ! git_common_dir="$(
+    git rev-parse --path-format=absolute --git-common-dir 2> /dev/null
+)"; then
     echo "Error: not inside a git repository." >&2
     exit 1
 fi
 main_repo_dir="$(dirname "$git_common_dir")"
-worktrees_base_dir="$(dirname "$main_repo_dir")/$(basename "$main_repo_dir")_worktree"
+worktrees_base_dir="$(dirname "$main_repo_dir")/"\
+"$(basename "$main_repo_dir")_worktree"
 
 # Personal files that git does not track. A worktree gets a link to each one
 # that exists in the main repository and is missing from the worktree.
@@ -70,7 +73,8 @@ case "$subcommand" in
             exit 1
         fi
 
-        worktree_path="$worktrees_base_dir/$(dir_name_from_branch "$branch_name")"
+        worktree_path="$worktrees_base_dir/$(dir_name_from_branch \
+            "$branch_name")"
 
         if [ -e "$worktree_path" ]; then
             echo "Worktree already exists at: $worktree_path"
@@ -103,15 +107,19 @@ case "$subcommand" in
                 || [ -L "$worktree_path/$personal_file" ]; then
                 continue
             fi
-            ln -s "$main_repo_dir/$personal_file" "$worktree_path/$personal_file"
+            ln -s "$main_repo_dir/$personal_file" \
+                "$worktree_path/$personal_file"
             echo "Symlinked $personal_file"
         done
 
-        if [ -e "$worktree_path/.autoenv.enter" ] && command -v autoenv-manage &> /dev/null; then
+        if [ -e "$worktree_path/.autoenv.enter" ] \
+            && command -v autoenv-manage &> /dev/null; then
             echo
-            echo "========= output: autoenv ======================================"
+            echo \
+            "========= output: autoenv ======================================"
             autoenv-manage authorize "$worktree_path"
-            echo "========= output: autoenv ======================================"
+            echo \
+            "========= output: autoenv ======================================"
         fi
 
         echo
@@ -125,7 +133,8 @@ case "$subcommand" in
         if [ -n "$branch_name" ]; then
             worktree_path="$(worktree_path_for_branch "$branch_name")"
             if [ -z "$worktree_path" ]; then
-                echo "Error: no worktree has branch '$branch_name' checked out." >&2
+                echo "Error: no worktree has branch '$branch_name'" \
+                    "checked out." >&2
                 exit 1
             fi
         else
@@ -134,9 +143,11 @@ case "$subcommand" in
             branch_name="$(git branch --show-current)"
         fi
 
-        worktree_git_dir="$(git -C "$worktree_path" rev-parse --path-format=absolute --git-dir)"
+        worktree_git_dir="$(git -C "$worktree_path" rev-parse \
+            --path-format=absolute --git-dir)"
         if [ "$worktree_git_dir" = "$git_common_dir" ]; then
-            echo "Error: $worktree_path is the main repository, not a worktree." >&2
+            echo "Error: $worktree_path is the main repository," \
+                "not a worktree." >&2
             exit 1
         fi
 
@@ -150,7 +161,8 @@ case "$subcommand" in
         git worktree remove --force "$worktree_path"
 
         echo "/j-execute"
-        if [[ "$caller_dir" == "$worktree_real_path" || "$caller_dir" == "$worktree_real_path"/* ]]; then
+        if [[ "$caller_dir" == "$worktree_real_path" \
+            || "$caller_dir" == "$worktree_real_path"/* ]]; then
             # The shell that evaluates these commands is still inside the
             # worktree directory, which no longer exists. autoenv runs leave
             # hooks by changing into the previous directory, so that step

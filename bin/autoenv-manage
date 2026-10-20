@@ -36,14 +36,15 @@ else
     _state_dir="${XDG_STATE_HOME:-}"
     case $_state_dir in
         /*) AUTOENV_NOTAUTH_FILE="$_state_dir/autoenv/not_authorized_list" ;;
-        *) AUTOENV_NOTAUTH_FILE="$HOME/.local/state/autoenv/not_authorized_list" ;;
+        *) AUTOENV_NOTAUTH_FILE="$HOME/.local/state/autoenv/"\
+"not_authorized_list" ;;
     esac
     unset _state_dir
 fi
 
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Detect a sha1sum binary.
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 if command -v gsha1sum > /dev/null 2>&1; then
     _shasum() { gsha1sum "$@"; }
 elif command -v sha1sum > /dev/null 2>&1; then
@@ -51,13 +52,14 @@ elif command -v sha1sum > /dev/null 2>&1; then
 elif command -v shasum > /dev/null 2>&1; then
     _shasum() { shasum "$@"; }
 else
-    printf 'autoenv-manage: error: cannot locate a compatible shasum binary\n' >&2
+    printf '%s\n' \
+        'autoenv-manage: error: cannot locate a compatible shasum binary' >&2
     exit 1
 fi
 
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Internal helpers (mirroring activate.sh logic).
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 _hashline() {
     local envfile="$1"
@@ -71,7 +73,8 @@ _deauthorize_env() {
     mkdir -p -- "$(dirname "$AUTOENV_AUTH_FILE")"
     touch -- "$AUTOENV_AUTH_FILE"
     cp -- "$AUTOENV_AUTH_FILE" "${AUTOENV_AUTH_FILE}.tmp"
-    grep -Fv "${envfile}:" -- "${AUTOENV_AUTH_FILE}.tmp" >| "$AUTOENV_AUTH_FILE" || true
+    grep -Fv "${envfile}:" -- "${AUTOENV_AUTH_FILE}.tmp" \
+        >| "$AUTOENV_AUTH_FILE" || true
     rm -- "${AUTOENV_AUTH_FILE}.tmp" 2> /dev/null || true
 }
 
@@ -95,10 +98,10 @@ _get_abs_dir() {
     (cd "$1" && pwd -P)
 }
 
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Validate common arguments shared by all subcommands.
 # Returns the validated absolute directory path on stdout.
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 _validate_args() {
     local dir="$1" which="$2"
 
@@ -110,7 +113,9 @@ _validate_args() {
     case "$which" in
         enter | leave | both) ;;
         *)
-            printf "autoenv-manage: error: invalid target '%s' (expected 'enter', 'leave', or 'both')\n" "$which" >&2
+            printf '%s %s\n' \
+                "autoenv-manage: error: invalid target '$which'" \
+                "(expected 'enter', 'leave', or 'both')" >&2
             exit 1
             ;;
     esac
@@ -118,9 +123,9 @@ _validate_args() {
     _get_abs_dir "$dir"
 }
 
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Subcommands.
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 cmd_authorize() {
     local dir="${1:-.}" which="${2:-both}"
@@ -137,7 +142,8 @@ cmd_authorize() {
     if [ "$which" = "leave" ] || [ "$which" = "both" ]; then
         if [ -f "${abs_dir}/${AUTOENV_ENV_LEAVE_FILENAME}" ]; then
             _authorize_env "${abs_dir}/${AUTOENV_ENV_LEAVE_FILENAME}"
-            printf 'Authorized: %s/%s\n' "$abs_dir" "$AUTOENV_ENV_LEAVE_FILENAME"
+            printf 'Authorized: %s/%s\n' "$abs_dir" \
+                "$AUTOENV_ENV_LEAVE_FILENAME"
         fi
     fi
 }
@@ -177,14 +183,15 @@ cmd_deauthorize() {
     if [ "$which" = "leave" ] || [ "$which" = "both" ]; then
         if [ -f "${abs_dir}/${AUTOENV_ENV_LEAVE_FILENAME}" ]; then
             _deauthorize_env "${abs_dir}/${AUTOENV_ENV_LEAVE_FILENAME}"
-            printf 'Deauthorized: %s/%s\n' "$abs_dir" "$AUTOENV_ENV_LEAVE_FILENAME"
+            printf 'Deauthorized: %s/%s\n' "$abs_dir" \
+                "$AUTOENV_ENV_LEAVE_FILENAME"
         fi
     fi
 }
 
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Usage / entry point.
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 usage() {
     cat << 'EOF'

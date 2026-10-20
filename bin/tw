@@ -113,7 +113,8 @@ Location: $HOSTNAME:$PWD_PATH"
 fi
 
 # Send Telegram notification.
-TELEGRAM_API_URL="https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage"
+TELEGRAM_API_URL="https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}"
+TELEGRAM_API_URL+="/sendMessage"
 
 CURL_OUTPUT=$(curl -s -X POST "$TELEGRAM_API_URL" \
     -d "chat_id=$TELEGRAM_CHAT_ID" \
@@ -123,7 +124,8 @@ CURL_OUTPUT=$(curl -s -X POST "$TELEGRAM_API_URL" \
 CURL_EXIT=$?
 
 if [ $CURL_EXIT -ne 0 ]; then
-    echo "Warning: Failed to send Telegram notification (curl exit code: $CURL_EXIT)" >&2
+    echo "Warning: Failed to send Telegram notification" \
+        "(curl exit code: $CURL_EXIT)" >&2
     echo "Curl output: $CURL_OUTPUT" >&2
 elif ! jq -e '.ok' <<< "$CURL_OUTPUT" > /dev/null 2>&1; then
     echo "Warning: Telegram API returned error: $CURL_OUTPUT" >&2

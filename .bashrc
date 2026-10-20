@@ -348,7 +348,9 @@ j() {
         local -a local_names=()
         if [ "$default_only" = false ] && [ -d "$local_bin_dir" ]; then
             mapfile -t local_names < <(
-                find -L "$local_bin_dir" -mindepth 1 -maxdepth 1 -type f -exec \
+                find -L "$local_bin_dir" \
+                    -mindepth 1 -maxdepth 1 \
+                    -type f -exec \
                     basename {} \
                     \;
             )
@@ -366,7 +368,8 @@ j() {
             if [ "$default_only" = true ]; then
                 echo "No commands found in $default_bin_dir" >&2
             else
-                echo "No commands found in $local_bin_dir or $default_bin_dir" >&2
+                echo "No commands found in $local_bin_dir" \
+                    "or $default_bin_dir" >&2
             fi
             return 1
         fi
@@ -384,9 +387,12 @@ j() {
 
     if [ ! -f "$command_path" ]; then
         if [ "$default_only" = true ]; then
-            echo "Error: Command '${command_name}' not found in $default_bin_dir" >&2
+            echo "Error: Command '${command_name}'" \
+                "not found in $default_bin_dir" >&2
         else
-            echo "Error: Command '${command_name}' not found in $local_bin_dir or $default_bin_dir" >&2
+            echo "Error: Command '${command_name}'" \
+                "not found in $local_bin_dir" \
+                "or $default_bin_dir" >&2
         fi
         return 1
     fi
@@ -567,6 +573,8 @@ alias dunpause='docker unpause $(docker ps -aq)'
 
 # Docker Compose aliases.
 alias dc='docker compose'
-alias dcps="docker compose ps --format 'table {{.Name}}\t{{.Service}}\t{{.Status}}\t{{.Ports}}'"
-alias dcpsa="docker compose ps -a --format 'table {{.Name}}\t{{.Service}}\t{{.Status}}\t{{.Ports}}'"
+alias dcps="docker compose ps \
+    --format 'table {{.Name}}\t{{.Service}}\t{{.Status}}\t{{.Ports}}'"
+alias dcpsa="docker compose ps -a \
+    --format 'table {{.Name}}\t{{.Service}}\t{{.Status}}\t{{.Ports}}'"
 alias dcls="docker compose ls"

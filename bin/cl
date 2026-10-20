@@ -121,7 +121,8 @@
 # /           },
 # /           "permissions": ["mcp__server-name__tool-name"],
 # /           "fast_permissions": [
-# /             {"name": "GitHub search", "permission": "mcp__github__search_repositories"}
+# /             {"name": "GitHub search",
+# /              "permission": "mcp__github__search_repositories"}
 # /           ]
 # /         },
 # /         "orgname": {
@@ -426,9 +427,9 @@ CONTAINER_PIDS_LIMIT = "4096"
 CONTAINER_MEMORY_LIMIT = "8g"
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Entry point.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 def main():
@@ -475,7 +476,9 @@ def main():
         profile_config = {}
     api_key = resolve_api_key(profile_config, profile)
     model = resolve_profile_text_setting(profile_config, profile, "model")
-    effort = resolve_profile_text_setting(profile_config, profile, "effortLevel")
+    effort = resolve_profile_text_setting(
+        profile_config, profile, "effortLevel"
+    )
 
     # Every directory of the user is private. The names of the profile
     # directories are the names of the organizations, the shared directory
@@ -513,14 +516,18 @@ def main():
         channel=channel,
         dockerfile_path=paths.dockerfile_path,
         home=paths.home,
-        lock_path=f"{profile_paths.user_tmp_dir}/claude-code-img-lock-{channel}",
+        lock_path=(
+            f"{profile_paths.user_tmp_dir}/claude-code-img-lock-{channel}"
+        ),
         container_script=container_script,
     )
     ensure_image(options, image_spec)
 
     # The project under work is not one of its own dependencies.
     dependency_dirs = [
-        project_dir for project_dir in project_dirs if project_dir.path != project_root
+        project_dir
+        for project_dir in project_dirs
+        if project_dir.path != project_root
     ]
     prepare_profile_dir(
         ProfilePrep(
@@ -584,9 +591,9 @@ def main():
         die(f"cannot run {run_command[0]}: {error}")
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Help.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 def process_help_option(argv):
@@ -621,9 +628,9 @@ def show_help():
             print(line[4:])
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Host environment.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 def check_docker_is_running():
@@ -710,9 +717,9 @@ def resolve_username():
         die(f"user ID {os.getuid()} has no entry in the password database")
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Projects.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 def list_project_dirs(dotfiles_dir):
@@ -758,7 +765,8 @@ def resolve_project_dirs(relative_project_dirs, devel_dir):
         if link is not None:
             die(
                 f"{link} is a link, expected a real directory. Projects, and "
-                f"the directories between {devel_dir} and them, cannot be links"
+                f"the directories between {devel_dir} and them, "
+                "cannot be links"
             )
         path = os.path.join(devel_dir, relative_project_dir)
         if not os.path.isdir(path):
@@ -809,8 +817,9 @@ def resolve_current_project_root(paths, project_dirs):
             current_dir, paths.resolved_devel_dir
         ):
             die(
-                f"{current_dir} is {paths.devel_dir} or under it, but inside no "
-                "project. Run from a project directory, or from outside "
+                f"{current_dir} is {paths.devel_dir} or under it, "
+                "but inside no project. Run from a project "
+                "directory, or from outside "
                 f"{paths.devel_dir} to work on {paths.dotfiles_dir}"
             )
         # The dotfiles repository is a project, so `resolve_project_dirs`
@@ -820,8 +829,8 @@ def resolve_current_project_root(paths, project_dirs):
         if not is_below(paths.resolved_dotfiles_dir, paths.resolved_devel_dir):
             die(
                 f"{paths.dotfiles_dir} resolves to "
-                f"{paths.resolved_dotfiles_dir}, which is outside {paths.devel_dir} "
-                "and is not visible inside the container"
+                f"{paths.resolved_dotfiles_dir}, which is outside "
+                f"{paths.devel_dir} and is not visible inside the container"
             )
         project_root = paths.dotfiles_dir
         log(f"Outside {paths.devel_dir}, defaulting to {project_root}")
@@ -856,9 +865,9 @@ def strip_leading_path(path, prefix):
     return path
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Options.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 @dataclass
@@ -901,7 +910,9 @@ def parse_options(argv, project_name, username):
         if has_inline_value and option_name in REPEATABLE_VALUE_OPTIONS:
             if not inline_value:
                 die(f"{option_name} requires a non-empty argument")
-            getattr(options, REPEATABLE_VALUE_OPTIONS[option_name]).append(inline_value)
+            getattr(
+                options, REPEATABLE_VALUE_OPTIONS[option_name]
+            ).append(inline_value)
             index += 1
         elif argument in REPEATABLE_VALUE_OPTIONS:
             index += 1
@@ -912,7 +923,9 @@ def parse_options(argv, project_name, username):
                     f"{argument} requires a value, and a value cannot start "
                     f"with `-`. Got '{argv[index]}'"
                 )
-            getattr(options, REPEATABLE_VALUE_OPTIONS[argument]).append(argv[index])
+            getattr(
+                options, REPEATABLE_VALUE_OPTIONS[argument]
+            ).append(argv[index])
             index += 1
         elif has_inline_value and option_name in VALUE_OPTIONS:
             if not inline_value:
@@ -939,9 +952,14 @@ def parse_options(argv, project_name, username):
             options.harness_args = argv[index + 1 :]
             break
         else:
-            die(f"Unknown option '{argument}'. Put harness arguments after `--`")
+            die(
+                f"Unknown option '{argument}'. "
+                "Put harness arguments after `--`"
+            )
 
-    harness_print_mode, harness_json_output = scan_harness_args(options.harness_args)
+    harness_print_mode, harness_json_output = scan_harness_args(
+        options.harness_args
+    )
     options.harness_print_mode = harness_print_mode
 
     # Validate that `--process-output` is only used with
@@ -964,7 +982,9 @@ def parse_options(argv, project_name, username):
     options.profile_detected = not options.profile
     profile_source = ""
     if options.profile_detected:
-        options.profile, profile_source = detect_profile(project_name, username)
+        options.profile, profile_source = detect_profile(
+            project_name, username
+        )
     # The profile becomes part of a directory name, so it must stay a single
     # path component without a leading dot or hyphen.
     if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}", options.profile):
@@ -1013,9 +1033,9 @@ def detect_profile(project_name, username):
     return username, "the user name"
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Profile paths.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 @dataclass
@@ -1072,7 +1092,9 @@ def check_origin_dir(paths, profile, profile_dir):
     # agent. An origin outside of `~/devel` is not visible in the container,
     # so the agent cannot reach it, and no warning is due.
     resolved_origin_dir = paths.resolved_origin_dir
-    if is_below(resolved_origin_dir, paths.resolved_devel_dir) and not is_below(
+    if is_below(
+        resolved_origin_dir, paths.resolved_devel_dir
+    ) and not is_below(
         resolved_origin_dir, paths.resolved_dotfiles_dir
     ):
         log(
@@ -1083,9 +1105,9 @@ def check_origin_dir(paths, profile, profile_dir):
         )
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # User configuration.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 def load_user_profiles(dotfiles_dir):
@@ -1096,7 +1118,11 @@ def load_user_profiles(dotfiles_dir):
     # `profiles`.
     try:
         result = subprocess.run(
-            [os.path.join(dotfiles_dir, "bin", "jc"), "get", "claude_code.profiles"],
+            [
+                os.path.join(dotfiles_dir, "bin", "jc"),
+                "get",
+                "claude_code.profiles",
+            ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             encoding="utf-8",
@@ -1117,7 +1143,10 @@ def load_user_profiles(dotfiles_dir):
     if profiles is None:
         return {}
     if not isinstance(profiles, dict):
-        die("`claude_code.profiles` in the configuration file is not a JSON object")
+        die(
+            "`claude_code.profiles` in the configuration file is not "
+            "a JSON object"
+        )
     return profiles
 
 
@@ -1132,8 +1161,8 @@ def find_profile_config(user_profiles, profile):
         return None
     if not isinstance(profile_config, dict):
         die(
-            f"`claude_code.profiles.{profile}` in the configuration file is not "
-            "a JSON object"
+            f"`claude_code.profiles.{profile}` in the "
+            "configuration file is not a JSON object"
         )
     return profile_config
 
@@ -1151,15 +1180,19 @@ def check_profile_without_entry(
     if not profile_detected and not os.path.isdir(profile_dir):
         if user_profiles is None:
             die(
-                f"profile '{profile}' has no directory {profile_dir}, and there "
-                f"is no {config_path} with an entry for it. Create the directory "
+                f"profile '{profile}' has no directory {profile_dir}, "
+                "and there "
+                f"is no {config_path} with an entry for it. "
+                "Create the directory "
                 "to start a new profile without an entry"
             )
         known_profiles = ", ".join(sorted(user_profiles)) or "none"
         die(
-            f"profile '{profile}' has no entry in {config_path} and no "
-            f"directory {profile_dir}. Known profiles: {known_profiles}. Add an "
-            "entry, or create the directory to start a new profile without one"
+            f"profile '{profile}' has no entry in {config_path} "
+            "and no "
+            f"directory {profile_dir}. Known profiles: "
+            f"{known_profiles}. Add an entry, or create the "
+            "directory to start a new profile without one"
         )
     if user_profiles is not None:
         log(f"Warning: {config_path} has no entry for profile '{profile}'")
@@ -1180,7 +1213,10 @@ def resolve_api_key(profile_config, profile):
     # the key of the profile.
     from_environment = os.environ.get("ANTHROPIC_API_KEY", "").strip()
     if from_environment:
-        log(f"API key: ANTHROPIC_API_KEY from the environment, for profile '{profile}'")
+        log(
+            f"API key: ANTHROPIC_API_KEY from the environment, "
+            f"for profile '{profile}'"
+        )
         if api_key:
             log(
                 "Warning: the environment key takes precedence over the "
@@ -1204,16 +1240,19 @@ def resolve_profile_text_setting(profile_config, profile, key):
     if value is None:
         return None
     if not isinstance(value, str):
-        log(f"Warning: the `{key}` of profile '{profile}' is not text, `{key}` not set")
+        log(
+            f"Warning: the `{key}` of profile '{profile}' is not text, "
+            f"`{key}` not set"
+        )
         return None
     if not value:
         return None
     return value
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Temporary directories.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 def prepare_tmp_dirs(tmp_dirs):
@@ -1248,7 +1287,8 @@ def prepare_tmp_dirs(tmp_dirs):
             # theirs to make. Another user could have written into it while
             # it was open, so the line asks them to look.
             log(
-                f"Warning: {path} was writable by other users, setting its mode "
+                f"Warning: {path} was writable by other users, "
+                "setting its mode "
                 f"to {mode:o}. Check its contents"
             )
         if stat.S_IMODE(info.st_mode) != mode:
@@ -1260,9 +1300,9 @@ def prepare_tmp_dirs(tmp_dirs):
             die(f"{path} is not writable")
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Docker image.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 def build_image_name(username, channel, project_name):
@@ -1285,7 +1325,10 @@ def build_image_name(username, channel, project_name):
             project_name.replace("/", "-"), IMAGE_NAME_PROJECT_LENGTH
         )
         if not project_part:
-            die(f"cannot build an image name from project name '{project_name}'")
+            die(
+                f"cannot build an image name from project name "
+                f"'{project_name}'"
+            )
         repository = f"{repository}-{project_part}"
 
     return f"{repository}:{channel}"
@@ -1325,14 +1368,17 @@ def read_container_script(project_root, paths):
     if not is_below(resolved_path, paths.resolved_devel_dir):
         die(
             f"{script_path} resolves to {resolved_path}, which is outside "
-            f"{paths.devel_dir}. The image would hold a file that the container "
-            "does not see otherwise"
+            f"{paths.devel_dir}. The image would hold a file that the "
+            "container does not see otherwise"
         )
     # See `open_owned_regular_file` for the checks on the target.
     try:
         descriptor, _ = open_owned_regular_file(resolved_path, os.O_RDONLY)
     except FileNotFoundError:
-        die(f"{script_path} is a link to {resolved_path}, which does not exist")
+        die(
+            f"{script_path} is a link to {resolved_path}, "
+            "which does not exist"
+        )
     try:
         with os.fdopen(descriptor, "rb") as handle:
             content = handle.read()
@@ -1340,7 +1386,9 @@ def read_container_script(project_root, paths):
         die(f"cannot read {script_path}: {error}")
 
     log(f"Project script: {script_path}")
-    return ContainerScript(content=content, digest=hashlib.sha256(content).hexdigest())
+    return ContainerScript(
+        content=content, digest=hashlib.sha256(content).hexdigest()
+    )
 
 
 @dataclass
@@ -1396,9 +1444,15 @@ def ensure_image_locked(options, image_spec):
             image_spec.channel,
         )
         if rebuild_reason:
-            log(f"--no-rebuild specified, skipping rebuild despite: {rebuild_reason}")
+            log(
+                f"--no-rebuild specified, skipping rebuild despite: "
+                f"{rebuild_reason}"
+            )
         else:
-            log("Skipping rebuild (--no-rebuild specified, image is up to date)")
+            log(
+                "Skipping rebuild (--no-rebuild specified, "
+                "image is up to date)"
+            )
         return
 
     dockerfile = read_dockerfile(image_spec.dockerfile_path)
@@ -1452,9 +1506,18 @@ def get_rebuild_reason(
     # content is unknown, and a pinned version does not spare it.
     if not image_info.build_date:
         return "image has no build date label"
-    if image_info.build_date != f"{today:%Y-%m-%d}" and not is_pinned_version(channel):
-        return f"image is from {image_info.build_date}, today is {today:%Y-%m-%d}"
-    if dockerfile is not None and image_info.dockerfile_digest != dockerfile.digest:
+    if (
+        image_info.build_date != f"{today:%Y-%m-%d}"
+        and not is_pinned_version(channel)
+    ):
+        return (
+            f"image is from {image_info.build_date}, "
+            f"today is {today:%Y-%m-%d}"
+        )
+    if (
+        dockerfile is not None
+        and image_info.dockerfile_digest != dockerfile.digest
+    ):
         return "Dockerfile changed since last build"
     # An image that no script went into has no digest label, and the field
     # is then empty, like the expected digest of a project without a script.
@@ -1486,7 +1549,9 @@ def read_dockerfile(dockerfile_path):
     except OSError as error:
         log(f"Warning: cannot read {dockerfile_path}: {error}")
         return None
-    return Dockerfile(content=content, digest=hashlib.sha256(content).hexdigest())
+    return Dockerfile(
+        content=content, digest=hashlib.sha256(content).hexdigest()
+    )
 
 
 @dataclass
@@ -1631,9 +1696,9 @@ def write_context_script(context_dir, container_script):
         os.fchmod(handle.fileno(), 0o755)
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Profile directory.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 # Planted links. The agent can write to the profile directory from inside the
 # container, so any path below it can turn into a link, a FIFO, or a directory
@@ -1676,8 +1741,9 @@ def prepare_profile_dir(profile_prep):
     # deeper in the copy with a message that does not name the link.
     if os.path.islink(profile_dir):
         die(
-            f"{profile_dir} is a link, expected a real directory. The launcher "
-            "mirrors the origin into it and does not follow links there"
+            f"{profile_dir} is a link, expected a real directory. "
+            "The launcher mirrors the origin into it and does not "
+            "follow links there"
         )
 
     # The directory holds credentials and chat history. `makedirs` applies the
@@ -1717,7 +1783,8 @@ def prepare_profile_dir(profile_prep):
     lock_path = f"{state_dir}/{LOCK_NAME}"
     with file_lock(
         lock_path,
-        f"Waiting for another launch that prepares profile '{profile_prep.profile}'...",
+        f"Waiting for another launch that prepares profile "
+        f"'{profile_prep.profile}'...",
     ):
         # The sweep runs inside the lock, so it never removes a file that
         # another launch is about to rename. The state directory belongs to
@@ -1726,7 +1793,10 @@ def prepare_profile_dir(profile_prep):
             try:
                 remove_stale_temp_files(directory)
             except OSError as error:
-                log(f"Warning: cannot remove temporary files in {directory}: {error}")
+                log(
+                    f"Warning: cannot remove temporary files in {directory}: "
+                    f"{error}"
+                )
 
         # The profile directory also holds history and credentials, so only
         # the directories that the origin has are mirrored. The top level is
@@ -1782,7 +1852,9 @@ def remove_stale_temp_files(directory):
     # Removal during the scan is undefined.
     with os.scandir(directory) as entries:
         stale_paths = [
-            entry.path for entry in entries if entry.name.startswith(TEMP_FILE_PREFIX)
+            entry.path
+            for entry in entries
+            if entry.name.startswith(TEMP_FILE_PREFIX)
         ]
     for stale_path in stale_paths:
         remove_path(stale_path)
@@ -1811,7 +1883,9 @@ def copy_tree_contents(source, destination, *, mirror, skip=()):
         os.close(destination_fd)
 
 
-def copy_tree_into(source, destination_fd, destination_path, *, mirror, skip=()):
+def copy_tree_into(
+    source, destination_fd, destination_path, *, mirror, skip=()
+):
     # Copies the entries of the directory `source` into the directory that
     # `destination_fd` names. `destination_path` is that directory for
     # messages only. See `copy_tree_contents` for `mirror` and `skip`, and the
@@ -1830,7 +1904,10 @@ def copy_tree_into(source, destination_fd, destination_path, *, mirror, skip=())
                 # that resolve outside the plugin directory.
                 link_content = os.path.realpath(entry.path)
                 if os.path.isfile(link_content):
-                    if target_stat is not None and stat.S_ISLNK(target_stat.st_mode):
+                    if (
+                        target_stat is not None
+                        and stat.S_ISLNK(target_stat.st_mode)
+                    ):
                         remove_entry(entry.name, destination_fd)
                     copy_file_atomically(
                         link_content, entry.name, destination_fd, target_path
@@ -1839,16 +1916,27 @@ def copy_tree_into(source, destination_fd, destination_path, *, mirror, skip=())
                 # A link that already points to the same place is left alone,
                 # so that a reader that watches the directory sees no change.
                 link_target = os.readlink(entry.path)
-                if target_stat is not None and stat.S_ISLNK(target_stat.st_mode):
-                    if os.readlink(entry.name, dir_fd=destination_fd) == link_target:
+                if (
+                    target_stat is not None
+                    and stat.S_ISLNK(target_stat.st_mode)
+                ):
+                    if (
+                        os.readlink(entry.name, dir_fd=destination_fd)
+                        == link_target
+                    ):
                         continue
                 if target_stat is not None:
                     remove_entry(entry.name, destination_fd)
                 os.symlink(link_target, entry.name, dir_fd=destination_fd)
             elif entry.is_dir():
-                if target_stat is not None and not stat.S_ISDIR(target_stat.st_mode):
+                if (
+                    target_stat is not None
+                    and not stat.S_ISDIR(target_stat.st_mode)
+                ):
                     remove_entry(entry.name, destination_fd)
-                copy_directory(entry.path, entry.name, destination_fd, target_path)
+                copy_directory(
+                    entry.path, entry.name, destination_fd, target_path
+                )
             else:
                 copy_file_atomically(
                     entry.path, entry.name, destination_fd, target_path
@@ -1857,7 +1945,9 @@ def copy_tree_into(source, destination_fd, destination_path, *, mirror, skip=())
     if mirror:
         # Collect the entries first. Removal during the scan is undefined.
         stale_names = [
-            name for name in os.listdir(destination_fd) if name not in source_names
+            name
+            for name in os.listdir(destination_fd)
+            if name not in source_names
         ]
         for stale_name in stale_names:
             remove_entry(stale_name, destination_fd)
@@ -1904,7 +1994,9 @@ def remove_entry(name, directory_fd):
         os.unlink(name, dir_fd=directory_fd)
 
 
-def remove_entries_gone_from_origin(profile_dir, manifest_path, installed_names):
+def remove_entries_gone_from_origin(
+    profile_dir, manifest_path, installed_names
+):
     # The top level of the profile directory is not mirrored, so an entry that
     # the origin no longer holds would stay in the profile forever. The
     # manifest at `manifest_path` lists the top-level entries that the
@@ -1929,7 +2021,10 @@ def remove_entries_gone_from_origin(profile_dir, manifest_path, installed_names)
     kept_names = set()
     for stale_name in sorted(previous_names - installed_names):
         if not is_plain_entry_name(stale_name):
-            log(f"Warning: ignoring invalid name {stale_name!r} in {manifest_path}")
+            log(
+                f"Warning: ignoring invalid name {stale_name!r} "
+                f"in {manifest_path}"
+            )
             continue
         if not remove_stale_profile_entry(f"{profile_dir}/{stale_name}"):
             kept_names.add(stale_name)
@@ -1939,7 +2034,8 @@ def remove_entries_gone_from_origin(profile_dir, manifest_path, installed_names)
         return
     try:
         write_text_atomically(
-            manifest_path, "".join(f"{name}\n" for name in sorted(manifest_names))
+            manifest_path,
+            "".join(f"{name}\n" for name in sorted(manifest_names)),
         )
     except OSError as error:
         log(f"Warning: cannot write {manifest_path}: {error}")
@@ -1999,7 +2095,9 @@ def copy_file_atomically(source, name, directory_fd, path):
                 temp_handle.fileno(),
                 ns=(source_stat.st_atime_ns, source_stat.st_mtime_ns),
             )
-        os.replace(temp_name, name, src_dir_fd=directory_fd, dst_dir_fd=directory_fd)
+        os.replace(
+            temp_name, name, src_dir_fd=directory_fd, dst_dir_fd=directory_fd
+        )
     except BaseException:
         remove_file(temp_name, dir_fd=directory_fd)
         raise
@@ -2050,7 +2148,9 @@ def copystat_if_changed(source, descriptor):
     source_stat = os.stat(source)
     target_stat = os.fstat(descriptor)
     same_mtime = source_stat.st_mtime_ns == target_stat.st_mtime_ns
-    same_mode = stat.S_IMODE(source_stat.st_mode) == stat.S_IMODE(target_stat.st_mode)
+    same_mode = stat.S_IMODE(source_stat.st_mode) == stat.S_IMODE(
+        target_stat.st_mode
+    )
     if same_mtime and same_mode:
         return
     os.fchmod(descriptor, stat.S_IMODE(source_stat.st_mode))
@@ -2132,7 +2232,9 @@ def remove_stale_profile_entry(path):
     return True
 
 
-def apply_dependencies_list(origin_claude_md, profile_claude_md, dependency_names):
+def apply_dependencies_list(
+    origin_claude_md, profile_claude_md, dependency_names
+):
     # The profile `CLAUDE.md` is the origin file with the dependencies marker
     # replaced by the list of dependency names. Without dependencies, the list
     # holds one `none` entry, so the marker never reaches the agent. Returns
@@ -2147,7 +2249,11 @@ def apply_dependencies_list(origin_claude_md, profile_claude_md, dependency_name
         )
 
     return sync_derived_file(
-        origin_claude_md, profile_claude_md, read_text, write_text_atomically, expand
+        origin_claude_md,
+        profile_claude_md,
+        read_text,
+        write_text_atomically,
+        expand,
     )
 
 
@@ -2185,11 +2291,17 @@ def sync_settings_json(origin_path, profile_path, profile_prep):
 
     permissions = origin_config.get("permissions")
     if not isinstance(permissions, dict):
-        log(f"Warning: {origin_path} has no `permissions` object, not installed")
+        log(
+            f"Warning: {origin_path} has no `permissions` object, "
+            "not installed"
+        )
         return True
     allow = permissions.get("allow")
     if not isinstance(allow, list):
-        log(f"Warning: {origin_path} has no `permissions.allow` list, not installed")
+        log(
+            f"Warning: {origin_path} has no `permissions.allow` list, "
+            "not installed"
+        )
         return True
 
     for extra in resolve_profile_permissions(
@@ -2261,16 +2373,16 @@ def resolve_profile_permissions(profile_config, profile):
         return []
     if not isinstance(permissions, list):
         log(
-            f"Warning: the `permissions` of profile '{profile}' is not a list, "
-            "extra permissions not set"
+            f"Warning: the `permissions` of profile '{profile}' "
+            "is not a list, extra permissions not set"
         )
         return []
     extra_permissions = []
     for entry in permissions:
         if not isinstance(entry, str) or not entry:
             log(
-                f"Warning: the `permissions` of profile '{profile}' holds an entry "
-                "that is not non-empty text, skipping it"
+                f"Warning: the `permissions` of profile '{profile}' "
+                "holds an entry that is not non-empty text, skipping it"
             )
             continue
         if entry not in extra_permissions:
@@ -2289,17 +2401,17 @@ def resolve_profile_fast_permissions(profile_config, profile):
         return []
     if not isinstance(fast_permissions, list):
         log(
-            f"Warning: the `fast_permissions` of profile '{profile}' is not a list, "
-            "fast permissions not set"
+            f"Warning: the `fast_permissions` of profile '{profile}' "
+            "is not a list, fast permissions not set"
         )
         return []
     extra_fast_permissions = []
     for entry in fast_permissions:
         if not is_fast_permission_entry(entry):
             log(
-                f"Warning: the `fast_permissions` of profile '{profile}' holds an entry "
-                "without a non-empty text `name` and a non-empty text `permission`, "
-                "skipping it"
+                f"Warning: the `fast_permissions` of profile "
+                f"'{profile}' holds an entry without a non-empty text "
+                "`name` and a non-empty text `permission`, skipping it"
             )
             continue
         if entry not in extra_fast_permissions:
@@ -2328,9 +2440,15 @@ def create_profile_json(profile_json_path):
     # it goes. The mode goes to a descriptor, and the open refuses a link that
     # appears after the check. See `open_without_following`.
     if os.path.islink(profile_json_path):
-        die(f"{profile_json_path} is a link, expected a regular file. Remove it")
+        die(
+            f"{profile_json_path} is a link, expected a regular file. "
+            "Remove it"
+        )
     if os.path.isdir(profile_json_path):
-        die(f"{profile_json_path} is a directory, expected a regular file. Remove it")
+        die(
+            f"{profile_json_path} is a directory, expected a regular file. "
+            "Remove it"
+        )
     if not os.path.isfile(profile_json_path):
         try:
             write_text_atomically(profile_json_path, "{}\n")
@@ -2382,7 +2500,10 @@ def update_profile_json(profile_json_path, api_key, profile_config, profile):
             log(f"Warning: cannot read {profile_json_path}: {error}")
             return
         if not isinstance(profile_json, dict):
-            log(f"Warning: {profile_json_path} is not a JSON object, not updated")
+            log(
+                f"Warning: {profile_json_path} is not a JSON object, "
+                "not updated"
+            )
             return
 
         key_changed = approved_tail is not None and approve_api_key(
@@ -2444,7 +2565,9 @@ def approve_api_key(profile_json, approved_tail):
     changed = False
     rejected = responses.get("rejected")
     if isinstance(rejected, list) and approved_tail in rejected:
-        responses["rejected"] = [tail for tail in rejected if tail != approved_tail]
+        responses["rejected"] = [
+            tail for tail in rejected if tail != approved_tail
+        ]
         changed = True
     approved = responses.get("approved")
     if not isinstance(approved, list):
@@ -2463,8 +2586,8 @@ def resolve_mcp_servers(profile_config, profile):
         return None
     if not isinstance(mcp_servers, dict):
         log(
-            f"Warning: the `mcp_servers` of profile '{profile}' is not an object, "
-            "MCP servers not set"
+            f"Warning: the `mcp_servers` of profile '{profile}' "
+            "is not an object, MCP servers not set"
         )
         return None
     return mcp_servers
@@ -2478,13 +2601,18 @@ def apply_mcp_servers(profile_json, mcp_servers):
     return True
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Container command.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 def build_harness_args(
-    user_harness_args, devel_dir, model, effort, extra_targets=(), plugin_dirs=()
+    user_harness_args,
+    devel_dir,
+    model,
+    effort,
+    extra_targets=(),
+    plugin_dirs=(),
 ):
     # Read settings from the profile only. The `project` and `local` sources
     # are files under `.claude` in the repository, and a cloned repository can
@@ -2547,7 +2675,10 @@ class RunConfig:
 def generate_container_name(project_root):
     basename = os.path.basename(project_root)
     dir_basename = re.sub(r"[^A-Za-z0-9_.-]", "", basename)
-    return f"claude_code_{dir_basename[:CONTAINER_NAME_PROJECT_LENGTH]}_{os.getpid()}"
+    return (
+        f"claude_code_{dir_basename[:CONTAINER_NAME_PROJECT_LENGTH]}_"
+        f"{os.getpid()}"
+    )
 
 
 def build_run_command(harness_args, run_config):
@@ -2716,7 +2847,8 @@ def profile_mount_args(run_config):
         # other mount sources under the home directory. See
         # `prepare_profile_dir` for the check on the directory itself.
         "--volume",
-        f"{os.path.realpath(run_config.profile_paths.profile_dir)}:{home}/.claude",
+        f"{os.path.realpath(run_config.profile_paths.profile_dir)}:"
+        f"{home}/.claude",
     ]
 
 
@@ -2817,11 +2949,15 @@ def git_config_args(home):
     git_config_dir = f"{home}/.config/git"
     if not os.path.isdir(git_config_dir):
         log(
-            f"Warning: {git_config_dir} does not exist, Git configuration will "
-            "not be available inside the container"
+            f"Warning: {git_config_dir} does not exist, "
+            "Git configuration will not be available inside "
+            "the container"
         )
         return []
-    return ["--volume", f"{os.path.realpath(git_config_dir)}:{git_config_dir}:ro"]
+    return [
+        "--volume",
+        f"{os.path.realpath(git_config_dir)}:{git_config_dir}:ro",
+    ]
 
 
 @dataclass
@@ -2858,7 +2994,9 @@ def resolve_extra_volumes(raw_specs, paths, profile_paths, project_root):
     volumes = []
     seen_targets = set()
     for spec in raw_specs:
-        volume = parse_add_volume_spec(spec, paths, profile_paths, project_root)
+        volume = parse_add_volume_spec(
+            spec, paths, profile_paths, project_root
+        )
         if volume.target in seen_targets:
             die(f"--add-volume {spec!r} repeats target {volume.target}")
         seen_targets.add(volume.target)
@@ -2919,7 +3057,9 @@ def parse_add_volume_spec(spec, paths, profile_paths, project_root):
     check_add_volume_target(spec, target, paths, profile_paths)
     check_add_volume_dotfiles(spec, source, paths, project_root, read_only)
     check_add_volume_state(spec, source, profile_paths)
-    return ExtraVolume(source=source, target=target, read_only=read_only, spec=spec)
+    return ExtraVolume(
+        source=source, target=target, read_only=read_only, spec=spec
+    )
 
 
 def resolve_add_volume_source(spec, raw_source):
@@ -2974,14 +3114,21 @@ def check_add_volume_target(spec, target, paths, profile_paths):
     for binary in AGENT_BINARIES:
         reserved_targets.append(os.path.normpath(f"/usr/local/bin/{binary}"))
     for reserved in reserved_targets:
-        if target == reserved or is_below(target, reserved) or is_below(reserved, target):
+        if (
+            target == reserved
+            or is_below(target, reserved)
+            or is_below(reserved, target)
+        ):
             die(
                 f"--add-volume {spec!r} target {target} overlaps fixed mount "
                 f"{reserved}"
             )
     for prefix in EXTRA_VOLUME_RESERVED_PREFIXES:
         if target == prefix or is_below(target, prefix):
-            die(f"--add-volume {spec!r} target {target} is under system path {prefix}")
+            die(
+                f"--add-volume {spec!r} target {target} is under "
+                f"system path {prefix}"
+            )
 
 
 def check_add_volume_dotfiles(spec, source, paths, project_root, read_only):
@@ -2991,9 +3138,16 @@ def check_add_volume_dotfiles(spec, source, paths, project_root, read_only):
     if project_root == paths.dotfiles_dir:
         return
     dotfiles = paths.resolved_dotfiles_dir
-    if source == dotfiles or is_below(source, dotfiles) or is_below(dotfiles, source):
+    if (
+        source == dotfiles
+        or is_below(source, dotfiles)
+        or is_below(dotfiles, source)
+    ):
         if not read_only:
-            die(f"--add-volume {spec!r} touches the dotfiles repository, must be read-only")
+            die(
+                f"--add-volume {spec!r} touches the dotfiles repository, "
+                "must be read-only"
+            )
 
 
 def check_add_volume_state(spec, source, profile_paths):
@@ -3002,7 +3156,10 @@ def check_add_volume_state(spec, source, profile_paths):
     # and a source under it exposes part of them.
     state = os.path.realpath(profile_paths.state_dir)
     if source == state or is_below(source, state) or is_below(state, source):
-        die(f"--add-volume {spec!r} source {source} exposes the launcher state")
+        die(
+            f"--add-volume {spec!r} source {source} exposes "
+            "the launcher state"
+        )
 
 
 def extra_volume_args(run_config):
@@ -3039,7 +3196,10 @@ def terminal_args(harness_print_mode):
         if stdin_tty:
             args.append("--tty")
         else:
-            log("Warning: stdin is not a terminal, the interactive UI needs one")
+            log(
+                "Warning: stdin is not a terminal, "
+                "the interactive UI needs one"
+            )
 
     return args
 
@@ -3081,20 +3241,23 @@ def additional_env_args():
         seen_env_vars.add(additional_env_var)
         if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", additional_env_var):
             log(
-                f"Warning: {additional_env_var} is not a valid variable name, "
-                "skipping it"
+                f"Warning: {additional_env_var} is not a valid "
+                "variable name, skipping it"
             )
             continue
         if additional_env_var in RESERVED_ENV_VARS:
             log(
-                f"Warning: {additional_env_var} is set by the launcher for the "
-                "container, skipping it"
+                f"Warning: {additional_env_var} is set by the launcher "
+                "for the container, skipping it"
             )
             continue
         # Docker leaves out a variable that the host does not set, and the
         # container would then lack it without a word.
         if additional_env_var not in os.environ:
-            log(f"Warning: {additional_env_var} is not set on the host, skipping it")
+            log(
+                f"Warning: {additional_env_var} is not set on the host, "
+                "skipping it"
+            )
             continue
         log(f"Additional environment variable: {additional_env_var}")
         args += ["--env", additional_env_var]
@@ -3112,8 +3275,8 @@ def docker_socket_args(home):
     docker_host = os.environ.get("DOCKER_HOST", "")
     if docker_host and not docker_host.startswith("unix://"):
         log(
-            f"Warning: DOCKER_HOST is {docker_host}, not a Unix socket. Docker "
-            "will not be available inside the container"
+            f"Warning: DOCKER_HOST is {docker_host}, not a Unix socket. "
+            "Docker will not be available inside the container"
         )
         return []
     if docker_host:
@@ -3146,8 +3309,8 @@ def docker_socket_args(home):
         return args
 
     log(
-        "Warning: Docker socket not found, Docker will not be available inside "
-        "the container"
+        "Warning: Docker socket not found, Docker will not be "
+        "available inside the container"
     )
     return []
 
@@ -3180,9 +3343,9 @@ def build_container_env(api_key):
     return env
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Captured run.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 def run_captured(run_command, env, container_name):
@@ -3255,7 +3418,9 @@ def parse_print_output(output):
     try:
         data = json.loads(output)
     except json.JSONDecodeError as error:
-        raise ValueError(f"harness output is not valid JSON: {error}") from error
+        raise ValueError(
+            f"harness output is not valid JSON: {error}"
+        ) from error
     if not isinstance(data, dict):
         raise ValueError("harness output is not a JSON object")
 
@@ -3272,7 +3437,9 @@ def parse_print_output(output):
                 for error in errors
             )
         else:
-            result = f"The harness failed: {data.get('subtype', 'unknown error')}"
+            result = (
+                f"The harness failed: {data.get('subtype', 'unknown error')}"
+            )
     if not isinstance(result, str):
         raise ValueError(f"harness output has no text `result`: {result!r}")
 
@@ -3285,7 +3452,11 @@ def parse_print_output(output):
     return PrintSummary(
         result=result,
         cost=Decimal(str(cost)) if is_number(cost) else None,
-        duration=Decimal(str(duration_ms)) / 1000 if is_number(duration_ms) else None,
+        duration=(
+            Decimal(str(duration_ms)) / 1000
+            if is_number(duration_ms)
+            else None
+        ),
         is_error=is_error,
     )
 
@@ -3338,9 +3509,9 @@ def shell_exit_code(returncode):
     return returncode
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Generic helpers.
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 def log(message):
@@ -3471,7 +3642,9 @@ def ensure_directory(path, mode):
         pass
     info = os.lstat(path)
     if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
-        raise NotADirectoryError(errno.ENOTDIR, "is a link or not a directory", path)
+        raise NotADirectoryError(
+            errno.ENOTDIR, "is a link or not a directory", path
+        )
     return info
 
 
@@ -3487,7 +3660,11 @@ def open_without_following(path, *, dir_fd=None):
     # that names the link. Every failure is an `OSError`, like any other
     # failure of a read.
     try:
-        return os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dir_fd)
+        return os.open(
+            path,
+            os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+            dir_fd=dir_fd,
+        )
     except OSError as error:
         if error.errno == errno.ELOOP:
             raise OSError(
@@ -3552,7 +3729,9 @@ def write_text_atomically(path, content, mode_source=None):
     # makes the content durable before the rename, so a crash right after the
     # rename cannot leave an empty file at the target.
     directory = os.path.dirname(path) or "."
-    descriptor, temp_path = tempfile.mkstemp(dir=directory, prefix=TEMP_FILE_PREFIX)
+    descriptor, temp_path = tempfile.mkstemp(
+        dir=directory, prefix=TEMP_FILE_PREFIX
+    )
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
             handle.write(content)

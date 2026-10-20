@@ -16,7 +16,8 @@ list_projects() {
     for entry in "$dir"/*/; do
         [ -d "$entry" ] || continue
 
-        if [ -e "${entry}.git" ] && [ ! -e "${entry}.list_project_dirs_ignore" ]; then
+        if [ -e "${entry}.git" ] \
+            && [ ! -e "${entry}.list_project_dirs_ignore" ]; then
             # Valid project. Print it and don't descend further.
             local relative="${entry#"$devel_dir"/}"
             echo "${relative%/}"

@@ -51,7 +51,10 @@ echo "$SUBTITLE_INFO"
 echo ""
 
 # Find text-based subtitle streams (can be converted to mov_text)
-TEXT_SUBTITLE_STREAMS=$(grep -E "subrip|ass|ssa|webvtt|mov_text|srt|subviewer|microdvd|text" <<< "$SUBTITLE_INFO" | grep -oE "Stream #[0-9]+:[0-9]+" | cut -d'#' -f2 | cut -d'(' -f1 || true)
+TEXT_SUBTITLE_STREAMS=$(grep -E \
+    "subrip|ass|ssa|webvtt|mov_text|srt|subviewer|microdvd|text" \
+    <<< "$SUBTITLE_INFO" | grep -oE "Stream #[0-9]+:[0-9]+" \
+    | cut -d'#' -f2 | cut -d'(' -f1 || true)
 
 if [ -z "$TEXT_SUBTITLE_STREAMS" ]; then
     echo "No text-based subtitle streams found (all are bitmap-based)."
@@ -80,7 +83,12 @@ while IFS= read -r stream; do
     FFMPEG_CMD="$FFMPEG_CMD -map $stream"
 done <<< "$TEXT_SUBTITLE_STREAMS"
 
-FFMPEG_CMD="$FFMPEG_CMD -c:v libx264 -profile:v high -level 4.1 -pix_fmt yuv420p -crf 20 -x264-params ref=4:keyint=48:min-keyint=48:scenecut=0 -maxrate 12000k -bufsize 24000k -c:a aac -ac 2 -b:a 192k -c:s mov_text -movflags +faststart \"$OUTPUT_FILE\""
+FFMPEG_CMD="$FFMPEG_CMD -c:v libx264 -profile:v high -level 4.1"
+FFMPEG_CMD="$FFMPEG_CMD -pix_fmt yuv420p -crf 20"
+FFMPEG_CMD="$FFMPEG_CMD -x264-params ref=4:keyint=48:min-keyint=48:scenecut=0"
+FFMPEG_CMD="$FFMPEG_CMD -maxrate 12000k -bufsize 24000k"
+FFMPEG_CMD="$FFMPEG_CMD -c:a aac -ac 2 -b:a 192k -c:s mov_text"
+FFMPEG_CMD="$FFMPEG_CMD -movflags +faststart \"$OUTPUT_FILE\""
 
 echo "Running ffmpeg command:"
 echo "$FFMPEG_CMD"
