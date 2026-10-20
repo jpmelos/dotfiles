@@ -47,34 +47,14 @@ reset_terminal_title() {
     echo -ne "\033]0;$BASH_TERMINAL_TITLE\007"
 }
 
-# The project name that this shell last wrote to its tmux window. Empty when
-# the shell was never in a project, or when it left the last one.
-TMUX_WINDOW_PROJECT=""
-
-# Name the tmux window of this shell after the project of the current
-# directory. Act only when the project changes from the last prompt, so that a
-# shell that stays in place, or that was never in a project, does not touch a
-# name that another pane or the user set. On the way into a project, rename
-# the window, which also turns `automatic-rename` off for it. On the way out,
-# unset `automatic-rename` for the window, so that the global default applies
-# again and tmux names the window by its own scheme.
-set_tmux_window_project() {
-    { [ -n "$TMUX" ] && [ -n "$TMUX_PANE" ]; } || return 0
-
-    local project_name
-    project_name="$(current_project_name)"
-    [ "$project_name" != "$TMUX_WINDOW_PROJECT" ] || return 0
-    TMUX_WINDOW_PROJECT="$project_name"
-
-    if [ -n "$project_name" ]; then
-        tmux rename-window -t "$TMUX_PANE" "$project_name" 2> /dev/null
-    else
-        tmux set-option -w -u -t "$TMUX_PANE" automatic-rename 2> /dev/null
-    fi
-}
-
 if [[ "$PROMPT_COMMAND" != *"reset_terminal_title"* ]]; then
-    export PROMPT_COMMAND="history -a; history -n; reset_terminal_title; set_tmux_window_project; ${PROMPT_COMMAND}"
+    export PROMPT_COMMAND="reset_terminal_title; ${PROMPT_COMMAND}"
+fi
+if [[ "$PROMPT_COMMAND" != *"history -n"* ]]; then
+    export PROMPT_COMMAND="history -n; ${PROMPT_COMMAND}"
+fi
+if [[ "$PROMPT_COMMAND" != *"history -a"* ]]; then
+    export PROMPT_COMMAND="history -a; ${PROMPT_COMMAND}"
 fi
 
 eval "$(starship init bash)"
