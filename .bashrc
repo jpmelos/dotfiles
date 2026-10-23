@@ -14,8 +14,12 @@ export GPG_TTY=$(tty)
 # makes the terminal close when the client exits, instead of leaving a shell
 # that ran the rest of this file for nothing. Skip this inside a tmux pane
 # (tmux sets `$TMUX` there), because the shell in the pane would otherwise open
-# another client, forever.
-if [[ $- == *i* ]] && [ -z "$TMUX" ] && command -v tmux &> /dev/null; then
+# another client, forever. Skip this inside a Herdr pane too (Herdr sets
+# `$HERDR_ENV` there). A Herdr pane has no `$TMUX`, even when Herdr runs inside
+# tmux. Without this check, the pane can attach to the tmux session that shows
+# it, and the screen loops.
+if [[ $- == *i* ]] && [ -z "$TMUX" ] && [ -z "$HERDR_ENV" ] \
+    && command -v tmux &> /dev/null; then
     if tmux has-session &> /dev/null; then
         exec tmux attach-session
     else
