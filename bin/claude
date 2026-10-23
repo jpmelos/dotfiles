@@ -2,4 +2,6 @@
 set -euo pipefail
 trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 
-exec cl --no-rebuild -- "$@"
+# Claude Code runs inside a container, where Herdr cannot see it. `HERDR_AGENT`
+# tells Herdr which agent runs in the pane.
+HERDR_AGENT=claude exec cl --no-rebuild -- "$@"
