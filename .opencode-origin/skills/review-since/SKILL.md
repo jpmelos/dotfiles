@@ -84,6 +84,10 @@ still report it, but tag it as such. Add "\[Scheduled: <reference>\]" after the
 item number, where <reference> identifies the issue or milestone that covers
 the fix.
 
+If a problem you find existed before the current change and was not introduced
+by it, still report it, but tag it as such. Add "[Pre-existent]" after the item
+number. Both tags can apply to the same item.
+
 Do not run compilers, linters, or tests.
 
 This message ends with the ref. A "--" separator can come after the ref. If the
