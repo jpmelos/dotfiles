@@ -47,6 +47,12 @@ function rowLabel(entry, enabled) {
   return (enabled ? "🟢" : "🔴") + " " + entry.name + " (" + entry.permission + ")";
 }
 
+// Text of the reminder for the enabled entries.
+function reminderText(enabled) {
+  const list = enabled.map((entry) => rowLabel(entry, true)).join(", ");
+  return "Fast permissions still on for next turn: " + list + ". Run /fp to turn off.";
+}
+
 // Flip one entry between allow and deny. Return the new state.
 async function flipRule($, entry) {
   const state = await readState($);
@@ -96,6 +102,19 @@ export function register(on) {
     const enabled = await flipRule($, found[0]);
     $.ui.invalidate("ui.render");
     return { text: rowLabel(found[0], enabled) };
+  });
+
+  on("turn.complete", async ($, e, next) => {
+    if (e.agentId === undefined) {
+      try {
+        const state = await readState($);
+        const enabled = state.entries.filter((entry) => isEnabled(state, entry));
+        if (enabled.length > 0) $.ui.log(reminderText(enabled));
+      } catch {
+        // The reminder is best-effort. A turn never fails over it.
+      }
+    }
+    return next(e);
   });
 
   on("ui.render", { component: "Pane" }, async ($, e, next) => {

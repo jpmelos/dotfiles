@@ -168,6 +168,61 @@ async function togglePending(context: Plugin.Context, pending: PendingAllows, en
   context.ui.toast.show({ message: `${chosen.name} turns on with the next session.`, variant: "success" })
 }
 
+// An entry counts as enabled when its rule allows it.
+function isRuleEnabled(rules: readonly SessionRule[], entry: FastPermission): boolean {
+  const ruleIndex = findRuleIndex(rules, entry)
+  return ruleIndex !== -1 && rules[ruleIndex]?.effect === "allow"
+}
+
+// One row as `<name> (<action>: <resource>)`.
+function rowLabel(entry: FastPermission): string {
+  return `${entry.name} (${entry.action}: ${entry.resource})`
+}
+
+// Text of the reminder for the enabled entries.
+function reminderText(enabled: readonly FastPermission[]): string {
+  const list = enabled.map(rowLabel).join(", ")
+  return `Fast permissions still on for next turn: ${list}. Run /fp to turn off.`
+}
+
+// Logs the enabled entries to the chat after a turn, unless none are on.
+async function remindForSession(
+  context: Plugin.Context,
+  sessionID: string,
+  active: Set<string>,
+): Promise<void> {
+  if (active.has(sessionID)) return
+  active.add(sessionID)
+  try {
+    let info
+    try {
+      info = await context.client.session.get({ sessionID })
+    } catch {
+      return
+    }
+    // A child session names its parent, so subagents stay silent.
+    if (info?.parentID) return
+    let entries: FastPermission[]
+    try {
+      entries = await loadFastPermissions()
+    } catch {
+      return
+    }
+    if (entries.length === 0) return
+    const currentRules: SessionRule[] = [...(info.permissions ?? [])]
+    const enabled = entries.filter((entry) => isRuleEnabled(currentRules, entry))
+    if (enabled.length === 0) return
+    const text = reminderText(enabled)
+    try {
+      await context.client.session.synthetic({ sessionID, text, description: text, resume: false })
+    } catch {
+      context.ui.toast.show({ message: text, variant: "warning" })
+    }
+  } finally {
+    active.delete(sessionID)
+  }
+}
+
 // Applies armed allows to a new session, then disarms them.
 async function applyPending(context: Plugin.Context, pending: PendingAllows, sessionID: string): Promise<void> {
   const armed = pending.list()
@@ -217,6 +272,16 @@ export default Plugin.define({
         context.ui.toast.show({ message: "Pending permissions failed.", variant: "error" })
       })
     })
+    const reminding = new Set<string>()
+    const offSucceeded = context.data.on("session.execution.succeeded", (event) => {
+      void remindForSession(context, event.data.sessionID, reminding).catch(() => {})
+    })
+    const offFailed = context.data.on("session.execution.failed", (event) => {
+      void remindForSession(context, event.data.sessionID, reminding).catch(() => {})
+    })
+    const offInterrupted = context.data.on("session.execution.interrupted", (event) => {
+      void remindForSession(context, event.data.sessionID, reminding).catch(() => {})
+    })
     context.keymap.layer(() => ({
       mode: "global",
       commands: [
@@ -233,6 +298,9 @@ export default Plugin.define({
     }))
     return () => {
       off()
+      offSucceeded()
+      offFailed()
+      offInterrupted()
     }
   },
 })
