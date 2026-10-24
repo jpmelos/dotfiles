@@ -37,6 +37,11 @@
 # /   A key with a dot in its name cannot be part of `path`. Get the object
 # /   that holds the key, and read the key from that object.
 # /
+# /   When a string value starts with `op://`, `get` resolves it with
+# /   `op read` and returns the resolved text. Lists and objects resolve
+# /   recursively. A failed resolve is an error. Values without the prefix
+# /   pass through as clear text.
+# /
 # / Configuration file:
 # /   `get` reads `~/config.json` only when it is a regular file, not a link,
 # /   owned by you, with no group or other permissions, as with `chmod 600`.
@@ -50,7 +55,8 @@
 # /
 # / Requirements:
 # /   `fetch` and `save` need the 1Password CLI, `op`, with an active
-# /   session, and `diff`.
+# /   session, and `diff`. `get` needs `op` only when the result holds
+# /   an `op://` ref.
 
 import errno
 import json
@@ -69,10 +75,16 @@ FIELD_NAME = "notesPlain"
 CONFIG_PATH = os.path.expanduser("~/config.json")
 # The configuration path as the messages show it.
 CONFIG_DISPLAY_PATH = "~/config.json"
-# The file holds secrets, such as API keys, so only its owner can read it.
+# The file holds refs to secrets plus clear text config, so only its owner
+# can read it. The refs reveal vault and item names.
 CONFIG_MODE = 0o600
 # The exit status of `get` when the configuration file does not exist.
 MISSING_CONFIG_STATUS = 2
+# How long `get` waits for one `op read` call, in seconds. The wait covers
+# a fingerprint approval.
+OP_READ_TIMEOUT = 120
+# The 1Password account that every `op` call uses.
+OP_ACCOUNT = "my.1password.com"
 
 
 # -----------------------------------------------------------------------------
@@ -189,13 +201,21 @@ def get_value(path):
         walked_keys.append(key)
         value = value.get(key)
 
-    print_json(value)
+    print_json(resolve_op_references(value))
     return 0
 
 
 # -----------------------------------------------------------------------------
 # 1Password.
 # -----------------------------------------------------------------------------
+
+
+def op_env():
+    # Returns the environment for every `op` call, with `OP_ACCOUNT` set to
+    # the fixed account.
+    env = dict(os.environ)
+    env["OP_ACCOUNT"] = OP_ACCOUNT
+    return env
 
 
 def read_note():
@@ -219,6 +239,7 @@ def read_note():
             stderr=subprocess.PIPE,
             encoding="utf-8",
             errors="replace",
+            env=op_env(),
         )
     except OSError as error:
         die(f"{failure}\n{error}")
@@ -248,12 +269,55 @@ def write_note(config_text):
     failure = f"Failed to update '{ITEM_NAME}' in 1Password."
     try:
         result = subprocess.run(
-            ["op", "item", "edit", ITEM_NAME, f"{FIELD_NAME}={note_text}"]
+            ["op", "item", "edit", ITEM_NAME, f"{FIELD_NAME}={note_text}"],
+            env=op_env(),
         )
     except OSError as error:
         die(f"{failure}\n{error}")
     if result.returncode != 0:
         die(failure)
+
+
+def resolve_op_references(value):
+    # Returns `value` with each whole-value `op://` ref replaced by the text
+    # that `op read` returns for it. Lists and objects resolve recursively.
+    # Other values pass through as they are. A result that starts with
+    # `op://` does not resolve again.
+    if isinstance(value, str):
+        if value.startswith("op://"):
+            return read_op_reference(value)
+        return value
+    if isinstance(value, list):
+        return [resolve_op_references(item) for item in value]
+    if isinstance(value, dict):
+        return {
+            key: resolve_op_references(item) for key, item in value.items()
+        }
+    return value
+
+
+def read_op_reference(ref):
+    # Returns the text that `op read` returns for `ref`.
+    try:
+        result = subprocess.run(
+            ["op", "read", "--no-newline", ref],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            encoding="utf-8",
+            errors="replace",
+            timeout=OP_READ_TIMEOUT,
+            env=op_env(),
+        )
+    except FileNotFoundError:
+        die("cannot run `op`. Install the 1Password CLI")
+    except OSError as error:
+        die(f"cannot run `op read`: {error}")
+    except subprocess.TimeoutExpired:
+        die(f"`op read` timed out for `{ref}`")
+    if result.returncode != 0:
+        detail = (result.stderr or "").strip() or "no error message from op"
+        die(f"cannot resolve `{ref}`: {detail}")
+    return result.stdout
 
 
 # -----------------------------------------------------------------------------
@@ -265,8 +329,9 @@ def load_config():
     # Returns the parsed configuration file, a `dict`. Exits with
     # `MISSING_CONFIG_STATUS` when the file does not exist.
     #
-    # The file holds secrets, so it must be a regular file that belongs to the
-    # user who runs this script, with no group or other access. The checks run
+    # The file holds refs to secrets plus clear text config, so it must be a
+    # regular file that belongs to the user who runs this script, with no
+    # group or other access. The checks run
     # on the open descriptor, so the file that passes them is the file that
     # the parser reads. `O_NOFOLLOW` makes a link fail the open. `O_NONBLOCK`
     # makes the open of a FIFO return at once instead of waiting for a writer,
@@ -330,7 +395,7 @@ def read_config():
 
 def write_config(text):
     # `os.open` applies the mode only to a file that it creates, so the mode
-    # of an existing file is set before the write. The secrets are then never
+    # of an existing file is set before the write. The refs are then never
     # in a file that other users can read.
     try:
         descriptor = os.open(
@@ -382,7 +447,7 @@ def print_json(value):
 def diff_with_text(arguments, text):
     # Runs `diff` with `arguments`, where `-` stands for `text`, and returns
     # its output. Returns `None` when the two inputs are the same. The text
-    # goes through standard input, so the secrets never touch a temporary
+    # goes through standard input, so the refs never touch a temporary
     # file.
     try:
         result = subprocess.run(
