@@ -1,10 +1,33 @@
 ---
-description: Review uncommitted changes.
-argument-hint: [additional instructions]
+description: Review uncommitted changes, changes since a ref, a PR, or files.
+argument-hint: '[target] [-- additional instructions]'
 disable-model-invocation: true
 ---
 
-Review uncommitted changes.
+Review the target given at the end of this message.
+
+## Kind of review
+
+Find the kind of review first. Use the first rule that matches the target.
+
+1. If the target is empty, review the uncommitted changes.
+2. If the target is a PR URL, a PR number, or a request for a PR, review the
+   PR. For example: `https://github.com/org/repo/pull/123`, `123`, `#123`, or
+   `PR my-branch`.
+3. If the target is a list of paths to files, review the files.
+4. If the target is a git ref, review the changes since the ref. A git ref is a
+   branch, a tag, a commit, or an expression such as `HEAD~3`. The word "since"
+   can come before the ref. If the target is only the word "since", use the
+   default branch as the ref. To check that a ref exists, run
+   `git rev-list --max-count=1 <ref>`.
+5. If the target is a description in plain words, convert it to one of the
+   kinds above. For example, "the last two commits" are the changes since
+   `HEAD~2`.
+
+If no rule matches the target, ask the user in the chat what to review. Stop
+there.
+
+## Uncommitted changes
 
 Obtain the changes first.
 
@@ -13,20 +36,55 @@ Obtain the changes first.
 - Review both outputs together as one change.
 - If both outputs are empty, state that there is nothing to review. Stop there.
 
+## Changes since a ref
+
+If the ref is the default branch, find the default branch first. The default
+branch is the result of `git main-branch`.
+
+- Run `git main-branch`. If the output names a branch, use it as the default
+  branch.
+- If that command fails or the output is empty, run `git branch --list` and
+  guess the default from the names. Prefer `main` over `master`, and `master`
+  over the rest. Names such as `dev` are also common defaults.
+
+Obtain the changes next.
+
+- Run `git diff <ref>...` for the ref in effect. Review that diff.
+- Also run `git log <ref>... --oneline` for commit context.
+- If both outputs are empty, state that there is nothing to review. Stop there.
+
+## PR
+
+The PR reference can be one of many things. Act accordingly:
+
+- The branch name. Find the PR for this branch in the remote server (GitHub,
+  GitLab, etc).
+- The PR URL.
+- The PR number.
+
+Before you review it, fetch the PR diff and metadata from the remote.
+
+## Files
+
+Obtain the files first. Before you review the files, read each listed file.
+
+## Review
+
 Provide a detailed explanation about what the changes are about, and if you can
-figure it out, also explain why the changes would be desirable. Feel free to
-read any files you feel are necessary to assist you in a more comprehensive
-review. Think very hard.
+figure it out, also explain why the changes would be desirable. In a review of
+files, explain instead what the contents of the files are about, and why the
+existence of these files is warranted. Feel free to read any files you feel are
+necessary to assist you in a more comprehensive review. Think very hard.
 
-If you know that the change corresponds to an issue or a PR in a tracker
-(GitHub, Linear, etc), read the issue or PR. Also read the project, the
-milestones, the parent and related issues and PRs, linked documents, and any
-other artifacts attached to it. Use them to understand the larger context in
-which the change happens, and review against that context. Look for the tracker
-reference in the branch name, the commit messages, the PR title and
-description, and the additional instructions.
+If you know that the change, or the work on the files, corresponds to an issue
+or a PR in a tracker (GitHub, Linear, etc), read the issue or PR. Also read the
+project, the milestones, the parent and related issues and PRs, linked
+documents, and any other artifacts attached to it. Use them to understand the
+larger context in which the work happens, and review against that context. Look
+for the tracker reference in the branch name, the commit messages, the PR title
+and description, and the additional instructions.
 
-Finally, provide your own version of:
+Finally, except in a review of files, provide your own version of:
 
 - A PR title, at most 50 characters.
 - A PR description that is concise and to the point, without excluding any
@@ -42,13 +100,13 @@ a fence of four backticks for the outer block.
 
 Review checklist:
 
-- Change is good and bug-free.
+- The change or the files are good and bug-free.
 - Code is simple and readable.
 - Functions and variables are well-named.
 - Proper error handling.
 - No exposed secrets or API keys.
 - Input is validated and sanitized.
-- Good test coverage.
+- Good test coverage. (Tests can be in other files.)
 - Code should have good performance characteristics.
 
 Provide feedback organized by priority. Always include all three sections, even
@@ -73,17 +131,19 @@ the fix.
 
 If a problem you find existed before the current change and was not introduced
 by it, still report it, but tag it as such. Add "[Pre-existent]" after the item
-number. Both tags can apply to the same item.
+number. Both tags can apply to the same item. Do not use this tag in a review
+of files.
 
 Do not run compilers, linters, or tests.
 
-This message ends with additional instructions from the user. The additional
-instructions can be empty.
+This message ends with the target. The target can be empty. A "--" separator
+can come after the target. If the separator is there, the text after it gives
+additional instructions from the user.
 
 If there are additional instructions, follow them. If the additional
 instructions conflict with the instructions above, the additional instructions
 have priority.
 
-Additional instructions:
+Target to review (additional instructions after "--"):
 
 $ARGUMENTS
