@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# Refresh the Telegram bot after changes to the code or the configuration.
+# Pulls the dotfiles, refreshes ~/config.json from 1Password, syncs both
+# into the telegram_bot user, and restarts the bot. Run on the Pi as
+# yourself, not as telegram_bot. It needs your 1Password session and your
+# GitHub access.
+#
+# Usage: update_telegram_bot
+
+if [ "$#" -ne 0 ]; then
+    echo "usage: update_telegram_bot" >&2
+    exit 1
+fi
+
+if ! id telegram_bot &> /dev/null; then
+    echo "Error: user telegram_bot does not exist." >&2
+    exit 1
+fi
+
+git -C "$HOME/devel/dotfiles" pull
+jc fetch
+sudo rm -rf /home/telegram_bot/devel/dotfiles
+sudo cp -a "$HOME/devel/dotfiles" /home/telegram_bot/devel/dotfiles
+sudo chown -R telegram_bot:telegram_bot /home/telegram_bot/devel
+sudo -u telegram_bot -H bash -c 'cd ~/devel/dotfiles && stow -R .'
+sudo install -o telegram_bot -g telegram_bot -m 600 "$HOME/config.json" \
+    /home/telegram_bot/config.json
+service_account_token_path=/home/telegram_bot/op_service_account_token.txt
+if ! sudo -u telegram_bot -H test -r "$service_account_token_path"; then
+    echo "Error: $service_account_token_path is missing." >&2
+    exit 1
+fi
+sudo systemctl restart telegram-bot
+echo "Telegram bot updated."

@@ -14,7 +14,8 @@ sudo apt-get -y clean
 ```bash
 sudo apt install curl wget git iptables-persistent openresolv wireguard transmission-daemon ca-certificates gpg jq starship stow fzf tmux npm chromium-browser sqlite3 libsqlite3-dev delta ffmpeg
 git clone https://github.com/hyperupcall/autoenv ~/.autoenv
-curl -LsSf https://astral.sh/uv/install.sh | sh
+curl -LsSf https://astral.sh/uv/install.sh | sudo env UV_INSTALL_DIR=/usr/local/bin sh
+uv --version
 curl -sS https://downloads.1password.com/linux/keys/1password.asc |
 	sudo gpg --dearmor --output /usr/share/keyrings/1password-archive-keyring.gpg &&
 	echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/$(dpkg --print-architecture) stable main" |
@@ -219,11 +220,57 @@ via AirVPN website.
 
 ## 11. Run Telegram Bot (Bypasses VPN)
 
-The bot runs under systemd with primary group `vpn-bypass` (see section 6),
-which marks its packets for the public Internet route. The unit file already
-sets this. The VPN replaces `/etc/resolv.conf` with VPN-only resolvers.
-Bypassed traffic cannot reach those resolvers. The unit bind-mounts
-`/etc/resolv.conf.bypass` over `/etc/resolv.conf`.
+The bot runs as user `telegram_bot` with primary group `vpn-bypass` (see
+section 6). This marks its packets for the public Internet route. The unit file
+already sets both. A dedicated user isolates the bot token and configuration.
+Only `telegram_bot` (and root) can read them. The bot then resolves secrets
+with `jc get` without human approval. The VPN replaces `/etc/resolv.conf` with
+VPN-only resolvers. Bypassed traffic cannot reach those resolvers. The unit
+bind-mounts `/etc/resolv.conf.bypass` over `/etc/resolv.conf`.
+
+Create the user first (after section 6, so the `vpn-bypass` group exists):
+
+```bash
+sudo useradd -m -s /bin/bash telegram_bot
+id telegram_bot
+```
+
+Give the bot its own copy of the dotfiles. The bot has no GitHub access. Copy
+from your checkout in section 5 instead of cloning:
+
+```bash
+sudo mkdir -p /home/telegram_bot/devel
+sudo cp -a /home/jpmelos/devel/dotfiles /home/telegram_bot/devel/dotfiles
+sudo chown -R telegram_bot:telegram_bot /home/telegram_bot/devel
+sudo -u telegram_bot -H bash -c 'cd ~/devel/dotfiles && rm -f ~/.bashrc && stow -R .'
+```
+
+After changes to the code or the configuration, run `update_telegram_bot`. It
+pulls the dotfiles, refreshes `~/config.json`, syncs both to the bot user, and
+restarts the bot.
+
+Copy your fetched configuration from section 5. The bot only runs `jc get`:
+
+```bash
+sudo install -o telegram_bot -g telegram_bot -m 600 /home/jpmelos/config.json /home/telegram_bot/config.json
+```
+
+Create the service account token file. In 1Password, create a service account
+with read access to each vault named in the `op://` refs of `config.json`. Save
+only the token in the file, with no key name and no extra lines:
+
+```bash
+sudo -u telegram_bot -H bash -c 'umask 077; cat > ~/op_service_account_token.txt'
+```
+
+Paste the token and press Enter. Then press Ctrl-D. Verify permissions. Only
+`telegram_bot` can read either file:
+
+```bash
+sudo stat -c '%a %U:%G %n' /home/telegram_bot/config.json /home/telegram_bot/op_service_account_token.txt
+```
+
+Both lines must show `600 telegram_bot:telegram_bot`.
 
 Create that file with clearnet resolvers first:
 

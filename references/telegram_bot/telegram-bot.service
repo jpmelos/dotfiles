@@ -1,28 +1,33 @@
 [Unit]
 Description=Telegram bot for interactive tasks
-Documentation=file:/home/jpmelos/devel/dotfiles/references/telegram_bot/README.md
+Documentation=file:/home/telegram_bot/devel/dotfiles/references/telegram_bot/README.md
 Wants=network-online.target
 After=network-online.target
 
 [Service]
 Type=simple
-User=jpmelos
+User=telegram_bot
 Group=vpn-bypass
 # The VPN replaces /etc/resolv.conf with VPN-only resolvers.
 # The bot bypasses the VPN, so it needs clearnet resolvers from its own file instead.
 BindReadOnlyPaths=/etc/resolv.conf.bypass:/etc/resolv.conf
 # Paths are hardcoded: in a system unit %h expands to /root and ignores
 # User=. Do not switch these back to %h.
-WorkingDirectory=/home/jpmelos
-# HOME is how `jc` finds ~/config.json. PATH holds ~/bin for `jc` and the
-# uv location for `uv run --script`. All secrets come from `jc get`, so the
-# unit holds none and reads no environment file.
-Environment=HOME=/home/jpmelos
-Environment=PATH=/home/jpmelos/bin:/home/jpmelos/.local/bin:/usr/local/bin:/usr/bin:/bin
+WorkingDirectory=/home/telegram_bot
+# HOME is how `jc` finds ~/config.json and how `uv` finds its cache.
+# PATH holds ~/bin for `jc` and the bot, plus /usr/local/bin for the
+# system-wide `uv` and agent-browser. OP_SERVICE_ACCOUNT_TOKEN comes from
+# ~/op_service_account_token.txt (see ExecStart). It lets `op` resolve
+# `jc get` refs without interactive approval. All other secrets still
+# come from `jc get`, so the unit holds none itself.
+Environment=HOME=/home/telegram_bot
+Environment=PATH=/home/telegram_bot/bin:/usr/local/bin:/usr/bin:/bin
 # Only one process can poll one bot token. Point --tasks-dir at the
-# directory with your <name>.py task files. An alternative line for the
-# dotfiles checkout is commented below.
-ExecStart=/home/jpmelos/bin/telegram_bot --tasks-dir=/home/jpmelos/devel/dotfiles/telegram_tasks
+# directory with your <name>.py task files.
+# The token file holds only the token (nothing else). It is owned by
+# telegram_bot with mode 600. Export it here so the bot and its `jc`
+# and `op` children authenticate without interaction.
+ExecStart=/bin/sh -c 'export OP_SERVICE_ACCOUNT_TOKEN="$(cat /home/telegram_bot/op_service_account_token.txt)"; exec /home/telegram_bot/bin/telegram_bot --tasks-dir=/home/telegram_bot/devel/dotfiles/telegram_tasks'
 Restart=always
 RestartSec=10
 # SIGTERM stops the running task gracefully, including its shutdown hook.
