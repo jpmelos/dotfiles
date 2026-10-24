@@ -198,8 +198,9 @@ def main(
     \b
     Chat commands:
       /list - show the available tasks
-      /run <name> ... - start a task; a shorthand works too; only one
-      task runs at a time
+      /run [<name>] ... - start a task; a shorthand works too; only
+      one task runs at a time; without a name, lists tasks by number
+      with next runs and waits for a number, name, or shorthand
       /status - show uptime, the running task, and the last result
       /cancel - stop the running task; its shutdown hook still runs
       /help - show the commands
@@ -1552,6 +1553,10 @@ class Bot:
         self.cond = threading.Condition(self.lock)
         self.stopping = threading.Event()
         self.current = None
+        # Numbered /run choice per chat: chat_id to the ordered task names
+        # shown by the last bare /run. A plain number, name, or shorthand
+        # next runs that task.
+        self.run_choices = {}
         self.last_summary = None
         self.last_time = None
         self.start_mono = time.monotonic()
@@ -1833,6 +1838,7 @@ class Bot:
                 self.current if self.is_alive_locked(self.current) else None
             )
             waiting = running is not None and running.pending is not None
+            has_picker = chat_id in self.run_choices
         if running is not None:
             if waiting:
                 return
@@ -1842,9 +1848,10 @@ class Bot:
                 "input right now.",
             )
             return
-        self.try_send(
-            chat_id, "Send /list to see tasks, /run <name> to start one."
-        )
+        if has_picker:
+            if self.handle_picker_reply(chat_id, text):
+                return
+        self.try_send(chat_id, "Send /list to see tasks, /run to choose one.")
 
     def handle_non_text(self, chat_id):
         with self.lock:
@@ -1881,7 +1888,7 @@ class Bot:
         return (
             "Commands:\n"
             "/list - show tasks\n"
-            "/run <name> ... - start a task\n"
+            "/run [<name>] ... - start a task; without a name, list tasks\n"
             "/status - show the running task\n"
             "/cancel - stop the running task\n"
             "/help - show this text"
@@ -1990,10 +1997,8 @@ class Bot:
 
     def handle_run(self, chat_id, arguments):
         if not arguments:
-            self.try_send(chat_id, "Usage: /run <name> ...")
+            self.handle_run_picker(chat_id)
             return
-        name = arguments[0]
-        task_args = arguments[1:]
         with self.lock:
             if self.is_alive_locked(self.current):
                 self.try_send_locked(
@@ -2002,8 +2007,31 @@ class Bot:
                     "for it or send /cancel.",
                 )
                 return
+            picker = self.run_choices.get(chat_id)
+            picker = list(picker) if picker is not None else None
         specs = discover_tasks(self.tasks_dir)
-        spec = resolve_task_spec(specs, name)
+        first = arguments[0]
+        task_args = arguments[1:]
+        if picker is not None and first.isdigit():
+            try:
+                index = int(first)
+            except ValueError:
+                index = None
+            if index is not None and 1 <= index <= len(picker):
+                stored = picker[index - 1]
+                spec = specs.get(stored)
+                if spec is None:
+                    self.try_send(
+                        chat_id,
+                        f"Task {stored!r} is no longer available. "
+                        "Send /run to see the current list.",
+                    )
+                    return
+                if self.launch_task(chat_id, spec, task_args):
+                    with self.lock:
+                        self.run_choices.pop(chat_id, None)
+                return
+        spec = resolve_task_spec(specs, first)
         if spec is None:
             hint = (
                 ", ".join(
@@ -2012,13 +2040,148 @@ class Bot:
                 or "none"
             )
             self.try_send(
-                chat_id, f"Unknown task {name!r}. Available: {hint}."
+                chat_id, f"Unknown task {first!r}. Available: {hint}."
             )
             return
+        if self.launch_task(chat_id, spec, task_args):
+            with self.lock:
+                self.run_choices.pop(chat_id, None)
+
+    def handle_run_picker(self, chat_id):
+        with self.lock:
+            if self.is_alive_locked(self.current):
+                self.try_send_locked(
+                    chat_id,
+                    f"Task {self.current.name} already runs. Wait "
+                    "for it or send /cancel.",
+                )
+                return
+        text, names = self.run_picker_text()
+        if not names:
+            with self.lock:
+                self.run_choices.pop(chat_id, None)
+            self.try_send(chat_id, text)
+            return
+        with self.lock:
+            self.run_choices[chat_id] = names
+        self.try_send(chat_id, text)
+
+    def run_picker_text(self):
+        # Returns the numbered task list for a bare /run and the ordered
+        # task names behind the numbers. Scheduled tasks show their next
+        # run, and every task shows its shorthands through the display name.
+        specs = discover_tasks(self.tasks_dir)
+        if not specs:
+            return (
+                (
+                    f"No tasks in {self.tasks_dir}. "
+                    "Add a <name>.py file to add one."
+                ),
+                [],
+            )
+        names = sorted(specs)
+        now = time.time()
+        with self.lock:
+            last_map = dict(self.schedule_last)
+        lines = ["Which task do you want to run?"]
+        for index, name in enumerate(names, 1):
+            spec = specs[name]
+            shown = display_task_name(spec)
+            try:
+                expr, _args = read_task_schedule(spec.path)
+            except TaskLoadError:
+                suffix = " [bad schedule]"
+            else:
+                if expr is None:
+                    suffix = ""
+                else:
+                    last = last_map.get(name)
+                    if last is None:
+                        suffix = (
+                            " [next run waits "
+                            f"for the first tick ({expr})]"
+                        )
+                    else:
+                        try:
+                            next_at = cron_next_after(expr, last)
+                        except Exception:
+                            suffix = f" [bad schedule ({expr})]"
+                        else:
+                            if next_at <= now:
+                                suffix = f" [next run due now ({expr})]"
+                            else:
+                                suffix = (
+                                    " [next run in "
+                                    f"{format_duration(next_at - now)} "
+                                    f"({expr})]"
+                                )
+            line = f"{index}. {shown}"
+            if spec.description:
+                line += f" - {spec.description}"
+            lines.append(line + suffix)
+        lines.append(
+            "Reply with a number, name, or shorthand, "
+            "or send /cancel to dismiss."
+        )
+        return ("\n".join(lines), names)
+
+    def handle_picker_reply(self, chat_id, text):
+        # Runs the task a bare /run waits for. The reply holds a number
+        # from the list, a task name, or a shorthand, with optional task
+        # args after it. Returns True when the picker consumed the reply.
+        try:
+            parts = shlex.split(text)
+        except ValueError:
+            parts = text.split()
+        if not parts:
+            return True
+        selector = parts[0]
+        task_args = parts[1:]
+        with self.lock:
+            picker = self.run_choices.get(chat_id)
+            picker = list(picker) if picker is not None else None
+        if picker is None:
+            return False
+        specs = discover_tasks(self.tasks_dir)
+        if selector.isdigit():
+            try:
+                index = int(selector)
+            except ValueError:
+                index = None
+            if index is not None and 1 <= index <= len(picker):
+                stored = picker[index - 1]
+                spec = specs.get(stored)
+                if spec is None:
+                    self.try_send(
+                        chat_id,
+                        f"Task {stored!r} is no longer available. "
+                        "Send /run to see the current list.",
+                    )
+                    return True
+                if self.launch_task(chat_id, spec, task_args):
+                    with self.lock:
+                        self.run_choices.pop(chat_id, None)
+                return True
+        spec = resolve_task_spec(specs, selector)
+        if spec is None:
+            self.try_send(
+                chat_id,
+                f"Unknown task {selector!r}. Reply with a number, name, "
+                "or shorthand, or send /run to see the list again.",
+            )
+            return True
+        if self.launch_task(chat_id, spec, task_args):
+            with self.lock:
+                self.run_choices.pop(chat_id, None)
+        return True
+
+    def launch_task(self, chat_id, spec, task_args):
+        # Starts one manual run. Returns True when the run started. Sends
+        # the busy notice and returns False when another task won the race.
         run_timeout = read_task_timeout(spec.path, self.default_run_timeout)
         record = RunRecord(
             name=spec.name,
-            args=task_args,
+            args=list(task_args),
             chat_id=chat_id,
             run_timeout=run_timeout,
         )
@@ -2030,10 +2193,17 @@ class Bot:
         )
         with self.lock:
             if self.is_alive_locked(self.current):
-                self.try_send_locked(
-                    chat_id, "Another task started first. Try again."
-                )
-                return
+                if self.current is not None:
+                    self.try_send_locked(
+                        chat_id,
+                        f"Task {self.current.name} already runs. Wait "
+                        "for it or send /cancel.",
+                    )
+                else:
+                    self.try_send_locked(
+                        chat_id, "Another task started first. Try again."
+                    )
+                return False
             record.thread = thread
             self.current = record
             # A manual run counts as an execution, so a schedule never fires
@@ -2042,10 +2212,15 @@ class Bot:
         self.save_schedule_state()
         log(f"task {spec.name}: started by chat, budget {run_timeout:g}s")
         thread.start()
+        return True
 
     def handle_cancel(self, chat_id):
         with self.lock:
             if not self.is_alive_locked(self.current):
+                if chat_id in self.run_choices:
+                    self.run_choices.pop(chat_id, None)
+                    self.try_send_locked(chat_id, "Cancelled.")
+                    return
                 self.try_send_locked(chat_id, "No task is running.")
                 return
             name = self.current.name
