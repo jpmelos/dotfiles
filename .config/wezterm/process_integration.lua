@@ -10,16 +10,4 @@ function m.is_outside_vim_and_tmux(pane)
     return not term.any_process_is_running(pane, { "nvim", "tmux" })
 end
 
-function m.is_in_claude(pane)
-    return term.any_process_is_running(pane, { "claude" })
-end
-
-function m.is_in_opencode(pane)
-    return term.any_process_is_running(pane, { "opencode" })
-end
-
-function m.is_in_claude_or_opencode(pane)
-    return term.any_process_is_running(pane, { "claude", "opencode" })
-end
-
 return m

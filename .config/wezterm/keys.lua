@@ -51,20 +51,6 @@ function module.apply_to_config(config)
             mods = "LEADER",
             action = action.ReloadConfiguration,
         },
-        -- Enter for new lines in Claude and OpenCode.
-        -- SHIFT + Enter to send the prompt in Claude and OpenCode.
-        bind_if_else_forward(
-            "",
-            "Enter",
-            process_integration.is_in_claude_or_opencode,
-            wezterm.action({ SendString = "\x1b\r" })
-        ),
-        bind_if_else_forward(
-            "SHIFT",
-            "Enter",
-            process_integration.is_in_claude_or_opencode,
-            wezterm.action({ SendString = "\r" })
-        ),
         -- Clear screen. When tmux is running, forward to tmux so its own `C-n`
         -- binding handles the `C-l` translation (WezTerm sending `C-l`
         -- directly would trigger tmux's pane navigation instead).

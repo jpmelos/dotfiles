@@ -3,5 +3,9 @@
   "highlights": false,
   "session": {
     "sidebar": "hide"
+  },
+  "keybinds": {
+    "input.submit": "shift+return",
+    "input.newline": "return"
   }
 }

@@ -13,6 +13,9 @@ config.audible_bell = "Disabled"
 
 config.check_for_updates = false
 
+-- Report modified keys distinctly, so `Shift+Enter` stays distinct from `Enter`.
+config.enable_kitty_keyboard = true
+
 -- When opening Wezterm when it's already open, open a new tab in the
 -- already-existent instance instead of creating a new one.
 config.prefer_to_spawn_tabs = true

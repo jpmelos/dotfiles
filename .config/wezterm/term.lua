@@ -3,41 +3,6 @@ local strings = require("strings")
 
 local m = {}
 
--- Check if a Docker container name belongs to one of the agent launchers.
-local function is_claude_code_container(container_name)
-    return container_name:match("^claude_code_")
-end
-
-local function is_opencode_container(container_name)
-    return container_name:match("^opencode_")
-end
-
--- Resolve the inner process name when `docker` is the foreground process on
--- the TTY. Returns the name of the process running inside the container, or
--- `nil` if it cannot be determined.
-local function resolve_docker_inner_process(args_line)
-    local docker_subcommand = args_line:match("docker%s+(%S+)")
-    if docker_subcommand ~= "run" then
-        return nil
-    end
-
-    local container_name = args_line:match("%-%-name%s+(%S+)")
-        or args_line:match("%-%-name=(%S+)")
-    if container_name == nil then
-        return nil
-    end
-
-    if is_claude_code_container(container_name) then
-        return "claude"
-    end
-
-    if is_opencode_container(container_name) then
-        return "opencode"
-    end
-
-    return container_name
-end
-
 -- Resolve the tmux pane TTY when `tmux` is active on the given TTY. Uses the
 -- WezTerm pane's TTY to find the `tmux` client, then looks up the active
 -- `tmux` pane's TTY.
@@ -123,16 +88,15 @@ local function find_foreground_process(tty)
 
     -- Strip leading dash (login shell indicator).
     process_path = process_path:gsub("^%-", "")
-    -- Strip path prefix (e.g. /usr/bin/docker -> docker).
+    -- Strip path prefix.
     local process_name = process_path:match("([^/]+)$")
 
     return process_name, args
 end
 
 -- Return a list of process names representing the nesting stack. If inside
--- `tmux`, `"tmux"` is the first element. If inside `docker`, `"docker"` comes
--- next. Finally, the innermost process name is appended when it can be
--- determined.
+-- `tmux`, `"tmux"` is the first element. Finally, the foreground process name
+-- is appended when it can be determined.
 local function get_current_process_names(pane)
     local tty = pane:get_tty_name()
     if tty == nil then
@@ -156,22 +120,12 @@ local function get_current_process_names(pane)
         end
     end
 
-    local process_name, args = find_foreground_process(pane_tty or tty)
+    local process_name = find_foreground_process(pane_tty or tty)
     if process_name == nil then
         return process_names
     end
 
-    -- If the foreground process is `docker`, add it to the stack and try to
-    -- identify what's running inside the container.
-    if process_name == "docker" then
-        table.insert(process_names, "docker")
-        local inner_process = resolve_docker_inner_process(args)
-        if inner_process ~= nil then
-            table.insert(process_names, inner_process)
-        end
-    else
-        table.insert(process_names, process_name)
-    end
+    table.insert(process_names, process_name)
 
     wezterm.log_info("Process names: " .. strings.dump(process_names))
 
