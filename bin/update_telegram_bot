@@ -4,9 +4,9 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 
 # Refresh the Telegram bot after changes to the code or the configuration.
 # Pulls the dotfiles, refreshes ~/config.json from 1Password, syncs both
-# into the telegram_bot user, and restarts the bot. Run on the Pi as
-# yourself, not as telegram_bot. It needs your 1Password session and your
-# GitHub access.
+# into the telegram_bot user, refreshes the service unit when it changed,
+# and restarts the bot. Run on the Pi as yourself, not as telegram_bot.
+# It needs your 1Password session and your GitHub access.
 #
 # Usage: update_telegram_bot
 
@@ -22,10 +22,18 @@ fi
 
 git -C "$HOME/devel/dotfiles" pull
 jc fetch
-sudo rm -rf /home/telegram_bot/devel/dotfiles
-sudo cp -a "$HOME/devel/dotfiles" /home/telegram_bot/devel/dotfiles
+bot_dotfiles=/home/telegram_bot/devel/dotfiles
+sudo rm -rf "$bot_dotfiles"
+sudo cp -a "$HOME/devel/dotfiles" "$bot_dotfiles"
 sudo chown -R telegram_bot:telegram_bot /home/telegram_bot/devel
 sudo -u telegram_bot -H bash -c 'cd ~/devel/dotfiles && stow -R .'
+unit_source=$bot_dotfiles/references/telegram_bot/telegram-bot.service
+unit_target=/etc/systemd/system/telegram-bot.service
+if ! cmp -s "$unit_source" "$unit_target"; then
+    sudo cp "$unit_source" "$unit_target"
+    sudo chown root:root "$unit_target"
+    sudo systemctl daemon-reload
+fi
 sudo install -o telegram_bot -g telegram_bot -m 600 "$HOME/config.json" \
     /home/telegram_bot/config.json
 service_account_token_path=/home/telegram_bot/op_service_account_token.txt

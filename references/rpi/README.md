@@ -246,8 +246,8 @@ sudo -u telegram_bot -H bash -c 'cd ~/devel/dotfiles && rm -f ~/.bashrc && stow 
 ```
 
 After changes to the code or the configuration, run `update_telegram_bot`. It
-pulls the dotfiles, refreshes `~/config.json`, syncs both to the bot user, and
-restarts the bot.
+pulls the dotfiles, refreshes `~/config.json`, syncs both to the bot user,
+refreshes the service unit when it changed, and restarts the bot.
 
 Copy your fetched configuration from section 5. The bot only runs `jc get`:
 
