@@ -7,7 +7,7 @@
 # vim: ft=python
 
 # / Manage `~/config.json`, the local configuration, and its copy in the
-# / "Local Configuration" note of 1Password.
+# / "Local Configuration" note of the "Configuration" vault in 1Password.
 # /
 # / Usage: jc <fetch|save>
 # /        jc get <path>
@@ -68,8 +68,9 @@ import termios
 import tty
 
 USAGE = "Usage: jc <fetch|save>\n       jc get <path>"
-# The 1Password item that holds the configuration, and the field of the item
-# with the text.
+# The 1Password vault, item, and field that hold the configuration. The
+# vault is named so that accounts with several vaults find the item.
+VAULT_NAME = "Configuration"
 ITEM_NAME = "Local Configuration"
 FIELD_NAME = "notesPlain"
 CONFIG_PATH = os.path.expanduser("~/config.json")
@@ -230,6 +231,8 @@ def read_note():
                 "item",
                 "get",
                 ITEM_NAME,
+                "--vault",
+                VAULT_NAME,
                 "--fields",
                 FIELD_NAME,
                 "--format",
@@ -269,7 +272,15 @@ def write_note(config_text):
     failure = f"Failed to update '{ITEM_NAME}' in 1Password."
     try:
         result = subprocess.run(
-            ["op", "item", "edit", ITEM_NAME, f"{FIELD_NAME}={note_text}"],
+            [
+                "op",
+                "item",
+                "edit",
+                ITEM_NAME,
+                "--vault",
+                VAULT_NAME,
+                f"{FIELD_NAME}={note_text}",
+            ],
             env=op_env(),
         )
     except OSError as error:
