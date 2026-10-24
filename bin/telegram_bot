@@ -51,6 +51,15 @@ EXPORT_MANIFEST_NAME = "telegram_bot_export.json"
 EXPORT_VERSION = 1
 # A bad SCHEDULE warns at most once per task per hour, so the log stays quiet.
 SCHEDULE_WARN_INTERVAL = 3600.0
+# Commands shown in the Telegram menu and autocomplete, via setMyCommands.
+BOT_COMMANDS = (
+    ("start", "show the commands"),
+    ("list", "show the available tasks"),
+    ("run", "start a task; without a name, list tasks"),
+    ("status", "show the running task"),
+    ("cancel", "stop the running task"),
+    ("help", "show the commands"),
+)
 
 
 # -----------------------------------------------------------------------------
@@ -1589,6 +1598,7 @@ class Bot:
             "Polling Telegram for updates."
         )
         self.load_schedule_state()
+        self.register_commands()
         self.start_heartbeat()
         self.start_scheduler()
         self.send_heartbeat()
@@ -1780,6 +1790,21 @@ class Bot:
         return offset
 
     # -- sending ----------------------------------------------------------
+
+    def register_commands(self):
+        # Publishes the command menu via setMyCommands, so clients show
+        # the commands in the menu and autocomplete. A failure only warns,
+        # so polling still starts without a menu.
+        commands = [
+            {"command": name, "description": description}
+            for name, description in BOT_COMMANDS
+        ]
+        try:
+            self.api.call("setMyCommands", {"commands": commands})
+        except BotError as error:
+            log(f"Warning: cannot set bot commands: {error}")
+        else:
+            log(f"Registered {len(commands)} bot command(s) with Telegram.")
 
     def send_text(self, chat_id, text):
         if not isinstance(text, str):
