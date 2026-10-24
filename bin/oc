@@ -383,6 +383,7 @@ RESERVED_ENV_VARS = frozenset(
         "COLORTERM",
         "DOCKER_HOST",
         "FORCE_COLOR",
+        "HERDR_AGENT",
         "HOME",
         "LANG",
         "NO_COLOR",
@@ -483,6 +484,10 @@ CONTAINER_MEMORY_LIMIT = "8g"
 
 
 def main():
+    # Herdr cannot see inside the container, so mark this launcher as the
+    # `opencode` agent. The hint applies to the foreground process that Herdr
+    # sees.
+    os.environ["HERDR_AGENT"] = "opencode"
     process_help_option(sys.argv[1:])
 
     paths = resolve_host_paths()
@@ -2852,6 +2857,9 @@ def agent_env_args(run_config):
     # read. A name alone relays the value of the host, and Docker leaves the
     # variable out when the host does not set it.
     return [
+        # Tell Herdr which agent runs in the container.
+        "--env",
+        "HERDR_AGENT=opencode",
         # OpenCode's own API key for the Zen proxy, which serves the `opencode`
         # provider. The name alone keeps the value out of the command line.
         # Without it only the free Zen models are enabled.
@@ -3344,6 +3352,7 @@ def stdin_is_tty():
 
 def build_container_env(opencode_api_key):
     env = dict(os.environ)
+    env["HERDR_AGENT"] = "opencode"
     if opencode_api_key:
         env["OPENCODE_API_KEY"] = opencode_api_key
     else:

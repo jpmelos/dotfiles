@@ -356,6 +356,7 @@ RESERVED_ENV_VARS = frozenset(
         "COLORTERM",
         "DOCKER_HOST",
         "FORCE_COLOR",
+        "HERDR_AGENT",
         "HOME",
         "LANG",
         "NO_COLOR",
@@ -433,6 +434,10 @@ CONTAINER_MEMORY_LIMIT = "8g"
 
 
 def main():
+    # Herdr cannot see inside the container, so mark this launcher as the
+    # `claude` agent. The hint applies to the foreground process that Herdr
+    # sees.
+    os.environ["HERDR_AGENT"] = "claude"
     process_help_option(sys.argv[1:])
 
     paths = resolve_host_paths()
@@ -2857,6 +2862,9 @@ def agent_env_args(run_config):
     # read. A name alone relays the value of the host, and Docker leaves the
     # variable out when the host does not set it.
     return [
+        # Tell Herdr which agent runs in the container.
+        "--env",
+        "HERDR_AGENT=claude",
         # Anthropic's API key if available. The name alone keeps the value out
         # of the command line. If not defined, Claude Code will check for OAuth
         # credentials. If not there too, it will ask the user how they want to
@@ -3336,6 +3344,7 @@ def stdin_is_tty():
 
 def build_container_env(api_key):
     env = dict(os.environ)
+    env["HERDR_AGENT"] = "claude"
     if api_key:
         env["ANTHROPIC_API_KEY"] = api_key
     else:

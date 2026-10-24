@@ -2,6 +2,4 @@
 set -euo pipefail
 trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 
-# OpenCode runs inside a container, where Herdr cannot see it. `HERDR_AGENT`
-# tells Herdr which agent runs in the pane.
-HERDR_AGENT=opencode exec oc --no-rebuild -- "$@"
+exec oc --no-rebuild -- "$@"
