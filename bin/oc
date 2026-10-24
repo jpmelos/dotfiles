@@ -154,9 +154,9 @@
 # /   yet, because that is almost always a typo. To start a new profile
 # /   without an entry, create the directory first.
 # /
-# /   One key pays for the session. `api_key` is an OpenCode (Zen) key:
-# /   it funds models of the `opencode` provider through the Zen proxy.
-# /   Without it only the free Zen models are enabled. With `model`, the
+# /   One key pays for the session. `api_key` is an OpenCode API key:
+# /   it funds models of the `opencode` provider.
+# /   Without it only the free models are enabled. With `model`, the
 # /   launcher passes it to `run` with `--model` and writes it into the
 # /   profile `opencode.json`, so the interactive interface uses it too.
 # /   Give the full reference in `provider/model#variant` form, such as
@@ -1251,8 +1251,8 @@ def resolve_opencode_api_key(profile_config, profile):
         profile,
         field="api_key",
         env_var="OPENCODE_API_KEY",
-        label="Zen",
-        empty_log="Zen API key: none, Zen paid models stay disabled",
+        label="OpenCode",
+        empty_log="OpenCode API key: none, paid models stay disabled",
     )
 
 
@@ -2852,9 +2852,9 @@ def agent_env_args(run_config):
     # read. A name alone relays the value of the host, and Docker leaves the
     # variable out when the host does not set it.
     return [
-        # OpenCode's own API key for the Zen proxy, which serves the `opencode`
+        # OpenCode's own API key, which serves the `opencode`
         # provider. The name alone keeps the value out of the command line.
-        # Without it only the free Zen models are enabled.
+        # Without it only the free models are enabled.
         "--env",
         "OPENCODE_API_KEY",
         # This is used to show the active profile and project in the status
