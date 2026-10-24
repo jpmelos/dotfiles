@@ -42,4 +42,5 @@ if ! sudo -u telegram_bot -H test -r "$service_account_token_path"; then
     exit 1
 fi
 sudo systemctl restart telegram-bot
-echo "Telegram bot updated."
+echo "Telegram bot updated. Showing its logs (Ctrl-C to stop):"
+sudo journalctl -u telegram-bot -e -f
