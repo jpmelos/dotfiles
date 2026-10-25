@@ -13,7 +13,8 @@
 # its YNAB payee and memo, or its split parts with payee, amount, and memo
 # each. The task lists new entries and asks for splits first, then asks
 # about YNAB transfers missing a side, then asks payees in date order and
-# remembers. Each payee question downloads all YNAB payees, asks the LLM for
+# remembers. Each payee question downloads all YNAB payees, sends the past
+# bank to YNAB choices of the last 90 days with them to the LLM, asks for
 # the three most likely matches, and shows them as a numbered list. A number
 # picks a match, and a name picks or creates a payee. A new payee needs
 # confirmation. One decision covers every identical entry of one day.
@@ -471,10 +472,35 @@ PAYEE_MATCHES_SCHEMA = {
 }
 
 
-def suggest_payees_with_llm(bank_payee, payee_names, api_key, model):
+def build_payee_history(decisions):
+    # Returns the past bank to YNAB payee associations in `decisions` as
+    # (bank payee, YNAB payee, count) tuples, most frequent first. Singles
+    # count once per entry, split parts count once per entry each. The
+    # database holds 90 days, so this is the recent history for the LLM.
+    counts = collections.Counter()
+    for decision in decisions:
+        _source, _date_iso, bank_payee, _bank_amount = decision["key"]
+        if decision["kind"] == "single":
+            counts[(bank_payee, decision["payee"])] += decision["count"]
+        else:
+            for part in decision["parts"]:
+                counts[(bank_payee, part["payee"])] += decision["count"]
+    return [
+        (bank_payee, payee, count)
+        for (bank_payee, payee), count in sorted(
+            counts.items(), key=lambda item: (-item[1], item[0][0], item[0][1])
+        )
+    ]
+
+
+def suggest_payees_with_llm(
+    bank_payee, payee_names, api_key, model, payee_history=None
+):
     # Returns up to three YNAB payee names most likely to match `bank_payee`,
     # via the LLM. Returns an empty list on any failure, so the caller falls
-    # back to the manual question.
+    # back to the manual question. `payee_history` holds the past bank to
+    # YNAB associations from the transaction database, so the LLM prefers
+    # past choices for the same or similar bank payee.
     if not bank_payee or not payee_names or not api_key or not model:
         return []
     cache_key = bank_payee.strip().casefold()
@@ -488,14 +514,32 @@ def suggest_payees_with_llm(bank_payee, payee_names, api_key, model):
     listed = "\n".join(
         f"- {name}" for name in sorted(payee_names, key=str.casefold)
     )
-    prompt = (
-        f'Bank payee: "{bank_payee.strip()}"\n'
-        f"Existing YNAB payees:\n{listed}\n"
-        "Pick the three most likely matches for the bank payee "
-        "from the existing list.\n"
-        'Reply with JSON only, like {"matches": ["Name 1", "Name 2", '
-        '"Name 3"]}, with names copied exactly from the list.'
-    )
+    if payee_history:
+        history_lines = "\n".join(
+            f'- Bank "{bank}" -> YNAB "{payee}" ({count}x)'
+            for bank, payee, count in payee_history
+        )
+        prompt = (
+            f'Bank payee: "{bank_payee.strip()}"\n'
+            f"Existing YNAB payees:\n{listed}\n"
+            "Past choices from the last 90 days "
+            "(bank payee -> YNAB payee):\n"
+            f"{history_lines}\n"
+            "Pick the three most likely matches for the bank payee "
+            "from the existing list. Prefer past choices for the same or "
+            "similar bank payee when relevant.\n"
+            'Reply with JSON only, like {"matches": ["Name 1", "Name 2", '
+            '"Name 3"]}, with names copied exactly from the list.'
+        )
+    else:
+        prompt = (
+            f'Bank payee: "{bank_payee.strip()}"\n'
+            f"Existing YNAB payees:\n{listed}\n"
+            "Pick the three most likely matches for the bank payee "
+            "from the existing list.\n"
+            'Reply with JSON only, like {"matches": ["Name 1", "Name 2", '
+            '"Name 3"]}, with names copied exactly from the list.'
+        )
     try:
         client = OpenAI(base_url=OPENCODE_BASE_URL, api_key=api_key)
         model_id, effort = parse_opencode_model(model)
@@ -1373,6 +1417,7 @@ def apply_decisions(
         ctx, groups, lookup, ynab_api_key, start_date
     )
     opencode_api_key, opencode_model = load_opencode_settings()
+    payee_history = build_payee_history(decisions)
     undecided_keys = [key for key in groups if key not in lookup]
     dirty = False
     for key, members in groups.items():
@@ -1393,6 +1438,7 @@ def apply_decisions(
         payee_names,
         opencode_api_key,
         opencode_model,
+        payee_history,
     )
     new_count = 0
     for key in undecided_keys:
@@ -1574,11 +1620,13 @@ def ask_all_payees(
     payee_names=None,
     opencode_api_key=None,
     opencode_model=None,
+    payee_history=None,
 ):
     # Asks payees for sides still needing them, with transfer matching and
-    # LLM suggestions. A confirmed new payee joins `payee_names` at once, so
-    # reuse in the same session skips confirmation. Returns paired side ids
-    # with updated remembered keys.
+    # LLM suggestions. `payee_history` holds the past bank to YNAB
+    # associations for the LLM. A confirmed new payee joins `payee_names` at
+    # once, so reuse in the same session skips confirmation. Returns paired
+    # side ids with updated remembered keys.
     if payee_names is None:
         payee_names = []
     paired_ids = set()
@@ -1620,6 +1668,7 @@ def ask_all_payees(
             payee_names,
             opencode_api_key,
             opencode_model,
+            payee_history,
         )
         side["payee"] = payee
         if not is_managed_transfer_side(side):
@@ -1677,8 +1726,10 @@ def ask_payee_for_side(
     payee_names=None,
     opencode_api_key=None,
     opencode_model=None,
+    payee_history=None,
 ):
     # Returns the payee for one side, with LLM suggestions and transfer help.
+    # `payee_history` holds the past bank to YNAB associations for the LLM.
     representative = groups[side["key"]][0]
     if side["is_part"]:
         label = (
@@ -1695,6 +1746,7 @@ def ask_payee_for_side(
             payee_names,
             opencode_api_key,
             opencode_model,
+            payee_history,
         )
     return ask_single_payee(
         ctx,
@@ -1704,6 +1756,7 @@ def ask_payee_for_side(
         payee_names,
         opencode_api_key,
         opencode_model,
+        payee_history,
     )
 
 
@@ -2602,6 +2655,7 @@ def ask_decision(
     payee_names=None,
     opencode_api_key=None,
     opencode_model=None,
+    payee_history=None,
 ):
     # Asks how one group of identical bank entries splits, and returns the
     # new decision row. `members` holds the entries. `suggestions` holds the
@@ -2612,7 +2666,8 @@ def ask_decision(
     # The parts then look themselves up in `all_suggestions` by account, date,
     # and amount. `transfer_accounts` holds the sorted YNAB account names for
     # the transfer menu. `payee_names` holds all YNAB payees for the LLM
-    # suggestions and the new payee confirmation.
+    # suggestions and the new payee confirmation. `payee_history` holds the
+    # past bank to YNAB associations for the LLM.
     adopted = ask_ynab_suggestion(ctx, members, suggestions)
     if adopted is not None:
         return adopted
@@ -2630,6 +2685,7 @@ def ask_decision(
             payee_names,
             opencode_api_key,
             opencode_model,
+            payee_history,
         )
     payee = ask_single_payee(
         ctx,
@@ -2639,6 +2695,7 @@ def ask_decision(
         payee_names,
         opencode_api_key,
         opencode_model,
+        payee_history,
     )
     memo = ask_memo(
         Transaction(
@@ -2826,21 +2883,24 @@ def ask_single_payee(
     payee_names=None,
     opencode_api_key=None,
     opencode_model=None,
+    payee_history=None,
 ):
     # Returns the YNAB payee for one undecided bank entry. Sends the bank
-    # payee with all YNAB payees to the LLM, shows three likely matches as a
-    # numbered list, and takes a number or a typed name. A lone `t` or a
-    # `Transfer:` prefix with an empty or unknown account shows the transfer
-    # menu and returns the canonical `Transfer: <account name>` form. The menu
-    # leaves out the account of the entry itself. A new payee needs
-    # confirmation before the task uses it, then joins the YNAB payee list
-    # at once, so reuse in the same session skips confirmation.
+    # payee with all YNAB payees and the past bank to YNAB associations to
+    # the LLM, shows three likely matches as a numbered list, and takes a
+    # number or a typed name. A lone `t` or a `Transfer:` prefix with an
+    # empty or unknown account shows the transfer menu and returns the
+    # canonical `Transfer: <account name>` form. The menu leaves out the
+    # account of the entry itself. A new payee needs confirmation before the
+    # task uses it, then joins the YNAB payee list at once, so reuse in the
+    # same session skips confirmation.
     excluded_account = YNAB_ACCOUNT_NAMES[transaction.account]
     matches = suggest_payees_with_llm(
         transaction.bank_payee,
         payee_names or [],
         opencode_api_key,
         opencode_model,
+        payee_history,
     )
     base_lines = ["Payee:", decision_line(transaction)]
     if count > 1:
@@ -2901,6 +2961,7 @@ def ask_split_decision(
     payee_names=None,
     opencode_api_key=None,
     opencode_model=None,
+    payee_history=None,
 ):
     # Returns the split decision row for one group of identical bank entries.
     # Asks only for the part amounts first: the amounts of each part but the
@@ -2928,6 +2989,7 @@ def ask_split_decision(
             payee_names,
             opencode_api_key,
             opencode_model,
+            payee_history,
         )
         for part_number, amount in enumerate(amounts, start=1)
     ]
@@ -2965,17 +3027,23 @@ def ask_split_payee(
     payee_names=None,
     opencode_api_key=None,
     opencode_model=None,
+    payee_history=None,
 ):
     # Returns the YNAB payee for one split part. Sends the bank payee with
-    # all YNAB payees to the LLM, shows three likely matches as a numbered
-    # list, and takes a number or a typed name. A lone `t` or a `Transfer:`
-    # prefix with an empty or unknown account shows the transfer menu and
-    # returns the canonical `Transfer: <account name>` form. The menu leaves
-    # out `excluded_account`, the account of the current transaction. A new
-    # payee needs confirmation before the task uses it, then joins the YNAB
-    # payee list at once, so reuse in the same session skips confirmation.
+    # all YNAB payees and the past bank to YNAB associations to the LLM,
+    # shows three likely matches as a numbered list, and takes a number or a
+    # typed name. A lone `t` or a `Transfer:` prefix with an empty or unknown
+    # account shows the transfer menu and returns the canonical
+    # `Transfer: <account name>` form. The menu leaves out `excluded_account`,
+    # the account of the current transaction. A new payee needs confirmation
+    # before the task uses it, then joins the YNAB payee list at once, so
+    # reuse in the same session skips confirmation.
     matches = suggest_payees_with_llm(
-        bank_payee or "", payee_names or [], opencode_api_key, opencode_model
+        bank_payee or "",
+        payee_names or [],
+        opencode_api_key,
+        opencode_model,
+        payee_history,
     )
     if matches:
         numbered = "\n".join(
@@ -3103,6 +3171,7 @@ def resolve_split_part(
     payee_names=None,
     opencode_api_key=None,
     opencode_model=None,
+    payee_history=None,
 ):
     # Returns one split part with its payee, amount, and memo. A YNAB
     # transaction with the same account, date, and amount offers its payee
@@ -3132,6 +3201,7 @@ def resolve_split_part(
         payee_names,
         opencode_api_key,
         opencode_model,
+        payee_history,
     )
     memo = ask_memo(
         Transaction(
