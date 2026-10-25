@@ -20,6 +20,8 @@ if ! id telegram_bot &> /dev/null; then
     exit 1
 fi
 
+eval $(op signin)
+
 git -C "$HOME/devel/dotfiles" pull
 jc fetch
 bot_dotfiles=/home/telegram_bot/devel/dotfiles
