@@ -79,11 +79,6 @@
     },
     {
       "action": "shell",
-      "resource": "ai_git_add *",
-      "effect": "allow"
-    },
-    {
-      "action": "shell",
       "resource": "ai_git_commit *",
       "effect": "allow"
     },
@@ -120,6 +115,16 @@
     {
       "action": "shell",
       "resource": "false",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "git add *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "git apply *",
       "effect": "allow"
     },
     {

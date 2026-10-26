@@ -56,23 +56,24 @@
     passing specific test files).
   - If either command doesn't exist, report that you can't perform the action.
   - *Always* use the exact commands above, and add arguments as needed.
-- *Never* run an `ai_git_*` command unless the user explicitly asks for that
-  exact action. Staging and committing belong to the user alone. Leave your
-  work unstaged and report what you changed instead, unless you've been
-  explicitly asked otherwise.
-- When the user asks you to stage or to commit, use these commands. *Never*
-  call `git` commands directly (`git add`, `git restore`, `git commit`, etc).
-  - To stage files, run `ai_git_add <path> ...`. It relays all arguments to
-    `git add`.
-  - To empty the staging area, run `ai_git_restore`. It takes no arguments. If
-    you stage the wrong files, run this command and stage them again from zero.
-  - To commit, run `ai_git_commit Commit message goes here`. This commits only
-    the contents of the staging area.
-  - To stage all changes and commit them in one step, run
-    `ai_git_commit -a Commit message goes here`.
+- Regarding `git`:
+  - *Never* run a `git` or `git`-related command unless the user explicitly
+    asks for that exact action. Staging and committing belong to the user
+    alone. Leave your work unstaged and report what you changed instead, unless
+    you've been explicitly asked otherwise.
+  - When the user asks you to stage or to commit, use these commands.
+    - To stage files, run `git add <path> ...`.
+    - To stage hunks, run `git apply --cached <patch> ...`.
+    - To empty the staging area, run `ai_git_restore`. It takes no arguments.
+      If you stage the wrong files, run this command and stage them again from
+      zero.
+    - To commit, run `ai_git_commit Commit message goes here`. This commits
+      only the contents of the staging area.
+    - To stage all changes and commit them in one step, run
+      `ai_git_commit -a Commit message goes here`.
   - *Never* delete a commit.
-  - If one of these commands doesn't exist, assume that you are not allowed to
-    do the related action.
+  - *Never* call `git` commands directly (`git restore`, `git commit`, etc),
+    except for `git add` and `git apply`.
 - To rename or delete files, use `safe_mv` and `safe_rm` instead of `mv` and
   `rm`. To delete directories, use `safe_rm -r` instead of `rmdir`. The CLI is
   otherwise identical to that of `mv` and `rm` respectively.

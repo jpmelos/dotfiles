@@ -374,7 +374,6 @@ RESERVED_ENV_VARS = frozenset(
 AGENT_BINARIES = (
     "safe_mv",
     "safe_rm",
-    "ai_git_add",
     "ai_git_restore",
     "ai_git_commit",
     "pane-state",
