@@ -121,6 +121,15 @@ The description.
 Write acceptance criteria that a reader can verify. Bad example is Works
 correctly. Good example is Response payload includes `date` field in X format.
 
+Order tickets to enable parallel work. Complete the steps below.
+
+- If the change spans backend and frontend, identify the integration points.
+- Define each integration point as an API contract, a shared schema, or an
+  event definition.
+- Place the integration points in the earliest tickets.
+- Write the full contract in those tickets.
+- Make later backend tickets and frontend tickets depend only on that contract.
+
 ### 4. Functional Requirements
 
 This section gives a numbered list of specific functions. Be explicit,
