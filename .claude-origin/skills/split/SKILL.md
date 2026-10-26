@@ -39,8 +39,15 @@ Write one commit message per micro-commit. Apply these rules:
 - Never use double backticks in the message.
 - Describe what the micro-commit does and why it matters.
 
-Order micro-commits from foundation to finish. Present the ordered plan with
-title and scope per micro-commit.
+Order micro-commits from foundation to finish:
+
+- Present the plan in the chat with the title, the scope, and the explanation
+  for each micro-commit.
+- Ask the user for approval before you continue to section 3.
+- If the user requests changes, revise the plan.
+- Present the revised plan in the chat.
+- Continue only after the user approves the plan.
+- Do not start section 3 without approval.
 
 ## 3. Create micro-commits
 
