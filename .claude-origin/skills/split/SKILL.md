@@ -1,6 +1,6 @@
 ---
 description: Split uncommitted changes into story-like micro-commits.
-argument-hint: '[-- additional instructions]'
+argument-hint: '[additional instructions]'
 disable-model-invocation: true
 ---
 
