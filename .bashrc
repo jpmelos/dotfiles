@@ -481,6 +481,33 @@ EOF
     $EDITOR "$command_path" "$@"
 }
 
+# List branches with worktrees, without the main repository.
+# Used to complete `j worktree rm`.
+_j_worktree_branches() {
+    local common_dir main_dir
+    common_dir="$(git rev-parse --path-format=absolute --git-common-dir \
+        2> /dev/null)" || return 0
+    main_dir="$(dirname "$common_dir")"
+    git worktree list --porcelain 2> /dev/null | awk -v main="$main_dir" '
+        /^worktree / {
+            if (path != "" && branch != "" && path != main) {
+                print branch
+            }
+            path = substr($0, 10)
+            branch = ""
+            next
+        }
+        /^branch refs\/heads\// {
+            branch = substr($0, length("branch refs/heads/") + 1)
+        }
+        END {
+            if (path != "" && branch != "" && path != main) {
+                print branch
+            }
+        }
+    '
+}
+
 _j_completion() {
     local cur="${COMP_WORDS[COMP_CWORD]}"
     local jpenv_bin_dir="./jpenv-bin"
@@ -504,6 +531,43 @@ _j_completion() {
             command_dirs=("$JPENV_BIN_DEFAULT_DIR")
         else
             extra_words=("--default")
+        fi
+    fi
+
+    # Complete `worktree` subcommands and `worktree rm` branches.
+    # `je` edits local commands, so it keeps the filename fallback below.
+    if [ "$1" = "j" ] || [ "$1" = "jd" ]; then
+        if [ "${COMP_CWORD}" -gt "$command_position" ]; then
+            local worktree_command="${COMP_WORDS[$command_position]:-}"
+            if [ "$worktree_command" = "worktree" ]; then
+                local subcommand_position=$((command_position + 1))
+                if [ "${COMP_CWORD}" \
+                    -eq "$subcommand_position" ]; then
+                    mapfile -t COMPREPLY < <(compgen -W "new rm ls" -- "$cur")
+                    return 0
+                fi
+                local subcommand="${COMP_WORDS[$subcommand_position]:-}"
+                if [ "$subcommand" = "rm" ]; then
+                    if [ "${COMP_CWORD}" \
+                        -eq $((subcommand_position + 1)) ]; then
+                        local -a branches=()
+                        mapfile -t branches < <(_j_worktree_branches)
+                        if [ "${#branches[@]}" -gt 0 ]; then
+                            mapfile -t COMPREPLY < <(compgen -W \
+                                "${branches[*]}" -- "$cur")
+                        else
+                            COMPREPLY=()
+                        fi
+                        return 0
+                    fi
+                    COMPREPLY=()
+                    return 0
+                fi
+                if [ "$subcommand" = "ls" ]; then
+                    COMPREPLY=()
+                    return 0
+                fi
+            fi
         fi
     fi
 
