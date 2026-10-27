@@ -418,6 +418,20 @@ def read_config_text(path):
 OPENCODE_BASE_URL = "https://opencode.ai/inference/go/openai/v1"
 # Suggested YNAB payees by bank payee without case, so repeats skip the LLM.
 _PAYEE_SUGGESTION_CACHE = {}
+# The user agent of the payee suggestion client. OpenCode Go asks each client
+# to identify itself with its own name, not with a generic SDK name.
+OPENCODE_USER_AGENT = "jpmelos-telegram-budget-sync/1.0"
+# The session ID of the current run for OpenCode Go. One ID per run keeps all
+# payee questions of the run in one conversation for route and cache use.
+_PAYEE_SESSION_ID = None
+
+
+def payee_session_id():
+    # Returns the stable session ID of the current run for OpenCode Go.
+    global _PAYEE_SESSION_ID
+    if _PAYEE_SESSION_ID is None:
+        _PAYEE_SESSION_ID = uuid.uuid4().hex
+    return _PAYEE_SESSION_ID
 
 
 def load_opencode_settings():
@@ -541,7 +555,15 @@ def suggest_payees_with_llm(
             '"Name 3"]}, with names copied exactly from the list.'
         )
     try:
-        client = OpenAI(base_url=OPENCODE_BASE_URL, api_key=api_key)
+        client = OpenAI(
+            base_url=OPENCODE_BASE_URL,
+            api_key=api_key,
+            default_headers={"User-Agent": OPENCODE_USER_AGENT},
+        )
+        go_headers = {
+            "User-Agent": OPENCODE_USER_AGENT,
+            "x-opencode-session": payee_session_id(),
+        }
         model_id, effort = parse_opencode_model(model)
         if not model_id:
             _log("Payee suggestion lookup skipped: empty model ID")
@@ -570,13 +592,17 @@ def suggest_payees_with_llm(
             if effort:
                 request["reasoning_effort"] = effort
             try:
-                res = client.chat.completions.create(**request)
+                res = client.chat.completions.create(
+                    extra_headers=go_headers, **request
+                )
             except Exception as error:
                 if not effort:
                     raise
                 _log(f"Payee suggestion retry without effort: {error}")
                 del request["reasoning_effort"]
-                res = client.chat.completions.create(**request)
+                res = client.chat.completions.create(
+                    extra_headers=go_headers, **request
+                )
             text = res.choices[0].message.content or ""
         except Exception as chat_error:
             _log(
@@ -598,13 +624,17 @@ def suggest_payees_with_llm(
             if effort:
                 response_request["reasoning"] = {"effort": effort}
             try:
-                response = client.responses.create(**response_request)
+                response = client.responses.create(
+                    extra_headers=go_headers, **response_request
+                )
             except Exception as error:
                 if not effort:
                     raise
                 _log(f"Payee suggestion retry without effort: {error}")
                 del response_request["reasoning"]
-                response = client.responses.create(**response_request)
+                response = client.responses.create(
+                    extra_headers=go_headers, **response_request
+                )
             text = response.output_text or ""
     except Exception as error:
         _log(f"Payee suggestion lookup skipped: {error}")
