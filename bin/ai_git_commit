@@ -23,4 +23,4 @@ if [ "$stage_everything" = true ]; then
     git add -A :/
 fi
 
-git commit --no-gpg-sign --allow-empty -m "$*"
+git commit --no-gpg-sign --no-verify --allow-empty -m "$*"
