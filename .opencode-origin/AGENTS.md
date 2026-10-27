@@ -19,6 +19,8 @@
 - When planning (writing plans, specs, etc.), discuss the plan in the chat.
   *Never* write it to a file unless the user explicitly asks you to.
 - The project root is *always* the current working directory.
+- When you need a temporary file that will not be committed, create it under
+  `/tmp`. *Never* create it under `~/devel`.
 - When citing code paths, *always* use paths *relative* to the project root,
   including the most relevant lines when applicable.
   - For example: src/main.rs, src/main.rs:45, or src/lib.rs:23-56.
