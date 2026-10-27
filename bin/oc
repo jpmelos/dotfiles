@@ -431,6 +431,7 @@ AGENT_BINARIES = (
     "safe_rm",
     "ai_git_restore",
     "ai_git_commit",
+    "ai_git_new_branch",
     "pane-state",
     "chime",
     "running",

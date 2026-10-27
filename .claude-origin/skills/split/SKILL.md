@@ -44,6 +44,8 @@ Group micro-commits into PRs. Apply these rules:
 - Put micro-commits that must deploy together in one PR group.
 - Put micro-commits that work alone in a separate PR group.
 - List each PR group with its micro-commits in plan order.
+- When the plan holds more than one PR group, list one new branch name for each
+  PR group.
 
 All micro-commits in one PR deploy together. The micro-commits in separate PRs
 deploy at different times. The separate PRs reach production with days of
@@ -63,6 +65,7 @@ Order micro-commits from foundation to finish:
 ## 3. Create micro-commits
 
 Use `git add` and `git apply --cached` to stage. Use `ai_git_commit` to commit.
+Use `ai_git_new_branch` to create branches.
 
 For each micro-commit in plan order, complete these actions:
 
@@ -76,8 +79,19 @@ For each micro-commit in plan order, complete these actions:
   scratch.
 - Run `ai_git_commit <message>` to commit the staged content.
 
+After the micro-commits, create branches. Apply these rules:
+
+- If the plan holds one PR group, create no branch.
+- If the plan holds more than one PR group, create one branch at the tip of
+  each PR group.
+- Run `git log --oneline -n <count>` to find each tip SHA.
+- Run `ai_git_new_branch <branch-name> <sha>` for each tip with the branch name
+  from the plan.
+
 If a stage is empty or a commit fails, stop. Report the state in the chat. Do
 not continue with later micro-commits.
+
+If a branch creation fails, stop. Report the state in the chat.
 
 ## 4. Verify and report
 
@@ -88,8 +102,8 @@ order.
 
 Do not run compilers, linters, or tests.
 
-Present the ordered list of new micro-commits with titles. Describe what the
-user can now do with the new history.
+Present the ordered list of new micro-commits with titles and new branches.
+Describe what the user can now do with the new history.
 
 If there are additional instructions, follow them. If the additional
 instructions conflict with the instructions above, the additional instructions

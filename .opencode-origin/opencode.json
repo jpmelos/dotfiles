@@ -94,6 +94,11 @@
     },
     {
       "action": "shell",
+      "resource": "ai_git_new_branch *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
       "resource": "ai_git_restore",
       "effect": "allow"
     },

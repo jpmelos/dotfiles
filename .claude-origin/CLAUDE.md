@@ -75,6 +75,9 @@
       only the contents of the staging area.
     - To stage all changes and commit them in one step, run
       `ai_git_commit -a Commit message goes here`.
+    - To create a new branch at a commit, run
+      `ai_git_new_branch <branch-name> <sha>`. This creates a branch that
+      points at the commit.
     - `ai_git_reset <ref>` moves the current branch to `ref` and keeps commit
       changes in the worktree.
       - The command fails unless `ref` is an ancestor of `HEAD` and each commit

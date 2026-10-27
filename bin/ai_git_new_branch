@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# This creates a new branch at a given commit.
+# Run it like `ai_git_new_branch <branch-name> <sha>`.
+# The branch name must not exist yet.
+# The SHA must resolve to a commit.
+
+if [ $# -ne 2 ]; then
+    echo "Error: Exactly two arguments are required" >&2
+    exit 1
+fi
+
+branch_name="$1"
+tip_arg="$2"
+
+case "$branch_name" in
+    -*)
+        echo "Error: Branch name must not start with a dash" >&2
+        exit 1
+        ;;
+esac
+
+case "$tip_arg" in
+    -*)
+        echo "Error: SHA must not start with a dash" >&2
+        exit 1
+        ;;
+esac
+
+if ! git check-ref-format --branch "$branch_name" >/dev/null 2>&1; then
+    echo "Error: Branch name is not valid" >&2
+    exit 1
+fi
+
+if git show-ref --verify --quiet "refs/heads/${branch_name}"; then
+    echo "Error: Branch already exists" >&2
+    exit 1
+fi
+
+tip_commit=$(git rev-parse --verify "${tip_arg}^{commit}" 2>/dev/null) || {
+    echo "Error: SHA does not resolve to a commit" >&2
+    exit 1
+}
+
+exec git branch -- "$branch_name" "$tip_commit"
