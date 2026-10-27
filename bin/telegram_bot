@@ -205,7 +205,10 @@ def main(
 
     \b
     Chat commands:
-      /<task> [...] - start a task; only one task runs at a time
+      /<task> [...] - start a task; only one task runs at a time.
+      Hyphens in task names become underscores in the Telegram menu
+      (budget-sync runs as /budget_sync there), while the chat accepts
+      the original name, the menu name, and any shorthand (/b, /br).
       /status - show uptime, the running task, and the last result
       /cancel - stop the running task; its shutdown hook still runs
       /help - show the commands
@@ -891,6 +894,41 @@ def display_task_name(spec):
     if spec.shorthands:
         return f"{spec.name} ({', '.join(spec.shorthands)})"
     return spec.name
+
+
+def menu_command_for_task(name):
+    # Returns the Telegram menu command for a task or shorthand name.
+    # Telegram BotCommand allows only 1-32 lowercase English letters,
+    # digits, and underscores, while task names also allow uppercase and
+    # hyphens. Lowercase and turn hyphens into underscores; any other
+    # unexpected character becomes an underscore as well. Truncate to the
+    # Telegram limit; an empty result means the name has no valid menu
+    # command.
+    command = name.lower().replace("-", "_")
+    command = re.sub(r"[^a-z0-9_]", "_", command)
+    return command[:32]
+
+
+def build_task_command_map(specs):
+    # Maps every accepted chat command to its task spec. Accepts the
+    # original task name (for example budget-sync), the Telegram menu
+    # name (for example budget_sync), and every shorthand (for example b).
+    # Keys are lowercased because incoming commands arrive lowercased.
+    # The first task in sorted order wins when several names share one
+    # command, so the choice stays deterministic.
+    mapping = {}
+    for task_name in sorted(specs):
+        spec = specs[task_name]
+        candidates = {task_name.lower(), menu_command_for_task(task_name)}
+        for shorthand in spec.shorthands:
+            candidates.add(shorthand.lower())
+            candidates.add(menu_command_for_task(shorthand))
+        for candidate in candidates:
+            if not candidate:
+                continue
+            if candidate not in mapping:
+                mapping[candidate] = spec
+    return mapping
 
 
 def read_task_description(path):
@@ -1789,13 +1827,42 @@ class Bot:
         # the commands in the menu and autocomplete. Task commands come
         # first, sorted alphabetically, then the other commands, also
         # sorted alphabetically. A failure only warns, so polling still
-        # starts without a menu.
+        # starts without a menu. Telegram menu commands allow only
+        # lowercase letters, digits, and underscores, so hyphens in task
+        # names become underscores here (budget-sync runs as /budget_sync
+        # in the menu, while the chat still accepts /budget-sync too).
         specs = discover_tasks(self.tasks_dir)
-        task_commands = []
+        seen = {}
         for name in sorted(specs):
-            description = specs[name].description or f"run {name}"
+            menu_command = menu_command_for_task(name)
+            if not menu_command:
+                log(
+                    f"Warning: task {name!r} has no valid Telegram "
+                    "menu command, skipping it in the menu."
+                )
+                continue
+            if menu_command in seen:
+                log(
+                    f"Warning: tasks {seen[menu_command]!r} and {name!r} "
+                    f"share the menu command /{menu_command}, keeping "
+                    "the first in sorted order."
+                )
+                continue
+            seen[menu_command] = name
+        builtin_names = {name for name, _description in BOT_COMMANDS}
+        task_commands = []
+        for menu_command in sorted(seen):
+            if menu_command in builtin_names:
+                log(
+                    f"Warning: task {seen[menu_command]!r} shares its menu "
+                    f"command /{menu_command} with a built-in command, "
+                    "skipping it in the menu."
+                )
+                continue
+            task_name = seen[menu_command]
+            description = specs[task_name].description or f"run {task_name}"
             task_commands.append(
-                {"command": name, "description": description[:256]}
+                {"command": menu_command, "description": description[:256]}
             )
         other_commands = [
             {"command": name, "description": description}
@@ -1903,21 +1970,7 @@ class Bot:
             self.handle_cancel(chat_id)
         else:
             specs = discover_tasks(self.tasks_dir)
-            spec = resolve_task_spec(specs, command)
-            if spec is None:
-                # Task names may hold uppercase letters, while commands
-                # arrive lowercased. Match case-insensitively as a fallback.
-                lowered = command.casefold()
-                for candidate in sorted(specs):
-                    if candidate.casefold() == lowered:
-                        spec = specs[candidate]
-                        break
-                    if any(
-                        shorthand.casefold() == lowered
-                        for shorthand in specs[candidate].shorthands
-                    ):
-                        spec = specs[candidate]
-                        break
+            spec = build_task_command_map(specs).get(command)
             if spec is None:
                 self.try_send(
                     chat_id, f"Unknown command /{command}. Try /help."
@@ -1928,15 +1981,40 @@ class Bot:
     def help_text(self):
         specs = discover_tasks(self.tasks_dir)
         lines = ["Commands:"]
+        seen = {}
         for name in sorted(specs):
+            menu_command = menu_command_for_task(name)
+            if not menu_command:
+                continue
+            if menu_command not in seen:
+                seen[menu_command] = name
+        builtin_names = {name for name, _description in BOT_COMMANDS}
+        for menu_command in sorted(seen):
+            if menu_command in builtin_names:
+                continue
+            name = seen[menu_command]
             spec = specs[name]
-            if spec.shorthands:
-                aliases = ", ".join(
-                    f"/{shorthand}" for shorthand in sorted(spec.shorthands)
+            alias_names = []
+            if name.lower() != menu_command:
+                alias_names.append(name.lower())
+            for shorthand in sorted(spec.shorthands):
+                for alias in (
+                    shorthand.lower(),
+                    menu_command_for_task(shorthand),
+                ):
+                    if (
+                        alias
+                        and alias != menu_command
+                        and alias not in alias_names
+                    ):
+                        alias_names.append(alias)
+            if alias_names:
+                joined = ", ".join(
+                    f"/{alias}" for alias in alias_names
                 )
-                prefix = f"/{name}, {aliases}"
+                prefix = f"/{menu_command}, {joined}"
             else:
-                prefix = f"/{name}"
+                prefix = f"/{menu_command}"
             if spec.description:
                 lines.append(f"{prefix} - {spec.description}")
             else:
