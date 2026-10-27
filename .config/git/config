@@ -170,7 +170,7 @@
     pl = pull
 
     # ps = push
-    ps = push
+    ps = push -u
     psf = push --force-with-lease
 
     # rb = rebase
