@@ -162,6 +162,10 @@
 # /   Code permission rule in `permission`, such as
 # /   `mcp__github__search_repositories`. The `/fp` skill flips that rule
 # /   between `permissions.allow` and `permissions.deny` for the run.
+# /   Each container gets its own copy of that file, so a flip stays in
+# /   the container where it ran and never reaches another running
+# /   container. The next launch copies the profile file again, so a flip
+# /   does not survive a relaunch.
 # /
 # /   An `ANTHROPIC_API_KEY` variable in the environment takes precedence
 # /   over the `api_key` of the profile. The launcher names the source of
@@ -387,6 +391,15 @@ AGENT_BINARIES = (
 # target. A launch that dies between the creation and the rename leaves one
 # behind, and the prefix lets the next launch recognize it.
 TEMP_FILE_PREFIX = ".launcher-tmp-"
+# Prefix and suffix of the per-run copies of the profile `settings.json`.
+# Each launch copies the profile file to one of these, and the container
+# mounts it over the profile file, so a `/fp` flip stays in that container.
+RUN_SETTINGS_PREFIX = "settings-run-"
+RUN_SETTINGS_SUFFIX = ".json"
+# How old a per-run copy gets before a launch removes it, in seconds. The
+# container of an old copy is long gone, and the copy is only there for the
+# mount that already ended.
+RUN_SETTINGS_MAX_AGE = 7 * 24 * 60 * 60
 # How many bytes the comparison of two files reads at a time.
 CONTENT_CHUNK_SIZE = 64 * 1024
 # Name of the directory in the home directory that holds the state of the
@@ -553,6 +566,13 @@ def main():
         else [],
     )
 
+    container_name = generate_container_name(project_root)
+    run_settings_path = prepare_run_settings(
+        profile_paths.profile_dir,
+        profile_paths.profile_tmp_dir,
+        container_name,
+    )
+
     run_config = RunConfig(
         paths=paths,
         profile_paths=profile_paths,
@@ -561,10 +581,11 @@ def main():
         project_name=project_name,
         api_key=api_key,
         docker_image_name=image_spec.name,
-        container_name=generate_container_name(project_root),
+        container_name=container_name,
         harness_print_mode=options.harness_print_mode,
         no_docker_socket=options.no_docker_socket,
         extra_volumes=extra_volumes,
+        run_settings_path=run_settings_path,
     )
 
     run_command, env = build_run_command(harness_args, run_config)
@@ -2669,6 +2690,9 @@ class RunConfig:
     no_docker_socket: bool
     # Checked `--add-volume` mounts, in the order given.
     extra_volumes: list = field(default_factory=list)
+    # Host path of the private `settings.json` copy for the container, or
+    # `None` when the profile has none.
+    run_settings_path: str | None = None
 
 
 def generate_container_name(project_root):
@@ -2697,6 +2721,7 @@ def build_run_command(harness_args, run_config):
         *scratch_space_args(run_config.profile_paths),
         *devel_mount_args(run_config),
         *profile_mount_args(run_config),
+        *run_settings_mount_args(run_config),
         *agent_env_args(run_config),
         *agent_binary_args(run_config.paths),
         *ripgrep_config_args(run_config.paths),
@@ -2848,6 +2873,92 @@ def profile_mount_args(run_config):
         "--volume",
         f"{os.path.realpath(run_config.profile_paths.profile_dir)}:"
         f"{home}/.claude",
+    ]
+
+
+def prepare_run_settings(profile_dir, profile_tmp_dir, container_name):
+    # Returns the host path of the private copy of the profile `settings.json`
+    # for one container, or `None` when the profile has none. The copy starts
+    # with the content of the profile file, and the container mounts it over
+    # that file, so a `/fp` flip lands in the copy and no other container sees
+    # it. A later launch copies the profile file again, so flips do not
+    # survive a relaunch.
+    base_path = f"{profile_dir}/settings.json"
+    try:
+        with open_regular_file(base_path) as handle:
+            content = handle.read()
+            base_mode = stat.S_IMODE(os.fstat(handle.fileno()).st_mode)
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        log(f"Warning: cannot read {base_path}: {error}")
+        return None
+    prune_run_settings(profile_tmp_dir)
+    token = os.urandom(8).hex()
+    run_path = (
+        f"{profile_tmp_dir}/{RUN_SETTINGS_PREFIX}"
+        f"{container_name}-{token}{RUN_SETTINGS_SUFFIX}"
+    )
+    try:
+        descriptor = os.open(
+            run_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600
+        )
+    except OSError as error:
+        log(f"Warning: cannot write {run_path}: {error}")
+        return None
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+            os.fchmod(handle.fileno(), base_mode)
+    except OSError as error:
+        log(f"Warning: cannot write {run_path}: {error}")
+        try:
+            remove_file(run_path)
+        except OSError:
+            pass
+        return None
+    return run_path
+
+
+def prune_run_settings(profile_tmp_dir):
+    # Removes per-run copies that outlived their container. A failure only
+    # warns, because the launch can go on with the copies in place.
+    try:
+        names = os.listdir(profile_tmp_dir)
+    except OSError as error:
+        log(f"Warning: cannot list {profile_tmp_dir}: {error}")
+        return
+    now = time.time()
+    for name in names:
+        if not name.startswith(RUN_SETTINGS_PREFIX):
+            continue
+        if not name.endswith(RUN_SETTINGS_SUFFIX):
+            continue
+        path = f"{profile_tmp_dir}/{name}"
+        try:
+            age = now - os.lstat(path).st_mtime
+        except OSError:
+            continue
+        if age < RUN_SETTINGS_MAX_AGE:
+            continue
+        try:
+            remove_file(path)
+        except OSError as error:
+            log(f"Warning: cannot remove {path}: {error}")
+
+
+def run_settings_mount_args(run_config):
+    # Mounts the private copy over the profile `settings.json`, after the
+    # profile mount, so the deeper mount wins. Without a copy there is no
+    # mount, and the container sees the profile file itself.
+    if run_config.run_settings_path is None:
+        return []
+    home = run_config.paths.home
+    return [
+        "--volume",
+        f"{run_config.run_settings_path}:{home}/.claude/settings.json",
     ]
 
 
