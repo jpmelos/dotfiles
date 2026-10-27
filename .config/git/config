@@ -39,6 +39,7 @@
 [rebase]
     updateRefs = true
     rescheduleFailedExec = true
+    autoSquash = true
 
 [rerere]
     enabled = true
