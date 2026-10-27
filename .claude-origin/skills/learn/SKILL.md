@@ -1,10 +1,11 @@
 ---
-description: Edit the user `AGENTS.md` and `CLAUDE.md` to learn new things.
+description: Edit `AGENTS.md` for OpenCode and `CLAUDE.md` for Claude Code to learn new things.
 disable-model-invocation: true
 ---
 
-Edit `~/devel/dotfiles/.opencode-origin/AGENTS.md` and
-`~/devel/dotfiles/.claude-origin/CLAUDE.md` to learn these new things:
+Edit `~/devel/dotfiles/.opencode-origin/AGENTS.md` for OpenCode and
+`~/devel/dotfiles/.claude-origin/CLAUDE.md` for Claude Code to learn these new
+things:
 
 ```
 $ARGUMENTS

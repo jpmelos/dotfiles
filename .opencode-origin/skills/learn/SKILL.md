@@ -1,14 +1,14 @@
 ---
 name: learn
-description: Edit the user `AGENTS.md` and `CLAUDE.md` to learn new things.
+description: Edit `AGENTS.md` for OpenCode and `CLAUDE.md` for Claude Code to learn new things.
 metadata:
   opencode/autoinvoke: false
 ---
 
-Edit `~/devel/dotfiles/.opencode-origin/AGENTS.md` and
-`~/devel/dotfiles/.claude-origin/CLAUDE.md` to learn the new things named in
-the user message after this skill block. Apply the same learning to both files,
-with identical wording except for tool-specific paths.
+Edit `~/devel/dotfiles/.opencode-origin/AGENTS.md` for OpenCode and
+`~/devel/dotfiles/.claude-origin/CLAUDE.md` for Claude Code to learn the new
+things named in the user message after this skill block. Apply the same
+learning to both files, with identical wording except for tool-specific paths.
 
 You do not need to use those exact words. If the thing to be learned can be
 better expressed with different words or in a shorter way, feel free to rewrite
