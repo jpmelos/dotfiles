@@ -40,8 +40,19 @@ Write one commit message per micro-commit. Apply these rules:
 - Never use double backticks in the message.
 - Describe what the micro-commit does and why it matters.
 
+Group micro-commits into PRs. Apply these rules:
+
+- Put micro-commits that must deploy together in one PR group.
+- Put micro-commits that work alone in a separate PR group.
+- List each PR group with its micro-commits in plan order.
+
+All micro-commits in one PR deploy together. The micro-commits in separate PRs
+deploy at different times. The separate PRs reach production with days of
+difference. No time guarantee exists across separate PRs.
+
 Order micro-commits from foundation to finish:
 
+- Include the PR groups in the plan.
 - Present the plan in the chat with the title, the scope, and the explanation
   for each micro-commit.
 - Ask the user for approval before you continue to section 3.
