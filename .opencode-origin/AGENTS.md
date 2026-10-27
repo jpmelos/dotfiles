@@ -59,7 +59,9 @@
   - If either command doesn't exist, report that you can't perform the action.
   - *Always* use the exact commands above, and add arguments as needed.
 - Regarding `git`:
-  - *Never* run a `git` or `git`-related command unless the user explicitly
+  - Read-only `git` commands run without explicit permission. Examples:
+    `git log`, `git show`, `git status`.
+  - *Never* run a `git` command with side effects unless the user explicitly
     asks for that exact action. Staging and committing belong to the user
     alone. Leave your work unstaged and report what you changed instead, unless
     you've been explicitly asked otherwise.
@@ -87,8 +89,8 @@
         - Recreate each undone commit in order with `ai_git_commit`.
   - *Never* delete a commit, except with `ai_git_reset` after the user asks to
     change history.
-  - *Never* call `git` commands directly (`git restore`, `git commit`, etc),
-    except for `git add` and `git apply`.
+  - *Never* call a `git` command with side effects directly (`git restore`,
+    `git commit`, etc), except for `git add` and `git apply`.
 - To rename or delete files, use `safe_mv` and `safe_rm` instead of `mv` and
   `rm`. To delete directories, use `safe_rm -r` instead of `rmdir`. The CLI is
   otherwise identical to that of `mv` and `rm` respectively.
