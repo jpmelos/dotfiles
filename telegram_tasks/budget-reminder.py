@@ -4,7 +4,7 @@
 # that budget-sync stores, and reminds the chat when budget-sync has not run
 # yet today. A manual run counts: any finished budget-sync run stores today.
 
-DESCRIPTION = "Remind to run budget-sync when it hasn't run today."
+DESCRIPTION = "Remind to run /budget-sync when it hasn't run today."
 SHORTHAND = "br"
 SCHEDULE = "0 12-23 * * *"
 TIMEOUT = 120
@@ -16,7 +16,7 @@ import json
 # The value is the file name stem of the watched task.
 BUDGET_SYNC_TASK = "budget-sync"
 LAST_RUN_ID = "last_run.json"
-REMINDER_MESSAGE = "Run `budget-sync`, it's still pending today."
+REMINDER_MESSAGE = "Run `/budget-sync`, it's still pending today."
 
 
 def run(ctx, args=None):

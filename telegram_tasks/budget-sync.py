@@ -1,7 +1,7 @@
 # Task that downloads the bank statements and syncs new transactions and
 # balances to YNAB.
 #
-# Run it with `/run budget-sync` from the allowlisted chat. Optional words
+# Run it with `/budget-sync` from the allowlisted chat. Optional words
 # after the name are `--no-download` and `--no-upload`.
 #
 # BMO comes from `agent-browser` downloads. Wise comes from the Wise API with
