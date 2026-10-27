@@ -414,8 +414,8 @@ def read_config_text(path):
     return value
 
 
-# The base of the OpenCode inference API for payee suggestions.
-OPENCODE_BASE_URL = "https://opencode.ai/inference/openai/v1"
+# The base of the OpenCode Go inference API for payee suggestions.
+OPENCODE_BASE_URL = "https://opencode.ai/inference/go/openai/v1"
 # Suggested YNAB payees by bank payee without case, so repeats skip the LLM.
 _PAYEE_SUGGESTION_CACHE = {}
 
