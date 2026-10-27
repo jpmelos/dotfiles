@@ -7,7 +7,9 @@
 # BMO comes from `agent-browser` downloads. Wise comes from the Wise API with
 # the token in `wise.api_key`, without a browser. The Wise cache lives in
 # the task state directory as JSON, so `--no-download` reuses the last Wise
-# fetch, same as it reuses the last BMO statements.
+# fetch, same as it reuses the last BMO statements. The balances cache lives
+# there too, so `--no-download` still sends the last BMO, Wise, and Questrade
+# balances to YNAB.
 #
 # Every bank entry needs a decision in `transactions.json` in the task state:
 # its YNAB payee and memo, or its split parts with payee, amount, and memo
@@ -148,6 +150,7 @@ TRANSACTIONS_ID = "transactions.json"
 CHEQUING_ID = "chequing.csv"
 CREDIT_CARD_ID = "credit_card.csv"
 WISE_ID = "wise.json"
+BALANCES_ID = "balances.json"
 DOWNLOAD_ID = "statement.csv"
 SESSION_ID = "bmo_session.json"
 TOKEN_ID = "questrade_refresh_token.txt"
@@ -196,8 +199,13 @@ def run(ctx, args=None):
     )
     if no_download:
         use_last_statements(paths)
-        balances = None
-        questrade_balance = None
+        balances, questrade_balance = load_balances(ctx)
+        if balances is None and questrade_balance is None:
+            _log("No saved balances, skipping balances.")
+            _say("No saved balances, skipping balances.")
+        else:
+            _log("Reusing the saved balances.")
+            _say("Reusing the saved balances.")
     else:
         ctx.log(f"Reading the Questrade balances in {QUESTRADE_CURRENCY}")
         questrade_balances = read_questrade_balances(
@@ -209,6 +217,7 @@ def run(ctx, args=None):
         wise_balance = run_wise_download(ctx, paths, start_date)
         balances = run_download(ctx, paths, start_date)
         balances[Account.WISE] = wise_balance
+        save_balances(ctx, balances, questrade_balance)
 
     ctx.log("Reading the statements")
     statement_transactions = [
@@ -3959,6 +3968,70 @@ def read_wise_transactions(path):
             )
         )
     return transactions
+
+
+def save_balances(ctx, balances, questrade_balance):
+    # Writes the bank and Questrade balances to the cache, so
+    # `--no-download` still sends them to YNAB. Amounts keep their
+    # exact value as strings, and `None` stays `None`.
+    raw_balances = {}
+    for account, amount in balances.items():
+        source = SOURCE_BY_ACCOUNT[account]
+        if amount is None:
+            raw_balances[source] = None
+        else:
+            raw_balances[source] = str(amount)
+    if questrade_balance is None:
+        raw_questrade = None
+    else:
+        raw_questrade = str(questrade_balance)
+    data = {
+        "balances": raw_balances,
+        "questrade_balance": raw_questrade,
+    }
+    try:
+        ctx.save_state(BALANCES_ID, data)
+    except (OSError, TypeError, ValueError) as error:
+        raise TaskError(f"cannot save {BALANCES_ID}: {error}") from error
+
+
+def load_balances(ctx):
+    # Returns the cached bank balances and Questrade balance, or
+    # `(None, None)` when no cache exists yet. Raises when the cache
+    # holds bad data, so bad data never reaches YNAB silently.
+    raw = ctx.load_state(BALANCES_ID)
+    if raw is None:
+        return None, None
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise TaskError(f"cannot read {BALANCES_ID}: {error}") from error
+    try:
+        data = json.loads(text)
+    except ValueError as error:
+        raise TaskError(f"cannot read {BALANCES_ID}: {error}") from error
+    if not isinstance(data, dict):
+        raise TaskError(f"{BALANCES_ID} holds no balance object")
+    raw_balances = data.get("balances")
+    if not isinstance(raw_balances, dict):
+        raise TaskError(f"{BALANCES_ID} holds no balances")
+    balances = {}
+    for source, account in ACCOUNTS_BY_SOURCE.items():
+        value = raw_balances.get(source)
+        if value is None:
+            balances[account] = None
+        else:
+            balances[account] = parse_decision_amount(
+                value, f"{BALANCES_ID} {source}"
+            )
+    raw_questrade = data.get("questrade_balance")
+    if raw_questrade is None:
+        questrade_balance = None
+    else:
+        questrade_balance = parse_decision_amount(
+            raw_questrade, f"{BALANCES_ID} questrade"
+        )
+    return balances, questrade_balance
 
 
 def wise_get(action, url, api_token):
