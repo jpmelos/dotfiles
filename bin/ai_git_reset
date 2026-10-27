@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# This moves the current branch to a past reference and keeps worktree content.
+# Run it like `ai_git_reset <ref>`.
+# It undoes recent commits and keeps their changes.
+# The reference must be an ancestor of `HEAD`.
+# Each commit after the reference must exist only on the current branch.
+
+if [ $# -ne 1 ]; then
+    echo "Error: Exactly one reference is required" >&2
+    exit 1
+fi
+
+target_name="$1"
+
+current_branch=$(git symbolic-ref --short HEAD 2>/dev/null) || {
+    echo "Error: HEAD is detached, so no current branch exists" >&2
+    exit 1
+}
+
+head_commit=$(git rev-parse HEAD)
+target_commit=$(git rev-parse --verify \
+    "${target_name}^{commit}" 2>/dev/null) || {
+    echo "Error: Reference does not resolve to a commit" >&2
+    exit 1
+}
+
+if [ "$target_commit" = "$head_commit" ]; then
+    echo "Error: Reference matches HEAD, so no commit exists to undo" >&2
+    exit 1
+fi
+
+if ! git merge-base --is-ancestor "$target_commit" "$head_commit"; then
+    echo "Error: Reference is not an ancestor of HEAD" >&2
+    exit 1
+fi
+
+commit_list=$(git rev-list "${target_commit}..${head_commit}")
+
+if [ -z "$commit_list" ]; then
+    echo "Error: No commit exists between HEAD and the reference" >&2
+    exit 1
+fi
+
+allowed_ref="refs/heads/${current_branch}"
+
+while IFS= read -r commit_hash; do
+    [ -n "$commit_hash" ] || continue
+    containing_refs=$(git for-each-ref \
+        --contains "$commit_hash" \
+        --format='%(refname)' \
+        refs/heads refs/remotes refs/tags)
+    found_allowed=false
+    while IFS= read -r containing_ref; do
+        [ -n "$containing_ref" ] || continue
+        if [ "$containing_ref" = "$allowed_ref" ]; then
+            found_allowed=true
+        else
+            echo "Error: Commit ${commit_hash}" \
+                "also exists in ${containing_ref}" >&2
+            exit 1
+        fi
+    done <<< "$containing_refs"
+    if [ "$found_allowed" = false ]; then
+        echo "Error: Commit ${commit_hash}" \
+            "does not exist on ${allowed_ref}" >&2
+        exit 1
+    fi
+done <<< "$commit_list"
+
+exec git reset "$target_name"

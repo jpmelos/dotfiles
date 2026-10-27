@@ -73,7 +73,20 @@
       only the contents of the staging area.
     - To stage all changes and commit them in one step, run
       `ai_git_commit -a Commit message goes here`.
-  - *Never* delete a commit.
+    - `ai_git_reset <ref>` moves the current branch to `ref` and keeps commit
+      changes in the worktree.
+      - The command fails unless `ref` is an ancestor of `HEAD` and each commit
+        after `ref` exists only on the current branch.
+      - After the reset, the original tip remains in `ORIG_HEAD`.
+      - To undo recent commits but keep their changes in the worktree, run
+        `ai_git_reset <ref>`.
+      - To change an older commit on the current branch, use this sequence.
+        - Record the commit messages after the target commit.
+        - Run `ai_git_reset <parent-of-target>`.
+        - Edit files to fold the fix into the target commit.
+        - Recreate each undone commit in order with `ai_git_commit`.
+  - *Never* delete a commit, except with `ai_git_reset` after the user asks to
+    change history.
   - *Never* call `git` commands directly (`git restore`, `git commit`, etc),
     except for `git add` and `git apply`.
 - To rename or delete files, use `safe_mv` and `safe_rm` instead of `mv` and
