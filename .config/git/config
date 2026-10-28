@@ -171,7 +171,7 @@
 
     # ps = push
     ps = push -u
-    psf = push --force-with-lease
+    psf = push -u --force-with-lease
 
     # rb = rebase
     rb = rebase
