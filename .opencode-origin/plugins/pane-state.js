@@ -22,6 +22,9 @@ export default {
     const subagentSessionIDs = new Set();
     const mainSessionIDs = new Set();
 
+    // The server started, like `SessionStart`.
+    await pane(["ready", "--no-chime"]);
+
     async function isSubagentSession(sessionID) {
       if (subagentSessionIDs.has(sessionID)) {
         return true;
