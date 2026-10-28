@@ -10,6 +10,8 @@ message.
 The reference can be one of many things. Act accordingly:
 
 - A project URL or identifier.
+- A list URL or identifier. A list is a container that holds items. Examples
+  are a Trello list, a project column, or a saved tracker view.
 - An issue URL or identifier.
 - A pull request URL or identifier.
 - A branch name linked to a pull request.
@@ -25,6 +27,10 @@ Read the full object with available tracker tools. Do not guess content.
   milestone, parent, relations, links, and comments.
 - For a project, read title, description, goals, and all items with title,
   status, assignee, and milestone. Page through all results.
+- For a list, read title, parent board or parent project, and all items. Page
+  through all results.
+- For each item, read title, description or body, status, assignee, and
+  milestone.
 - For a pull request, read title, description, state, diff, checks, reviews,
   review threads, comments, and linked issues.
 - If the object does not exist or access fails, report that fact and stop.
@@ -40,6 +46,9 @@ complete.
   pull requests.
 - For a pull request, also read each linked issue and its sub-issues.
 - For a project, expand sub-issues for each open issue.
+- For a list, expand sub-issues for each item. Treat each item as an issue.
+- For a list, follow links from each item description or body. Read each linked
+  issue or linked pull request with its sub-issues.
 - Page through all results. Do not stop at the first page.
 
 ## 3. Determine next actions
@@ -51,13 +60,26 @@ Apply these rules:
 - Prefer active work with recent comments or reviews over idle work.
 - Flag pull requests with failed checks or open review threads.
 - Flag issues with no assignee or with stale discussion.
-- Order candidates from most urgent to least urgent.
+- If the reference is not a list, order candidates from most urgent to least
+  urgent.
+- If the reference is a list, determine next actions for each item separately.
+- If the reference is a list, do not merge actions across items into one global
+  order.
+- If the reference is a list, order items as they appear in the list.
+- If the reference is a list, order actions within each item from most urgent
+  to least urgent.
 
 ## 4. Output
 
-Present a short summary of the current state. Then present an ordered list of
-next actions. For each action, give identifier and title, reason it ranks
-there, blockers if any, and a concrete entry point.
+If the reference is not a list, present a short summary of the current state.
+If the reference is not a list, present an ordered list of next actions. For
+each action, give identifier and title, reason it ranks there, blockers if any,
+and a concrete entry point.
+
+If the reference is a list, present a short summary of the list state. Then
+present one section for each item in list order. For each item, give identifier
+and title. Then give its ordered next actions with reason, blockers, and entry
+point. If an item has no further action, state that fact under the item.
 
 - For each action that includes development work:
   - State the repository to which the change belongs. State it as a local path
