@@ -43,7 +43,11 @@ Write one commit message per micro-commit. Apply these rules:
 Group micro-commits into PRs. Apply these rules:
 
 - Put micro-commits that must deploy together in one PR group.
-- Put micro-commits that work alone in a separate PR group.
+- Micro-commits that can deploy alone do not need separate PR groups. If they
+  serve the same larger goal, put them in one PR group.
+- Use separate PR groups for unrelated goals, or where deploying separately is
+  objectively better. Also use them when one part must reach production before
+  another part.
 - List each PR group with its micro-commits in plan order.
 - When the plan holds more than one PR group, list one new branch name for each
   PR group.
