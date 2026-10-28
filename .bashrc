@@ -177,13 +177,9 @@ alias gbd='g bd'
 alias gbdd='g bdd'
 alias gbs='g bs'
 __git_complete gb git_branch
-__git_complete gbc git_branch
-__git_complete gbr git_branch
 __git_complete gbn git_checkout
 __git_complete gbd git_branch
-# gbdd doesn't use additional arguments.
 # __git_complete gbdd git_branch
-__git_complete gbs git_branch
 
 alias gc='g c'
 alias gca='g ca'
@@ -237,16 +233,11 @@ alias gmom='g mom'
 alias gmc='g mc'
 alias gma='g ma'
 __git_complete gm git_merge
-__git_complete gmm git_merge
-__git_complete gmom git_merge
-__git_complete gmc git_merge
-__git_complete gma git_merge
 
 alias go='g o'
 alias gom='g om'
 alias gof='g of'
 __git_complete go git_checkout
-__git_complete gom git_checkout
 __git_complete gof git_checkout
 
 alias gpl='g pl'
@@ -268,13 +259,7 @@ alias grbiom='g rbiom'
 alias grbc='g rbc'
 alias grba='g rba'
 __git_complete grb git_rebase
-__git_complete grbm git_rebase
-__git_complete grbom git_rebase
 __git_complete grbi git_rebase
-__git_complete grbim git_rebase
-__git_complete grbiom git_rebase
-__git_complete grbc git_rebase
-__git_complete grba git_rebase
 
 alias grs='g rs'
 alias grso='g rso'
@@ -304,8 +289,6 @@ alias gwl='g wl'
 alias gwp='g wp'
 __git_complete gw git_worktree
 __git_complete gwa git_worktree
-__git_complete gwl git_worktree
-__git_complete gwp git_worktree
 
 alias gy='g y'
 __git_complete gy git_cherry_pick
