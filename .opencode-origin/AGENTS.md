@@ -27,22 +27,38 @@
   - When referring to code outside the current working directory, use `..`
     prefixes as needed.
 
-# PR Titles and Descriptions
+# Titles and Descriptions
 
-- Keep each PR title short, at most 50 characters.
-- Describe in the title what the PR does.
-- Keep each PR description concise and to the point.
-- Include all important topics in the description.
-- Describe in the description what the PR does and why it matters.
-- Emit each title and each description as raw Markdown, ready to paste into
-  GitHub.
+- Apply these rules to PRs, issues, and tickets.
+- Keep each title short, at most 50 characters.
+- Describe in the title what the change does or what the issue requests.
+- Keep each body very concise and to the point.
+- Make each body complete in isolation from parent items and related items.
+- Write each body for a human reader in very plain and direct terms.
+- Start each body with a section named User Perspective or Business
+  Perspective.
+- Explain in that section the change from a user and business view.
+- Omit function names, variable names, layer names, and database terms unless a
+  term explains a business change.
+- If the change alters what the user sees or does, state the current behavior
+  and the new behavior after release.
+- If the change has no user effect, state the prior business problem and the
+  new business state.
+- Add after that section a section named Technical Details if the item holds
+  development work.
+- Explain in that section high-level technical choices of interest to a lead or
+  manager.
+- Focus in that section on architecture, performance, safety, and security.
+- Omit from that section function names, variable names, and layer names.
+- Emit each title and each body as raw Markdown, ready to paste into the
+  tracker.
 - Put each title alone inside one code block.
-- Put each description inside a separate code block tagged as `markdown`.
+- Put each body inside a separate code block tagged as `markdown`.
 - Show raw Markdown syntax in the block for verbatim copy.
 - Include headings, lists, links, and inline code as raw syntax.
-- Do not render descriptions as formatted Markdown outside code blocks.
-- If a description holds code blocks of its own, use a fence of four backticks
-  for the outer block.
+- Do not render bodies as formatted Markdown outside code blocks.
+- If a body holds code blocks of its own, use a fence of four backticks for the
+  outer block.
 
 # Code Style
 
