@@ -184,6 +184,8 @@
 # /   The launcher reads these variables of the host:
 # /
 # /   OPENCODE_API_KEY   The API key of the session. See `Configuration`.
+# /   AI_DEFAULT_NEXT    The default tracker reference for `/next`. Relayed
+# /                      into the container, where `ai_default_next` prints it.
 # /   AGENTS_ADDITIONAL_ENV_VARS
 # /                      A colon-separated list of variable names to relay
 # /                      into the container with the value of the host. A
@@ -366,6 +368,7 @@ RESERVED_ENV_VARS = frozenset(
         "AGENT_BROWSER_EXECUTABLE_PATH",
         "AGENT_PROFILE",
         "AGENT_SHARED_DIR",
+        "AI_DEFAULT_NEXT",
         "OPENCODE_API_KEY",
         "OPENCODE_CONFIG_DIR",
         "OPENCODE_CONFIG",
@@ -423,6 +426,7 @@ OPENCODE_SUBCOMMANDS = frozenset(
 AGENT_BINARIES = (
     "safe_mv",
     "safe_rm",
+    "ai_default_next",
     "ai_git_restore",
     "ai_git_commit",
     "ai_git_new_branch",
@@ -2862,6 +2866,11 @@ def agent_env_args(run_config):
         # Without it only the free models are enabled.
         "--env",
         "OPENCODE_API_KEY",
+        # The default tracker reference for `/next`. The name alone relays
+        # the value of the host, and Docker leaves it out when the host does
+        # not set it.
+        "--env",
+        "AI_DEFAULT_NEXT",
         # This is used to show the active profile and project in the status
         # line.
         "--env",

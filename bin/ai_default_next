@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# This prints the default tracker reference for `/next`.
+# Run it like `ai_default_next`.
+
+if [ $# -ne 0 ]; then
+    echo "Error: This command takes no arguments" >&2
+    exit 1
+fi
+
+printf '%s\n' "${AI_DEFAULT_NEXT:-}"

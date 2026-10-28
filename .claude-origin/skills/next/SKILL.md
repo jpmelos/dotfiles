@@ -16,8 +16,10 @@ The reference can be one of many things. Act accordingly:
 - A pull request URL or identifier.
 - A branch name linked to a pull request.
 
-If the reference is empty or ambiguous, stop and ask the user which object to
-use. Ask directly in the chat. Do not use a tool to ask.
+If the reference is empty, run `ai_default_next` to get the default reference.
+Use the output as the reference. If the reference is still empty or ambiguous,
+stop. Ask the user which object to use. Ask directly in the chat. Do not use a
+tool to ask.
 
 ## 1. Read the referenced object
 

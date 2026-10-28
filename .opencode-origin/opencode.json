@@ -89,6 +89,11 @@
     },
     {
       "action": "shell",
+      "resource": "ai_default_next",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
       "resource": "ai_git_commit *",
       "effect": "allow"
     },

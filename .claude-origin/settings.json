@@ -38,6 +38,7 @@
       "Bash(./jpenv-bin/tests *)",
       "Bash(agent-browser)",
       "Bash(agent-browser *)",
+      "Bash(ai_default_next)",
       "Bash(ai_git_commit *)",
       "Bash(ai_git_new_branch *)",
       "Bash(ai_git_restore)",
