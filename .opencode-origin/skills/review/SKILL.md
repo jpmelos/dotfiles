@@ -85,19 +85,8 @@ larger context in which the work happens, and review against that context. Look
 for the tracker reference in the branch name, the commit messages, the PR title
 and description, and the additional instructions.
 
-Finally, except in a review of files, provide your own version of:
-
-- A PR title, at most 50 characters.
-- A PR description that is concise and to the point, without excluding any
-  important topics that need to be covered.
-
-Emit the title and the description as raw Markdown, ready to paste into GitHub.
-Put the title alone inside its own fenced code block. Put the description
-inside a separate fenced code block, with the fence tagged as "markdown", so
-that the raw Markdown syntax (headings, lists, links, inline code) is visible
-and can be copied verbatim. Do not render the description as formatted Markdown
-outside the code block. If the description contains code blocks of its own, use
-a fence of four backticks for the outer block.
+Finally, except in a review of files, provide your own version of a PR title
+and a PR description.
 
 Review checklist:
 

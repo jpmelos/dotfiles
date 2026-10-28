@@ -27,6 +27,23 @@
   - When referring to code outside the current working directory, use `..`
     prefixes as needed.
 
+# PR Titles and Descriptions
+
+- Keep each PR title short, at most 50 characters.
+- Describe in the title what the PR does.
+- Keep each PR description concise and to the point.
+- Include all important topics in the description.
+- Describe in the description what the PR does and why it matters.
+- Emit each title and each description as raw Markdown, ready to paste into
+  GitHub.
+- Put each title alone inside one code block.
+- Put each description inside a separate code block tagged as `markdown`.
+- Show raw Markdown syntax in the block for verbatim copy.
+- Include headings, lists, links, and inline code as raw syntax.
+- Do not render descriptions as formatted Markdown outside code blocks.
+- If a description holds code blocks of its own, use a fence of four backticks
+  for the outer block.
+
 # Code Style
 
 - Document only the code that exists *now*. *Never* write comments or

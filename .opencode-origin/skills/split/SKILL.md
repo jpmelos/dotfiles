@@ -48,14 +48,7 @@ Group micro-commits into PRs. Apply these rules:
 - When the plan holds more than one PR group, list one new branch name for each
   PR group.
 
-Write one PR title and one PR description for each PR group. Apply these rules:
-
-- Keep each PR title short, at most 50 characters.
-- Keep each PR description concise and to the point. Include all important
-  topics.
-- Use single backticks for identifiers in titles and descriptions.
-- Never use double backticks in titles and descriptions.
-- Describe what the PR group does and why it matters.
+Write one PR title and one PR description for each PR group.
 
 All micro-commits in one PR deploy together. The micro-commits in separate PRs
 deploy at different times. The separate PRs reach production with days of
@@ -117,14 +110,7 @@ Do not run compilers, linters, or tests.
 
 Present the ordered list of new micro-commits with titles and new branches.
 Describe what the user can now do with the new history. For each PR group,
-present one PR title and one PR description. Emit each title and each
-description as raw Markdown, ready to paste into GitHub. Put each title alone
-inside its own fenced code block. Put each description inside a separate fenced
-code block. Tag the fence as "markdown". Show the raw Markdown syntax in the
-block for verbatim copy. Include headings, lists, links, and inline code as raw
-syntax. Do not render descriptions as formatted Markdown outside code blocks.
-If a description holds code blocks of its own, use a fence of four backticks
-for the outer block.
+present one PR title and one PR description.
 
 If there are additional instructions, follow them. If the additional
 instructions conflict with the instructions above, the additional instructions
