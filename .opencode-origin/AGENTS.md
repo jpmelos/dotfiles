@@ -10,9 +10,9 @@
 
 - When you report work, describe only what the user can now do. Never mention
   code changes, files, functions, or implementation details.
-- When you mention an issue, PR, ticket, or similar by reference (number, code,
-  etc.), always add a short description of what it is about. The user does not
-  remember references from memory.
+- When you mention an issue, PR, ticket, or similar, always add a short
+  description of what it is about. The user does not remember references from
+  memory.
 - *Never* use tools to ask questions. Instead, ask directly in the chat and
   expect a response in the user's turn.
 - When unsure about the codebase, ask for clarification rather than guessing.
@@ -30,6 +30,10 @@
 # Titles and Descriptions
 
 - Apply these rules to PRs, issues, and tickets.
+- Refer to any issue, PR, ticket, or similar only by its canonical URL, without
+  optional parts. Never use a bare number or code.
+  - For example, use `https://linear.app/close/issue/COMMS-1698`, not
+    `COMMS-1698` or `https://linear.app/close/issue/COMMS-1698/issue-slug`.
 - Keep each title short, at most 50 characters.
 - Describe in the title what the change does or what the issue requests.
 - Keep each body very concise and to the point.
