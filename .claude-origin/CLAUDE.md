@@ -111,6 +111,11 @@
     - To create a new branch at a commit, run
       `ai_git_new_branch <branch-name> <sha>`. This creates a branch that
       points at the commit.
+    - Name new branches as `jpmelos-{what the changeset does}`.
+      - For example: `jpmelos-index-numbers-by-assigned-group`.
+      - When the work addresses an issue, include the issue number as
+        `jpmelos-{issue number}-{what the changeset does}`.
+        - For example: `jpmelos-comms-1705-clear-stale-pins-on-auto-agents`.
     - `ai_git_reset <ref>` moves the current branch to `ref` and keeps commit
       changes in the worktree.
       - The command fails unless `ref` is an ancestor of `HEAD` and each commit
