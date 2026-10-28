@@ -59,6 +59,11 @@ Present a short summary of the current state. Then present an ordered list of
 next actions. For each action, give identifier and title, reason it ranks
 there, blockers if any, and a concrete entry point.
 
+- For each action that includes development work:
+  - State the repository to which the change belongs. State it as a local path
+    or as a name in a forge such as GitHub.
+  - Suggest one branch name.
+
 Do not implement anything. Do not change tracker state. Do not run compilers,
 linters, or tests.
 
