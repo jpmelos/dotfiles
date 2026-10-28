@@ -35,8 +35,16 @@
 - Keep each body very concise and to the point.
 - Make each body complete in isolation from parent items and related items.
 - Write each body for a human reader in very plain and direct terms.
+- If the PR closes the issue, start the PR body with
+  `Closes <issue tracker link>.` on the first line.
+- If the PR covers only part of the issue, start the PR body with
+  `Related to <issue tracker link>.` on the first line instead.
+- If the PR has no link to an issue, omit this line.
+- If the PR holds several commits, add
+  `Reviewing commit by commit may be easiest.` in a new paragraph directly
+  below that line, or as the first paragraph when no link line exists.
 - Start each body with a section named User Perspective or Business
-  Perspective.
+  Perspective, after any PR preamble lines above.
 - Explain in that section the change from a user and business view.
 - Omit function names, variable names, layer names, and database terms unless a
   term explains a business change.
