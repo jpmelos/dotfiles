@@ -124,18 +124,10 @@
 # /             "server-name": {"type": "local", "command": ["..."]}
 # /           },
 # /           "permissions": [
-# /             {
-# /               "action": "server-name_tool-name",
-# /               "resource": "*",
-# /               "effect": "allow"
-# /             }
+# /             "github_search_repositories:*:allow"
 # /           ],
 # /           "fast_permissions": [
-# /             {
-# /               "name": "GitHub search",
-# /               "action": "github_search_repositories",
-# /               "resource": "*"
-# /             }
+# /             "GitHub search:github_search_repositories:*"
 # /           ]
 # /         },
 # /         "orgname": {
@@ -165,15 +157,17 @@
 # /
 # /   The `mcp_servers` object of a profile replaces the `mcp.servers`
 # /   object in the profile `opencode.json`. The `permissions` list of a
-# /   profile holds extra rules for the `permissions` list in that profile
-# /   `opencode.json`, after the rules of the origin file. The last
+# /   profile holds extra rules as `action:resource:effect` strings for the
+# /   `permissions` list in that profile `opencode.json`, after the rules
+# /   of the origin file. The last
 # /   matching rule wins, so a profile rule overrides an origin rule for
 # /   the same action and resource. Without `permissions`, the profile
 # /   keeps the permissions of the origin file. The `fast_permissions`
-# /   list of a profile holds toggle entries for the
-# /   `jpenv.fast_permissions` list in that profile `opencode.json`, after
-# /   the entries of the origin file. Each entry names an `action` and a
-# /   `resource` for the `/fp` command. Without `fast_permissions`, the
+# /   list of a profile holds toggle entries as `name:action:resource`
+# /   strings for the `jpenv.fast_permissions` list in that profile
+# /   `opencode.json`, after the entries of the origin file. Each entry
+# /   names an `action` and a `resource` for the `/fp` command. Without
+# /   `fast_permissions`, the
 # /   profile keeps the toggle list of the origin file. The profile `AGENTS.md`
 # /   loads as the global instructions file. Project configurations stay
 # /   disabled (`OPENCODE_CONFIG_PROJECT_DISABLE=1`), so the profile is
@@ -2459,9 +2453,9 @@ def resolve_mcp_servers(profile_config, profile):
 
 def resolve_profile_permissions(profile_config, profile):
     # Returns the extra permission rules of the profile, in the order given,
-    # without duplicates. A profile without `permissions` adds none. Rules
-    # without a non-empty text `action`, a text `resource`, and an `effect`
-    # of `allow`, `deny`, or `ask` are skipped with a warning.
+    # without duplicates. A profile without `permissions` adds none. Entries
+    # hold `action:resource:effect` text, such as
+    # `github_get_commit:*:allow`. Other entries are skipped with a warning.
     permissions = profile_config.get("permissions")
     if permissions is None:
         return []
@@ -2473,13 +2467,15 @@ def resolve_profile_permissions(profile_config, profile):
         )
         return []
     extra_permissions = []
-    for rule in permissions:
-        if not is_permission_rule(rule):
+    for entry in permissions:
+        rule = parse_permission_entry(entry)
+        if rule is None:
             log(
                 f"Warning: the `permissions` of profile "
-                f"'{profile}' holds a rule "
-                "without a non-empty text `action`, a text `resource`, and an "
-                "`effect` of `allow`, `deny`, or `ask`, skipping it"
+                f"'{profile}' holds an entry "
+                "that is not `action:resource:effect` text with a non-empty "
+                "`action`, any `resource`, and an `effect` of `allow`, "
+                "`deny`, or `ask`, skipping it"
             )
             continue
         if rule not in extra_permissions:
@@ -2487,24 +2483,28 @@ def resolve_profile_permissions(profile_config, profile):
     return extra_permissions
 
 
-def is_permission_rule(rule):
-    # Whether `rule` is a permission rule object with a non-empty text
-    # `action`, a text `resource`, and an `effect` of `allow`, `deny`, or
-    # `ask`.
-    return (
-        isinstance(rule, dict)
-        and isinstance(rule.get("action"), str)
-        and bool(rule.get("action"))
-        and isinstance(rule.get("resource"), str)
-        and rule.get("effect") in ("allow", "deny", "ask")
-    )
+def parse_permission_entry(entry):
+    # Returns the permission rule object for `action:resource:effect` text
+    # `entry`, or `None` when `entry` has another form.
+    if not isinstance(entry, str):
+        return None
+    parts = entry.split(":")
+    if len(parts) != 3:
+        return None
+    action, resource, effect = parts
+    if not action:
+        return None
+    if effect not in ("allow", "deny", "ask"):
+        return None
+    return {"action": action, "resource": resource, "effect": effect}
 
 
 def resolve_profile_fast_permissions(profile_config, profile):
     # Returns the fast permission entries of the profile, in the order given,
     # without duplicates. A profile without `fast_permissions` adds none.
-    # Entries without a non-empty text `name`, a non-empty text `action`, and
-    # a non-empty text `resource` are skipped with a warning.
+    # Entries hold `name:action:resource` text, such as
+    # `GitHub search:github_search_repositories:*`. Other entries are skipped
+    # with a warning.
     fast_permissions = profile_config.get("fast_permissions")
     if fast_permissions is None:
         return []
@@ -2517,32 +2517,37 @@ def resolve_profile_fast_permissions(profile_config, profile):
         return []
     extra_fast_permissions = []
     for entry in fast_permissions:
-        if not is_fast_permission_entry(entry):
+        parsed = parse_fast_permission_entry(entry)
+        if parsed is None:
             log(
                 f"Warning: the `fast_permissions` of profile "
                 f"'{profile}' holds an entry "
-                "without a non-empty text `name`, a non-empty "
-                "text `action`, and a "
-                "non-empty text `resource`, skipping it"
+                "that is not `name:action:resource` text with a non-empty "
+                "`name`, a non-empty text `action`, and a non-empty text "
+                "`resource`, skipping it"
             )
             continue
-        if entry not in extra_fast_permissions:
-            extra_fast_permissions.append(entry)
+        if parsed not in extra_fast_permissions:
+            extra_fast_permissions.append(parsed)
     return extra_fast_permissions
 
 
-def is_fast_permission_entry(entry):
-    # Whether `entry` is a fast permission entry object with a non-empty text
-    # `name`, a non-empty text `action`, and a non-empty text `resource`.
-    return (
-        isinstance(entry, dict)
-        and isinstance(entry.get("name"), str)
-        and bool(entry.get("name"))
-        and isinstance(entry.get("action"), str)
-        and bool(entry.get("action"))
-        and isinstance(entry.get("resource"), str)
-        and bool(entry.get("resource"))
-    )
+def parse_fast_permission_entry(entry):
+    # Returns the fast permission entry object for `name:action:resource`
+    # text `entry`, or `None` when `entry` has another form.
+    if not isinstance(entry, str):
+        return None
+    parts = entry.split(":")
+    if len(parts) != 3:
+        return None
+    name, action, resource = parts
+    if not name:
+        return None
+    if not action:
+        return None
+    if not resource:
+        return None
+    return {"name": name, "action": action, "resource": resource}
 
 
 # -----------------------------------------------------------------------------
