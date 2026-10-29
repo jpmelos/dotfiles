@@ -84,9 +84,6 @@ larger context in which the work happens, and review against that context. Look
 for the tracker reference in the branch name, the commit messages, the PR title
 and description, and the additional instructions.
 
-Finally, except in a review of files, provide your own version of a PR title
-and a PR description.
-
 Review checklist:
 
 - The change or the files are good and bug-free.
@@ -97,17 +94,6 @@ Review checklist:
 - Input is validated and sanitized.
 - Good test coverage. (Tests can be in other files.)
 - Code should have good performance characteristics.
-
-Provide feedback organized by priority. Always include all three sections, even
-if a section has no findings — in that case, explicitly state so (for example,
-"There are no critical findings."). Feedback items should be numbered C1..Cn,
-W1..Wn, S1..Sn:
-
-- Critical issues (must fix).
-- Warnings (should fix).
-- Suggestions (consider improving).
-
-Include specific examples of how to fix issues.
 
 If you fix a problem from the review, always report the fix. If the fix changes
 the PR description, present an updated PR description.
@@ -122,6 +108,39 @@ If a problem you find existed before the current change and was not introduced
 by it, still report it, but tag it as such. Add "[Pre-existent]" after the item
 number. Both tags can apply to the same item. Do not use this tag in a review
 of files.
+
+Present all findings as review requests. Output comments for the change author.
+Do not post comments to a forge. Emit each comment as raw Markdown ready to
+copy. The user will paste each comment to the right location in the PR.
+
+Always include all three priority groups. If a group has no findings,
+explicitly state so (for example, "There are no critical findings."). Number
+feedback items C1..Cn, W1..Wn, S1..Sn:
+
+- Critical issues (must fix).
+- Warnings (should fix).
+- Suggestions (consider improving).
+
+For each review request:
+
+- Give the exact location first. Name the file path relative to the project
+  root. Add the line or line range where the comment belongs. For example, use
+  `src/main.rs:45` or `src/lib.rs:23-56`. If the problem is not in the code
+  (for example, the problem is in the PR description), mention it.
+- Write in plain prose for a human reader. Focus on behavior and functionality.
+  State what is wrong, what correct behavior looks like, and why it matters.
+  Where relevant, mention architecture, safety, performance, and security
+  concerns. Unless a term clarifies the change, avoid function names, variable
+  names, layer names, and database terms.
+- Keep each comment concise and complete in isolation. Use a few paragraphs.
+  Where possible, explain the problem first, then propose a solution.
+- Where it helps, include code. Add complete code when reasonable, or partial
+  snippets for inspiration.
+
+Except in a review of files, also provide your own version of a PR title and a
+PR description.
+
+## Constraints and target
 
 Do not run compilers, linters, or tests.
 
