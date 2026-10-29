@@ -8,6 +8,7 @@
 
 # General
 
+- The user's GitHub handle is `jpmelos`.
 - When you report work, describe only what the user can now do. Never mention
   code changes, files, functions, or implementation details.
 - When you mention an issue, PR, ticket, or similar, always add a short
