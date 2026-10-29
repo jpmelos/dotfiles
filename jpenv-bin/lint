@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+#/ Lint the project.
+
+# If `-n` is present, pass through.
+# If `--all-files` or `--files` is present, pass through.
+# Without those flags, add `--files` with changed files, or `--all-files`
+# when no changed files exist.
+has_flag_n=false
+has_flag_all_files=false
+has_flag_files=false
+for arg in "$@"; do
+    case "${arg}" in
+        -n) has_flag_n=true ;;
+        --all-files) has_flag_all_files=true ;;
+        --files) has_flag_files=true ;;
+    esac
+done
+
+extra_args=()
+if [[ "${has_flag_n}" == false ]] \
+    && [[ "${has_flag_all_files}" == false ]] \
+    && [[ "${has_flag_files}" == false ]]; then
+    mapfile -t -d '' modified_files < <(
+        git status --porcelain -z | while IFS= read -r -d '' entry; do
+            # Each entry starts with a status and a space.
+            # For a rename or a copy, a second field follows with the
+            # new path. Skip the old path.
+            status="${entry:0:2}"
+            path="${entry:3}"
+            if [[ "${status}" == "D " ]] || [[ "${status}" == " D" ]]; then
+                # Skip deleted files.
+                continue
+            elif [[ "${status}" == R* ]] || [[ "${status}" == C* ]]; then
+                # Read the new path from the next field.
+                IFS= read -r -d '' dest
+                # Emit the new path.
+                printf '%s\0' "${dest}"
+            else
+                printf '%s\0' "${path}"
+            fi
+        done
+    )
+    if [[ ${#modified_files[@]} -gt 0 ]]; then
+        extra_args=(--files "${modified_files[@]}")
+    else
+        extra_args=(--all-files)
+    fi
+fi
+
+# Run `pre-commit` the same way that the `git commit` hook runs it.
+pre-commit run "$@" "${extra_args[@]}"
