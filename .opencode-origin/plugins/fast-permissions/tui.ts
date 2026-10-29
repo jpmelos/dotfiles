@@ -168,6 +168,68 @@ async function togglePending(context: Plugin.Context, pending: PendingAllows, en
   context.ui.toast.show({ message: `${chosen.name} turns on with the next session.`, variant: "success" })
 }
 
+// Disables every enabled entry for the current session.
+async function disableAllFastPermissions(context: Plugin.Context, pending: PendingAllows): Promise<void> {
+  let entries: FastPermission[]
+  try {
+    entries = await loadFastPermissions()
+  } catch {
+    context.ui.toast.show({ message: "Fast permissions config is unreadable.", variant: "error" })
+    return
+  }
+  if (entries.length === 0) {
+    context.ui.toast.show({ message: "No fast permissions in config.", variant: "warning" })
+    return
+  }
+  const armed = pending.list()
+  const sessionID = currentSessionID(context)
+  if (sessionID === undefined) {
+    if (armed.length === 0) {
+      context.ui.toast.show({ message: "No fast permissions enabled.", variant: "warning" })
+      return
+    }
+    pending.clear()
+    const list = armed.map(rowLabel).join(", ")
+    context.ui.toast.show({ message: `Disabled fast permissions: ${list}.`, variant: "success" })
+    return
+  }
+  let info
+  try {
+    info = await context.client.session.get({ sessionID })
+  } catch {
+    context.ui.toast.show({ message: "Session is unreadable.", variant: "error" })
+    return
+  }
+  const currentRules: SessionRule[] = [...(info.permissions ?? [])]
+  pending.clear()
+  const enabled = entries.filter((entry) => isRuleEnabled(currentRules, entry))
+  const disabled: FastPermission[] = [...enabled]
+  for (const entry of armed) {
+    const known = disabled.some((item) => item.action === entry.action && item.resource === entry.resource)
+    if (known === false) disabled.push(entry)
+  }
+  if (disabled.length === 0) {
+    context.ui.toast.show({ message: "No fast permissions enabled.", variant: "warning" })
+    return
+  }
+  if (enabled.length > 0) {
+    for (const entry of enabled) {
+      const ruleIndex = findRuleIndex(currentRules, entry)
+      if (ruleIndex !== -1) {
+        currentRules[ruleIndex] = { action: entry.action, resource: entry.resource, effect: "deny" }
+      }
+    }
+    try {
+      await context.client.session.update({ sessionID, permissions: currentRules })
+    } catch {
+      context.ui.toast.show({ message: "Session update failed.", variant: "error" })
+      return
+    }
+  }
+  const list = disabled.map(rowLabel).join(", ")
+  context.ui.toast.show({ message: `Disabled fast permissions: ${list}.`, variant: "success" })
+}
+
 // An entry counts as enabled when its rule allows it.
 function isRuleEnabled(rules: readonly SessionRule[], entry: FastPermission): boolean {
   const ruleIndex = findRuleIndex(rules, entry)
@@ -292,6 +354,15 @@ export default Plugin.define({
           slash: { name: "fp" },
           run: async () => {
             await toggleFastPermission(context, pending)
+          },
+        },
+        {
+          id: "jpenv.fast-permissions-disable-all",
+          title: "Disable all fast permissions",
+          description: "Disable all enabled permissions from the config list.",
+          slash: { name: "fpd" },
+          run: async () => {
+            await disableAllFastPermissions(context, pending)
           },
         },
       ],

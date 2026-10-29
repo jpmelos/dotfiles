@@ -1,6 +1,6 @@
 {
   "name": "fast-permissions",
   "version": "0.1.0",
-  "description": "Fast permissions pane and instant /fp command",
+  "description": "Fast permissions pane and instant /fp and /fpd commands",
   "author": { "name": "jpenv" }
 }

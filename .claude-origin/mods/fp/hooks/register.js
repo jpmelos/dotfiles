@@ -1,4 +1,4 @@
-// Fast permissions pane and instant /fp command.
+// Fast permissions pane and instant /fp and /fpd commands.
 //
 // Reads the toggle list from `jpenv.fast_permissions` in the profile
 // settings file. Each row toggles its rule between allow and deny. The
@@ -68,6 +68,20 @@ async function flipRule($, entry) {
   return true;
 }
 
+// Disable every enabled entry. Return the disabled entries.
+async function disableAll($) {
+  const state = await readState($);
+  const enabled = state.entries.filter((entry) => isEnabled(state, entry));
+  if (enabled.length === 0) return [];
+  const disabled = new Set(enabled.map((entry) => entry.permission));
+  state.settings.permissions.allow = state.allow.filter((rule) => disabled.has(rule) === false);
+  for (const entry of enabled) {
+    if (state.deny.includes(entry.permission) === false) state.deny.push(entry.permission);
+  }
+  await $.fs.write(state.file, JSON.stringify(state.settings, null, 2) + "\n");
+  return enabled;
+}
+
 // A hotkey per row while keys last. Rows past `z` keep no hotkey.
 function hotkeyFor(index) {
   if (index < 9) return String(index + 1);
@@ -82,6 +96,11 @@ export function register(on) {
       name: "fp",
       description: "Toggle fast permissions",
       argumentHint: "[name]",
+      immediate: true,
+    });
+    await $.command.register({
+      name: "fpd",
+      description: "Disable all fast permissions",
       immediate: true,
     });
     return next(e);
@@ -102,6 +121,14 @@ export function register(on) {
     const enabled = await flipRule($, found[0]);
     $.ui.invalidate("ui.render");
     return { text: rowLabel(found[0], enabled) };
+  });
+
+  on("command.run", { command: "fpd" }, async ($) => {
+    const disabled = await disableAll($);
+    $.ui.invalidate("ui.render");
+    if (disabled.length === 0) return { text: "No fast permissions enabled." };
+    const list = disabled.map((entry) => rowLabel(entry, false)).join(", ");
+    return { text: "Disabled fast permissions: " + list };
   });
 
   on("turn.complete", async ($, e, next) => {
