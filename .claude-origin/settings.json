@@ -62,6 +62,8 @@
       "Bash(git diff *)",
       "Bash(git log)",
       "Bash(git log *)",
+      "Bash(git ls-files)",
+      "Bash(git ls-files *)",
       "Bash(git main-branch)",
       "Bash(git remote --verbose)",
       "Bash(git rev-list *)",

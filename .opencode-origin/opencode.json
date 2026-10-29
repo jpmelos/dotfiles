@@ -209,6 +209,16 @@
     },
     {
       "action": "shell",
+      "resource": "git ls-files",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "git ls-files *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
       "resource": "git main-branch",
       "effect": "allow"
     },
