@@ -121,8 +121,7 @@
 # /           },
 # /           "permissions": ["mcp__server-name__tool-name"],
 # /           "fast_permissions": [
-# /             {"name": "GitHub search",
-# /              "permission": "mcp__github__search_repositories"}
+# /             "GitHub search:mcp__github__search_repositories"
 # /           ]
 # /         },
 # /         "orgname": {
@@ -156,11 +155,13 @@
 # /   in that profile's `.claude.json`. The `permissions` list of a
 # /   profile holds extra entries for `permissions.allow` in that
 # /   profile's `settings.json`, after the entries of the origin file. The
-# /   `fast_permissions` list of a profile holds toggle entries for the
-# /   `jpenv.fast_permissions` list in that profile's `settings.json`,
-# /   after the entries of the origin file. Each entry names a full Claude
-# /   Code permission rule in `permission`, such as
-# /   `mcp__github__search_repositories`. The `/fp` skill flips that rule
+# /   `fast_permissions` list of a profile holds toggle entries as
+# /   `name:permission` strings for the `jpenv.fast_permissions` list in
+# /   that profile's `settings.json`, after the entries of the origin
+# /   file. Each entry names a full Claude Code permission rule, such as
+# /   `mcp__github__search_repositories`, for the `/fp` command. Without
+# /   `fast_permissions`, the profile keeps the toggle list of the origin
+# /   file. The `/fp` skill flips that rule
 # /   between `permissions.allow` and `permissions.deny` for the run.
 # /   Each container gets its own copy of that file, so a flip stays in
 # /   the container where it ran and never reaches another running
@@ -2418,9 +2419,10 @@ def resolve_profile_permissions(profile_config, profile):
 def resolve_profile_fast_permissions(profile_config, profile):
     # Returns the fast permission entries of the profile, in the order given,
     # without duplicates. A profile without `fast_permissions` adds none.
-    # Entries without a non-empty text `name` and a non-empty text
-    # `permission` are skipped with a warning. The `permission` holds a full
-    # Claude Code permission rule, such as `mcp__github__search_repositories`.
+    # Entries hold `name:permission` text, such as
+    # `GitHub search:mcp__github__search_repositories`. Other entries are
+    # skipped with a warning. The `permission` holds a full Claude Code
+    # permission rule.
     fast_permissions = profile_config.get("fast_permissions")
     if fast_permissions is None:
         return []
@@ -2432,28 +2434,34 @@ def resolve_profile_fast_permissions(profile_config, profile):
         return []
     extra_fast_permissions = []
     for entry in fast_permissions:
-        if not is_fast_permission_entry(entry):
+        parsed = parse_fast_permission_entry(entry)
+        if parsed is None:
             log(
                 f"Warning: the `fast_permissions` of profile "
-                f"'{profile}' holds an entry without a non-empty text "
-                "`name` and a non-empty text `permission`, skipping it"
+                f"'{profile}' holds an entry that is not "
+                "`name:permission` text with a non-empty `name` and a "
+                "non-empty text `permission`, skipping it"
             )
             continue
-        if entry not in extra_fast_permissions:
-            extra_fast_permissions.append(entry)
+        if parsed not in extra_fast_permissions:
+            extra_fast_permissions.append(parsed)
     return extra_fast_permissions
 
 
-def is_fast_permission_entry(entry):
-    # Whether `entry` is a fast permission entry object with a non-empty text
-    # `name` and a non-empty text `permission`.
-    return (
-        isinstance(entry, dict)
-        and isinstance(entry.get("name"), str)
-        and bool(entry.get("name"))
-        and isinstance(entry.get("permission"), str)
-        and bool(entry.get("permission"))
-    )
+def parse_fast_permission_entry(entry):
+    # Returns the fast permission entry object for `name:permission`
+    # text `entry`, or `None` when `entry` has another form.
+    if not isinstance(entry, str):
+        return None
+    parts = entry.split(":")
+    if len(parts) != 2:
+        return None
+    name, permission = parts
+    if not name:
+        return None
+    if not permission:
+        return None
+    return {"name": name, "permission": permission}
 
 
 def create_profile_json(profile_json_path):
