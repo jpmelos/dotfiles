@@ -224,8 +224,9 @@ def main(
       and the state directory. A task module must define NAME and run,
       and may define DESCRIPTION, TIMEOUT, SCHEDULE, SCHEDULE_ARGS,
       SHORTHAND, SHORTHANDS, MENU, HELP, and shutdown. SHORTHAND holds
-      one shorthand string such as "bs", and SHORTHANDS holds a tuple or list of them;
-      a shorthand works everywhere the task name works, including as
+      one shorthand string such as "bs", and SHORTHANDS holds a tuple
+      or list of them; a shorthand works everywhere the task name
+      works, including as
       /<shorthand>, while messages that list tasks show the task name
       with its shorthands in parentheses and all other messages show
       just the task name. HELP holds text about the task itself, such as
