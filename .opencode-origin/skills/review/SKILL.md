@@ -114,9 +114,11 @@ Present all findings as review requests. Output comments for the change author.
 Do not post comments to a forge. Emit each comment as raw Markdown ready to
 copy. The user will paste each comment to the right location in the PR.
 
-Always include all three priority groups. If a group has no findings,
-explicitly state so (for example, "There are no critical findings."). Number
-feedback items C1..Cn, W1..Wn, S1..Sn:
+Always include all three priority groups. Number feedback items C1..Cn, W1..Wn,
+S1..Sn. Start each group with a heading that includes the item count, for
+example `2 Critical issues`, `1 Warning`, or `3 Suggestions`. If a group has no
+findings, use `0` in the heading and explicitly state so (for example,
+`0 Critical issues. There are no critical findings.`):
 
 - Critical issues (must fix).
 - Warnings (should fix).
