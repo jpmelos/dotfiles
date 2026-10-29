@@ -33,7 +33,7 @@ from dataclasses import dataclass
 import click
 from croniter import croniter
 
-TASK_NAME_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
+TASK_NAME_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_]*")
 # Telegram refuses messages past 4096 characters. Chunks stay below that.
 SEND_CHUNK_LIMIT = 4000
 ERROR_PREVIEW_LIMIT = 500
@@ -76,7 +76,7 @@ BOT_COMMANDS = (
     default=None,
     metavar="DIR",
     help=(
-        "Directory with <name>.py task files. Defaults to TELEGRAM_TASKS_DIR, "
+        "Directory with task .py files. Defaults to TELEGRAM_TASKS_DIR, "
         "else ./telegram_tasks."
     ),
 )
@@ -205,10 +205,9 @@ def main(
 
     \b
     Chat commands:
-      /<task> [...] - start a task; only one task runs at a time.
-      Hyphens in task names become underscores in the Telegram menu
-      (budget-sync runs as /budget_sync there), while the chat accepts
-      the original name, the menu name, and any shorthand (/b, /br).
+      /<task> [...] - start a task; only one task runs at a time. The
+      task name is its declared NAME, and any shorthand works too
+      (/budget_sync, /b, /br).
       /status - show uptime, the running task, and the last result
       /cancel - stop the running task; its shutdown hook still runs
       /help - show the commands
@@ -217,19 +216,20 @@ def main(
 
     \b
     Task files:
-      A task is a Python file at TASKS_DIR/<name>.py, where <name> holds
-      letters, digits, _ and -. Files that start with _ or . are ignored.
-      The bot loads the file fresh on every run, so edits apply to the
-      next run without a restart. The file name is the task name in /<task>,
-      /status, and the state directory. A task module may define
-      DESCRIPTION, TIMEOUT, SCHEDULE, SCHEDULE_ARGS, SHORTHAND, SHORTHANDS,
-      run and shutdown. SHORTHAND holds one shorthand string such as "bs",
-      and SHORTHANDS holds a tuple or list of them; a shorthand works
-      everywhere the task name works, including as /<shorthand>, while
-      messages that list tasks show
-      the task name with its shorthands in parentheses and all other
-      messages show just the task name.
-      run is required as run(ctx)
+      A task is a Python file at TASKS_DIR/*.py. Files that start with
+      _ or . are ignored. The bot loads the file fresh on every run, so
+      edits apply to the next run without a restart. Each task declares
+      its NAME, which holds letters, digits, and _, starting with a
+      letter or digit. The NAME is the task name in /<task>, /status,
+      and the state directory. A task module must define NAME and run,
+      and may define DESCRIPTION, TIMEOUT, SCHEDULE, SCHEDULE_ARGS,
+      SHORTHAND, SHORTHANDS, and shutdown. SHORTHAND holds one shorthand
+      string such as "bs", and SHORTHANDS holds a tuple or list of them;
+      a shorthand works everywhere the task name works, including as
+      /<shorthand>, while messages that list tasks show the task name
+      with its shorthands in parentheses and all other messages show
+      just the task name.
+      run takes run(ctx)
       or run(ctx, args) and may be async. shutdown is optional as
       shutdown(ctx) or shutdown(ctx, reason) and runs once after every
       outcome: done, error, timeout, cancelled or shutdown.
@@ -719,7 +719,7 @@ class StateStore:
         ensure_dir(self.base_dir)
 
     def task_dir(self, task_name):
-        # Task names come from file names that match TASK_NAME_PATTERN, so
+        # Task names come from NAME and match TASK_NAME_PATTERN, so
         # the join cannot escape the base directory. resolve() guards anyway.
         path = os.path.join(self.base_dir, "tasks", task_name)
         ensure_dir(path)
@@ -839,9 +839,38 @@ class TaskSpec:
     shorthands: tuple = ()
 
 
+def read_task_name(path):
+    # Returns the NAME string of the task file, or None when the file
+    # defines none or a bad one. NAME is required and must match
+    # TASK_NAME_PATTERN. Read from the syntax tree, so no task code runs.
+    try:
+        with open(path, encoding="utf-8") as handle:
+            tree = ast.parse(handle.read(), filename=path)
+    except (OSError, SyntaxError, ValueError):
+        return None
+    for node in tree.body:
+        if not (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id == "NAME"
+        ):
+            continue
+        if isinstance(node.value, ast.Constant) and isinstance(
+            node.value.value, str
+        ):
+            text = node.value.value.strip()
+            if TASK_NAME_PATTERN.fullmatch(text):
+                return text
+        return None
+    return None
+
+
 def discover_tasks(tasks_dir):
-    # Lists the tasks without executing their code. DESCRIPTION, SHORTHAND and
-    # SHORTHANDS come from a syntax tree scan, so listing never runs task code.
+    # Lists the tasks without executing their code. NAME, DESCRIPTION,
+    # SHORTHAND and SHORTHANDS come from a syntax tree scan, so listing
+    # never runs task code. Files that start with _ or . are ignored. The
+    # file name is not the task name; NAME declares it.
     specs = {}
     if not os.path.isdir(tasks_dir):
         return specs
@@ -852,19 +881,21 @@ def discover_tasks(tasks_dir):
     for entry in entries:
         if not entry.endswith(".py"):
             continue
-        stem = entry[:-3]
-        if not TASK_NAME_PATTERN.fullmatch(stem):
-            continue
-        if stem.startswith("_"):
+        if entry.startswith("_") or entry.startswith("."):
             continue
         path = os.path.join(tasks_dir, entry)
         if not os.path.isfile(path):
             continue
+        name = read_task_name(path)
+        if name is None:
+            continue
+        if name in specs:
+            continue
         shorthands = tuple(
-            item for item in read_task_shorthands(path) if item != stem
+            item for item in read_task_shorthands(path) if item != name
         )
-        specs[stem] = TaskSpec(
-            name=stem,
+        specs[name] = TaskSpec(
+            name=name,
             path=path,
             description=read_task_description(path),
             shorthands=shorthands,
@@ -899,23 +930,22 @@ def display_task_name(spec):
 def menu_command_for_task(name):
     # Returns the Telegram menu command for a task or shorthand name.
     # Telegram BotCommand allows only 1-32 lowercase English letters,
-    # digits, and underscores, while task names also allow uppercase and
-    # hyphens. Lowercase and turn hyphens into underscores; any other
-    # unexpected character becomes an underscore as well. Truncate to the
-    # Telegram limit; an empty result means the name has no valid menu
-    # command.
-    command = name.lower().replace("-", "_")
+    # digits, and underscores. Task names use the same characters plus
+    # uppercase. Lowercase; any other unexpected character becomes an
+    # underscore as well. Truncate to the Telegram limit; an empty result
+    # means the name has no valid menu command.
+    command = name.lower()
     command = re.sub(r"[^a-z0-9_]", "_", command)
     return command[:32]
 
 
 def build_task_command_map(specs):
     # Maps every accepted chat command to its task spec. Accepts the
-    # original task name (for example budget-sync), the Telegram menu
-    # name (for example budget_sync), and every shorthand (for example b).
-    # Keys are lowercased because incoming commands arrive lowercased.
-    # The first task in sorted order wins when several names share one
-    # command, so the choice stays deterministic.
+    # declared NAME (for example budget_sync) and every shorthand (for
+    # example b), plus their Telegram menu names. Keys are lowercased
+    # because incoming commands arrive lowercased. The first task in
+    # sorted order wins when several names share one command, so the
+    # choice stays deterministic.
     mapping = {}
     for task_name in sorted(specs):
         spec = specs[task_name]
@@ -1620,7 +1650,7 @@ class Bot:
         if not os.path.isdir(self.tasks_dir):
             log(
                 f"Warning: tasks directory {self.tasks_dir} does not exist. "
-                "Create it and add <name>.py files."
+                "Create it and add task .py files."
             )
         else:
             log(f"Loaded {len(specs)} task(s) from {self.tasks_dir}")
@@ -1827,10 +1857,7 @@ class Bot:
         # the commands in the menu and autocomplete. Task commands come
         # first, sorted alphabetically, then the other commands, also
         # sorted alphabetically. A failure only warns, so polling still
-        # starts without a menu. Telegram menu commands allow only
-        # lowercase letters, digits, and underscores, so hyphens in task
-        # names become underscores here (budget-sync runs as /budget_sync
-        # in the menu, while the chat still accepts /budget-sync too).
+        # starts without a menu.
         specs = discover_tasks(self.tasks_dir)
         seen = {}
         for name in sorted(specs):

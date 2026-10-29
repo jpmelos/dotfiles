@@ -1,7 +1,7 @@
 # Task that downloads the bank statements and syncs new transactions and
 # balances to YNAB.
 #
-# Run it with `/budget-sync` from the allowlisted chat. Optional words
+# Run it with `/budget_sync` from the allowlisted chat. Optional words
 # after the name are `--no-download` and `--no-upload`.
 #
 # BMO comes from `agent-browser` downloads. Wise comes from the Wise API with
@@ -55,6 +55,7 @@
 # account, one line each with the full payee, plus short confirmations,
 # one combined balance message, and a count of the transactions without a memo.
 
+NAME = "budget_sync"
 DESCRIPTION = (
     "Sync new BMO and Wise transactions and BMO, Wise, and Questrade "
     "balances to YNAB."
