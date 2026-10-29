@@ -266,7 +266,7 @@ def main(
       SCHEDULE_ARGS as its args. Only one task runs at a time, so a due
       task waits for the running one to finish. Missed executions never
       burst: a task runs at most once per check no matter how many ticks
-      it skipped. A manual run counts as an execution. Only failures
+      it skipped. A successful run counts as an execution. Only failures
       reach the chat: scheduled runs report failures to the first
       allowlisted chat, while successful runs stay silent.
 
@@ -2191,10 +2191,6 @@ class Bot:
                 return False
             record.thread = thread
             self.current = record
-            # A manual run counts as an execution, so a schedule never fires
-            # right after a manual run of the same task.
-            self.schedule_last[record.name] = time.time()
-        self.save_schedule_state()
         log(f"task {spec.name}: started by chat, budget {run_timeout:g}s")
         thread.start()
         return True
@@ -2331,6 +2327,12 @@ class Bot:
             error_text = f"{type(error).__name__}: {error}"
             log(f"task {record.name}: run failed:")
             traceback.print_exc()
+        if outcome == "done":
+            # Only a successful run counts as an execution. A failed run
+            # stays due and runs again at the next check.
+            with self.lock:
+                self.schedule_last[record.name] = time.time()
+            self.save_schedule_state()
         record.phase = "finishing"
         if callable(shutdown_fn):
             shutdown_ctx = TaskContext(self, record, in_shutdown=True)
@@ -2442,10 +2444,10 @@ class Bot:
                 traceback.print_exc()
 
     def check_schedules(self, now=None):
-        # Starts the most overdue scheduled task when idle. A dispatch stamps
-        # last with now, so skipped executions coalesce instead of bursting:
-        # a task runs at most once per check. A busy bot leaves due tasks
-        # for the next check.
+        # Starts the most overdue scheduled task when idle. A successful
+        # run stamps last, so skipped executions coalesce instead of
+        # bursting: a task runs at most once per check. A busy bot leaves
+        # due tasks for the next check. A failed run stays due.
         if now is None:
             now = time.time()
         specs = discover_tasks(self.tasks_dir)
@@ -2487,13 +2489,13 @@ class Bot:
             return
         due.sort(key=lambda item: (-item[0], item[1]))
         for _overdue, _name, spec, args in due:
-            if self.start_scheduled_task(spec, args, now):
+            if self.start_scheduled_task(spec, args):
                 break
 
-    def start_scheduled_task(self, spec, args, now):
+    def start_scheduled_task(self, spec, args):
         # Starts one scheduled run when no task runs. Returns True when the
-        # run started. Stamps last at dispatch, even when loading later
-        # fails, so a broken task cannot error every few seconds.
+        # run started. The worker stamps last only when the run succeeds,
+        # so a failed run stays due for the next check.
         run_timeout = read_task_timeout(spec.path, self.default_run_timeout)
         with self.lock:
             if self.is_alive_locked(self.current):
@@ -2515,8 +2517,6 @@ class Bot:
             )
             record.thread = thread
             self.current = record
-            self.schedule_last[spec.name] = now
-        self.save_schedule_state()
         log(f"task {spec.name}: scheduled start, budget {run_timeout:g}s")
         thread.start()
         return True
