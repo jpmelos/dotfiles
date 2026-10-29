@@ -2067,7 +2067,7 @@ class Bot:
 
     def help_text(self):
         specs = discover_tasks(self.tasks_dir)
-        lines = ["Commands:"]
+        lines = ["Commands:", ""]
         seen = {}
         for name in sorted(specs):
             menu_command = menu_command_for_task(name)
@@ -2076,9 +2076,13 @@ class Bot:
             if menu_command not in seen:
                 seen[menu_command] = name
         builtin_names = {name for name, _description in BOT_COMMANDS}
+        first = True
         for menu_command in sorted(seen):
             if menu_command in builtin_names:
                 continue
+            if not first:
+                lines.append("")
+            first = False
             name = seen[menu_command]
             spec = specs[name]
             alias_names = []
@@ -2111,6 +2115,9 @@ class Bot:
                 if help_line:
                     lines.append(f"  {help_line}")
         for name, description in sorted(BOT_COMMANDS):
+            if not first:
+                lines.append("")
+            first = False
             lines.append(f"/{name} - {description}")
         return "\n".join(lines)
 
