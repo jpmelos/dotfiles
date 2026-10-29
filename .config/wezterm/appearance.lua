@@ -6,7 +6,7 @@ function module.apply_to_config(config)
 
     local padding_px = 5
 
-    config.window_decorations = "RESIZE"
+    config.window_decorations = "TITLE | RESIZE"
 
     config.colors = {
         foreground = foreground_color,
