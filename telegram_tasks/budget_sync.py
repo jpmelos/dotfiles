@@ -305,13 +305,13 @@ def shutdown(ctx, reason):
     ctx.log(f"shutdown: {reason}")
     try:
         os.environ["AGENT_BROWSER_SESSION"] = BROWSER_SESSION
-    except Exception as error:
+    except (OSError, ValueError, TypeError) as error:
         ctx.log(f"browser session setup failed: {error}")
         return
     if _BROWSER_OPENED:
         try:
             session_file = ctx.state_path(SESSION_ID)
-        except Exception as error:
+        except (OSError, TaskError, ValueError, RuntimeError) as error:
             ctx.log(f"browser session save skipped: {error}")
             session_file = None
         if session_file:
@@ -324,12 +324,13 @@ def shutdown(ctx, reason):
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     timeout=30,
+                    check=False,
                 )
                 try:
                     os.chmod(session_file, 0o600)
                 except OSError as error:
                     ctx.log(f"browser session chmod failed: {error}")
-            except Exception as error:
+            except (OSError, subprocess.SubprocessError) as error:
                 ctx.log(f"browser session save failed: {error}")
     try:
         subprocess.run(
@@ -337,8 +338,9 @@ def shutdown(ctx, reason):
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             timeout=30,
+            check=False,
         )
-    except Exception as error:
+    except (OSError, subprocess.SubprocessError) as error:
         ctx.log(f"browser close failed: {error}")
 
 
@@ -418,8 +420,8 @@ def read_config_text(path):
     try:
         result = subprocess.run(
             ["jc", "get", path],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
+            check=False,
             encoding="utf-8",
             errors="replace",
             timeout=15,
@@ -550,7 +552,7 @@ def suggest_payees_with_llm(
     if cache_key in _PAYEE_SUGGESTION_CACHE:
         return _PAYEE_SUGGESTION_CACHE[cache_key]
     try:
-        from openai import OpenAI
+        from openai import OpenAI, OpenAIError
     except ImportError as error:
         _log(f"Payee suggestion lookup skipped: {error}")
         return []
@@ -624,7 +626,13 @@ def suggest_payees_with_llm(
                 res = client.chat.completions.create(
                     extra_headers=go_headers, **request
                 )
-            except Exception as error:
+            except (
+                OpenAIError,
+                OSError,
+                ValueError,
+                TypeError,
+                RuntimeError,
+            ) as error:
                 if not effort:
                     raise
                 _log(f"Payee suggestion retry without effort: {error}")
@@ -633,7 +641,16 @@ def suggest_payees_with_llm(
                     extra_headers=go_headers, **request
                 )
             text = res.choices[0].message.content or ""
-        except Exception as chat_error:
+        except (
+            OpenAIError,
+            OSError,
+            ValueError,
+            TypeError,
+            RuntimeError,
+            AttributeError,
+            KeyError,
+            IndexError,
+        ) as chat_error:
             _log(
                 f"Payee suggestion chat failed, trying responses: {chat_error}"
             )
@@ -656,7 +673,13 @@ def suggest_payees_with_llm(
                 response = client.responses.create(
                     extra_headers=go_headers, **response_request
                 )
-            except Exception as error:
+            except (
+                OpenAIError,
+                OSError,
+                ValueError,
+                TypeError,
+                RuntimeError,
+            ) as error:
                 if not effort:
                     raise
                 _log(f"Payee suggestion retry without effort: {error}")
@@ -665,7 +688,16 @@ def suggest_payees_with_llm(
                     extra_headers=go_headers, **response_request
                 )
             text = response.output_text or ""
-    except Exception as error:
+    except (
+        OpenAIError,
+        OSError,
+        ValueError,
+        TypeError,
+        RuntimeError,
+        AttributeError,
+        KeyError,
+        IndexError,
+    ) as error:
         _log(f"Payee suggestion lookup skipped: {error}")
         return []
     matches = parse_payee_suggestions(text, payee_names)
@@ -787,7 +819,7 @@ def record_last_run(ctx, full=True):
     stamp = datetime.datetime.now(datetime.UTC).isoformat()
     try:
         ctx.save_state(LAST_RUN_ID, {"last_run": stamp})
-    except Exception as error:
+    except (OSError, TaskError, ValueError, RuntimeError) as error:
         ctx.log(f"Warning: cannot save {LAST_RUN_ID}: {error}")
 
 
@@ -1365,7 +1397,7 @@ def parse_decision_parts(raw_parts, what, bank_amount):
             raise TaskError(f"{part_what} has a bad memo")
         parts.append({"payee": payee, "amount": amount, "memo": memo})
     if (
-        sum((part["amount"] for part in parts), decimal.Decimal("0"))
+        sum((part["amount"] for part in parts), decimal.Decimal(0))
         != bank_amount
     ):
         raise TaskError(f"{what} parts do not add to the bank amount")
@@ -1491,7 +1523,7 @@ def apply_decisions(
     split_amounts_by_key = ask_all_splits(ctx, undecided_keys, groups)
     sides = build_all_sides(groups, lookup, split_amounts_by_key)
     ask_all_transfer_matches(ctx, sides, ynab_api_key, start_date, decisions)
-    paired_ids, updated_keys = ask_all_payees(
+    _paired_ids, updated_keys = ask_all_payees(
         ctx,
         sides,
         groups,
@@ -2136,7 +2168,7 @@ def fetch_ynab_managed_pairs(ctx, api_key, fetch_start):
                 other_account, other_txn = by_id[other_id]
                 pairs.append(((account, txn), (other_account, other_txn)))
             return pairs
-    except Exception as error:
+    except (TaskError, OSError, ValueError, RuntimeError) as error:
         ctx.log(f"YNAB transfer match lookup skipped: {error}")
         return []
 
@@ -2615,7 +2647,7 @@ def load_ynab_suggestions(ctx, groups, lookup, ynab_api_key, start_date):
     ctx.log("Checking YNAB for payee suggestions")
     try:
         return fetch_ynab_suggestions(ynab_api_key, start_date)
-    except Exception as error:
+    except (TaskError, OSError, ValueError, RuntimeError) as error:
         ctx.log(f"YNAB suggestion lookup skipped: {error}")
         return {}, [], []
 
@@ -3166,7 +3198,7 @@ def ask_split_amounts(ctx, transaction, part_count):
             ask_split_amount(ctx, transaction, part_number, part_count)
             for part_number in range(1, part_count)
         ]
-        entered = sum(amounts, decimal.Decimal("0"))
+        entered = sum(amounts, decimal.Decimal(0))
         remaining = transaction.amount - entered
         label = (
             f"Part {part_count} of {part_count} "
@@ -3295,8 +3327,10 @@ def ask_part_ynab_offer(
     offer = offers[0]
     lines = [
         part_line(transaction, amount, part_number, part_count),
-        f'YNAB has payee "{offer["payee"]}" '
-        f"memo {display_memo(offer['memo'])}.",
+        (
+            f'YNAB has payee "{offer["payee"]}" '
+            f"memo {display_memo(offer['memo'])}."
+        ),
     ]
     if ask_yes("\n".join(lines) + "\nTake payee and memo from YNAB?"):
         return {"payee": offer["payee"], "memo": offer["memo"]}
@@ -4365,7 +4399,7 @@ def update_from_statements(
                 0,
                 0,
                 {
-                    account: decimal.Decimal("0")
+                    account: decimal.Decimal(0)
                     for account in YNAB_ACCOUNT_NAMES
                 },
             )
@@ -4383,7 +4417,7 @@ def update_from_statements(
                 0,
                 0,
                 {
-                    account: decimal.Decimal("0")
+                    account: decimal.Decimal(0)
                     for account in YNAB_ACCOUNT_NAMES
                 },
             )
@@ -4430,7 +4464,7 @@ def update_from_statements(
                 0,
                 0,
                 {
-                    account: decimal.Decimal("0")
+                    account: decimal.Decimal(0)
                     for account in YNAB_ACCOUNT_NAMES
                 },
             )
@@ -4448,7 +4482,7 @@ def update_from_statements(
                     0,
                     0,
                     {
-                        account: decimal.Decimal("0")
+                        account: decimal.Decimal(0)
                         for account in YNAB_ACCOUNT_NAMES
                     },
                 )
@@ -4505,7 +4539,7 @@ def update_from_statements(
             0,
             0,
             sync_count,
-            {account: decimal.Decimal("0") for account in YNAB_ACCOUNT_NAMES},
+            {account: decimal.Decimal(0) for account in YNAB_ACCOUNT_NAMES},
         )
 
     if missing_count:
@@ -4537,7 +4571,7 @@ def update_from_statements(
             0,
             0,
             sync_count,
-            {account: decimal.Decimal("0") for account in YNAB_ACCOUNT_NAMES},
+            {account: decimal.Decimal(0) for account in YNAB_ACCOUNT_NAMES},
         )
     changes = []
     if missing_count:
@@ -4564,7 +4598,7 @@ def update_from_statements(
             0,
             0,
             sync_count,
-            {account: decimal.Decimal("0") for account in YNAB_ACCOUNT_NAMES},
+            {account: decimal.Decimal(0) for account in YNAB_ACCOUNT_NAMES},
         )
 
     if missing_count:
@@ -4622,7 +4656,7 @@ def update_from_statements(
         f"deleted {delete_count}, updated {memo_count} memos{synced_part}."
     )
     report_memo_count(result, start_date)
-    deltas = {account: decimal.Decimal("0") for account in YNAB_ACCOUNT_NAMES}
+    deltas = {account: decimal.Decimal(0) for account in YNAB_ACCOUNT_NAMES}
     for transaction in comparison.missing_transactions:
         deltas[transaction.account] += transaction.amount
     for ynab_transaction in comparison.uncleared_transactions:
@@ -4925,7 +4959,9 @@ def load_ynab_plan(api_client):
     plans = plans.data.plans
     if len(plans) != 1:
         plan_names = ", ".join(plan.name for plan in plans) or "none"
-        raise TaskError(f"expected one YNAB plan, found {len(plans)}")
+        raise TaskError(
+            f"expected one YNAB plan, found {len(plans)}: {plan_names}"
+        )
     plan_id = str(plans[0].id)
 
     accounts = call_ynab(
@@ -5437,7 +5473,6 @@ def create_ynab_transactions(plan, new_transactions):
             or transaction.cleared != ynab.TransactionClearedStatus.UNCLEARED
         )
     ]
-    wrong_transactions = wrong_sent + wrong_others
     if wrong_sent:
         for transaction in wrong_sent:
             _log(f"  {describe_ynab_transaction(transaction)}")
@@ -5637,8 +5672,10 @@ def ask_memo_direction(ctx, account, key, stored, copies):
     date, payee, milliunits = key
     ynab_options = sorted({normalize_memo(copy.memo) for copy in copies})
     lines = [
-        f"{date.strftime('%m-%d')} {ACCOUNT_TAGS[account]} "
-        f"{format_amount(from_milliunits(milliunits))} {payee}",
+        (
+            f"{date.strftime('%m-%d')} {ACCOUNT_TAGS[account]} "
+            f"{format_amount(from_milliunits(milliunits))} {payee}"
+        ),
         f"Database: {display_memo(stored)}",
         "YNAB: " + ", ".join(display_memo(option) for option in ynab_options),
         "Update YNAB or the database? Reply `ynab` or `db`.",
@@ -5938,11 +5975,15 @@ def ask_sync_direction(
     else:
         database_memo = "(not set)"
     lines = [
-        f"{date.strftime('%m-%d')} {ACCOUNT_TAGS[account]} "
-        f"{format_amount(from_milliunits(milliunits))} {stored_payee}",
+        (
+            f"{date.strftime('%m-%d')} {ACCOUNT_TAGS[account]} "
+            f"{format_amount(from_milliunits(milliunits))} {stored_payee}"
+        ),
         f"Bank: {bank_payee}",
-        f'Database: payee "{canonical_expected_payee(stored_payee)}" '
-        f"memo {database_memo}",
+        (
+            f'Database: payee "{canonical_expected_payee(stored_payee)}" '
+            f"memo {database_memo}"
+        ),
         f'YNAB: payee "{actual_payee_c}" memo {display_memo(actual_memo_n)}',
         "Update YNAB or the database? Reply `ynab` or `db`.",
     ]
@@ -6086,8 +6127,10 @@ def ask_sync_payee_direction(
     # Asks whether one transfer side takes the payee of the database or of
     # YNAB. Memos go through the pair question. Returns True for YNAB.
     lines = [
-        f"{date.strftime('%m-%d')} {ACCOUNT_TAGS[account]} "
-        f"{format_amount(from_milliunits(milliunits))} {stored_payee}",
+        (
+            f"{date.strftime('%m-%d')} {ACCOUNT_TAGS[account]} "
+            f"{format_amount(from_milliunits(milliunits))} {stored_payee}"
+        ),
         f"Bank: {bank_payee}",
         f'Database payee: "{canonical_expected_payee(stored_payee)}"',
         f'YNAB payee: "{actual_payee_c}"',
@@ -6106,10 +6149,13 @@ def transfer_memo_lines(date, milliunits, sides):
     # holds its account with its database and YNAB memo display strings.
     # Sorts by account, so every question about the pair matches.
     ordered = sorted(sides, key=lambda side: side[0].value)
+    accounts = " <-> ".join(ACCOUNT_TAGS[account] for account, _, _ in ordered)
     lines = [
-        f"{date.strftime('%m-%d')} Transfer "
-        f"{' <-> '.join(ACCOUNT_TAGS[account] for account, _, _ in ordered)} "
-        f"{format_amount(from_milliunits(milliunits))}"
+        (
+            f"{date.strftime('%m-%d')} Transfer "
+            f"{accounts} "
+            f"{format_amount(from_milliunits(milliunits))}"
+        )
     ]
     for account, db_disp, _ in ordered:
         lines.append(f"Database {ACCOUNT_TAGS[account]}: {db_disp}")
@@ -6182,9 +6228,12 @@ def ask_transfer_reuse(ctx, item, recorded):
     stored_payee, _, _ = current_expected_values(
         expected["row"], expected["part"]
     )
+    amount = format_amount(from_milliunits(item["milliunits"]))
     lines = [
-        f"{item['date'].strftime('%m-%d')} {ACCOUNT_TAGS[account]} "
-        f"{format_amount(from_milliunits(item['milliunits']))} {stored_payee}",
+        (
+            f"{item['date'].strftime('%m-%d')} {ACCOUNT_TAGS[account]} "
+            f"{amount} {stored_payee}"
+        ),
         f"Bank: {expected['bank_payee']}",
         f"The other side uses memo {display_memo(recorded)}. Use it here too?",
     ]
@@ -6325,7 +6374,7 @@ def handle_transfer_memo(ctx, transactions, push_items, pair_memos, item):
     expected = item["expected"]
     txn = item["actual"]["txn"]
     row = expected["row"]
-    stored_payee, stored_memo, stored_known = current_expected_values(
+    _stored_payee, stored_memo, stored_known = current_expected_values(
         row, expected["part"]
     )
     actual_memo_n = normalize_memo(txn.memo)
@@ -6486,9 +6535,7 @@ def reconcile_transfer_pairs(ctx, transactions, push_items, transfer_pairs):
         legs, db_refs, displays, values = pair_memo_parts(pair["sides"])
         if len(values) <= 1:
             continue
-        first = sorted(pair["sides"], key=lambda side: side["account"].value)[
-            0
-        ]
+        first = min(pair["sides"], key=lambda side: side["account"].value)
         value = ask_pair_memo_value(
             ctx,
             transfer_memo_lines(first["date"], first["milliunits"], displays),
@@ -6845,6 +6892,7 @@ def run_agent_browser(arguments, stdout, stderr):
             stderr=stderr,
             encoding="utf-8",
             errors="replace",
+            check=False,
         )
     except OSError as error:
         raise StepError(f"cannot run agent-browser: {error}") from error
