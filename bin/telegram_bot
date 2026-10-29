@@ -223,14 +223,15 @@ def main(
       letter or digit. The NAME is the task name in /<task>, /status,
       and the state directory. A task module must define NAME and run,
       and may define DESCRIPTION, TIMEOUT, SCHEDULE, SCHEDULE_ARGS,
-      SHORTHAND, SHORTHANDS, MENU, and shutdown. SHORTHAND holds one shorthand
-      string such as "bs", and SHORTHANDS holds a tuple or list of them;
+      SHORTHAND, SHORTHANDS, MENU, HELP, and shutdown. SHORTHAND holds
+      one shorthand string such as "bs", and SHORTHANDS holds a tuple or list of them;
       a shorthand works everywhere the task name works, including as
       /<shorthand>, while messages that list tasks show the task name
       with its shorthands in parentheses and all other messages show
-      just the task name. Set MENU to True to list the task in the
-      Telegram menu; without it the task still runs as /<task> and
-      appears in /help, but the menu omits it.
+      just the task name. HELP holds text about the task itself, such as
+      the flags it accepts, shown under the task in /help. Set MENU to
+      True to list the task in the Telegram menu; without it the task
+      still runs as /<task> and appears in /help, but the menu omits it.
       run takes run(ctx)
       or run(ctx, args) and may be async. shutdown is optional as
       shutdown(ctx) or shutdown(ctx, reason) and runs once after every
@@ -840,6 +841,7 @@ class TaskSpec:
     description: str
     shorthands: tuple = ()
     menu: bool = False
+    help: str = ""
 
 
 def read_task_name(path):
@@ -895,8 +897,8 @@ def read_task_menu(path):
 
 def discover_tasks(tasks_dir):
     # Lists the tasks without executing their code. NAME, DESCRIPTION,
-    # SHORTHAND, SHORTHANDS, and MENU come from a syntax tree scan, so
-    # listing never runs task code. Files that start with _ or . are
+    # HELP, SHORTHAND, SHORTHANDS, and MENU come from a syntax tree scan,
+    # so listing never runs task code. Files that start with _ or . are
     # ignored. The file name is not the task name; NAME declares it.
     specs = {}
     if not os.path.isdir(tasks_dir):
@@ -927,6 +929,7 @@ def discover_tasks(tasks_dir):
             description=read_task_description(path),
             shorthands=shorthands,
             menu=read_task_menu(path),
+            help=read_task_help(path),
         )
     return specs
 
@@ -1004,6 +1007,30 @@ def read_task_description(path):
             continue
         target = node.targets[0]
         if not isinstance(target, ast.Name) or target.id != "DESCRIPTION":
+            continue
+        if isinstance(node.value, ast.Constant) and isinstance(
+            node.value.value, str
+        ):
+            return node.value.value.strip()
+    return ""
+
+
+def read_task_help(path):
+    # Returns the HELP string of the task file, or an empty string when
+    # the file defines none. HELP holds text about the task itself, such
+    # as the flags it accepts. Read from the syntax tree, so no task
+    # code runs.
+    try:
+        with open(path, encoding="utf-8") as handle:
+            source = handle.read()
+        tree = ast.parse(source, filename=path)
+    except (OSError, SyntaxError, ValueError):
+        return ""
+    for node in tree.body:
+        if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+            continue
+        target = node.targets[0]
+        if not isinstance(target, ast.Name) or target.id != "HELP":
             continue
         if isinstance(node.value, ast.Constant) and isinstance(
             node.value.value, str
@@ -2078,6 +2105,10 @@ class Bot:
                 lines.append(f"{prefix} - {spec.description}")
             else:
                 lines.append(prefix)
+            for help_line in spec.help.splitlines():
+                help_line = help_line.strip()
+                if help_line:
+                    lines.append(f"  {help_line}")
         for name, description in sorted(BOT_COMMANDS):
             lines.append(f"/{name} - {description}")
         return "\n".join(lines)

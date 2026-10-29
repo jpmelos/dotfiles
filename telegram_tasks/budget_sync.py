@@ -61,6 +61,13 @@ DESCRIPTION = (
     "Sync new BMO and Wise transactions and BMO, Wise, and Questrade "
     "balances to YNAB."
 )
+HELP = (
+    "Flags:\n"
+    "--no-download: reuse the last statements and balances.\n"
+    "--no-upload: preview only, YNAB stays unchanged.\n"
+    "--questrade-config-token: redeem the config Questrade token "
+    "instead of the saved one."
+)
 SHORTHAND = "b"
 MENU = True
 # Banking with user questions can take a while. This is the budget for one
