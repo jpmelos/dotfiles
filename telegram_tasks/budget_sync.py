@@ -61,6 +61,7 @@ DESCRIPTION = (
     "balances to YNAB."
 )
 SHORTHAND = "b"
+MENU = True
 # Banking with user questions can take a while. This is the budget for one
 # run, in seconds.
 TIMEOUT = 7200

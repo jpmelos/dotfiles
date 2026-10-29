@@ -223,12 +223,14 @@ def main(
       letter or digit. The NAME is the task name in /<task>, /status,
       and the state directory. A task module must define NAME and run,
       and may define DESCRIPTION, TIMEOUT, SCHEDULE, SCHEDULE_ARGS,
-      SHORTHAND, SHORTHANDS, and shutdown. SHORTHAND holds one shorthand
+      SHORTHAND, SHORTHANDS, MENU, and shutdown. SHORTHAND holds one shorthand
       string such as "bs", and SHORTHANDS holds a tuple or list of them;
       a shorthand works everywhere the task name works, including as
       /<shorthand>, while messages that list tasks show the task name
       with its shorthands in parentheses and all other messages show
-      just the task name.
+      just the task name. Set MENU to True to list the task in the
+      Telegram menu; without it the task still runs as /<task> and
+      appears in /help, but the menu omits it.
       run takes run(ctx)
       or run(ctx, args) and may be async. shutdown is optional as
       shutdown(ctx) or shutdown(ctx, reason) and runs once after every
@@ -837,6 +839,7 @@ class TaskSpec:
     path: str
     description: str
     shorthands: tuple = ()
+    menu: bool = False
 
 
 def read_task_name(path):
@@ -866,11 +869,35 @@ def read_task_name(path):
     return None
 
 
+def read_task_menu(path):
+    # Returns True when the task file sets MENU to True, else False. Only
+    # an explicit MENU = True opts the task into the Telegram menu; the
+    # task still runs as a command and appears in /help without it. Read
+    # from the syntax tree, so no task code runs.
+    try:
+        with open(path, encoding="utf-8") as handle:
+            tree = ast.parse(handle.read(), filename=path)
+    except (OSError, SyntaxError, ValueError):
+        return False
+    for node in tree.body:
+        if not (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id == "MENU"
+        ):
+            continue
+        if isinstance(node.value, ast.Constant):
+            return node.value.value is True
+        return False
+    return False
+
+
 def discover_tasks(tasks_dir):
     # Lists the tasks without executing their code. NAME, DESCRIPTION,
-    # SHORTHAND and SHORTHANDS come from a syntax tree scan, so listing
-    # never runs task code. Files that start with _ or . are ignored. The
-    # file name is not the task name; NAME declares it.
+    # SHORTHAND, SHORTHANDS, and MENU come from a syntax tree scan, so
+    # listing never runs task code. Files that start with _ or . are
+    # ignored. The file name is not the task name; NAME declares it.
     specs = {}
     if not os.path.isdir(tasks_dir):
         return specs
@@ -899,6 +926,7 @@ def discover_tasks(tasks_dir):
             path=path,
             description=read_task_description(path),
             shorthands=shorthands,
+            menu=read_task_menu(path),
         )
     return specs
 
@@ -1854,13 +1882,17 @@ class Bot:
 
     def register_commands(self):
         # Publishes the command menu via setMyCommands, so clients show
-        # the commands in the menu and autocomplete. Task commands come
-        # first, sorted alphabetically, then the other commands, also
-        # sorted alphabetically. A failure only warns, so polling still
-        # starts without a menu.
+        # the commands in the menu and autocomplete. Only tasks that set
+        # MENU to True appear here; the rest still run as commands and
+        # appear in /help. Task commands come first, sorted
+        # alphabetically, then the other commands, also sorted
+        # alphabetically. A failure only warns, so polling still starts
+        # without a menu.
         specs = discover_tasks(self.tasks_dir)
         seen = {}
         for name in sorted(specs):
+            if not specs[name].menu:
+                continue
             menu_command = menu_command_for_task(name)
             if not menu_command:
                 log(
