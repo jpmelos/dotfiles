@@ -2,7 +2,8 @@
 # balances to YNAB.
 #
 # Run it with `/budget_sync` from the allowlisted chat. Optional words
-# after the name are `--no-download` and `--no-upload`.
+# after the name are `--no-download`, `--no-upload`, and
+# `--questrade-config-token`.
 #
 # BMO comes from `agent-browser` downloads. Wise comes from the Wise API with
 # the token in `wise.api_key`, without a browser. The Wise cache lives in
@@ -185,7 +186,9 @@ def run(ctx, args=None):
     a short summary for the chat."""
     global _CTX
     _CTX = ctx
-    no_download, no_upload = parse_task_args(list(args or []))
+    no_download, no_upload, questrade_config_token = parse_task_args(
+        list(args or [])
+    )
     ctx.say("Budget sync started.")
     try:
         ynab_api_key = read_config_text("ynab.api_key")
@@ -200,6 +203,11 @@ def run(ctx, args=None):
         datetime.date.today() - datetime.timedelta(days=HISTORY_DAYS),
     )
     if no_download:
+        if questrade_config_token:
+            _say(
+                "--questrade-config-token needs a download, so it has no "
+                "effect with --no-download."
+            )
         use_last_statements(paths)
         balances, questrade_balance = load_balances(ctx)
         if balances is None and questrade_balance is None:
@@ -211,7 +219,8 @@ def run(ctx, args=None):
     else:
         ctx.log(f"Reading the Questrade balances in {QUESTRADE_CURRENCY}")
         questrade_balances = read_questrade_balances(
-            paths.questrade_token_file
+            paths.questrade_token_file,
+            force_config_token=questrade_config_token,
         )
         questrade_balance = sum(questrade_balances.values())
         ctx.log(f"Questrade total {format_amount(questrade_balance)}")
@@ -331,15 +340,17 @@ def shutdown(ctx, reason):
 )
 @click.option("--no-download", is_flag=True, default=False)
 @click.option("--no-upload", is_flag=True, default=False)
-def _budget_sync_options(no_download, no_upload):
+@click.option("--questrade-config-token", is_flag=True, default=False)
+def _budget_sync_options(no_download, no_upload, questrade_config_token):
     # Holds the CLI options. `parse_task_args` runs it without exiting, so
     # its errors raise instead.
-    return no_download, no_upload
+    return no_download, no_upload, questrade_config_token
 
 
 def parse_task_args(args):
-    # Returns no-download and no-upload from `args`, the words after the task
-    # name, with the same rules as a regular CLI.
+    # Returns no-download, no-upload, and questrade-config-token from
+    # `args`, the words after the task name, with the same rules as a
+    # regular CLI.
     # Telegram replaces `--` with an n-dash or an m-dash, so leading `-`,
     # `–` (U+2013), and `—` (U+2014) all count as `--`.
     normalized = []
@@ -348,12 +359,12 @@ def parse_task_args(args):
             argument = "--" + argument.lstrip("-–—")
         normalized.append(argument)
     try:
-        no_download, no_upload = _budget_sync_options.main(
-            normalized, standalone_mode=False
+        no_download, no_upload, questrade_config_token = (
+            _budget_sync_options.main(normalized, standalone_mode=False)
         )
     except click.ClickException as error:
         raise TaskError(str(error)) from error
-    return no_download, no_upload
+    return no_download, no_upload, questrade_config_token
 
 
 # -----------------------------------------------------------------------------
@@ -3412,10 +3423,14 @@ class QuestradeSession:
     api_server: str
 
 
-def read_questrade_balances(token_path):
+def read_questrade_balances(token_path, force_config_token=False):
     # Returns the balance of each Questrade account in `QUESTRADE_CURRENCY`,
-    # rounded to cents, by the type and the number of the account.
-    session = start_questrade_session(token_path)
+    # rounded to cents, by the type and the number of the account. When
+    # `force_config_token` holds, the saved token is skipped and the
+    # config token is used.
+    session = start_questrade_session(
+        token_path, force_config_token=force_config_token
+    )
     accounts = questrade_get(
         session, "accounts", "read the Questrade accounts"
     )
@@ -3469,26 +3484,30 @@ def find_combined_balance(account_balances, account_number):
     )
 
 
-def start_questrade_session(token_path):
+def start_questrade_session(token_path, force_config_token=False):
     # Returns a session with a new access token. Questrade accepts each
     # refresh token once, and returns a new one with the access token. The
     # new refresh token goes to `token_path` before any other call, so that
     # the next run can use it. The refresh token that `jc` reads serves only
-    # when `token_path` holds no token, or when Questrade rejects that token.
+    # when `token_path` holds no token, when Questrade rejects that token,
+    # or when `force_config_token` skips the saved token.
     response = None
-    saved_token = read_questrade_token(token_path)
-    if saved_token is None:
-        _log(
-            "No saved Questrade token. "
-            "The task uses `jc get questrade.api_key`."
-        )
+    if force_config_token:
+        _log("Skipping the saved Questrade token by request.")
     else:
-        response = redeem_questrade_token(saved_token)
-        if response is None:
+        saved_token = read_questrade_token(token_path)
+        if saved_token is None:
             _log(
-                "Warning: Questrade rejected the saved refresh token. "
+                "No saved Questrade token. "
                 "The task uses `jc get questrade.api_key`."
             )
+        else:
+            response = redeem_questrade_token(saved_token)
+            if response is None:
+                _log(
+                    "Warning: Questrade rejected the saved refresh token. "
+                    "The task uses `jc get questrade.api_key`."
+                )
     if response is None:
         try:
             fallback = read_config_text("questrade.api_key")
