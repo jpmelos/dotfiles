@@ -72,16 +72,12 @@
 # /
 # / Projects:
 # /   A project is a directory that `list_project_dirs` reports. The
-# /   current directory can be the project root or any directory below
+# /   current directory must be the project root or any directory below
 # /   it. Both cases behave the same: the profile comes from the root,
-# /   and the container starts in the root. If run from outside of
-# /   `~/devel`, defaults to ~/devel/dotfiles as the project. A run from
-# /   a directory under `~/devel` that is inside no project is an error.
-# /   The default would start the agent on the dotfiles repository,
-# /   where it can edit the scripts that run on the host, and a
-# /   `.list_project_dirs_ignore` file asks for the opposite. `~/devel`,
-# /   every project, and every directory between the two must be real
-# /   directories, not links. The container sees `~/devel` through one
+# /   and the container starts in the root. A run from outside any project
+# /   is an error. `~/devel`, every project, and every directory between
+# /   the two must be real directories, not links. The container sees
+# /   `~/devel` through one
 # /   mount, and a link whose target is outside of that mount does not
 # /   resolve inside it. The launcher refuses to start when it finds
 # /   one.
@@ -700,7 +696,7 @@ class HostPaths:
     devel_dir: str
     resolved_devel_dir: str
     # The dotfiles repository holds the helper scripts, the Dockerfile, and
-    # the origin of the profile directories. It is also the default project.
+    # the origin of the profile directories.
     dotfiles_dir: str
     resolved_dotfiles_dir: str
     # The directory that every launch copies into the profile directory.
@@ -851,35 +847,10 @@ def resolve_current_project_root(paths, project_dirs):
         die(f"cannot read the current directory: {error}")
     project_root = find_project_root(current_dir, project_dirs)
     if project_root is None:
-        # A directory under `~/devel` that is inside no project is an
-        # organization directory, or a repository that a
-        # `.list_project_dirs_ignore` file keeps out of the list. The default
-        # below would start the agent on the dotfiles repository, where it can
-        # edit the scripts that run on the host, and the ignore file asks for
-        # the opposite. So the default applies only outside of `~/devel`.
-        # `~/devel` itself is inside no project either, and counts as under.
-        if current_dir == paths.resolved_devel_dir or is_below(
-            current_dir, paths.resolved_devel_dir
-        ):
-            die(
-                f"{current_dir} is {paths.devel_dir} or under "
-                "it, but inside no "
-                "project. Run from a project directory, or from outside "
-                f"{paths.devel_dir} to work on {paths.dotfiles_dir}"
-            )
-        # The dotfiles repository is a project, so `resolve_project_dirs`
-        # refuses a link there. The check stays for a repository that
-        # `list_project_dirs` does not report. The container would fail to
-        # enter a directory that it cannot see.
-        if not is_below(paths.resolved_dotfiles_dir, paths.resolved_devel_dir):
-            die(
-                f"{paths.dotfiles_dir} resolves to "
-                f"{paths.resolved_dotfiles_dir}, which is outside "
-                f"{paths.devel_dir} "
-                "and is not visible inside the container"
-            )
-        project_root = paths.dotfiles_dir
-        log(f"Outside {paths.devel_dir}, defaulting to {project_root}")
+        die(
+            f"{current_dir} is inside no project. Run from a project "
+            f"directory under {paths.devel_dir}"
+        )
     return project_root
 
 
