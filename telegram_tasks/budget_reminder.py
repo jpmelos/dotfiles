@@ -2,7 +2,8 @@
 #
 # Runs once per hour between noon and midnight. It reads the last-run state
 # that budget_sync stores, and reminds the chat when budget_sync has not run
-# yet today. A manual run counts: any finished budget_sync run stores today.
+# yet today. Only a finished run without flags stores today, so a run with
+# --no-download or --no-upload still counts as pending.
 
 NAME = "budget_reminder"
 DESCRIPTION = "Remind to run /budget_sync when it hasn't run today."

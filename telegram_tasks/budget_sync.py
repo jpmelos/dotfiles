@@ -276,7 +276,7 @@ def run(ctx, args=None):
         if sync_count:
             summary += f", {sync_count} payees and memos synced"
         summary += "."
-    record_last_run(ctx)
+    record_last_run(ctx, full=not no_download and not no_upload)
     _say(summary)
     return summary
 
@@ -758,10 +758,14 @@ def resolve_state_files(ctx):
     )
 
 
-def record_last_run(ctx):
-    # Stores when this run finished, so other tasks can check whether this
-    # task ran today. A failure to store only warns, so it never fails a
-    # run that already synced.
+def record_last_run(ctx, full=True):
+    # Stores when this run finished, so other tasks can check whether a
+    # full run happened today. Only runs without flags store, so a run
+    # with --no-download or --no-upload leaves the stamp alone. A
+    # failure to store only warns, so it never fails a run that already
+    # synced.
+    if not full:
+        return
     stamp = datetime.datetime.now(datetime.UTC).isoformat()
     try:
         ctx.save_state(LAST_RUN_ID, {"last_run": stamp})
