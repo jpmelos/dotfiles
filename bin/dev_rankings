@@ -143,10 +143,10 @@ def slug_for_scope(organization, repository):
     return re.sub(r"[^a-z0-9\-_]", "_", lowered)
 
 
-def handle_file_name(slug, handle, stamp):
+def handle_file_name(slug, handle):
     """Build the report file name for one handle."""
     safe = re.sub(r"[^a-z0-9\-]", "-", handle.lower())
-    return "dev-rankings-" + slug + "-handle-" + safe + "-" + stamp + ".html"
+    return "dev-rankings-" + slug + "-handle-" + safe + ".html"
 
 
 def valid_name(value):
@@ -830,7 +830,7 @@ FILTER_JS = [
     "  } catch (err) {",
     "    return;",
     "  }",
-    "  var STORE_KEY = 'dev-rankings-' + DATA.meta.slug + '-repos';",
+    "  var STORE_KEY = 'dev-rankings-' + DATA.meta.slug + '-v2';",
     "  function sortNames(names) {",
     "    return names.slice().sort(function (a, b) {",
     "      var al = a.toLowerCase(), bl = b.toLowerCase();",
@@ -851,7 +851,41 @@ FILTER_JS = [
     "  }",
     "  var currentRepos = sortNames(DATA.repos);",
     "  var currentHandles = sortNames(DATA.handles || []);",
+    "  var storageOK = (function () {",
+    "    try {",
+    "      var probe = '__dr_probe__';",
+    "      window.localStorage.setItem(probe, '1');",
+    "      window.localStorage.removeItem(probe);",
+    "      return true;",
+    "    } catch (err) {",
+    "      return false;",
+    "    }",
+    "  })();",
+    "  function showStorageWarning() {",
+    "    var box = document.getElementById('alert-box');",
+    "    var group = document.getElementById('new-storage');",
+    "    if (!box || !group) {",
+    "      return;",
+    "    }",
+    "    group.hidden = false;",
+    "    box.hidden = false;",
+    "  }",
+    "  function applySelection() {",
+    "    boxes.forEach(function (box) {",
+    "      var repo = box.getAttribute('data-repo');",
+    "      if (repo) {",
+    "        box.checked = excluded.indexOf(repo) === -1;",
+    "      }",
+    "      var who = box.getAttribute('data-handle');",
+    "      if (who) {",
+    "        box.checked = excludedHandles.indexOf(who) === -1;",
+    "      }",
+    "    });",
+    "  }",
     "  function loadState() {",
+    "    if (!storageOK) {",
+    "      return null;",
+    "    }",
     "    try {",
     "      var raw = localStorage.getItem(STORE_KEY);",
     "      return raw ? JSON.parse(raw) : null;",
@@ -860,6 +894,9 @@ FILTER_JS = [
     "    }",
     "  }",
     "  function saveState(state) {",
+    "    if (!storageOK) {",
+    "      return;",
+    "    }",
     "    try {",
     "      localStorage.setItem(STORE_KEY, JSON.stringify(state));",
     "    } catch (err) {}",
@@ -909,6 +946,22 @@ FILTER_JS = [
     "      excludedHandles: excludedHandles",
     "    });",
     "  }",
+    "  if (!storageOK) {",
+    "    showStorageWarning();",
+    "  }",
+    "  window.addEventListener('storage', function (e) {",
+    "    if (!e.key || e.key !== STORE_KEY) {",
+    "      return;",
+    "    }",
+    "    var state = loadState();",
+    "    if (!state) {",
+    "      return;",
+    "    }",
+    "    excluded = state.excluded || [];",
+    "    excludedHandles = state.excludedHandles || [];",
+    "    applySelection();",
+    "    refreshAll();",
+    "  });",
     "  function showWarning(kind, fresh) {",
     "    var box = document.getElementById('alert-box');",
     "    if (!box) {",
@@ -1037,7 +1090,7 @@ FILTER_JS = [
     "    }",
     "    var safe = handle.toLowerCase().replace(/[^a-z0-9-]/g, '-');",
     "    var href = './dev-rankings-' + DATA.meta.slug + '-handle-';",
-    "    href += safe + '-' + DATA.meta.stamp + '.html';",
+    "    href += safe + '.html';",
     "    href += '#card-' + metric + '-' + weeks;",
     "    return href;",
     "  }",
@@ -1294,6 +1347,10 @@ def render_html(
     out.append("</header>")
     if filter_repos is not None:
         out.append('<div id="alert-box" hidden>')
+        out.append('<div id="new-storage" hidden>')
+        out.append("<strong>Selections cannot be saved in this browser,")
+        out[-1] += " so filters reset on reload.</strong>"
+        out.append("</div>")
         out.append('<div id="new-repos" hidden>')
         out.append("<strong>New repo showing up for the first time:</strong>")
         out.append('<ul id="new-repos-list"></ul>')
@@ -1700,7 +1757,6 @@ def main(organization, repository):
 
     title = "Dev rankings for " + scope_text
     made_text = now.strftime("%Y-%m-%d %H:%M UTC")
-    stamp = now.strftime("%Y%m%d-%H%M%S")
     sorted_repos = sorted(all_repos, key=lambda repo: (repo.lower(), repo))
     sorted_handles = sorted(all_handles, key=lambda h: (h.lower(), h))
     filter_labels = {}
@@ -1717,7 +1773,6 @@ def main(organization, repository):
         {
             "meta": {
                 "slug": slug,
-                "stamp": stamp,
                 "orgMode": repository is None,
             },
             "repos": sorted_repos,
@@ -1732,7 +1787,7 @@ def main(organization, repository):
         notes.append("Select a handle to see the per-repository breakdown.")
 
         def link_for(handle, fragment=""):
-            file_name = handle_file_name(slug, handle, stamp)
+            file_name = handle_file_name(slug, handle)
             return "./" + file_name + fragment
     else:
         notes = list(METHOD_NOTES)
@@ -1751,11 +1806,13 @@ def main(organization, repository):
         sorted_handles,
         filter_json,
     )
-    file_name = "dev-rankings-" + slug + "-" + stamp + ".html"
+    file_name = "dev-rankings-" + slug + ".html"
     html_path = os.path.join(state_root, file_name)
     os.makedirs(state_root, exist_ok=True)
-    with open(html_path, "w", encoding="utf-8") as handle:
+    tmp_path = html_path + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as handle:
         handle.write(page)
+    os.replace(tmp_path, html_path)
     if repository is None:
         for handle in sorted(handles_with_pages, key=str.lower):
             handle_sections = build_handle_sections(
@@ -1774,7 +1831,6 @@ def main(organization, repository):
                 {
                     "meta": {
                         "slug": slug,
-                        "stamp": stamp,
                         "orgMode": True,
                     },
                     "repos": sorted_repos,
@@ -1797,10 +1853,12 @@ def main(organization, repository):
                 handle_json,
             )
             handle_path = os.path.join(
-                state_root, handle_file_name(slug, handle, stamp)
+                state_root, handle_file_name(slug, handle)
             )
-            with open(handle_path, "w", encoding="utf-8") as handle_file:
+            tmp_handle_path = handle_path + ".tmp"
+            with open(tmp_handle_path, "w", encoding="utf-8") as handle_file:
                 handle_file.write(handle_page)
+            os.replace(tmp_handle_path, handle_path)
     print("open " + html_path)
 
 
