@@ -143,6 +143,12 @@ def slug_for_scope(organization, repository):
     return re.sub(r"[^a-z0-9\-_]", "_", lowered)
 
 
+def handle_file_name(slug, handle, stamp):
+    """Build the report file name for one handle."""
+    safe = re.sub(r"[^a-z0-9\-]", "-", handle.lower())
+    return "dev-rankings-" + slug + "-handle-" + safe + "-" + stamp + ".html"
+
+
 def valid_name(value):
     """Check that a name fits GitHub naming rules."""
     return re.fullmatch(NAME_PATTERN, value) is not None
@@ -536,6 +542,17 @@ def bump(counter, handle, amount=1):
     counter[handle] = counter.get(handle, 0) + amount
 
 
+def bump_nested(weekly, index, handle, repo, amount=1):
+    """Add the amount to the handle and repo count."""
+    if not handle or not repo:
+        return
+    repos = weekly[index].get(handle)
+    if repos is None:
+        repos = {}
+        weekly[index][handle] = repos
+    repos[repo] = repos.get(repo, 0) + amount
+
+
 def summarize_period(weekly, week_count):
     """Sum the last week_count weeks into ranked totals."""
     totals = {}
@@ -562,7 +579,7 @@ def weekly_values(weekly, handles, week_count):
     return series
 
 
-def table_lines(ranked, limit):
+def table_lines(ranked, limit, link_for):
     """Build table markup for the top handles."""
     rows = []
     rows.append("<table>")
@@ -578,8 +595,41 @@ def table_lines(ranked, limit):
     for position, pair in enumerate(shown, 1):
         handle, value = pair
         safe_handle = html.escape(handle)
-        profile = "https://github.com/" + handle
-        link = '<a href="' + profile + '">' + safe_handle + "</a>"
+        target = link_for(handle)
+        link = '<a href="' + target + '">' + safe_handle + "</a>"
+        count = f"{value:,}"
+        rows.append(
+            "<tr><td>"
+            + str(position)
+            + "</td><td>"
+            + link
+            + "</td><td>"
+            + count
+            + "</td></tr>"
+        )
+    rows.append("</tbody>")
+    rows.append("</table>")
+    return rows
+
+
+def table_repo_lines(ranked, limit):
+    """Build table markup for the top repositories."""
+    rows = []
+    rows.append("<table>")
+    rows.append("<thead>")
+    rows.append("<tr><th>Rank</th><th>Repository</th>")
+    rows.append("<th>Count</th></tr>")
+    rows.append("</thead>")
+    rows.append("<tbody>")
+    if not ranked:
+        rows.append("<tr><td>-</td><td>None</td>")
+        rows.append("<td>0</td></tr>")
+    shown = ranked[:limit]
+    for position, pair in enumerate(shown, 1):
+        repo, value = pair
+        safe_repo = html.escape(repo)
+        target = "https://github.com/" + repo
+        link = '<a href="' + target + '">' + safe_repo + "</a>"
         count = f"{value:,}"
         rows.append(
             "<tr><td>"
@@ -718,7 +768,22 @@ def css_lines():
     ]
 
 
-def render_html(title, scope_text, made_text, sections):
+METHOD_NOTES = [
+    "Only pull requests merged in each week count.",
+    "Weeks run Sunday 00:00 to Saturday 23:59 UTC.",
+    "Lines changed credit both author and merger.",
+    "Reviews count distinct pull requests reviewed.",
+    "Author self reviews do not count.",
+    "Data comes from the GitHub API through gh.",
+    "Cached data lives under the state directory.",
+    "Tables show the top 20 handles; charts show top 10.",
+    "The org-wide chart sums all merged pull requests per week.",
+]
+
+
+def render_html(
+    title, scope_text, made_text, sections, link_for, notes, header_extra=()
+):
     """Render the full report page and return it as text."""
     out = []
     out.append("<!DOCTYPE html>")
@@ -741,6 +806,8 @@ def render_html(title, scope_text, made_text, sections):
     out.append("<h1>" + html.escape(title) + "</h1>")
     out.append("<p>Scope: " + html.escape(scope_text) + "</p>")
     out.append("<p>Generated: " + html.escape(made_text) + "</p>")
+    for paragraph in header_extra:
+        out.append("<p>" + paragraph + "</p>")
     out.append("</header>")
     out.append('<nav class="periods">')
     for section in sections:
@@ -765,7 +832,15 @@ def render_html(title, scope_text, made_text, sections):
             out.append('<article class="card">')
             out.append("<h3>" + html.escape(card["title"]) + "</h3>")
             if card.get("ranked") is not None:
-                out.extend(table_lines(card["ranked"], TABLE_LIMIT))
+                if card.get("table_kind") == "repos":
+                    table_rows = table_repo_lines(
+                        card["ranked"], TABLE_LIMIT
+                    )
+                else:
+                    table_rows = table_lines(
+                        card["ranked"], TABLE_LIMIT, link_for
+                    )
+                out.extend(table_rows)
             out.extend(
                 chart_block(
                     card["chart_id"],
@@ -781,17 +856,7 @@ def render_html(title, scope_text, made_text, sections):
     out.append("<footer>")
     out.append("<h2>Method</h2>")
     out.append("<ul>")
-    notes = [
-        "Only pull requests merged in each week count.",
-        "Weeks run Sunday 00:00 to Saturday 23:59 UTC.",
-        "Lines changed credit both author and merger.",
-        "Reviews count distinct pull requests reviewed.",
-        "Author self reviews do not count.",
-        "Data comes from the GitHub API through gh.",
-        "Cached data lives under the state directory.",
-        "Tables show the top 20 handles; charts show top 10.",
-        "The org-wide chart sums all merged pull requests per week.",
-    ]
+    # The caller provides the method notes.
     for note in notes:
         out.append("<li>" + html.escape(note) + "</li>")
     out.append("</ul>")
@@ -799,6 +864,66 @@ def render_html(title, scope_text, made_text, sections):
     out.append("</body>")
     out.append("</html>")
     return "\n".join(out) + "\n"
+
+
+def build_handle_sections(handle, detail, week_starts):
+    """Build per-repository sections for one handle."""
+    sections = []
+    for label, week_count in PERIODS:
+        anchor = "last-" + str(week_count) + "-weeks"
+        start = week_starts[FETCH_WEEKS - week_count]
+        end = week_starts[FETCH_WEEKS - 1]
+        end_day = end + datetime.timedelta(days=6)
+        range_text = start.date().isoformat()
+        range_text += " to " + end_day.date().isoformat()
+        labels = []
+        first = FETCH_WEEKS - week_count
+        for index in range(first, FETCH_WEEKS):
+            labels.append(week_starts[index].date().isoformat())
+        cards = []
+        merged_total = 0
+        for key, metric_title in METRICS:
+            repo_totals = {}
+            for index in range(first, FETCH_WEEKS):
+                repos = detail[key][index].get(handle, {})
+                for repo, value in repos.items():
+                    repo_totals[repo] = repo_totals.get(repo, 0) + value
+            ranked = sorted(
+                repo_totals.items(),
+                key=lambda item: (-item[1], item[0].lower()),
+            )
+            if key == "merged":
+                merged_total = sum(repo_totals.values())
+            top_repos = [repo for repo, _ in ranked[:CHART_LIMIT]]
+            series = {}
+            for repo in top_repos:
+                values = []
+                for index in range(first, FETCH_WEEKS):
+                    repos = detail[key][index].get(handle, {})
+                    values.append(repos.get(repo, 0))
+                series[repo] = values
+            chart_id = "chart-handle-" + key + "-" + str(week_count)
+            cards.append(
+                {
+                    "title": metric_title,
+                    "ranked": ranked,
+                    "table_kind": "repos",
+                    "labels": labels,
+                    "series": series,
+                    "unit": metric_title,
+                    "chart_id": chart_id,
+                }
+            )
+        sections.append(
+            {
+                "anchor": anchor,
+                "label": label,
+                "range_text": range_text,
+                "pr_total": merged_total,
+                "cards": cards,
+            }
+        )
+    return sections
 
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
@@ -868,6 +993,12 @@ def main(organization, repository):
     reviewed_weekly = [{} for _ in range(FETCH_WEEKS)]
     loc_weekly = [{} for _ in range(FETCH_WEEKS)]
     org_weekly = [0] * FETCH_WEEKS
+    detail = {
+        "merged": [{} for _ in range(FETCH_WEEKS)],
+        "authored": [{} for _ in range(FETCH_WEEKS)],
+        "reviewed": [{} for _ in range(FETCH_WEEKS)],
+        "loc": [{} for _ in range(FETCH_WEEKS)],
+    }
     week_starts = []
     for index in range(FETCH_WEEKS):
         week_starts.append(first_start + datetime.timedelta(days=index * 7))
@@ -886,13 +1017,22 @@ def main(organization, repository):
         org_weekly[index] += 1
         author = stored.get("author") or ""
         merger = stored.get("merged_by") or ""
+        org_name = stored.get("organization") or ""
+        repo_name = stored.get("repository") or ""
+        repo_key = ""
+        if org_name and repo_name:
+            repo_key = org_name + "/" + repo_name
         bump(merged_weekly[index], merger)
         bump(authored_weekly[index], author)
+        bump_nested(detail["merged"], index, merger, repo_key)
+        bump_nested(detail["authored"], index, author, repo_key)
         for reviewer in stored.get("reviewers") or []:
             bump(reviewed_weekly[index], reviewer)
+            bump_nested(detail["reviewed"], index, reviewer, repo_key)
         loc = stored.get("loc") or 0
         for handle in {author, merger}:
             bump(loc_weekly[index], handle, loc)
+            bump_nested(detail["loc"], index, handle, repo_key, loc)
 
     weeklies = {
         "merged": merged_weekly,
@@ -901,6 +1041,7 @@ def main(organization, repository):
         "loc": loc_weekly,
     }
     org_labels = [w.date().isoformat() for w in week_starts]
+    handles_with_pages = set()
     org_end = week_starts[-1] + datetime.timedelta(days=6)
     org_range = week_starts[0].date().isoformat()
     org_range += " to " + org_end.date().isoformat()
@@ -946,6 +1087,9 @@ def main(organization, repository):
         cards = []
         for key, metric_title in METRICS:
             _totals, ranked = summarize_period(weeklies[key], week_count)
+            if repository is None:
+                for handle, _ in ranked[:TABLE_LIMIT]:
+                    handles_with_pages.add(handle)
             top_handles = [h for h, _ in ranked[:CHART_LIMIT]]
             series = weekly_values(weeklies[key], top_handles, week_count)
             chart_id = "chart-" + key + "-" + str(week_count)
@@ -971,13 +1115,51 @@ def main(organization, repository):
 
     title = "Dev rankings for " + scope_text
     made_text = now.strftime("%Y-%m-%d %H:%M UTC")
-    page = render_html(title, scope_text, made_text, sections)
     stamp = now.strftime("%Y%m%d-%H%M%S")
+    if repository is None:
+        notes = list(METHOD_NOTES)
+        notes.append("Select a handle to see the per-repository breakdown.")
+
+        def link_for(handle):
+            return "./" + handle_file_name(slug, handle, stamp)
+    else:
+        notes = list(METHOD_NOTES)
+
+        def link_for(handle):
+            return "https://github.com/" + handle
+    page = render_html(
+        title, scope_text, made_text, sections, link_for, notes
+    )
     file_name = "dev-rankings-" + slug + "-" + stamp + ".html"
     html_path = os.path.join(state_root, file_name)
     os.makedirs(state_root, exist_ok=True)
     with open(html_path, "w", encoding="utf-8") as handle:
         handle.write(page)
+    if repository is None:
+        for handle in sorted(handles_with_pages, key=str.lower):
+            handle_sections = build_handle_sections(
+                handle, detail, week_starts
+            )
+            handle_title = "Dev rankings for " + handle
+            handle_title += " in " + scope_text
+            profile = "https://github.com/" + handle
+            back_link = '<a href="./' + file_name + '">'
+            back_link += "Back to org rankings</a>"
+            profile_link = '<a href="' + profile + '">' + handle + "</a>"
+            handle_page = render_html(
+                handle_title,
+                scope_text,
+                made_text,
+                handle_sections,
+                link_for,
+                list(METHOD_NOTES),
+                (back_link, "GitHub profile: " + profile_link),
+            )
+            handle_path = os.path.join(
+                state_root, handle_file_name(slug, handle, stamp)
+            )
+            with open(handle_path, "w", encoding="utf-8") as handle_file:
+                handle_file.write(handle_page)
     print("open " + html_path)
 
 
