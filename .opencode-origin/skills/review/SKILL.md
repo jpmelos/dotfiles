@@ -91,6 +91,9 @@ Check prior decisions at the start.
 - Include files with dates near today.
 - Read each selected file.
 - Apply prior decisions in the current review.
+- If you have confidence that a prior decision is wrong, push back against it.
+- When a different choice helps the project, push back.
+- Do not keep a bad decision because a prior review made it.
 - If `jpenv-scratch/reviews/index.md` exists, read it.
 - Apply its rules in the current review.
 
@@ -114,7 +117,9 @@ Report inherited decisions in the review.
 
 - List each decision inherited from a prior review file.
 - State the source file name for each inherited decision.
-- State why the old decision still applies.
+- If the old decision still applies, state why it still applies.
+- If the old decision is wrong, state why it is wrong.
+- If the old decision is wrong, do not follow it.
 
 ## Review
 
