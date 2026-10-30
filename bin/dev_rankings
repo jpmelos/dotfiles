@@ -768,7 +768,7 @@ def css_lines():
         "  padding: 1rem 1rem 3rem 1rem;",
         "  color: #57606a;",
         "}",
-        "div#repo-alert {",
+        "div#alert-box {",
         "  background: #fff8c5;",
         "  border: 1px solid #d4a72c;",
         "  border-radius: 12px;",
@@ -776,16 +776,23 @@ def css_lines():
         "  margin: 1rem;",
         "}",
         "@media (prefers-color-scheme: dark) {",
-        "  div#repo-alert {",
+        "  div#alert-box {",
         "    background: #3d2e00;",
         "    border-color: #d4a72c;",
         "  }",
         "}",
-        "section#repo-filter ul {",
+        "div#filters section.period {",
+        "  margin: 0;",
+        "}",
+        "section#repo-filter ul,",
+        "section#handle-filter ul {",
         "  list-style: none;",
         "  padding: 0;",
+        "  max-height: 20rem;",
+        "  overflow-y: auto;",
         "}",
-        "section#repo-filter li {",
+        "section#repo-filter li,",
+        "section#handle-filter li {",
         "  margin: 0.25rem 0;",
         "}",
     ]
@@ -820,8 +827,8 @@ FILTER_JS = [
     "    return;",
     "  }",
     "  var STORE_KEY = 'dev-rankings-' + DATA.meta.slug + '-repos';",
-    "  function sortRepos(repos) {",
-    "    return repos.slice().sort(function (a, b) {",
+    "  function sortNames(names) {",
+    "    return names.slice().sort(function (a, b) {",
     "      var al = a.toLowerCase(), bl = b.toLowerCase();",
     "      if (al < bl) {",
     "        return -1;",
@@ -838,7 +845,8 @@ FILTER_JS = [
     "      return 0;",
     "    });",
     "  }",
-    "  var currentRepos = sortRepos(DATA.repos);",
+    "  var currentRepos = sortNames(DATA.repos);",
+    "  var currentHandles = sortNames(DATA.handles || []);",
     "  function loadState() {",
     "    try {",
     "      var raw = localStorage.getItem(STORE_KEY);",
@@ -854,8 +862,14 @@ FILTER_JS = [
     "  }",
     "  var stored = loadState();",
     "  var excluded = [];",
+    "  var excludedHandles = [];",
     "  if (stored === null) {",
-    "    saveState({repos: currentRepos, excluded: []});",
+    "    saveState({",
+    "      repos: currentRepos,",
+    "      excluded: [],",
+    "      handles: currentHandles,",
+    "      excludedHandles: []",
+    "    });",
     "  } else {",
     "    var known = stored.repos || [];",
     "    var fresh = currentRepos.filter(function (repo) {",
@@ -865,41 +879,94 @@ FILTER_JS = [
     "      return currentRepos.indexOf(repo) !== -1;",
     "    });",
     "    if (fresh.length > 0) {",
-    "      showWarning(fresh);",
+    "      showWarning('repos', fresh);",
     "    }",
-    "    saveState({repos: currentRepos, excluded: excluded});",
+    "    var knownHandles = stored.handles || null;",
+    "    var freshHandles = [];",
+    "    if (knownHandles === null) {",
+    "      knownHandles = currentHandles;",
+    "    } else {",
+    "      freshHandles = currentHandles.filter(function (handle) {",
+    "        return knownHandles.indexOf(handle) === -1;",
+    "      });",
+    "      if (freshHandles.length > 0) {",
+    "        showWarning('handles', freshHandles);",
+    "      }",
+    "    }",
+    "    excludedHandles = (stored.excludedHandles || []).filter(",
+    "      function (handle) {",
+    "        return currentHandles.indexOf(handle) !== -1;",
+    "      }",
+    "    );",
+    "    saveState({",
+    "      repos: currentRepos,",
+    "      excluded: excluded,",
+    "      handles: currentHandles,",
+    "      excludedHandles: excludedHandles",
+    "    });",
     "  }",
-    "  function showWarning(fresh) {",
-    "    var box = document.getElementById('repo-alert');",
-    "    var list = document.getElementById('repo-alert-list');",
-    "    if (!box || !list) {",
+    "  function showWarning(kind, fresh) {",
+    "    var box = document.getElementById('alert-box');",
+    "    if (!box) {",
     "      return;",
     "    }",
-    "    sortRepos(fresh).forEach(function (repo) {",
+    "    var ids = {",
+    "      repos: ['new-repos', 'new-repos-list'],",
+    "      handles: ['new-handles', 'new-handles-list']",
+    "    };",
+    "    var pair = ids[kind] || ids.repos;",
+    "    var group = document.getElementById(pair[0]);",
+    "    var list = document.getElementById(pair[1]);",
+    "    if (!group || !list) {",
+    "      return;",
+    "    }",
+    "    sortNames(fresh).forEach(function (name) {",
     "      var item = document.createElement('li');",
-    "      item.textContent = repo;",
+    "      item.textContent = name;",
     "      list.appendChild(item);",
     "    });",
+    "    group.hidden = false;",
     "    box.hidden = false;",
     "  }",
     "  function isExcluded(repo) {",
     "    return excluded.indexOf(repo) !== -1;",
     "  }",
+    "  function isExcludedHandle(handle) {",
+    "    return excludedHandles.indexOf(handle) !== -1;",
+    "  }",
     "  var boxes = Array.prototype.slice.call(",
-    "    document.querySelectorAll('input[type=\"checkbox\"][data-repo]')",
+    "    document.querySelectorAll('#filters input[type=\"checkbox\"]')",
     "  );",
     "  boxes.forEach(function (box) {",
-    "    if (isExcluded(box.getAttribute('data-repo'))) {",
+    "    var repo = box.getAttribute('data-repo');",
+    "    if (repo && isExcluded(repo)) {",
+    "      box.checked = false;",
+    "    }",
+    "    var who = box.getAttribute('data-handle');",
+    "    if (who && isExcludedHandle(who)) {",
     "      box.checked = false;",
     "    }",
     "    box.addEventListener('change', function () {",
     "      excluded = [];",
+    "      excludedHandles = [];",
     "      boxes.forEach(function (other) {",
     "        if (!other.checked) {",
-    "          excluded.push(other.getAttribute('data-repo'));",
+    "          var missing = other.getAttribute('data-repo');",
+    "          if (missing) {",
+    "            excluded.push(missing);",
+    "          }",
+    "          var gone = other.getAttribute('data-handle');",
+    "          if (gone) {",
+    "            excludedHandles.push(gone);",
+    "          }",
     "        }",
     "      });",
-    "      saveState({repos: currentRepos, excluded: excluded});",
+    "      saveState({",
+    "        repos: currentRepos,",
+    "        excluded: excluded,",
+    "        handles: currentHandles,",
+    "        excludedHandles: excludedHandles",
+    "      });",
     "      refreshAll();",
     "    });",
     "  });",
@@ -1037,6 +1104,9 @@ FILTER_JS = [
     "    var totals = {}, name;",
     "    var start = periodStart(weeks);",
     "    for (name in scope) {",
+    "      if (isExcludedHandle(name)) {",
+    "        continue;",
+    "      }",
     "      totals[name] = rangeSum(keptPairs(scope[name]), start);",
     "    }",
     "    var ranked = rankKeys(totals);",
@@ -1071,11 +1141,33 @@ FILTER_JS = [
     "      }",
     "    ));",
     "  }",
+    "  function orgWeekly(weeks) {",
+    "    var start = periodStart(weeks);",
+    "    var values = [], week, i, pr;",
+    "    for (week = start; week < 52; week++) {",
+    "      values.push(0);",
+    "    }",
+    "    var prs = DATA.org || [];",
+    "    for (i = 0; i < prs.length; i++) {",
+    "      pr = prs[i];",
+    "      if (pr[0] < start) {",
+    "        continue;",
+    "      }",
+    "      if (isExcluded(pr[3])) {",
+    "        continue;",
+    "      }",
+    "      if (isExcludedHandle(pr[1]) || isExcludedHandle(pr[2])) {",
+    "        continue;",
+    "      }",
+    "      values[pr[0] - start] += 1;",
+    "    }",
+    "    return values;",
+    "  }",
     "  function refreshCard(card) {",
     "    var weeks = parseInt(card.getAttribute('data-weeks'), 10);",
     "    var metric = card.getAttribute('data-metric');",
     "    if (metric === 'org') {",
-    "      var values = weeklySums(keptPairs(DATA.org || {}), weeks);",
+    "      var values = orgWeekly(weeks);",
     "      updateChart(card, [datasetFor('PRs merged', values, 0)]);",
     "      return;",
     "    }",
@@ -1105,9 +1197,7 @@ FILTER_JS = [
     "          }",
     "        }",
     "      } else {",
-    "        total = weeklySums(",
-    "          keptPairs(DATA.org || {}), weeks",
-    "        ).reduce(function (a, b) {",
+    "        total = orgWeekly(weeks).reduce(function (a, b) {",
     "          return a + b;",
     "        }, 0);",
     "      }",
@@ -1141,7 +1231,8 @@ METHOD_NOTES = [
 
 def render_html(
     title, scope_text, made_text, sections, link_for, notes,
-    header_extra=(), filter_repos=None, filter_json=None,
+    header_extra=(), filter_repos=None, filter_handles=None,
+    filter_json=None,
 ):
     """Render the full report page and return it as text."""
     out = []
@@ -1169,9 +1260,16 @@ def render_html(
         out.append("<p>" + paragraph + "</p>")
     out.append("</header>")
     if filter_repos is not None:
-        out.append('<div id="repo-alert" hidden>')
+        out.append('<div id="alert-box" hidden>')
+        out.append('<div id="new-repos" hidden>')
         out.append("<strong>New repo showing up for the first time:</strong>")
-        out.append('<ul id="repo-alert-list"></ul>')
+        out.append('<ul id="new-repos-list"></ul>')
+        out.append("</div>")
+        out.append('<div id="new-handles" hidden>')
+        out.append("<strong>New handle showing up")
+        out[-1] += " for the first time:</strong>"
+        out.append('<ul id="new-handles-list"></ul>')
+        out.append("</div>")
         out.append("</div>")
     out.append('<nav class="periods">')
     for section in sections:
@@ -1220,6 +1318,7 @@ def render_html(
         out.append("</div>")
         out.append("</section>")
     if filter_repos is not None:
+        out.append('<div class="grid" id="filters">')
         out.append('<section class="period" id="repo-filter">')
         out.append("<h2>Repositories</h2>")
         out.append("<p>Uncheck a repository to leave it out of")
@@ -1232,6 +1331,19 @@ def render_html(
             out.append(box_open + safe_repo + "</label></li>")
         out.append("</ul>")
         out.append("</section>")
+        out.append('<section class="period" id="handle-filter">')
+        out.append("<h2>Handles</h2>")
+        out.append("<p>Uncheck a handle to leave them out of")
+        out[-1] += " every ranking."
+        out.append("<ul>")
+        for handle in filter_handles or []:
+            safe_handle = html.escape(handle, quote=True)
+            box_open = '<li><label><input type="checkbox" data-handle="'
+            box_open += safe_handle + '" checked> '
+            out.append(box_open + safe_handle + "</label></li>")
+        out.append("</ul>")
+        out.append("</section>")
+        out.append("</div>")
     out.append("</main>")
     out.append("<footer>")
     out.append("<h2>Method</h2>")
@@ -1396,8 +1508,9 @@ def main(organization, repository):
     reviewed_weekly = [{} for _ in range(FETCH_WEEKS)]
     loc_weekly = [{} for _ in range(FETCH_WEEKS)]
     org_weekly = [0] * FETCH_WEEKS
-    org_repo_detail = {}
+    org_prs = []
     all_repos = set()
+    all_handles = set()
     detail = {
         "merged": [{} for _ in range(FETCH_WEEKS)],
         "authored": [{} for _ in range(FETCH_WEEKS)],
@@ -1422,6 +1535,10 @@ def main(organization, repository):
         org_weekly[index] += 1
         author = stored.get("author") or ""
         merger = stored.get("merged_by") or ""
+        if author:
+            all_handles.add(author)
+        if merger:
+            all_handles.add(merger)
         org_name = stored.get("organization") or ""
         repo_name = stored.get("repository") or ""
         repo_key = ""
@@ -1434,17 +1551,15 @@ def main(organization, repository):
         for reviewer in stored.get("reviewers") or []:
             bump(reviewed_weekly[index], reviewer)
             bump_nested(detail["reviewed"], index, reviewer, repo_key)
+            if reviewer:
+                all_handles.add(reviewer)
         loc = stored.get("loc") or 0
         for handle in {author, merger}:
             bump(loc_weekly[index], handle, loc)
             bump_nested(detail["loc"], index, handle, repo_key, loc)
         if repo_key:
             all_repos.add(repo_key)
-            week_counts = org_repo_detail.get(repo_key)
-            if week_counts is None:
-                week_counts = {}
-                org_repo_detail[repo_key] = week_counts
-            week_counts[index] = week_counts.get(index, 0) + 1
+            org_prs.append([index, author, merger, repo_key])
 
     weeklies = {
         "merged": merged_weekly,
@@ -1533,6 +1648,7 @@ def main(organization, repository):
     made_text = now.strftime("%Y-%m-%d %H:%M UTC")
     stamp = now.strftime("%Y%m%d-%H%M%S")
     sorted_repos = sorted(all_repos, key=lambda repo: (repo.lower(), repo))
+    sorted_handles = sorted(all_handles, key=lambda h: (h.lower(), h))
     filter_labels = {}
     for label_weeks in (1, 4, 12, 52):
         week_labels = []
@@ -1542,14 +1658,7 @@ def main(organization, repository):
     filter_metrics = {}
     for key in ("merged", "authored", "reviewed", "loc"):
         filter_metrics[key] = sparse_detail(detail[key])
-    org_pairs = {}
-    for repo, week_counts in org_repo_detail.items():
-        pairs = []
-        for week in sorted(week_counts):
-            if week_counts[week]:
-                pairs.append([week, week_counts[week]])
-        if pairs:
-            org_pairs[repo] = pairs
+    # org_prs already holds one entry per merged pull request.
     filter_json = json.dumps(
         {
             "meta": {
@@ -1560,7 +1669,8 @@ def main(organization, repository):
             "repos": sorted_repos,
             "labels": filter_labels,
             "metrics": filter_metrics,
-            "org": org_pairs,
+            "handles": sorted_handles,
+            "org": org_prs,
         }
     )
     if repository is None:
@@ -1583,6 +1693,7 @@ def main(organization, repository):
         notes,
         (),
         sorted_repos,
+        sorted_handles,
         filter_json,
     )
     file_name = "dev-rankings-" + slug + "-" + stamp + ".html"
@@ -1614,6 +1725,7 @@ def main(organization, repository):
                     "repos": sorted_repos,
                     "labels": filter_labels,
                     "metrics": handle_metrics,
+                    "handles": sorted_handles,
                     "handle": handle,
                 }
             )
@@ -1626,6 +1738,7 @@ def main(organization, repository):
                 list(METHOD_NOTES),
                 (back_link, "GitHub profile: " + profile_link),
                 sorted_repos,
+                sorted_handles,
                 handle_json,
             )
             handle_path = os.path.join(
