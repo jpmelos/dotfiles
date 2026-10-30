@@ -1403,6 +1403,9 @@ def build_handle_sections(handle, detail, week_starts):
         cards = []
         merged_total = 0
         for key, metric_title in METRICS:
+            card_title = (
+                metric_title + " (" + label.lower() + ", by " + handle + ")"
+            )
             repo_totals = {}
             for index in range(first, FETCH_WEEKS):
                 repos = detail[key][index].get(handle, {})
@@ -1425,7 +1428,7 @@ def build_handle_sections(handle, detail, week_starts):
             chart_id = "chart-handle-" + key + "-" + str(week_count)
             cards.append(
                 {
-                    "title": metric_title,
+                    "title": card_title,
                     "ranked": ranked,
                     "table_kind": "repos",
                     "weeks": week_count,
@@ -1623,6 +1626,7 @@ def main(organization, repository):
         cards = []
         for key, metric_title in METRICS:
             _totals, ranked = summarize_period(weeklies[key], week_count)
+            card_title = metric_title + " (" + label.lower() + ")"
             if repository is None:
                 for handle, _ in ranked[:TABLE_LIMIT]:
                     handles_with_pages.add(handle)
@@ -1631,7 +1635,7 @@ def main(organization, repository):
             chart_id = "chart-" + key + "-" + str(week_count)
             cards.append(
                 {
-                    "title": metric_title,
+                    "title": card_title,
                     "ranked": ranked,
                     "labels": labels,
                     "weeks": week_count,
