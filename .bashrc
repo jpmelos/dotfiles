@@ -245,10 +245,8 @@ __git_complete gpl git_pull
 
 alias gps='g ps'
 alias gpsf='g psf'
-alias gpsst='g psst'
 __git_complete gps git_push
 __git_complete gpsf git_push
-__git_complete gpsst git_checkout
 
 alias grb='g rb'
 alias grbm='g rbm'
