@@ -781,18 +781,22 @@ def css_lines():
         "    border-color: #d4a72c;",
         "  }",
         "}",
-        "div#filters section.period {",
+        "div.grid section.period {",
         "  margin: 0;",
         "}",
         "section#repo-filter ul,",
-        "section#handle-filter ul {",
+        "section#handle-filter ul,",
+        "section#ignored-repos ul,",
+        "section#ignored-handles ul {",
         "  list-style: none;",
         "  padding: 0;",
         "  max-height: 20rem;",
         "  overflow-y: auto;",
         "}",
         "section#repo-filter li,",
-        "section#handle-filter li {",
+        "section#handle-filter li,",
+        "section#ignored-repos li,",
+        "section#ignored-handles li {",
         "  margin: 0.25rem 0;",
         "}",
     ]
@@ -1208,12 +1212,37 @@ FILTER_JS = [
     "      span.textContent = total + ' merged PRs.';",
     "    });",
     "  }",
+    "  function fillIgnored(listId, items) {",
+    "    var list = document.getElementById(listId);",
+    "    if (!list) {",
+    "      return;",
+    "    }",
+    "    while (list.firstChild) {",
+    "      list.removeChild(list.firstChild);",
+    "    }",
+    "    if (items.length === 0) {",
+    "      var none = document.createElement('li');",
+    "      none.textContent = 'None';",
+    "      list.appendChild(none);",
+    "      return;",
+    "    }",
+    "    sortNames(items.slice()).forEach(function (name) {",
+    "      var item = document.createElement('li');",
+    "      item.textContent = name;",
+    "      list.appendChild(item);",
+    "    });",
+    "  }",
+    "  function refreshIgnored() {",
+    "    fillIgnored('ignored-repos-list', excluded);",
+    "    fillIgnored('ignored-handles-list', excludedHandles);",
+    "  }",
     "  function refreshAll() {",
     "    var cards = document.querySelectorAll(",
     "      'article.card[data-weeks][data-metric]'",
     "    );",
     "    Array.prototype.forEach.call(cards, refreshCard);",
     "    refreshTotals();",
+    "    refreshIgnored();",
     "  }",
     "  refreshAll();",
     "})();",
@@ -1348,6 +1377,20 @@ def render_html(
             box_open = '<li><label><input type="checkbox" data-handle="'
             box_open += safe_handle + '" checked> '
             out.append(box_open + safe_handle + "</label></li>")
+        out.append("</ul>")
+        out.append("</section>")
+        out.append("</div>")
+        out.append('<div class="grid" id="ignored">')
+        out.append('<section class="period" id="ignored-repos">')
+        out.append("<h2>Ignored repositories</h2>")
+        out.append('<ul id="ignored-repos-list">')
+        out.append("<li>None</li>")
+        out.append("</ul>")
+        out.append("</section>")
+        out.append('<section class="period" id="ignored-handles">')
+        out.append("<h2>Ignored handles</h2>")
+        out.append('<ul id="ignored-handles-list">')
+        out.append("<li>None</li>")
         out.append("</ul>")
         out.append("</section>")
         out.append("</div>")
