@@ -68,6 +68,51 @@ Before you review it, fetch the PR diff and metadata from the remote.
 
 Obtain the files first. Before you review the files, read each listed file.
 
+## Review memory
+
+A review job can span several days.
+
+Uncommitted changes belong to the current branch.
+
+Check prior decisions at the start.
+
+- Do not trust memory as truth.
+- Check each claim from memory against its source.
+- If the source differs, use the source.
+- List files in `jpenv-scratch/reviews` from the repository root.
+- Select files with names that match the review target.
+- For branch reviews, ref reviews, and PR reviews, use the ticket, the issue,
+  the PR number, or the subject.
+- For uncommitted changes, use the current branch name.
+- For file reviews, use file names.
+- Include files with dates near today.
+- Read each selected file.
+- Apply prior decisions in the current review.
+- If `jpenv-scratch/reviews/index.md` exists, read it.
+- Apply its rules in the current review.
+
+Save decisions at the end.
+
+- If the folder does not exist, create `jpenv-scratch/reviews`.
+- Write decisions and facts that will help future review rounds to a file in
+  that folder.
+- Record explicit user choices such as fix, ignore, or document in the PR
+  description.
+- Record facts about the code, the intent, and the scope that affect future
+  reviews.
+- Name the file with `YYYY-MM-DD-` prefix plus ticket, PR number, branch, file,
+  or subject, for example `2026-10-30-comms-1698-local-presence.md`.
+- Update the same file on later runs.
+- Create a new dated file only for a distinct review.
+- Move facts that apply to all reviews to `jpenv-scratch/reviews/index.md`.
+- Keep only review-specific facts in the dated file.
+
+Report inherited decisions in the review.
+
+- List each decision inherited from a prior review file.
+- State the source file name for each inherited decision.
+- State why the old decision still applies.
+
 ## Review
 
 Provide a detailed explanation about what the changes are about, and if you can
