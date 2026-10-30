@@ -581,7 +581,7 @@ def weekly_values(weekly, handles, week_count):
     return series
 
 
-def table_lines(ranked, limit, link_for):
+def table_lines(ranked, limit, link_for, suffix=""):
     """Build table markup for the top handles."""
     rows = []
     rows.append("<table>")
@@ -597,7 +597,7 @@ def table_lines(ranked, limit, link_for):
     for position, pair in enumerate(shown, 1):
         handle, value = pair
         safe_handle = html.escape(handle)
-        target = link_for(handle)
+        target = link_for(handle, suffix)
         link = '<a href="' + target + '">' + safe_handle + "</a>"
         count = f"{value:,}"
         rows.append(
@@ -1027,13 +1027,14 @@ FILTER_JS = [
     "      return 0;",
     "    });",
     "  }",
-    "  function handleHref(handle) {",
+    "  function handleHref(handle, metric, weeks) {",
     "    if (!DATA.meta.orgMode) {",
     "      return 'https://github.com/' + handle;",
     "    }",
     "    var safe = handle.toLowerCase().replace(/[^a-z0-9-]/g, '-');",
     "    var href = './dev-rankings-' + DATA.meta.slug + '-handle-';",
     "    href += safe + '-' + DATA.meta.stamp + '.html';",
+    "    href += '#card-' + metric + '-' + weeks;",
     "    return href;",
     "  }",
     "  function repoHref(repo) {",
@@ -1100,7 +1101,7 @@ FILTER_JS = [
     "      chart.update();",
     "    }",
     "  }",
-    "  function refreshHandleCard(card, scope, weeks) {",
+    "  function refreshHandleCard(card, scope, metric, weeks) {",
     "    var totals = {}, name;",
     "    var start = periodStart(weeks);",
     "    for (name in scope) {",
@@ -1112,7 +1113,10 @@ FILTER_JS = [
     "    var ranked = rankKeys(totals);",
     "    var tbody = card.querySelector('tbody');",
     "    if (tbody) {",
-    "      rebuildRows(tbody, ranked, totals, handleHref);",
+    "      var hrefFor = function (name) {",
+    "        return handleHref(name, metric, weeks);",
+    "      };",
+    "      rebuildRows(tbody, ranked, totals, hrefFor);",
     "    }",
     "    updateChart(card, ranked.slice(0, CHART_LIMIT).map(",
     "      function (name, i) {",
@@ -1175,7 +1179,7 @@ FILTER_JS = [
     "    if (DATA.handle) {",
     "      refreshRepoCard(card, scope[DATA.handle] || {}, weeks);",
     "    } else {",
-    "      refreshHandleCard(card, scope, weeks);",
+    "      refreshHandleCard(card, scope, metric, weeks);",
     "    }",
     "  }",
     "  function refreshTotals() {",
@@ -1291,9 +1295,10 @@ def render_html(
         )
         out.append('<div class="grid">')
         for card in section["cards"]:
-            article_open = '<article class="card" data-weeks="'
-            article_open += str(card["weeks"]) + '" data-metric="'
-            article_open += card["metric"] + '">'
+            article_open = '<article class="card" id="card-'
+            article_open += card["metric"] + "-" + str(card["weeks"])
+            article_open += '" data-weeks="' + str(card["weeks"])
+            article_open += '" data-metric="' + card["metric"] + '">'
             out.append(article_open)
             out.append("<h3>" + html.escape(card["title"]) + "</h3>")
             if card.get("ranked") is not None:
@@ -1302,8 +1307,10 @@ def render_html(
                         card["ranked"], TABLE_LIMIT
                     )
                 else:
+                    fragment = "#card-" + card["metric"]
+                    fragment += "-" + str(card["weeks"])
                     table_rows = table_lines(
-                        card["ranked"], TABLE_LIMIT, link_for
+                        card["ranked"], TABLE_LIMIT, link_for, fragment
                     )
                 out.extend(table_rows)
             out.extend(
@@ -1677,12 +1684,13 @@ def main(organization, repository):
         notes = list(METHOD_NOTES)
         notes.append("Select a handle to see the per-repository breakdown.")
 
-        def link_for(handle):
-            return "./" + handle_file_name(slug, handle, stamp)
+        def link_for(handle, fragment=""):
+            file_name = handle_file_name(slug, handle, stamp)
+            return "./" + file_name + fragment
     else:
         notes = list(METHOD_NOTES)
 
-        def link_for(handle):
+        def link_for(handle, fragment=""):
             return "https://github.com/" + handle
     page = render_html(
         title,
