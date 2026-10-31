@@ -170,6 +170,99 @@ SCREENSHOT_ID = "browser-error.png"
 LAST_RUN_ID = "last_run.json"
 # How many new transactions the chat report lists before it summarizes.
 REPORT_LINE_LIMIT = 60
+# Retry policy for all requests to external APIs. Every external call
+# retries at least API_MAX_RETRIES times with an exponential backoff that
+# starts at API_RETRY_INITIAL_DELAY, doubles every iteration, and maxes out
+# at API_RETRY_MAX_DELAY.
+API_MAX_RETRIES = 10
+API_RETRY_INITIAL_DELAY = 0.1
+API_RETRY_MAX_DELAY = 10.0
+
+
+def api_retry_delay(attempt):
+    # Exponential backoff for external API retries. Starts at
+    # API_RETRY_INITIAL_DELAY, doubles every iteration, and maxes out at
+    # API_RETRY_MAX_DELAY. Attempt counts retries so far, starting at 0.
+    return min(API_RETRY_INITIAL_DELAY * (2.0**attempt), API_RETRY_MAX_DELAY)
+
+
+def is_retryable_status(status):
+    # Whether one HTTP status is transient and worth retrying. Rate limiting
+    # and server errors retry, other statuses do not.
+    if isinstance(status, bool):
+        return False
+    if not isinstance(status, int):
+        return False
+    if status == 429:
+        return True
+    return 500 <= status <= 599
+
+
+def is_retryable_ynab_error(error):
+    # Whether one YNAB API error is transient. Rate limiting, server errors,
+    # and connection failures retry, other client errors do not.
+    status = getattr(error, "status", None)
+    if status is None:
+        status = getattr(error, "status_code", None)
+    if status is None:
+        return isinstance(error, urllib3.exceptions.HTTPError)
+    if isinstance(status, bool):
+        return False
+    if isinstance(status, int):
+        return is_retryable_status(status)
+    return False
+
+
+def is_retryable_openai_error(error):
+    # Whether one OpenAI client error is transient. Rate limiting, server
+    # errors, and connection failures retry, other client errors do not.
+    if isinstance(error, (ValueError, TypeError)):
+        return False
+    status = getattr(error, "status_code", None)
+    if status is None:
+        status = getattr(error, "status", None)
+    if isinstance(status, bool):
+        status = None
+    if isinstance(status, int):
+        if status in (400, 401, 403, 404, 422):
+            return False
+        if is_retryable_status(status):
+            return True
+    if isinstance(error, OSError):
+        return True
+    name = type(error).__name__
+    return name not in (
+        "AuthenticationError",
+        "PermissionDeniedError",
+        "NotFoundError",
+        "BadRequestError",
+        "UnprocessableEntityError",
+    )
+
+
+def openai_call_with_retry(action, call):
+    # Runs one OpenAI request with retries. Transient failures retry at
+    # least API_MAX_RETRIES times with exponential backoff starting at
+    # API_RETRY_INITIAL_DELAY, doubling, maxing out at API_RETRY_MAX_DELAY.
+    last_error = None
+    for attempt in range(API_MAX_RETRIES + 1):
+        try:
+            return call()
+        except (ValueError, TypeError, AttributeError, KeyError, IndexError):
+            raise
+        except Exception as error:
+            if not is_retryable_openai_error(error):
+                raise
+            last_error = error
+            if attempt >= API_MAX_RETRIES:
+                raise
+            delay = api_retry_delay(attempt)
+            _log(
+                f"{action} attempt {attempt + 1} failed: {error}. "
+                f"Retrying in {delay:g} seconds."
+            )
+            time.sleep(delay)
+    raise last_error
 
 
 # -----------------------------------------------------------------------------
@@ -623,8 +716,11 @@ def suggest_payees_with_llm(
             if effort:
                 request["reasoning_effort"] = effort
             try:
-                res = client.chat.completions.create(
-                    extra_headers=go_headers, **request
+                res = openai_call_with_retry(
+                    "Payee suggestion chat",
+                    lambda: client.chat.completions.create(
+                        extra_headers=go_headers, **request
+                    ),
                 )
             except (
                 OpenAIError,
@@ -635,11 +731,17 @@ def suggest_payees_with_llm(
             ) as error:
                 if not effort:
                     raise
-                _log(f"Payee suggestion retry without effort: {error}")
-                del request["reasoning_effort"]
-                res = client.chat.completions.create(
-                    extra_headers=go_headers, **request
-                )
+                if "reasoning_effort" in request:
+                    _log(f"Payee suggestion retry without effort: {error}")
+                    del request["reasoning_effort"]
+                    res = openai_call_with_retry(
+                        "Payee suggestion chat without effort",
+                        lambda: client.chat.completions.create(
+                            extra_headers=go_headers, **request
+                        ),
+                    )
+                else:
+                    raise
             text = res.choices[0].message.content or ""
         except (
             OpenAIError,
@@ -670,8 +772,11 @@ def suggest_payees_with_llm(
             if effort:
                 response_request["reasoning"] = {"effort": effort}
             try:
-                response = client.responses.create(
-                    extra_headers=go_headers, **response_request
+                response = openai_call_with_retry(
+                    "Payee suggestion responses",
+                    lambda: client.responses.create(
+                        extra_headers=go_headers, **response_request
+                    ),
                 )
             except (
                 OpenAIError,
@@ -682,11 +787,17 @@ def suggest_payees_with_llm(
             ) as error:
                 if not effort:
                     raise
-                _log(f"Payee suggestion retry without effort: {error}")
-                del response_request["reasoning"]
-                response = client.responses.create(
-                    extra_headers=go_headers, **response_request
-                )
+                if "reasoning" in response_request:
+                    _log(f"Payee suggestion retry without effort: {error}")
+                    del response_request["reasoning"]
+                    response = openai_call_with_retry(
+                        "Payee suggestion responses without effort",
+                        lambda: client.responses.create(
+                            extra_headers=go_headers, **response_request
+                        ),
+                    )
+                else:
+                    raise
             text = response.output_text or ""
     except (
         OpenAIError,
@@ -2570,14 +2681,12 @@ def apply_transfer_date_corrections(plan, corrections):
                     id=txn.id, var_date=correction["early"]
                 )
             )
-    try:
-        ynab.TransactionsApi(plan.api_client).update_transactions(
-            plan.plan_id, ynab.PatchTransactionsWrapper(transactions=updates)
-        )
-    except YNAB_ERRORS as error:
-        raise TaskError(
-            f"cannot move the transfer dates in YNAB: {error}"
-        ) from error
+    call_ynab(
+        "move the transfer dates in YNAB",
+        ynab.TransactionsApi(plan.api_client).update_transactions,
+        plan.plan_id,
+        ynab.PatchTransactionsWrapper(transactions=updates),
+    )
 
 
 def suggestion_key(transaction):
@@ -3669,14 +3778,46 @@ def questrade_url(api_server, path):
 
 
 def send_questrade_request(action, method, url, **keyword_arguments):
-    # Sends one request to Questrade, and returns the response. Raises with
-    # `action` in the message when no response arrives.
-    try:
-        return urllib3.request(
-            method, url, timeout=QUESTRADE_TIMEOUT_SECONDS, **keyword_arguments
-        )
-    except urllib3.exceptions.HTTPError as error:
-        raise TaskError(f"cannot {action}: {error}") from error
+    # Sends one request to Questrade, and returns the response. Transient
+    # failures retry at least API_MAX_RETRIES times with exponential backoff
+    # starting at API_RETRY_INITIAL_DELAY, doubling, maxing out at
+    # API_RETRY_MAX_DELAY. Raises with `action` in the message when no
+    # response arrives.
+    last_error = None
+    for attempt in range(API_MAX_RETRIES + 1):
+        try:
+            response = urllib3.request(
+                method,
+                url,
+                timeout=QUESTRADE_TIMEOUT_SECONDS,
+                **keyword_arguments,
+            )
+        except urllib3.exceptions.HTTPError as error:
+            last_error = TaskError(f"cannot {action}: {error}")
+            if attempt >= API_MAX_RETRIES:
+                raise last_error from error
+            delay = api_retry_delay(attempt)
+            _log(
+                f"Warning: cannot {action}: {error}. "
+                f"Retrying in {delay:g} seconds (attempt {attempt + 1})."
+            )
+            time.sleep(delay)
+            continue
+        if is_retryable_status(getattr(response, "status", None)):
+            last_error = TaskError(
+                f"cannot {action}: {describe_questrade_failure(response)}"
+            )
+            if attempt >= API_MAX_RETRIES:
+                raise last_error
+            delay = api_retry_delay(attempt)
+            _log(
+                f"Warning: {last_error}. "
+                f"Retrying in {delay:g} seconds (attempt {attempt + 1})."
+            )
+            time.sleep(delay)
+            continue
+        return response
+    raise last_error
 
 
 def parse_questrade_response(action, response):
@@ -4103,39 +4244,68 @@ def load_balances(ctx):
 def wise_get(action, url, api_token):
     # Returns the JSON body that the Wise API returns for `url`. A number
     # with a fraction becomes a `decimal.Decimal`, so an amount keeps its
-    # exact value.
-    try:
-        response = urllib3.request(
-            "GET",
-            url,
-            headers={"Authorization": f"Bearer {api_token}"},
-            timeout=WISE_TIMEOUT_SECONDS,
-        )
-    except urllib3.exceptions.HTTPError as error:
-        raise TaskError(f"cannot {action}: {error}") from error
-    if response.status == 401:
-        raise TaskError(
-            f"cannot {action}: Wise rejected the token "
-            f"({describe_wise_failure(response)})"
-        )
-    if response.status == 403:
-        raise TaskError(
-            f"cannot {action}: Wise refused the call "
-            f"({describe_wise_failure(response)})"
-        )
-    if response.status != 200:
-        raise TaskError(f"cannot {action}: {describe_wise_failure(response)}")
-    try:
-        value = json.loads(response.data, parse_float=decimal.Decimal)
-    except ValueError as error:
-        raise TaskError(
-            f"cannot {action}: Wise returned invalid JSON: {error}"
-        ) from error
-    if not isinstance(value, (dict, list)):
-        raise TaskError(
-            f"cannot {action}: Wise returned no JSON object or list"
-        )
-    return value
+    # exact value. Transient failures retry at least API_MAX_RETRIES times
+    # with exponential backoff starting at API_RETRY_INITIAL_DELAY,
+    # doubling, maxing out at API_RETRY_MAX_DELAY.
+    last_error = None
+    for attempt in range(API_MAX_RETRIES + 1):
+        try:
+            response = urllib3.request(
+                "GET",
+                url,
+                headers={"Authorization": f"Bearer {api_token}"},
+                timeout=WISE_TIMEOUT_SECONDS,
+            )
+        except urllib3.exceptions.HTTPError as error:
+            last_error = TaskError(f"cannot {action}: {error}")
+            if attempt >= API_MAX_RETRIES:
+                raise last_error from error
+            delay = api_retry_delay(attempt)
+            _log(
+                f"Warning: cannot {action}: {error}. "
+                f"Retrying in {delay:g} seconds (attempt {attempt + 1})."
+            )
+            time.sleep(delay)
+            continue
+        if response.status == 401:
+            raise TaskError(
+                f"cannot {action}: Wise rejected the token "
+                f"({describe_wise_failure(response)})"
+            )
+        if response.status == 403:
+            raise TaskError(
+                f"cannot {action}: Wise refused the call "
+                f"({describe_wise_failure(response)})"
+            )
+        if is_retryable_status(response.status):
+            last_error = TaskError(
+                f"cannot {action}: {describe_wise_failure(response)}"
+            )
+            if attempt >= API_MAX_RETRIES:
+                raise last_error
+            delay = api_retry_delay(attempt)
+            _log(
+                f"Warning: {last_error}. "
+                f"Retrying in {delay:g} seconds (attempt {attempt + 1})."
+            )
+            time.sleep(delay)
+            continue
+        if response.status != 200:
+            raise TaskError(
+                f"cannot {action}: {describe_wise_failure(response)}"
+            )
+        try:
+            value = json.loads(response.data, parse_float=decimal.Decimal)
+        except ValueError as error:
+            raise TaskError(
+                f"cannot {action}: Wise returned invalid JSON: {error}"
+            ) from error
+        if not isinstance(value, (dict, list)):
+            raise TaskError(
+                f"cannot {action}: Wise returned no JSON object or list"
+            )
+        return value
+    raise last_error
 
 
 def describe_wise_failure(response):
@@ -5411,15 +5581,12 @@ def create_ynab_transactions(plan, new_transactions):
     # no leg moves afterwards. Last, raises when YNAB holds any sent leg as
     # approved or not cleared, or any other side as approved or cleared.
     transactions_api = ynab.TransactionsApi(plan.api_client)
-    try:
-        response = transactions_api.create_transaction(
-            plan.plan_id,
-            ynab.PostTransactionsWrapper(transactions=new_transactions),
-        )
-    except YNAB_ERRORS as error:
-        raise TaskError(
-            f"cannot add the transactions to YNAB: {error}"
-        ) from error
+    response = call_ynab(
+        "add the transactions to YNAB",
+        transactions_api.create_transaction,
+        plan.plan_id,
+        ynab.PostTransactionsWrapper(transactions=new_transactions),
+    )
     # The last state of each transaction, by its ID.
     saved_list = saved_transactions_of(response)
     saved_transactions = {
@@ -5443,15 +5610,12 @@ def create_ynab_transactions(plan, new_transactions):
             )
             for transaction_id in other_side_ids
         ]
-        try:
-            response = transactions_api.update_transactions(
-                plan.plan_id,
-                ynab.PatchTransactionsWrapper(transactions=updates),
-            )
-        except YNAB_ERRORS as error:
-            raise TaskError(
-                f"cannot update the other sides in YNAB: {error}"
-            ) from error
+        response = call_ynab(
+            "update the other sides in YNAB",
+            transactions_api.update_transactions,
+            plan.plan_id,
+            ynab.PatchTransactionsWrapper(transactions=updates),
+        )
         for transaction in saved_transactions_of(response):
             saved_transactions[transaction.id] = transaction
 
@@ -5493,14 +5657,12 @@ def clear_ynab_transactions(plan, ynab_transactions):
         )
         for ynab_transaction in ynab_transactions
     ]
-    try:
-        ynab.TransactionsApi(plan.api_client).update_transactions(
-            plan.plan_id, ynab.PatchTransactionsWrapper(transactions=updates)
-        )
-    except YNAB_ERRORS as error:
-        raise TaskError(
-            f"cannot clear the transactions in YNAB: {error}"
-        ) from error
+    call_ynab(
+        "clear the transactions in YNAB",
+        ynab.TransactionsApi(plan.api_client).update_transactions,
+        plan.plan_id,
+        ynab.PatchTransactionsWrapper(transactions=updates),
+    )
 
 
 def delete_ynab_transactions(plan, victims_by_account):
@@ -5704,12 +5866,12 @@ def update_ynab_memos(plan, push_items):
         )
         for item in push_items
     ]
-    try:
-        ynab.TransactionsApi(plan.api_client).update_transactions(
-            plan.plan_id, ynab.PatchTransactionsWrapper(transactions=updates)
-        )
-    except YNAB_ERRORS as error:
-        raise TaskError(f"cannot update the memos in YNAB: {error}") from error
+    call_ynab(
+        "update the memos in YNAB",
+        ynab.TransactionsApi(plan.api_client).update_transactions,
+        plan.plan_id,
+        ynab.PatchTransactionsWrapper(transactions=updates),
+    )
 
 
 def say_memo_updates(push_items):
@@ -6606,14 +6768,12 @@ def update_ynab_payees_memos(plan, push_items):
             data["payee_id"] = item["payee_id"]
             data["payee_name"] = item["payee_name"]
         updates.append(ynab.SaveTransactionWithIdOrImportId(**data))
-    try:
-        ynab.TransactionsApi(plan.api_client).update_transactions(
-            plan.plan_id, ynab.PatchTransactionsWrapper(transactions=updates)
-        )
-    except YNAB_ERRORS as error:
-        raise TaskError(
-            f"cannot update the payees and memos in YNAB: {error}"
-        ) from error
+    call_ynab(
+        "update the payees and memos in YNAB",
+        ynab.TransactionsApi(plan.api_client).update_transactions,
+        plan.plan_id,
+        ynab.PatchTransactionsWrapper(transactions=updates),
+    )
 
 
 def say_sync_updates(push_items):
@@ -6814,12 +6974,27 @@ YNAB_ERRORS = (ynab.ApiException, urllib3.exceptions.HTTPError)
 
 
 def call_ynab(action, function, *arguments, **keyword_arguments):
-    # Runs one call of the YNAB API. Raises with `action` in the message when
-    # the call fails.
-    try:
-        return function(*arguments, **keyword_arguments)
-    except YNAB_ERRORS as error:
-        raise TaskError(f"cannot {action}: {error}") from error
+    # Runs one call of the YNAB API. Transient failures retry at least
+    # API_MAX_RETRIES times with exponential backoff starting at
+    # API_RETRY_INITIAL_DELAY, doubling, maxing out at API_RETRY_MAX_DELAY.
+    # Raises with `action` in the message when the call fails.
+    last_error = None
+    for attempt in range(API_MAX_RETRIES + 1):
+        try:
+            return function(*arguments, **keyword_arguments)
+        except YNAB_ERRORS as error:
+            if not is_retryable_ynab_error(error):
+                raise TaskError(f"cannot {action}: {error}") from error
+            last_error = error
+            if attempt >= API_MAX_RETRIES:
+                raise TaskError(f"cannot {action}: {error}") from error
+            delay = api_retry_delay(attempt)
+            _log(
+                f"Warning: cannot {action}: {error}. "
+                f"Retrying in {delay:g} seconds (attempt {attempt + 1})."
+            )
+            time.sleep(delay)
+    raise TaskError(f"cannot {action}: {last_error}") from last_error
 
 
 # -----------------------------------------------------------------------------
