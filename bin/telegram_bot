@@ -59,6 +59,13 @@ BOT_COMMANDS = (
     ("help", "show the commands"),
     ("status", "show the running task"),
 )
+# Retry policy for all requests to external APIs. Every external call
+# retries at least API_MAX_RETRIES times with an exponential backoff that
+# starts at API_RETRY_INITIAL_DELAY, doubles every iteration, and maxes out
+# at API_RETRY_MAX_DELAY.
+API_MAX_RETRIES = 10
+API_RETRY_INITIAL_DELAY = 0.1
+API_RETRY_MAX_DELAY = 10.0
 
 
 # -----------------------------------------------------------------------------
@@ -633,6 +640,27 @@ class TaskLoadError(BotError):
     pass
 
 
+def api_retry_delay(attempt):
+    # Exponential backoff for external API retries. Starts at
+    # API_RETRY_INITIAL_DELAY, doubles every iteration, and maxes out at
+    # API_RETRY_MAX_DELAY. Attempt counts retries so far, starting at 0.
+    return min(API_RETRY_INITIAL_DELAY * (2.0**attempt), API_RETRY_MAX_DELAY)
+
+
+def is_retryable_api_error(error):
+    # Whether the Telegram API error is transient and worth retrying.
+    # Rate limiting and server errors retry, other client errors do not.
+    code = getattr(error, "code", None)
+    if code == 429:
+        return True
+    if isinstance(code, int) and not isinstance(code, bool):
+        if code == 0:
+            return True
+        if 500 <= code <= 599:
+            return True
+    return False
+
+
 # -----------------------------------------------------------------------------
 # Telegram API.
 # -----------------------------------------------------------------------------
@@ -644,32 +672,90 @@ class TelegramApi:
         self.http_timeout = http_timeout
 
     def call(self, method, params=None, http_timeout=None):
+        # Every Telegram API request retries transient failures at least
+        # API_MAX_RETRIES times. The backoff starts at
+        # API_RETRY_INITIAL_DELAY, doubles every iteration, and maxes out at
+        # API_RETRY_MAX_DELAY. Rate limiting and server errors retry, other
+        # client errors raise at once.
         body = json.dumps(params or {}).encode("utf-8")
-        request = urllib.request.Request(
-            self.base_url + method,
-            data=body,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
         timeout = self.http_timeout if http_timeout is None else http_timeout
-        try:
-            with urllib.request.urlopen(request, timeout=timeout) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-        except urllib.error.HTTPError as error:
-            raise self.http_error(method, error) from error
-        except (
-            urllib.error.URLError,
-            TimeoutError,
-            OSError,
-            ValueError,
-        ) as error:
-            raise NetworkError(f"{method} failed: {error}") from error
-        if not isinstance(payload, dict) or not payload.get("ok"):
-            description = "unknown error"
-            if isinstance(payload, dict):
-                description = str(payload.get("description", description))
-            raise ApiError(0, f"{method} failed: {description}")
-        return payload.get("result")
+        for attempt in range(API_MAX_RETRIES + 1):
+            request = urllib.request.Request(
+                self.base_url + method,
+                data=body,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            try:
+                with urllib.request.urlopen(
+                    request, timeout=timeout
+                ) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+            except urllib.error.HTTPError as error:
+                api_error = self.http_error(method, error)
+                if not is_retryable_api_error(api_error):
+                    raise api_error from error
+                if attempt >= API_MAX_RETRIES:
+                    raise api_error from error
+                delay = self.retry_delay_for(api_error, attempt)
+                log(
+                    f"Warning: {api_error}. "
+                    f"Retrying in {delay:g} seconds "
+                    f"(attempt {attempt + 1})."
+                )
+                time.sleep(delay)
+                continue
+            except (
+                urllib.error.URLError,
+                TimeoutError,
+                OSError,
+                ValueError,
+            ) as error:
+                if attempt >= API_MAX_RETRIES:
+                    raise NetworkError(
+                        f"{method} failed: {error}"
+                    ) from error
+                delay = api_retry_delay(attempt)
+                log(
+                    f"Warning: {method} failed: {error}. "
+                    f"Retrying in {delay:g} seconds "
+                    f"(attempt {attempt + 1})."
+                )
+                time.sleep(delay)
+                continue
+            if not isinstance(payload, dict) or not payload.get("ok"):
+                description = "unknown error"
+                if isinstance(payload, dict):
+                    description = str(payload.get("description", description))
+                api_error = ApiError(0, f"{method} failed: {description}")
+                if attempt >= API_MAX_RETRIES:
+                    raise api_error
+                delay = api_retry_delay(attempt)
+                log(
+                    f"Warning: {api_error}. "
+                    f"Retrying in {delay:g} seconds "
+                    f"(attempt {attempt + 1})."
+                )
+                time.sleep(delay)
+                continue
+            return payload.get("result")
+        raise NetworkError(f"{method} failed after retries")
+
+    def retry_delay_for(self, api_error, attempt):
+        # Backoff for one retry, honoring the server retry hint when present.
+        # The delay never exceeds API_RETRY_MAX_DELAY.
+        delay = api_retry_delay(attempt)
+        if getattr(api_error, "code", None) == 429:
+            retry_after = getattr(api_error, "retry_after", None)
+            try:
+                server_delay = float(retry_after)
+            except (TypeError, ValueError):
+                server_delay = None
+            if server_delay is not None and server_delay > 0:
+                delay = min(
+                    max(delay, server_delay), API_RETRY_MAX_DELAY
+                )
+        return delay
 
     def http_error(self, method, error):
         try:
@@ -1745,27 +1831,36 @@ class Bot:
                     if error.code == 409:
                         log(
                             "Warning: another process polls this bot (409). "
-                            "Waiting 15 seconds."
+                            "Waiting 10 seconds."
                         )
-                        if self.stopping.wait(15.0):
+                        if self.stopping.wait(API_RETRY_MAX_DELAY):
                             break
                         continue
                     if error.code == 429:
-                        wait_for = error.retry_after or 30.0
+                        wait_for = error.retry_after or API_RETRY_MAX_DELAY
+                        try:
+                            wait_for = float(wait_for)
+                        except (TypeError, ValueError):
+                            wait_for = API_RETRY_MAX_DELAY
+                        wait_for = min(
+                            max(wait_for, 0.0), API_RETRY_MAX_DELAY
+                        )
                         log(
                             "Warning: rate limited. "
-                            f"Waiting {wait_for} seconds."
+                            f"Waiting {wait_for:g} seconds."
                         )
                         if self.stopping.wait(float(wait_for)):
                             break
                         continue
-                    log(f"Warning: {error}. Waiting 5 seconds.")
-                    if self.stopping.wait(5.0):
+                    wait_for = api_retry_delay(backoff)
+                    backoff = min(backoff + 1, API_MAX_RETRIES)
+                    log(f"Warning: {error}. Waiting {wait_for:g} seconds.")
+                    if self.stopping.wait(wait_for):
                         break
                     continue
                 except NetworkError as error:
-                    backoff = min(backoff + 1, 5)
-                    wait_for = min(2.0**backoff, 30.0)
+                    wait_for = api_retry_delay(backoff)
+                    backoff = min(backoff + 1, API_MAX_RETRIES)
                     log(f"Warning: {error}. Waiting {wait_for:g} seconds.")
                     if self.stopping.wait(wait_for):
                         break
@@ -2571,14 +2666,31 @@ class Bot:
         thread.start()
 
     def send_heartbeat(self):
+        # The dead-man-switch ping retries like any other external call.
         if not self.heartbeat_url:
             return
-        try:
-            request = urllib.request.Request(self.heartbeat_url, method="GET")
-            with urllib.request.urlopen(request, timeout=10.0) as response:
-                response.read(1024)
-        except Exception as error:
-            log(f"Warning: heartbeat ping failed: {error}")
+        last_error = None
+        for attempt in range(API_MAX_RETRIES + 1):
+            try:
+                request = urllib.request.Request(
+                    self.heartbeat_url, method="GET"
+                )
+                with urllib.request.urlopen(
+                    request, timeout=10.0
+                ) as response:
+                    response.read(1024)
+                return
+            except Exception as error:
+                last_error = error
+                if attempt >= API_MAX_RETRIES:
+                    break
+                delay = api_retry_delay(attempt)
+                log(
+                    f"Warning: heartbeat ping attempt {attempt + 1} "
+                    f"failed: {error}. Retrying in {delay:g} seconds."
+                )
+                time.sleep(delay)
+        log(f"Warning: heartbeat ping failed: {last_error}")
 
     def heartbeat_loop(self):
         while not self.stopping.is_set():
