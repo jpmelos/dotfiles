@@ -594,7 +594,7 @@ x() {
             echo "Projects Root"
             list_project_dirs
         } | fzf --prompt="Select project: " --height=40% --reverse --query="$*"
-    )
+    ) || return $?
 
     if [ "$project" = "Projects Root" ] || [ -z "$project" ]; then
         cd "$HOME/devel"
