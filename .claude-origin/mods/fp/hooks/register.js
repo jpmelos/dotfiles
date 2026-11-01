@@ -2,9 +2,13 @@
 //
 // Reads the toggle list from `jpenv.fast_permissions` in the profile
 // settings file. Each row toggles its rule between allow and deny. The
-// settings watcher applies the change to the running session.
+// settings watcher applies the change to the running session. The pane
+// shows a search box above the rows. Typing filters the rows.
 
 const PANE = "fast-permissions";
+
+// Text of the search box. Reset each time the pane opens.
+let searchText = "";
 
 // Entries with a non-empty text name and permission.
 function validEntries(value) {
@@ -82,6 +86,23 @@ async function disableAll($) {
   return enabled;
 }
 
+// Rows whose name or permission holds the search text, with the index of
+// each row in the full list. An empty search keeps every row.
+function filteredEntries(entries) {
+  const query = searchText.trim().toLowerCase();
+  const found = [];
+  entries.forEach((entry, index) => {
+    if (
+      query === "" ||
+      entry.name.toLowerCase().includes(query) ||
+      entry.permission.toLowerCase().includes(query)
+    ) {
+      found.push({ entry, index });
+    }
+  });
+  return found;
+}
+
 // A hotkey per row while keys last. Rows past `z` keep no hotkey.
 function hotkeyFor(index) {
   if (index < 9) return String(index + 1);
@@ -109,6 +130,7 @@ export function register(on) {
   on("command.run", { command: "fp" }, async ($, e) => {
     const args = e.args.trim();
     if (args === "") {
+      searchText = "";
       await $.ui.open({ id: PANE, title: "Fast permissions", focus: true, closeOnEscape: true });
       return {};
     }
@@ -146,30 +168,59 @@ export function register(on) {
 
   on("ui.render", { component: "Pane" }, async ($, e, next) => {
     if (e.requestId !== PANE) return next(e);
-    const { Box, Text, Button } = $.ui.resolve(e);
+    const { Box, Text, Button, Input } = $.ui.resolve(e);
     const state = await readState($);
     if (state.entries.length === 0) {
       return Box({ children: [Text({ children: ["No fast permissions in config."] })] });
     }
+    const redraw = () => $.ui.invalidate("ui.render");
+    // Flip one row, then close the pane and name the change.
+    const toggleRow = async (entry) => {
+      const enabled = await flipRule($, entry);
+      redraw();
+      await $.ui.close({ id: PANE });
+      $.ui.log(rowLabel(entry, enabled));
+    };
+    const found = filteredEntries(state.entries);
+    const rows =
+      found.length === 0
+        ? [Text({ children: ["No matches."] })]
+        : found.map((item, position) => {
+            const props = {
+              key: "fp-" + item.index,
+              label: rowLabel(item.entry, isEnabled(state, item.entry)),
+              plain: true,
+              onPress: async () => {
+                await toggleRow(item.entry);
+              },
+            };
+            const hotkey = hotkeyFor(position);
+            if (hotkey !== undefined) props.hotkey = hotkey;
+            return Button(props);
+          });
     return Box({
       flexDirection: "column",
-      children: state.entries.map((entry, index) => {
-        const props = {
-          key: "fp-" + index,
-          label: rowLabel(entry, isEnabled(state, entry)),
-          onPress: async () => {
-            const enabled = await flipRule($, entry);
-            $.ui.invalidate("ui.render");
-            await $.ui.close({ id: PANE });
-            $.ui.log(rowLabel(entry, enabled));
+      children: [
+        Input({
+          key: "fp-search",
+          placeholder: "Search...",
+          value: searchText,
+          submitLabel: "toggle",
+          // Focus starts here, so typing filters at once.
+          autoFocus: true,
+          onInput: (value) => {
+            searchText = value;
+            redraw();
           },
-        };
-        const hotkey = hotkeyFor(index);
-        if (hotkey !== undefined) props.hotkey = hotkey;
-        // The first row takes focus, so Enter toggles it.
-        if (index === 0) props.autoFocus = true;
-        return Button(props);
-      }),
+          onSubmit: async (value) => {
+            searchText = value;
+            const first = filteredEntries(state.entries)[0];
+            if (first === undefined) return;
+            await toggleRow(first.entry);
+          },
+        }),
+        ...rows,
+      ],
     });
   });
 }
