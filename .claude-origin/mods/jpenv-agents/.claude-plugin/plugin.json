@@ -1,0 +1,6 @@
+{
+  "name": "jpenv-agents",
+  "version": "0.1.0",
+  "description": "Announce context files loaded from jpenv-agents.json",
+  "author": { "name": "jpenv" }
+}

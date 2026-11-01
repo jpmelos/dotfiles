@@ -60,8 +60,8 @@
 # /   - `--effort` with the `effortLevel` of the profile, if any.
 # /   - `--add-dir` with `~/devel`.
 # /   - `--add-dir` with the target of each `--add-volume` mount.
-# /   - `--plugin-dir` with the fast permissions mod, when the origin
-# /     holds it.
+# /   - `--plugin-dir` with each mod under `mods/`, when the origin
+# /     holds any.
 # /   A `--setting-sources`, `--model`, or `--effort` that you pass
 # /   wins. An `--add-dir` that you pass adds to the list.
 # /
@@ -563,9 +563,15 @@ def main():
         model,
         effort,
         [volume.target for volume in extra_volumes],
-        plugin_dirs=[f"{paths.home}/.claude/mods/fp"]
-        if os.path.isdir(f"{paths.origin_dir}/mods/fp")
-        else [],
+        plugin_dirs=sorted(
+            f"{paths.home}/.claude/mods/{name}"
+            for name in (
+                os.listdir(f"{paths.origin_dir}/mods")
+                if os.path.isdir(f"{paths.origin_dir}/mods")
+                else []
+            )
+            if os.path.isdir(f"{paths.origin_dir}/mods/{name}")
+        ),
     )
 
     container_name = generate_container_name(project_root)

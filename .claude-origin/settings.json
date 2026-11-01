@@ -108,6 +108,15 @@
             "command": "ready --no-chime"
           }
         ]
+      },
+      {
+        "matcher": "startup|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/scripts/jpenv-agents.sh root"
+          }
+        ]
       }
     ],
     "SessionEnd": [
@@ -126,6 +135,17 @@
           {
             "type": "command",
             "command": "running"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Read|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/scripts/jpenv-agents.sh sibling"
           }
         ]
       }

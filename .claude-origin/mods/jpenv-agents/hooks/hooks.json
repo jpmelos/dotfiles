@@ -1,0 +1,4 @@
+{
+  "description": "The jpenv-agents announce module",
+  "modules": ["./register.js"]
+}
