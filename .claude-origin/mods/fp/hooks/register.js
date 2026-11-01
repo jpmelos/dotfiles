@@ -166,6 +166,8 @@ export function register(on) {
         };
         const hotkey = hotkeyFor(index);
         if (hotkey !== undefined) props.hotkey = hotkey;
+        // The first row takes focus, so Enter toggles it.
+        if (index === 0) props.autoFocus = true;
         return Button(props);
       }),
     });
