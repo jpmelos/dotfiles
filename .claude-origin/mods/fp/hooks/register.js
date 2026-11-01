@@ -50,7 +50,7 @@ function rowLabel(entry, enabled) {
 // Text of the reminder for the enabled entries.
 function reminderText(enabled) {
   const list = enabled.map((entry) => rowLabel(entry, true)).join(", ");
-  return "Fast permissions still on for next turn: " + list + ". Run /fp to turn off.";
+  return "Fast permissions still on for next turn: " + list + ". Run /fpd to turn off.";
 }
 
 // Flip one entry between allow and deny. Return the new state.
@@ -161,7 +161,7 @@ export function register(on) {
             const enabled = await flipRule($, entry);
             $.ui.invalidate("ui.render");
             await $.ui.close({ id: PANE });
-            $.ui.toast(rowLabel(entry, enabled));
+            $.ui.log(rowLabel(entry, enabled));
           },
         };
         const hotkey = hotkeyFor(index);

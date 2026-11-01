@@ -76,20 +76,29 @@ function currentSessionID(context: Plugin.Context): string | undefined {
   return context.data.session.list()[0]?.id
 }
 
+// Post one notice as a chat message, like `jpenv-agents` does.
+async function announce(context: Plugin.Context, sessionID: string, text: string): Promise<void> {
+  try {
+    await context.client.session.synthetic({ sessionID, text, description: text, resume: false })
+  } catch {
+    // The notice is best-effort. A failure never stops the run.
+  }
+}
+
 // Toggles one entry for the current session.
 async function toggleFastPermission(context: Plugin.Context, pending: PendingAllows): Promise<void> {
+  const sessionID = currentSessionID(context)
   let entries: FastPermission[]
   try {
     entries = await loadFastPermissions()
   } catch {
-    context.ui.toast.show({ message: "Fast permissions config is unreadable.", variant: "error" })
+    if (sessionID !== undefined) await announce(context, sessionID, "Fast permissions config is unreadable.")
     return
   }
   if (entries.length === 0) {
-    context.ui.toast.show({ message: "No fast permissions in config.", variant: "warning" })
+    if (sessionID !== undefined) await announce(context, sessionID, "No fast permissions in config.")
     return
   }
-  const sessionID = currentSessionID(context)
   if (sessionID === undefined) {
     await togglePending(context, pending, entries)
     return
@@ -98,7 +107,7 @@ async function toggleFastPermission(context: Plugin.Context, pending: PendingAll
   try {
     info = await context.client.session.get({ sessionID })
   } catch {
-    context.ui.toast.show({ message: "Session is unreadable.", variant: "error" })
+    await announce(context, sessionID, "Session is unreadable.")
     return
   }
   const currentRules: SessionRule[] = [...(info.permissions ?? [])]
@@ -133,13 +142,10 @@ async function toggleFastPermission(context: Plugin.Context, pending: PendingAll
   try {
     await context.client.session.update({ sessionID, permissions: currentRules })
   } catch {
-    context.ui.toast.show({ message: "Session update failed.", variant: "error" })
+    await announce(context, sessionID, "Session update failed.")
     return
   }
-  context.ui.toast.show({
-    message: `${chosen.name} is now ${nextEffect === "allow" ? "enabled" : "disabled"}.`,
-    variant: "success",
-  })
+  await announce(context, sessionID, `${nextEffect === "allow" ? "🟢" : "🔴"} ${rowLabel(chosen)} is now ${nextEffect === "allow" ? "enabled" : "disabled"}.`)
 }
 
 // Arms one allow for the next session, while none exists yet.
@@ -161,43 +167,36 @@ async function togglePending(context: Plugin.Context, pending: PendingAllows, en
   const on = pending.list().some((item) => item.action === chosen.action && item.resource === chosen.resource)
   if (on) {
     pending.remove(chosen)
-    context.ui.toast.show({ message: `${chosen.name} stays off.`, variant: "success" })
     return
   }
   pending.add(chosen)
-  context.ui.toast.show({ message: `${chosen.name} turns on with the next session.`, variant: "success" })
 }
 
 // Disables every enabled entry for the current session.
 async function disableAllFastPermissions(context: Plugin.Context, pending: PendingAllows): Promise<void> {
+  const sessionID = currentSessionID(context)
   let entries: FastPermission[]
   try {
     entries = await loadFastPermissions()
   } catch {
-    context.ui.toast.show({ message: "Fast permissions config is unreadable.", variant: "error" })
+    if (sessionID !== undefined) await announce(context, sessionID, "Fast permissions config is unreadable.")
     return
   }
   if (entries.length === 0) {
-    context.ui.toast.show({ message: "No fast permissions in config.", variant: "warning" })
+    if (sessionID !== undefined) await announce(context, sessionID, "No fast permissions in config.")
     return
   }
   const armed = pending.list()
-  const sessionID = currentSessionID(context)
   if (sessionID === undefined) {
-    if (armed.length === 0) {
-      context.ui.toast.show({ message: "No fast permissions enabled.", variant: "warning" })
-      return
-    }
+    if (armed.length === 0) return
     pending.clear()
-    const list = armed.map(rowLabel).join(", ")
-    context.ui.toast.show({ message: `Disabled fast permissions: ${list}.`, variant: "success" })
     return
   }
   let info
   try {
     info = await context.client.session.get({ sessionID })
   } catch {
-    context.ui.toast.show({ message: "Session is unreadable.", variant: "error" })
+    await announce(context, sessionID, "Session is unreadable.")
     return
   }
   const currentRules: SessionRule[] = [...(info.permissions ?? [])]
@@ -209,7 +208,7 @@ async function disableAllFastPermissions(context: Plugin.Context, pending: Pendi
     if (known === false) disabled.push(entry)
   }
   if (disabled.length === 0) {
-    context.ui.toast.show({ message: "No fast permissions enabled.", variant: "warning" })
+    await announce(context, sessionID, "No fast permissions enabled.")
     return
   }
   if (enabled.length > 0) {
@@ -222,12 +221,12 @@ async function disableAllFastPermissions(context: Plugin.Context, pending: Pendi
     try {
       await context.client.session.update({ sessionID, permissions: currentRules })
     } catch {
-      context.ui.toast.show({ message: "Session update failed.", variant: "error" })
+      await announce(context, sessionID, "Session update failed.")
       return
     }
   }
   const list = disabled.map(rowLabel).join(", ")
-  context.ui.toast.show({ message: `Disabled fast permissions: ${list}.`, variant: "success" })
+  await announce(context, sessionID, `Disabled fast permissions: ${list}.`)
 }
 
 // An entry counts as enabled when its rule allows it.
@@ -244,7 +243,7 @@ function rowLabel(entry: FastPermission): string {
 // Text of the reminder for the enabled entries.
 function reminderText(enabled: readonly FastPermission[]): string {
   const list = enabled.map(rowLabel).join(", ")
-  return `Fast permissions still on for next turn: ${list}. Run /fp to turn off.`
+  return `Fast permissions still on for next turn: ${list}. Run /fpd to turn off.`
 }
 
 // Logs the enabled entries to the chat after a turn, unless none are on.
@@ -274,12 +273,7 @@ async function remindForSession(
     const currentRules: SessionRule[] = [...(info.permissions ?? [])]
     const enabled = entries.filter((entry) => isRuleEnabled(currentRules, entry))
     if (enabled.length === 0) return
-    const text = reminderText(enabled)
-    try {
-      await context.client.session.synthetic({ sessionID, text, description: text, resume: false })
-    } catch {
-      context.ui.toast.show({ message: text, variant: "warning" })
-    }
+    await announce(context, sessionID, reminderText(enabled))
   } finally {
     active.delete(sessionID)
   }
@@ -300,11 +294,12 @@ async function applyPending(context: Plugin.Context, pending: PendingAllows, ses
   try {
     await context.client.session.update({ sessionID, permissions: currentRules })
   } catch {
-    context.ui.toast.show({ message: "Pending permissions failed.", variant: "error" })
+    await announce(context, sessionID, "Pending permissions failed.")
     return
   }
   pending.clear()
-  context.ui.toast.show({ message: "Fast permissions applied.", variant: "success" })
+  const list = armed.map((entry) => `🟢 ${rowLabel(entry)}`).join(", ")
+  await announce(context, sessionID, `Fast permissions applied: ${list}.`)
 }
 
 export default Plugin.define({
@@ -330,9 +325,7 @@ export default Plugin.define({
         }),
     }
     const off = context.data.on("session.created", (event) => {
-      void applyPending(context, pending, event.data.sessionID).catch(() => {
-        context.ui.toast.show({ message: "Pending permissions failed.", variant: "error" })
-      })
+      void applyPending(context, pending, event.data.sessionID).catch(() => {})
     })
     const reminding = new Set<string>()
     const offSucceeded = context.data.on("session.execution.succeeded", (event) => {
