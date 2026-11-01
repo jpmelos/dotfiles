@@ -225,7 +225,7 @@ async function disableAllFastPermissions(context: Plugin.Context, pending: Pendi
       return
     }
   }
-  const list = disabled.map(rowLabel).join(", ")
+  const list = disabled.map((entry) => `🔴 ${rowLabel(entry)}`).join(", ")
   await announce(context, sessionID, `Disabled fast permissions: ${list}.`)
 }
 
