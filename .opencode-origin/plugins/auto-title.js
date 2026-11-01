@@ -9,6 +9,11 @@ import path from "node:path";
 const FALLBACK_MODEL = "opencode-go/claude-haiku-5-5";
 const FALLBACK_MAX_LENGTH = 60;
 
+// This caps one user turn in the title prompt.
+const MAX_USER_CHARS = 500;
+// This caps one assistant turn in the title prompt.
+const MAX_ASSISTANT_CHARS = 200;
+
 // This is the path of the profile config inside the container.
 function configPath() {
   return path.join(homedir(), ".config", "opencode", "opencode.json");
@@ -89,6 +94,55 @@ function messageRole(message) {
   return "unknown";
 }
 
+// This reads the current title of the session.
+function titleFromInfo(info) {
+  if (!info || typeof info !== "object") return "";
+  if (typeof info.title !== "string") return "";
+  return info.title.trim();
+}
+
+// This cuts text to a cap and cleans the ends.
+function cutText(value, limit) {
+  if (typeof value !== "string") return "";
+  let text = value.trim();
+  if (text.length > limit) text = text.slice(0, limit).trim();
+  return text;
+}
+
+// This builds history with full user turns and short assistant turns.
+function buildHistory(messages) {
+  const lines = [];
+  for (const message of messages) {
+    const role = messageRole(message);
+    if (role !== "user" && role !== "assistant" && role !== "unknown") continue;
+    const cap = role === "user" ? MAX_USER_CHARS : MAX_ASSISTANT_CHARS;
+    const text = cutText(messageText(message), cap);
+    if (!text) continue;
+    lines.push(role + ": " + text);
+  }
+  return lines.join("\n\n");
+}
+
+// This builds the title prompt with a hint of the current title.
+function buildPrompt(config, currentTitleValue, history) {
+  let prompt =
+    "Write a short session title of 3 to 10 words and at most " +
+    config.maxLength +
+    " characters. Name the main goal across all turns. " +
+    "Do not title only the last exchange. " +
+    "Avoid narrow details like single flags or file names unless they define the whole task. " +
+    "Reply with the title only and no quotes.";
+  const hint = cutText(currentTitleValue, config.maxLength);
+  if (hint) {
+    prompt +=
+      " Current title: " +
+      hint +
+      ". Keep it if it still fits the whole conversation. " +
+      "Broaden it if the scope grew. Replace it only if the main topic changed.";
+  }
+  return prompt + "\n\n" + history;
+}
+
 // This trims a raw answer to one line within the cap.
 function normalizeTitle(value, maxLength) {
   if (typeof value !== "string") return "";
@@ -117,27 +171,17 @@ async function renameFromHistory(ctx, sessionID) {
     return;
   }
   if (!Array.isArray(messages)) return;
-  const lines = [];
-  for (const message of messages) {
-    const role = messageRole(message);
-    if (role !== "user" && role !== "assistant" && role !== "unknown") continue;
-    const text = messageText(message).trim();
-    if (!text) continue;
-    lines.push(role + ": " + text);
-  }
+  const history = buildHistory(messages);
   // An empty history carries no name.
-  if (lines.length === 0) return;
-  const history = lines.join("\n\n");
+  if (!history) return;
+  const currentTitleValue = titleFromInfo(info);
+  const prompt = buildPrompt(config, currentTitleValue, history);
   const model = parseModelRef(config.model) ?? modelFromSession(info) ?? parseModelRef(FALLBACK_MODEL);
   let answer;
   try {
     answer = await ctx.generate.text({
       model,
-      prompt:
-        "Write a short session title of 3 to 10 words and at most " +
-        config.maxLength +
-        " characters for the session below. Reply with the title only and no quotes.\n\n" +
-        history,
+      prompt,
     });
   } catch {
     return;

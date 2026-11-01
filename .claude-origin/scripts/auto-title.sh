@@ -12,38 +12,59 @@ if [ -n "${AUTO_TITLE_NESTED:-}" ]; then
 fi
 
 # A detached worker performs the slow title request.
+# The prompt favors the main goal with a hint of the prior title.
 if [ -n "${AUTO_TITLE_WORKER:-}" ]; then
   sleep 5
   history_text=$(jq -r \
-    'if .type == "summary" then .summary? // empty '\
-    'elif .type == "user" or .type == "assistant" then '\
-    '.message.content? // empty | if type == "array" then .[] | '\
-    'select(type == "object" and .type == "text") | .text? // empty '\
-    'elif type == "string" then . else empty end else empty end' \
+    '.type as $kind | if $kind == "summary" then '\
+    '("summary: " + ((.summary? // empty | tostring) '\
+    '| .[0:500])) elif $kind == "user" then '\
+    '(.message.content? // empty | if type == "array" '\
+    'then ([.[] | select(type == "object" and '\
+    '.type == "text") | .text? // empty] | join(" ")) '\
+    'elif type == "string" then . else empty end '\
+    'as $text | select($text != "") '\
+    '| ("user: " + ($text | .[0:500]))) '\
+    'elif $kind == "assistant" then '\
+    '(.message.content? // empty | if type == "array" '\
+    'then ([.[] | select(type == "object" and '\
+    '.type == "text") | .text? // empty] | join(" ")) '\
+    'elif type == "string" then . else empty end '\
+    'as $text | select($text != "") '\
+    '| ("assistant: " + ($text | .[0:200]))) '\
+    'else empty end' \
     "$AUTO_TITLE_TRANSCRIPT" 2> /dev/null || true)
   # An empty history carries no name.
   if [ -z "$history_text" ]; then
     exit 0
   fi
   combined="$history_text"
-  instructions="Write a short session title in lowercase kebab-case, "\
-    "3 to 6 words and at most 50 characters, that describes the whole "\
-    "session below. Reply with the title only and no quotes."
+  # This reads the prior title for a hint.
+  last_title=$(grep -F '"custom-title"' "$AUTO_TITLE_TRANSCRIPT" \
+    2> /dev/null | tail -n 1 | jq -r '.customTitle // empty' \
+    2> /dev/null || true)
+  instructions="Write a short session title of 3 to 10 words and at most "\
+    "50 characters. Name the main goal across all turns. Do not title "\
+    "only the last exchange. Avoid narrow details like single flags "\
+    "unless they define the whole task. Reply with the title only and "\
+    "no quotes."
+  if [ -n "$last_title" ]; then
+    instructions="$instructions Current title: $last_title. Keep it if it "\
+      "still fits the whole conversation. Broaden it if the scope grew. "\
+      "Replace it only if the main topic changed."
+  fi
   raw_title=$(claude -p --model haiku \
     --max-turns 1 --output-format text "$instructions
 
 $combined" 2> /dev/null || true)
   title=$(printf '%s' "$raw_title" | head -n 1 \
-    | tr '[:upper:]' '[:lower:]' \
-    | sed 's/[^a-z0-9]/-/g' | tr -s '-' \
-    | sed 's/^-//;s/-$//' | cut -c1-50 | sed 's/-$//')
+    | sed "s/^[\"']*//;s/[\"']*$//" \
+    | tr -s '[:space:]' ' ' | sed 's/^ //;s/ $//' \
+    | cut -c1-50 | sed 's/[.,;:!?-]*$//' | sed 's/ *$//')
   # Without a usable title the script keeps the current name.
   if [ -z "$title" ]; then
     exit 0
   fi
-  last_title=$(grep -F '"custom-title"' "$AUTO_TITLE_TRANSCRIPT" \
-    2> /dev/null | tail -n 1 | jq -r '.customTitle // empty' \
-    2> /dev/null || true)
   # The name is current, so the worker writes nothing.
   if [ "$title" = "$last_title" ]; then
     exit 0
