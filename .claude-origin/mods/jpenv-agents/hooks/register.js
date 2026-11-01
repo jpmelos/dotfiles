@@ -3,6 +3,8 @@
 // The settings hook prints a read directive silently. This mod logs one
 // manifest per load, like the `fp` reminder, so the transcript shows
 // which files the session must read. The model never reads these lines.
+// Root loads combine the `all` and `root` lists. Tool loads expand the
+// `all` list from the file directory and every parent to the root.
 
 const CONFIG_NAME = "jpenv-agents.json";
 const MANIFEST_TAG = "jpenv-agents manifest";
@@ -19,21 +21,33 @@ function announceManifest($, files) {
   }
 }
 
-// Read the pattern list at the working directory.
-async function readPatterns($) {
+// Read the `all` and `root` pattern lists at the working directory.
+async function readContexts($) {
   let parsed;
   try {
     parsed = JSON.parse(await $.fs.read(CONFIG_NAME));
   } catch {
-    return [];
+    return { all: [], root: [] };
   }
   if (parsed === null || typeof parsed !== "object") {
+    return { all: [], root: [] };
+  }
+  const context = parsed.context;
+  if (Array.isArray(context)) {
+    return { all: cleanList(context), root: [] };
+  }
+  if (context === null || typeof context !== "object") {
+    return { all: [], root: [] };
+  }
+  return { all: cleanList(context.all), root: cleanList(context.root) };
+}
+
+// Keep the non-empty string entries of one list.
+function cleanList(value) {
+  if (Array.isArray(value) === false) {
     return [];
   }
-  if (Array.isArray(parsed.context) === false) {
-    return [];
-  }
-  return parsed.context.filter(
+  return value.filter(
     (entry) => typeof entry === "string" && entry.length > 0,
   );
 }
@@ -159,6 +173,52 @@ async function expandPatterns($, patterns, base) {
   return [...found].sort();
 }
 
+// Expand patterns from each directory in one chain into sorted paths.
+async function expandPatternsChain($, patterns, dirs) {
+  const found = new Set();
+  for (const dir of dirs) {
+    const matches = await expandPatterns($, patterns, dir);
+    for (const match of matches) {
+      found.add(match);
+    }
+  }
+  return [...found].sort();
+}
+
+// List the directories from the project root to one directory.
+function ancestorDirs(root, start) {
+  const top = stripSlash(root);
+  const leaf = stripSlash(start);
+  if (leaf === top) {
+    return [start];
+  }
+  if (top === "" || top === ".") {
+    return [start];
+  }
+  if (leaf === "") {
+    return [start];
+  }
+  if (leaf !== top && leaf.startsWith(top + "/") === false) {
+    return [start];
+  }
+  const rest = leaf.slice(top.length + 1).split("/");
+  const dirs = [top];
+  let current = top;
+  for (const part of rest) {
+    current = current + "/" + part;
+    dirs.push(current);
+  }
+  return dirs;
+}
+
+// Drop one trailing slash, except for the filesystem root.
+function stripSlash(value) {
+  if (value.length > 1 && value.endsWith("/")) {
+    return value.slice(0, -1);
+  }
+  return value;
+}
+
 // Resolve the project root through the process working directory.
 async function projectRoot($) {
   try {
@@ -213,7 +273,9 @@ export function register(on) {
       if ((await hasManifest($)) === false) {
         const root = await projectRoot($);
         const base = root === "" ? "." : root;
-        const files = await expandPatterns($, await readPatterns($), base);
+        const contexts = await readContexts($);
+        const combined = [...contexts.all, ...contexts.root];
+        const files = await expandPatterns($, combined, base);
         if (files.length > 0) {
           for (const file of files) {
             siblingSeen.add(file);
@@ -233,11 +295,11 @@ export function register(on) {
       const raw = e.file_path;
       if (typeof raw === "string" && raw.length > 0) {
         const root = await projectRoot($);
-        const base = raw.startsWith("/")
-          ? raw
-          : joinPath(root === "" ? "." : root, raw);
-        const patterns = await readPatterns($);
-        const matches = await expandPatterns($, patterns, dirName(base));
+        const top = root === "" ? "." : root;
+        const base = raw.startsWith("/") ? raw : joinPath(top, raw);
+        const contexts = await readContexts($);
+        const dirs = ancestorDirs(top, dirName(base));
+        const matches = await expandPatternsChain($, contexts.all, dirs);
         const fresh = matches.filter(
           (file) => siblingSeen.has(file) === false,
         );

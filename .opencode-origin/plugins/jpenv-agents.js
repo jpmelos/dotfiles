@@ -3,8 +3,9 @@
 // Each load prints a directive and a manifest header as a chat
 // message. The model reads the message and fetches the files with
 // the file tool. Root loads run with the first prompt of each
-// session. Sibling loads run when a file tool runs, resolved from
-// the directory of that file.
+// session and combine the `all` and `root` lists. Sibling loads run
+// when a file tool runs and expand the `all` list from the directory
+// of that file and every parent up to the project root.
 
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
@@ -33,21 +34,34 @@ function manifestBlock(files) {
   return lines.join("\n");
 }
 
-// Read the pattern list at the project root for this run.
-async function readPatterns(root) {
+// Read the `all` and `root` pattern lists at the project root.
+async function readContexts(root) {
+  const empty = { all: [], root: [] };
   let parsed;
   try {
     parsed = JSON.parse(await readFile(path.join(root, CONFIG_NAME), "utf8"));
   } catch {
-    return [];
+    return empty;
   }
   if (parsed === null || typeof parsed !== "object") {
+    return empty;
+  }
+  const context = parsed.context;
+  if (Array.isArray(context)) {
+    return { all: cleanList(context), root: [] };
+  }
+  if (context === null || typeof context !== "object") {
+    return empty;
+  }
+  return { all: cleanList(context.all), root: cleanList(context.root) };
+}
+
+// Keep the non-empty string entries of one list.
+function cleanList(value) {
+  if (!Array.isArray(value)) {
     return [];
   }
-  if (!Array.isArray(parsed.context)) {
-    return [];
-  }
-  return parsed.context.filter((entry) => typeof entry === "string" && entry.length > 0);
+  return value.filter((entry) => typeof entry === "string" && entry.length > 0);
 }
 
 // Expand patterns from one base directory into sorted file paths.
@@ -84,6 +98,39 @@ async function expandPatterns(patterns, base) {
       }
     } catch {
       // Bad patterns stay silent.
+    }
+  }
+  return [...found].sort();
+}
+
+// List the directories from the project root to one directory.
+function ancestorDirs(root, start) {
+  const top = path.resolve(root);
+  const leaf = path.resolve(start);
+  if (leaf === top) {
+    return [top];
+  }
+  const prefix = top.endsWith(path.sep) ? top : top + path.sep;
+  if (!leaf.startsWith(prefix)) {
+    return [leaf];
+  }
+  const rest = leaf.slice(prefix.length).split(path.sep);
+  const dirs = [top];
+  let current = top;
+  for (const part of rest) {
+    current = path.join(current, part);
+    dirs.push(current);
+  }
+  return dirs;
+}
+
+// Expand patterns from each directory in one chain into sorted paths.
+async function expandPatternsChain(patterns, dirs) {
+  const found = new Set();
+  for (const dir of dirs) {
+    const matches = await expandPatterns(patterns, dir);
+    for (const match of matches) {
+      found.add(match);
     }
   }
   return [...found].sort();
@@ -167,7 +214,9 @@ export default {
       }
       state.rootDone.add(sessionID);
       const root = await projectRoot(ctx, sessionID);
-      const matches = await expandPatterns(await readPatterns(root), root);
+      const contexts = await readContexts(root);
+      const combined = [...contexts.all, ...contexts.root];
+      const matches = await expandPatterns(combined, root);
       if (!matches.length) {
         return;
       }
@@ -199,12 +248,13 @@ export default {
       const sessionID = event.sessionID;
       await ensureSeeded(ctx, state, sessionID);
       const root = await projectRoot(ctx, sessionID);
-      const patterns = await readPatterns(root);
-      if (!patterns.length) {
+      const contexts = await readContexts(root);
+      if (!contexts.all.length) {
         return;
       }
       const absolute = path.isAbsolute(raw) ? raw : path.join(root, raw);
-      const matches = await expandPatterns(patterns, path.dirname(absolute));
+      const dirs = ancestorDirs(root, path.dirname(absolute));
+      const matches = await expandPatternsChain(contexts.all, dirs);
       let seen = state.injected.get(sessionID);
       if (!seen) {
         seen = new Set();
