@@ -18,7 +18,9 @@ Usage: dev_rankings ORGANIZATION [REPOSITORY]
 
 import concurrent.futures
 import datetime
+import functools
 import html
+import http.server
 import json
 import os
 import random
@@ -41,6 +43,8 @@ MAX_WORKERS = 10
 MAX_ATTEMPTS = 6
 RATE_LIMIT_RETRIES = 8
 NAME_PATTERN = r"[A-Za-z0-9_.\-]+"
+SERVER_HOST = "dev_rankings.local"
+SERVER_PORT = 59819
 
 PERIODS = (
     ("Last full week", 1),
@@ -1610,6 +1614,33 @@ def build_handle_sections(handle, detail, week_starts):
     return sections
 
 
+def serve_report(directory, file_name):
+    """Serve the directory on dev_rankings.local until interrupted."""
+    handler = functools.partial(
+        http.server.SimpleHTTPRequestHandler, directory=directory
+    )
+    try:
+        server = http.server.ThreadingHTTPServer(
+            (SERVER_HOST, SERVER_PORT), handler
+        )
+    except OSError as error:
+        raise RuntimeError(
+            "cannot listen on "
+            + SERVER_HOST
+            + ": "
+            + str(error)
+            + ". Add 127.0.0.1 "
+            + SERVER_HOST
+            + " to /etc/hosts."
+        )
+    port = server.server_address[1]
+    url = "http://" + SERVER_HOST + ":" + str(port)
+    url += "/" + file_name
+    print(url, flush=True)
+    with server:
+        server.serve_forever()
+
+
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
 @click.argument("organization")
 @click.argument("repository", required=False, default=None)
@@ -1919,7 +1950,7 @@ def main(organization, repository):
             with open(tmp_handle_path, "w", encoding="utf-8") as handle_file:
                 handle_file.write(handle_page)
             os.replace(tmp_handle_path, handle_path)
-    print("open " + html_path)
+    serve_report(state_root, file_name)
 
 
 if __name__ == "__main__":
