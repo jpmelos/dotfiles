@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
+
+# This continues a Git rebase without a signature.
+#
+# Run it like `ai_git_rebase_continue`.
+
+if [ $# -ne 0 ]; then
+    echo "Error: This command takes no arguments" >&2
+    exit 1
+fi
+
+exec git -c commit.gpgsign=false rebase --continue

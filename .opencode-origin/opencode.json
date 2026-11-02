@@ -104,6 +104,11 @@
     },
     {
       "action": "shell",
+      "resource": "ai_git_rebase_continue",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
       "resource": "ai_git_restore",
       "effect": "allow"
     },

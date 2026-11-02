@@ -41,6 +41,7 @@
       "Bash(ai_default_next)",
       "Bash(ai_git_commit *)",
       "Bash(ai_git_new_branch *)",
+      "Bash(ai_git_rebase_continue)",
       "Bash(ai_git_restore)",
       "Bash(cat *)",
       "Bash(cd)",
