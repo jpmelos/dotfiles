@@ -1,21 +1,17 @@
 #!/usr/bin/env bash
-# Tell the agent which files `jpenv-agents.json` names.
+# Report how many files `jpenv-agents.json` names.
 #
 # The hook passes the mode as the first argument and the event JSON on
 # stdin. Mode `root` combines the `all` and `root` lists from the
 # project root. Mode `sibling` expands the `all` list from the
 # directory of the file in the event and every parent up to the
-# project root. Absent files stay silent. Each load prints a directive
-# and a manifest. The agent reads the files with the file tool.
+# project root. Absent files stay silent. Each load prints a single
+# line with the file count.
 
 set -u
 
 MODE="${1:-root}"
 MARKER_DIR="/tmp/jpenv-agents"
-MANIFEST_TAG="jpenv-agents manifest"
-DIRECTIVE="Read each listed file in full with the file tool. "
-DIRECTIVE="${DIRECTIVE}Skip a file whose complete contents "
-DIRECTIVE="${DIRECTIVE}are already in context."
 
 INPUT="$(cat)"
 
@@ -85,7 +81,7 @@ build_chain() {
 
 main() {
   local root session key patterns bases base source file dir
-  local pattern expansion candidate found matches text count path
+  local pattern expansion candidate found matches count event report path
   local all_q root_q
   root="$(resolve_root)"
   [ -n "$root" ] || exit 0
@@ -161,21 +157,30 @@ main() {
   matches=()
   mapfile -t matches < <(printf '%s\n' "${found[@]}" | LC_ALL=C sort -u)
 
-  # Build the directive and the manifest.
-  count="${#matches[@]}"
-  text="$DIRECTIVE
-$MANIFEST_TAG ($count files):"
+  # Record each match and report the file count in one line.
   for path in "${matches[@]}"; do
-    text="$text
-- $path"
     record_loaded "$key" "$path"
   done
+  count="${#matches[@]}"
+  if [ "$count" -eq 1 ]; then
+    report="jpenv-agents: 1 file."
+  else
+    report="jpenv-agents: $count files."
+  fi
 
   if [ "$MODE" = "root" ]; then
     touch "$MARKER_DIR/$key"
-    printf '%s\n' "$text"
+    event="$(json_field '.hook_event_name')"
+    [ -n "$event" ] || event="SessionStart"
+    jq -n --arg msg "$report" --arg event "$event" '{
+      "systemMessage": $msg,
+      "hookSpecificOutput": {
+        "hookEventName": $event,
+        "additionalContext": $msg
+      }
+    }'
   else
-    jq -n --arg ctx "$text" '{
+    jq -n --arg ctx "$report" '{
       "hookSpecificOutput": {
         "hookEventName": "PreToolUse",
         "additionalContext": $ctx

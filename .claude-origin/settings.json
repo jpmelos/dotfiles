@@ -137,6 +137,14 @@
             "command": "running"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/scripts/jpenv-agents.sh root"
+          }
+        ]
       }
     ],
     "PreToolUse": [

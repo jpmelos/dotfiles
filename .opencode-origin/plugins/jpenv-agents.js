@@ -1,8 +1,7 @@
-// Load files named in `jpenv-agents.json` into context.
+// Report how many files `jpenv-agents.json` names.
 //
-// Each load prints a directive and a manifest header as a chat
-// message. The model reads the message and fetches the files with
-// the file tool. Root loads run with the first prompt of each
+// Each load prints a single line with the file count as a chat
+// message. Root loads run with the first prompt of each
 // session and combine the `all` and `root` lists. Sibling loads run
 // when a file tool runs and expand the `all` list from the directory
 // of that file and every parent up to the project root.
@@ -11,27 +10,24 @@ import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 
 const CONFIG_NAME = "jpenv-agents.json";
-const MANIFEST_TAG = "jpenv-agents manifest";
-// Tell the model to read the listed files with the file tool.
-const DIRECTIVE = "Read each listed file in full with the file tool. Skip a file whose complete contents are already in context.";
 
-// Post one file list as a chat message.
+// Build the single line report for one announcement.
+function reportLine(files) {
+  const count = files.length;
+  if (count === 1) {
+    return "jpenv-agents: 1 file.";
+  }
+  return "jpenv-agents: " + count + " files.";
+}
+
+// Post one file count as a chat message.
 async function announce(ctx, sessionID, files) {
-  const text = DIRECTIVE + "\n" + manifestBlock(files);
+  const text = reportLine(files);
   try {
     await ctx.session.synthetic({ sessionID, text, description: text, resume: false });
   } catch {
-    // The manifest is best-effort. A failure never stops the session.
+    // The report is best-effort. A failure never stops the session.
   }
-}
-
-// Build the manifest header for one file list.
-function manifestBlock(files) {
-  const lines = [MANIFEST_TAG + " (" + files.length + " files):"];
-  for (const file of files) {
-    lines.push("- " + file);
-  }
-  return lines.join("\n");
 }
 
 // Read the `all` and `root` pattern lists at the project root.
@@ -194,7 +190,14 @@ async function ensureSeeded(ctx, state, sessionID) {
     return;
   }
   for (const message of messages) {
-    if (messageText(message).includes(MANIFEST_TAG)) {
+    const text = messageText(message);
+    // New reports carry the single line prefix. Old reports carry the
+    // retired directive or the retired header line.
+    if (
+      text.includes("jpenv-agents:") ||
+      text.includes("Read each listed file in full") ||
+      text.includes("jpenv-agents manifest")
+    ) {
       state.rootDone.add(sessionID);
     }
   }
@@ -205,7 +208,7 @@ export default {
   setup: async (ctx) => {
     const state = { seeded: new Set(), rootDone: new Set(), injected: new Map() };
 
-    // Announce root matches as a chat message for the model to read.
+    // Report root matches as a chat message.
     await ctx.session.hook("prompt", async (event) => {
       const sessionID = event.sessionID;
       await ensureSeeded(ctx, state, sessionID);
@@ -235,7 +238,7 @@ export default {
       await announce(ctx, sessionID, fresh);
     });
 
-    // Direct the model to sibling matches when a file tool runs.
+    // Report sibling matches when a file tool runs.
     await ctx.tool.hook("execute.before", async (event) => {
       if (event.tool !== "read" && event.tool !== "edit" && event.tool !== "write") {
         return;
