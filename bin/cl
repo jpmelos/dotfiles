@@ -382,6 +382,7 @@ AGENT_BINARIES = (
     "ai_git_restore",
     "ai_git_commit",
     "ai_git_new_branch",
+    "ai_git_rebase_continue",
     "pane-state",
     "chime",
     "running",
