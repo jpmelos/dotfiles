@@ -115,8 +115,18 @@ __git_push_stack() {
         fi
     done
     local index
+    local local_sha
+    local remote_sha
     for ((index = ${#stack[@]} - 1; index >= 0; index--)); do
         branch="${stack[$index]}"
+        # Skip branches that match the remote.
+        local_sha="$(git rev-parse "$branch")" || return 1
+        remote_sha="$(git rev-parse --verify --quiet \
+            "refs/remotes/origin/$branch" 2>/dev/null || true)"
+        if [ -n "$remote_sha" ] && [ "$local_sha" = "$remote_sha" ]; then
+            echo "Skipping $branch (unchanged)..."
+            continue
+        fi
         echo "Pushing $branch..."
         git push --force-with-lease --set-upstream \
             origin "$branch" || return 1
