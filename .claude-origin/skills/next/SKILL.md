@@ -62,6 +62,10 @@ Apply these rules:
 - Prefer active work with recent comments or reviews over idle work.
 - Flag pull requests with failed checks or open review threads.
 - Flag issues with no assignee or with stale discussion.
+- Treat acceptance criteria as plain lists, not as checklists.
+- Never report an action to mark acceptance criteria as complete.
+- Check each criterion at its source of truth instead.
+- Use source code, the tracker, Slack, GitHub, or linked records.
 - If the reference is not a list, order candidates from most urgent to least
   urgent.
 - If the reference is a list, determine next actions for each item separately.
