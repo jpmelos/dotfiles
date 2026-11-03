@@ -11,4 +11,14 @@ if [ $# -ne 0 ]; then
     exit 1
 fi
 
+# `git rebase --continue` reuses the `gpg_sign_opt` file saved when the rebase
+# started, so `-c commit.gpgsign=false` alone does not stop signing.
+# Remove the saved option first, then continue with signing disabled.
+for state in rebase-merge rebase-apply; do
+    if opt_file=$(git rev-parse --git-path \
+        "${state}/gpg_sign_opt" 2>/dev/null); then
+        rm -f "${opt_file}"
+    fi
+done
+
 exec git -c commit.gpgsign=false rebase --continue
