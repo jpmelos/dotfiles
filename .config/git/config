@@ -178,6 +178,7 @@
     rb = rebase
     rbm = ! git rebase $(git main-branch)
     rbom = ! git rebase $(git main-branch-remote)
+    rbcm = ! git rebase $(git merge-base --fork-point $(git main-branch))
     rbi = rebase -i
     rbim = ! git rebase -i $(git main-branch)
     rbiom = ! git rebase -i $(git main-branch-remote)
