@@ -172,6 +172,7 @@
     # ps = push
     ps = push -u
     psf = push -u --force-with-lease
+    psst = "! f() { source "$HOME/devel/dotfiles/references/scripts/gitfunctions.sh"; __git_push_stack "$@"; }; f"
 
     # rb = rebase
     rb = rebase
