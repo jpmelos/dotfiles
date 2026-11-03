@@ -17,9 +17,9 @@ Find the kind of review first. Use the first rule that matches the target.
 3. If the target is a list of paths to files, review the files.
 4. If the target is a git ref, review the changes since the ref. A git ref is a
    branch, a tag, a commit, or an expression such as `HEAD~3`. The word "since"
-   can come before the ref. If the target is only the word "since", use the
-   default branch as the ref. To check that a ref exists, run
-   `git rev-list --max-count=1 <ref>`.
+   can come before the ref. `since <ref>` means since but not including that
+   ref. If the target is only the word "since", use the default branch as the
+   ref. To check that a ref exists, run `git rev-list --max-count=1 <ref>`.
 5. If the target is a description in plain words, convert it to one of the
    kinds above. For example, "the last two commits" are the changes since
    `HEAD~2`.
