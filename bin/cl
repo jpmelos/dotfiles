@@ -263,14 +263,16 @@
 # /   runs in. `--no-docker-socket` does not change that. Read the file
 # /   before you launch on a repository that you do not trust.
 # /
-# /   The host directory `/tmp/cl-<user>/<profile>` is mounted at the
-# /   same path in every container of the profile, so these containers
-# /   share it. It holds the cache directories of the tools in the
-# /   image, which the `XDG_CACHE_HOME` and `npm_config_cache` variables
-# /   name, and the directory that the `AGENT_SHARED_DIR` variable
-# /   names, where the hook scripts write. Only you can read those. The
-# /   hooks see tool input and output, which can hold secrets from the
-# /   session.
+# /   Each container gets its own `/tmp` directory. The launcher
+# /   mounts the host directory `/tmp/<container>-<rand>` at `/tmp`.
+# /   It holds the cache directories of the tools in the image. The
+# /   `XDG_CACHE_HOME` and `npm_config_cache` variables name them. The
+# /   `AGENT_SHARED_DIR` variable names the directory where the hook
+# /   scripts write. Only you can read those.
+# /
+# /   The hooks see tool input and output, which can hold secrets
+# /   from the session. No container sees the `/tmp` directory of
+# /   another container. The directory dies with the container.
 # /
 # / tmux:
 # /   The `pane-state` and `chime` scripts write below
@@ -394,15 +396,17 @@ AGENT_BINARIES = (
 # target. A launch that dies between the creation and the rename leaves one
 # behind, and the prefix lets the next launch recognize it.
 TEMP_FILE_PREFIX = ".launcher-tmp-"
-# Prefix and suffix of the per-run copies of the profile `settings.json`.
-# Each launch copies the profile file to one of these, and the container
-# mounts it over the profile file, so a `/fp` flip stays in that container.
+# Prefix and suffix of the per-run copy of the profile `settings.json`.
+# Each launch copies the profile file to one of these in the per-run
+# `/tmp` directory. The container mounts it over the profile file,
+# so a `/fp` flip stays in that container.
 RUN_SETTINGS_PREFIX = "settings-run-"
 RUN_SETTINGS_SUFFIX = ".json"
-# How old a per-run copy gets before a launch removes it, in seconds. The
-# container of an old copy is long gone, and the copy is only there for the
-# mount that already ended.
-RUN_SETTINGS_MAX_AGE = 7 * 24 * 60 * 60
+# How old a per-run `/tmp` directory gets before a launch removes
+# it, in seconds. The container of an old directory is long gone.
+# A directory with the same container name dies at creation, even
+# when young.
+CONTAINER_TMP_MAX_AGE = 7 * 24 * 60 * 60
 # How many bytes the comparison of two files reads at a time.
 CONTENT_CHUNK_SIZE = 64 * 1024
 # Name of the directory in the home directory that holds the state of the
@@ -467,7 +471,12 @@ def main():
     check_docker_is_running()
 
     profile = options.profile
-    profile_paths = resolve_profile_paths(paths.home, username, profile)
+    container_name = generate_container_name(project_root)
+    prune_stale_container_tmps()
+    container_tmp_dir = create_container_tmp_dir(container_name)
+    profile_paths = resolve_profile_paths(
+        paths.home, username, profile, container_tmp_dir
+    )
     check_origin_dir(paths, profile, profile_paths.profile_dir)
     extra_volumes = resolve_extra_volumes(
         options.add_volumes, paths, profile_paths, project_root
@@ -495,33 +504,30 @@ def main():
         profile_config, profile, "effortLevel"
     )
 
-    # Every directory of the user is private. The names of the profile
-    # directories are the names of the organizations, the shared directory
-    # receives what the hooks see, which includes tool input and output, and
-    # the caches hold what the tools fetched or browsed. Another user has no
-    # business in any of them, nor in the pane state directory of the user.
-    profile_tmp_dir = profile_paths.profile_tmp_dir
+    # The pane state directory stays shared with the host. The
+    # per-run `/tmp` directory holds the caches and the shared
+    # directory. No two runs share it. Another user has no business
+    # in any of them.
     prepare_tmp_dirs(
         (
-            (profile_paths.user_tmp_dir, 0o700),
-            (profile_tmp_dir, 0o700),
-            (profile_paths.shared_dir, 0o700),
             (profile_paths.pane_states_dir, 0o700),
-            (f"{profile_tmp_dir}/xdg_cache", 0o700),
-            (f"{profile_tmp_dir}/npm_cache", 0o700),
+            (f"{container_tmp_dir}/xdg_cache", 0o700),
+            (f"{container_tmp_dir}/npm_cache", 0o700),
+            (profile_paths.shared_dir, 0o700),
         )
     )
 
     channel = options.channel
-    # The lock is per user and channel, so two launches that build an image
-    # of one channel take turns. Two profiles that launch on a new day at the
-    # same time need the same image, and the second one finds the image that
-    # the first one built. Two projects with a script need two images, and
-    # the second build takes the layers that both share from the cache. Two
-    # channels build in parallel, because each one installs another release.
-    # The file sits in the directory of the user under `/tmp`, so no other
-    # local user can create it first. See `prepare_tmp_dirs` for the checks
-    # on that directory.
+    # The lock is per user and channel, so two launches that build an
+    # image of one channel take turns. Two profiles that launch on a
+    # new day at the same time need the same image, and the second
+    # one finds the image that the first one built. Two projects with
+    # a script need two images, and the second build takes the layers
+    # that both share from the cache. Two channels build in parallel,
+    # because each one installs another release. The file lives in
+    # the launcher state directory in the home tree. No mount
+    # exposes it, so the agent cannot touch it.
+    ensure_image_lock_parent(paths.home)
     image_spec = ImageSpec(
         name=build_image_name(
             username,
@@ -532,7 +538,8 @@ def main():
         dockerfile_path=paths.dockerfile_path,
         home=paths.home,
         lock_path=(
-            f"{profile_paths.user_tmp_dir}/claude-code-img-lock-{channel}"
+            f"{paths.home}/{LAUNCHER_STATE_DIR_NAME}/"
+            f"img-lock-{channel}"
         ),
         container_script=container_script,
     )
@@ -575,11 +582,9 @@ def main():
         ),
     )
 
-    container_name = generate_container_name(project_root)
     run_settings_path = prepare_run_settings(
         profile_paths.profile_dir,
-        profile_paths.profile_tmp_dir,
-        container_name,
+        container_tmp_dir,
     )
 
     run_config = RunConfig(
@@ -604,7 +609,17 @@ def main():
     log("Running container...")
 
     if options.process_output:
-        return run_captured(run_command, env, run_config.container_name)
+        try:
+            return run_captured(
+                run_command, env, run_config.container_name
+            )
+        finally:
+            remove_container_tmp(container_tmp_dir)
+
+    # The `exec` below replaces this process, so nothing here can
+    # clean up after the container. A forked reaper waits on the
+    # container and removes the per-run `/tmp` directory instead.
+    spawn_tmp_reaper(container_name, container_tmp_dir)
 
     # Replace this process with the container. Claude Code then owns the
     # terminal and its exit status becomes ours.
@@ -617,6 +632,7 @@ def main():
     try:
         os.execvpe(run_command[0], run_command, env)
     except OSError as error:
+        remove_container_tmp(container_tmp_dir)
         die(f"cannot run {run_command[0]}: {error}")
 
 
@@ -1047,15 +1063,12 @@ def detect_profile(project_name, username):
 class ProfilePaths:
     # The directory with the login, history, and credentials of the profile.
     profile_dir: str
-    # The host directory of the user under `/tmp`, named after the launcher
-    # and the user. The profile directory below is inside it, so two users
-    # with the same profile name do not collide.
-    user_tmp_dir: str
-    # The host directory that every container of the profile mounts at the
-    # same path. The directory below is inside it.
-    profile_tmp_dir: str
-    # The directory where the hook scripts write. The `AGENT_SHARED_DIR`
-    # variable names it inside the container.
+    # The private host directory for one container run, under `/tmp`.
+    # The name holds the container name plus a random tail. No two
+    # runs share it. The container mounts it at `/tmp`.
+    container_tmp_dir: str
+    # The host path where the hook scripts write. The `AGENT_SHARED_DIR`
+    # variable names the same basename under `/tmp` in the container.
     shared_dir: str
     # The directory of the user, `TMUX_PANE_STATES_DIR_PREFIX` followed by the
     # user name. See the `tmux` section of the help.
@@ -1065,17 +1078,11 @@ class ProfilePaths:
     state_dir: str
 
 
-def resolve_profile_paths(home, username, profile):
-    # The directory carries the `cl-` prefix, so it never overlaps with a
-    # `/tmp/<user>` directory that another tool keeps, whose mode the launcher
-    # would otherwise tighten.
-    user_tmp_dir = f"/tmp/cl-{username}"
-    profile_tmp_dir = f"{user_tmp_dir}/{profile}"
+def resolve_profile_paths(home, username, profile, container_tmp_dir):
     return ProfilePaths(
         profile_dir=f"{home}/.claude-{profile}",
-        user_tmp_dir=user_tmp_dir,
-        profile_tmp_dir=profile_tmp_dir,
-        shared_dir=f"{profile_tmp_dir}/claude-code-shared",
+        container_tmp_dir=container_tmp_dir,
+        shared_dir=f"{container_tmp_dir}/claude-code-shared",
         pane_states_dir=f"{TMUX_PANE_STATES_DIR_PREFIX}{username}",
         state_dir=f"{home}/{LAUNCHER_STATE_DIR_NAME}/{profile}",
     )
@@ -1303,6 +1310,153 @@ def prepare_tmp_dirs(tmp_dirs):
                 die(f"cannot set the mode of {path}: {error}")
         if not os.access(path, os.W_OK | os.X_OK):
             die(f"{path} is not writable")
+
+
+def create_container_tmp_dir(container_name):
+    # Creates a private host directory `/tmp/<container>-<rand>`
+    # with mode `0700` and returns the path. The random tail blocks
+    # squats on the predictable container name. Old directories with
+    # the same container name die first, even when young, so data
+    # from an old container never reaches a new one. The caller
+    # removes the directory after the run. A failure is fatal,
+    # because Docker will create an absent mount source owned by
+    # `root`.
+    remove_same_name_tmps(container_name)
+    while True:
+        token = os.urandom(8).hex()
+        path = f"/tmp/{container_name}-{token}"
+        try:
+            os.mkdir(path, 0o700)
+        except FileExistsError:
+            continue
+        except OSError as error:
+            die(f"cannot create {path}: {error}")
+        try:
+            info = os.lstat(path)
+        except OSError as error:
+            die(f"cannot read {path}: {error}")
+        if stat.S_ISLNK(info.st_mode):
+            die(f"{path} is a link, not a directory")
+        if not stat.S_ISDIR(info.st_mode):
+            die(f"{path} is not a directory")
+        if info.st_uid != os.getuid():
+            die(f"{path} is owned by another user")
+        try:
+            os.chmod(path, 0o700)
+        except OSError as error:
+            die(f"cannot set the mode of {path}: {error}")
+        if not os.access(path, os.W_OK | os.X_OK):
+            die(f"{path} is not writable")
+        return path
+
+
+def prune_stale_container_tmps():
+    # Removes per-run `/tmp` directories older than
+    # `CONTAINER_TMP_MAX_AGE`. The names start with `claude_code_`.
+    # A failure only warns, because the launch can go on with the
+    # old directories in place.
+    try:
+        names = os.listdir("/tmp")
+    except OSError as error:
+        log(f"Warning: cannot list /tmp: {error}")
+        return
+    now = time.time()
+    for name in names:
+        if not name.startswith("claude_code_"):
+            continue
+        path = f"/tmp/{name}"
+        try:
+            info = os.lstat(path)
+        except OSError:
+            continue
+        if stat.S_ISLNK(info.st_mode):
+            continue
+        if not stat.S_ISDIR(info.st_mode):
+            continue
+        if info.st_uid != os.getuid():
+            continue
+        try:
+            age = now - info.st_mtime
+        except OSError:
+            continue
+        if age < CONTAINER_TMP_MAX_AGE:
+            continue
+        try:
+            remove_path(path)
+        except OSError as error:
+            log(f"Warning: cannot remove {path}: {error}")
+
+
+def remove_same_name_tmps(container_name):
+    # Removes per-run `/tmp` directories with the same container
+    # name, even when young. A new container with a repeated name
+    # must not see data from an old container. When a container with
+    # the same name still exists, it keeps its directories. A failure
+    # only warns, because the launch can go on with the old
+    # directories in place.
+    if container_exists(container_name):
+        log(f"Warning: container {container_name} still runs")
+        return
+    prefix = f"{container_name}-"
+    try:
+        names = os.listdir("/tmp")
+    except OSError as error:
+        log(f"Warning: cannot list /tmp: {error}")
+        return
+    for name in names:
+        if not name.startswith(prefix):
+            continue
+        tail = name[len(prefix):]
+        if len(tail) != 16:
+            continue
+        valid = True
+        for character in tail:
+            if character not in "0123456789abcdef":
+                valid = False
+                break
+        if not valid:
+            continue
+        path = f"/tmp/{name}"
+        try:
+            info = os.lstat(path)
+        except OSError:
+            continue
+        if stat.S_ISLNK(info.st_mode):
+            continue
+        if not stat.S_ISDIR(info.st_mode):
+            continue
+        if info.st_uid != os.getuid():
+            continue
+        try:
+            remove_path(path)
+        except OSError as error:
+            log(f"Warning: cannot remove {path}: {error}")
+
+
+def remove_container_tmp(path):
+    # Removes the per-run `/tmp` directory. A failure only warns,
+    # because the container already ended.
+    if not path:
+        return
+    try:
+        remove_path(path)
+    except OSError as error:
+        log(f"Warning: cannot remove {path}: {error}")
+
+
+def ensure_image_lock_parent(home):
+    # Creates `~/.cl-launcher` with mode `0700` when absent. The
+    # image lock file lives there. No mount exposes it, so the
+    # agent cannot touch it.
+    directory = f"{home}/{LAUNCHER_STATE_DIR_NAME}"
+    try:
+        os.makedirs(directory, mode=0o700, exist_ok=True)
+    except OSError as error:
+        die(f"cannot create {directory}: {error}")
+    try:
+        os.chmod(directory, 0o700)
+    except OSError as error:
+        die(f"cannot set the mode of {directory}: {error}")
 
 
 # -----------------------------------------------------------------------------
@@ -2697,14 +2851,14 @@ def generate_container_name(project_root):
 
 
 def build_run_command(harness_args, run_config):
-    # The mount sources under the home directory are resolved paths, because
-    # Docker needs the real directory. Every target is the unresolved path,
-    # because the paths inside the container, such as the project root and the
-    # scripts under the dotfiles repository, name `~/devel` as the user sees it
-    # on the host. The sources under `/tmp` stay unresolved on purpose. The
-    # scripts that write there see the same path on both sides of the mount,
-    # and on macOS `/tmp` is a link to `/private/tmp`, so a resolved source
-    # would not match the target.
+    # The mount sources under the home directory use resolved paths,
+    # because Docker needs the real directory. Every target uses the
+    # unresolved path, because the paths inside the container name
+    # `~/devel` as the user sees it on the host. The pane source under
+    # `/tmp` stays unresolved, so the path matches on both sides. The
+    # per-run source mounts at `/tmp`, so the container sees a private
+    # `/tmp`. On macOS `/tmp` links to `/private/tmp`, so a resolved
+    # source would not match.
     home = run_config.paths.home
     run_command = [
         "docker",
@@ -2781,39 +2935,31 @@ def container_args(run_config):
 
 
 def scratch_space_args(profile_paths):
-    # Returns the arguments for the writable places of the container and for
-    # the directories that the containers of the profile share.
-    profile_tmp_dir = profile_paths.profile_tmp_dir
+    # Returns the mounts for the writable places of one container.
+    # Each container gets its own `/tmp` directory from the host.
+    # No two runs share caches or hook output.
     runtime_dir = f"/run/user/{os.getuid()}"
     return [
-        # Make the entire filesystem read-only. `/tmp` and the runtime
-        # directory are the only writable places outside of the mounts. Both
-        # are a tmpfs of the container, because a runtime directory belongs to
-        # one session, and two containers of a profile must not share sockets
-        # and locks. The runtime directory gets its own tmpfs, because the XDG
-        # specification asks for a directory with mode 700 that the user owns,
-        # and `/tmp` is world-writable.
+        # The root stays read-only. The per-run host directory
+        # mounts at `/tmp`.
         "--read-only",
-        "--tmpfs",
-        "/tmp",
+        "--volume",
+        f"{profile_paths.container_tmp_dir}:/tmp",
+        # The runtime directory gets its own tmpfs, because it
+        # belongs to one session.
         "--tmpfs",
         f"{runtime_dir}:mode=700,uid={os.getuid()},gid={os.getgid()}",
         "--env",
         f"XDG_RUNTIME_DIR={runtime_dir}",
-        # The directory that every container of the profile shares. It sits
-        # under the `/tmp` tmpfs, and Docker applies the deeper mount last.
-        # The cache directories that Chromium and Node tools write to are
-        # inside it, so the containers of the profile share those too. npm
-        # does not read the XDG variables, so it gets its own one.
-        "--volume",
-        f"{profile_tmp_dir}:{profile_tmp_dir}",
+        # The cache variables point under `/tmp`, so each run starts
+        # with cold caches. npm does not read the XDG variables, so
+        # it gets its own one.
         "--env",
-        f"XDG_CACHE_HOME={profile_tmp_dir}/xdg_cache",
+        "XDG_CACHE_HOME=/tmp/xdg_cache",
         "--env",
-        f"npm_config_cache={profile_tmp_dir}/npm_cache",
-        # The directory where the `pane-state` and `chime` scripts write, and
-        # the variable that names it for them. See the `tmux` section of the
-        # help.
+        "npm_config_cache=/tmp/npm_cache",
+        # The pane directory stays shared with the host for `tmux`
+        # state. See the `tmux` section of the help.
         "--volume",
         f"{profile_paths.pane_states_dir}:{profile_paths.pane_states_dir}",
         "--env",
@@ -2868,13 +3014,12 @@ def profile_mount_args(run_config):
     ]
 
 
-def prepare_run_settings(profile_dir, profile_tmp_dir, container_name):
-    # Returns the host path of the private copy of the profile `settings.json`
-    # for one container, or `None` when the profile has none. The copy starts
-    # with the content of the profile file, and the container mounts it over
-    # that file, so a `/fp` flip lands in the copy and no other container sees
-    # it. A later launch copies the profile file again, so flips do not
-    # survive a relaunch.
+def prepare_run_settings(profile_dir, container_tmp_dir):
+    # Returns the host path of the private copy of the profile
+    # `settings.json` in the per-run `/tmp` directory, or `None` when
+    # the profile has none. The container mounts the copy over the
+    # profile file, so a `/fp` flip lands in the copy. The leaf dies
+    # with the container, so no prune runs.
     base_path = f"{profile_dir}/settings.json"
     try:
         with open_regular_file(base_path) as handle:
@@ -2885,11 +3030,10 @@ def prepare_run_settings(profile_dir, profile_tmp_dir, container_name):
     except OSError as error:
         log(f"Warning: cannot read {base_path}: {error}")
         return None
-    prune_run_settings(profile_tmp_dir)
     token = os.urandom(8).hex()
     run_path = (
-        f"{profile_tmp_dir}/{RUN_SETTINGS_PREFIX}"
-        f"{container_name}-{token}{RUN_SETTINGS_SUFFIX}"
+        f"{container_tmp_dir}/{RUN_SETTINGS_PREFIX}"
+        f"{token}{RUN_SETTINGS_SUFFIX}"
     )
     try:
         descriptor = os.open(
@@ -2912,33 +3056,6 @@ def prepare_run_settings(profile_dir, profile_tmp_dir, container_name):
             pass
         return None
     return run_path
-
-
-def prune_run_settings(profile_tmp_dir):
-    # Removes per-run copies that outlived their container. A failure only
-    # warns, because the launch can go on with the copies in place.
-    try:
-        names = os.listdir(profile_tmp_dir)
-    except OSError as error:
-        log(f"Warning: cannot list {profile_tmp_dir}: {error}")
-        return
-    now = time.time()
-    for name in names:
-        if not name.startswith(RUN_SETTINGS_PREFIX):
-            continue
-        if not name.endswith(RUN_SETTINGS_SUFFIX):
-            continue
-        path = f"{profile_tmp_dir}/{name}"
-        try:
-            age = now - os.lstat(path).st_mtime
-        except OSError:
-            continue
-        if age < RUN_SETTINGS_MAX_AGE:
-            continue
-        try:
-            remove_file(path)
-        except OSError as error:
-            log(f"Warning: cannot remove {path}: {error}")
 
 
 def run_settings_mount_args(run_config):
@@ -2983,9 +3100,10 @@ def agent_env_args(run_config):
         "TMUX_PANE",
         # The hook scripts write their debug output here. Without the
         # variable, the scripts fall back to a directory named after the user,
-        # and the container user is not the host user.
+        # and the container user is not the host user. The path names the
+        # per-run `/tmp` directory in the container, not on the host.
         "--env",
-        f"AGENT_SHARED_DIR={run_config.profile_paths.shared_dir}",
+        "AGENT_SHARED_DIR=/tmp/claude-code-shared",
         # Terminal configuration.
         "--env",
         "TERM",
@@ -3213,7 +3331,7 @@ def check_add_volume_target(spec, target, paths, profile_paths):
         os.path.normpath(paths.dotfiles_dir),
         os.path.normpath(claude_dir),
         os.path.normpath(git_config_dir),
-        os.path.normpath(profile_paths.profile_tmp_dir),
+        os.path.normpath(profile_paths.container_tmp_dir),
         os.path.normpath(profile_paths.pane_states_dir),
         os.path.normpath(f"/run/user/{os.getuid()}"),
         os.path.normpath("/var/run/docker.sock"),
@@ -3451,6 +3569,71 @@ def build_container_env(api_key):
 
 
 # -----------------------------------------------------------------------------
+# Per-run cleanup.
+# -----------------------------------------------------------------------------
+
+
+def spawn_tmp_reaper(container_name, container_tmp_dir):
+    # Forks a reaper that removes the per-run `/tmp` directory after
+    # the container ends. The interactive launch below replaces this
+    # process with the container, so nothing here can clean up
+    # after it.
+    try:
+        pid = os.fork()
+    except OSError as error:
+        log(f"Warning: cannot fork the tmp reaper: {error}")
+        return
+    if pid != 0:
+        return
+    try:
+        os.setsid()
+        for stream_fd in (0, 1, 2):
+            with contextlib.suppress(OSError):
+                os.close(stream_fd)
+        null_fd = os.open(os.devnull, os.O_RDWR)
+        for stream_fd in (0, 1, 2):
+            os.dup2(null_fd, stream_fd)
+        if null_fd > 2:
+            os.close(null_fd)
+        wait_for_container_exit(container_name)
+        remove_container_tmp(container_tmp_dir)
+    finally:
+        os._exit(0)
+
+
+def wait_for_container_exit(container_name):
+    # Waits until the container stops. The reaper can start before
+    # the container exists, so it polls for it first. When it never
+    # appears, there is nothing to wait for.
+    for _ in range(100):
+        if container_exists(container_name):
+            break
+        time.sleep(0.2)
+    else:
+        return
+    with contextlib.suppress(OSError):
+        subprocess.run(
+            ["docker", "wait", container_name],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+
+def container_exists(container_name):
+    try:
+        result = subprocess.run(
+            ["docker", "inspect", container_name],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError:
+        return False
+    return result.returncode == 0
+
+
+# -----------------------------------------------------------------------------
 # Captured run.
 # -----------------------------------------------------------------------------
 
@@ -3676,9 +3859,8 @@ def file_lock(lock_path, wait_message):
     # `flock` takes an exclusive lock on a read-only descriptor too, so a lock
     # file that other local users can open lets any of them stall every
     # launch. The mode keeps the file private. `os.open` applies it only to a
-    # file that it creates, so tighten an existing one as well. The file can
-    # sit in a world-writable directory, where another user can create it
-    # first, see `open_owned_regular_file`.
+    # file that it creates, so tighten an existing one as well. The lock
+    # lives in the launcher state directory, which no mount exposes.
     try:
         descriptor, _ = open_owned_regular_file(
             lock_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600
