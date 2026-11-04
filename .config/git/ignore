@@ -11,4 +11,5 @@
 
 /.venv*
 
-/.agentcontainer/config.local.toml
+**/AGENTS.local.md
+**/CLAUDE.local.md
