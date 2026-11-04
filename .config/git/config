@@ -168,6 +168,7 @@
 
     # pl = pull
     pl = pull
+    plst = "! f() { source "$HOME/devel/dotfiles/references/scripts/gitfunctions.sh"; __git_pull_stack "$@"; }; f"
 
     # ps = push
     ps = push -u

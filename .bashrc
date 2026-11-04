@@ -241,7 +241,9 @@ __git_complete go git_checkout
 __git_complete gof git_checkout
 
 alias gpl='g pl'
+alias gplst='g plst'
 __git_complete gpl git_pull
+__git_complete gplst git_pull
 
 alias gps='g ps'
 alias gpsf='g psf'
