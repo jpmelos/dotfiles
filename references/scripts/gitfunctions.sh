@@ -73,6 +73,7 @@ __git_push_stack() {
     local -a stack=()
     local current_branch="$tip_branch"
     local base_branch
+    local merged_branch
     local base_state
     local depth=0
     while true; do
@@ -85,14 +86,40 @@ __git_push_stack() {
         if [ "$base_branch" = "$main_branch" ]; then
             break
         fi
-        base_state="$(gh pr view "$base_branch" --json state \
-            --jq '.state')" || {
-            echo "Error: base '$base_branch' has no PR." >&2
-            return 1
-        }
-        if [ "$base_state" != "OPEN" ]; then
-            echo "Error: base '$base_branch' PR is not open." >&2
-            return 1
+        # Follow the base chain through merged PRs. Merged PRs and their
+        # branches basically do not exist from this command's perspective.
+        while true; do
+            base_state="$(gh pr view "$base_branch" --json state \
+                --jq '.state')" || {
+                echo "Error: base '$base_branch' has no PR." >&2
+                return 1
+            }
+            if [ "$base_state" = "OPEN" ]; then
+                break
+            fi
+            if [ "$base_state" != "MERGED" ]; then
+                echo "Error: base '$base_branch' PR is not open." >&2
+                return 1
+            fi
+            echo "Skipping $base_branch (merged)..."
+            merged_branch="$base_branch"
+            base_branch="$(gh pr view "$merged_branch" \
+                --json baseRefName --jq '.baseRefName')" || {
+                echo "Error: cannot get base of merged" \
+                    "'$merged_branch'." >&2
+                return 1
+            }
+            depth=$((depth + 1))
+            if [ "$depth" -gt 50 ]; then
+                echo "Error: stack deeper than 50." >&2
+                return 1
+            fi
+            if [ "$base_branch" = "$main_branch" ]; then
+                break
+            fi
+        done
+        if [ "$base_branch" = "$main_branch" ]; then
+            break
         fi
         current_branch="$base_branch"
         depth=$((depth + 1))
