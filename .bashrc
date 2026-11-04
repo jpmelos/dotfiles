@@ -255,10 +255,10 @@ __git_complete gpsst git_push
 alias grb='g rb'
 alias grbm='g rbm'
 alias grbom='g rbom'
-alias grbcm='g rbcm'
 alias grbi='g rbi'
 alias grbim='g rbim'
 alias grbiom='g rbiom'
+alias grbicm='g rbicm'
 alias grbc='g rbc'
 alias grba='g rba'
 __git_complete grb git_rebase

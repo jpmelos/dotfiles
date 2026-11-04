@@ -308,9 +308,14 @@ __git_pull_stack() {
         fi
         if ! git merge-base --is-ancestor \
             "$local_sha" "$remote_sha"; then
-            echo "Error: '$branch' diverged" \
-                "from 'origin/$branch'." >&2
-            return 1
+            echo "Overriding $branch (diverged)..."
+            if [ "$branch" = "$tip_branch" ]; then
+                git reset --hard "origin/$branch" || return 1
+            else
+                git update-ref "refs/heads/$branch" \
+                    "$remote_sha" || return 1
+            fi
+            continue
         fi
         echo "Updating $branch..."
         if [ "$branch" = "$tip_branch" ]; then
@@ -320,4 +325,31 @@ __git_pull_stack() {
                 "$remote_sha" "$local_sha" || return 1
         fi
     done
+}
+
+__git_rebase_merge_base() {
+    if [ $# -gt 0 ]; then
+        echo "Error: grbicm takes no arguments." >&2
+        return 1
+    fi
+    local main_branch
+    main_branch="$(git main-branch)" || {
+        echo "Error: cannot determine main branch." >&2
+        return 1
+    }
+    # The base of the stack is the common ancestor of
+    # the main branch and the current branch.
+    local base
+    base="$(git merge-base HEAD "$main_branch")" || {
+        echo "Error: cannot find merge base with" \
+            "'$main_branch'." >&2
+        return 1
+    }
+    local head
+    head="$(git rev-parse HEAD)" || return 1
+    if [ "$base" = "$head" ]; then
+        echo "Error: branch holds no own commits." >&2
+        return 1
+    fi
+    git rebase -i "$base"
 }
