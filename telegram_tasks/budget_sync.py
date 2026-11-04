@@ -31,6 +31,11 @@
 # the other side by itself. The statement leg goes as cleared, and the
 # other side stays uncleared until its statement appears, when the uncleared
 # flow clears it. Pairs with both legs present go as cleared on both sides.
+# Transfers into accounts without a statement, like Questrade, ask whether
+# the transfer has landed, and the other side goes as cleared when it has,
+# else stays uncleared. Transfers out of such accounts clear at once, since
+# the statement arrival proves the departure. Old uncleared Questrade legs
+# ask again each run until they land.
 # Later runs match new entries to YNAB transfers missing a side, after the
 # split question.
 # YNAB keeps both legs of a transfer on one date: the earliest bank date of
@@ -51,7 +56,8 @@
 # database sides hold the same memo once all is done, as YNAB requires. New
 # transfers send only one side, since YNAB adds the other side by itself.
 # Balance lines show cleared YNAB balances, which leave out uncleared other
-# sides, so they match what the banks report. The chat gets the new
+# sides, so they match what the banks report. Cleared Questrade sides join
+# the expected YNAB balance at once. The chat gets the new
 # transactions and the ignored
 # account, one line each with the full payee, plus short confirmations,
 # one combined balance message, and a count of the transactions without a memo.
@@ -4408,18 +4414,20 @@ def save_to_ynab(
     api_key,
     upload,
 ):
-    # Brings YNAB up to date with the statements, then compares the cleared
-    # balances with `bank_balances`, then brings the YNAB account of
-    # Questrade to `questrade_balance`. Pre-reads the YNAB cleared balances of
-    # each managed account before any write when `bank_balances` exists,
-    # passes the pre-reads with the statement deltas to `report_balances` so
-    # the YNAB sides hold this run's writes, and reports again after a
-    # Questrade add so the final message holds all writes. Returns whether
-    # YNAB matches the statements, with the counts of added, cleared,
-    # deleted, memo-updated, and synced transactions. Because of
-    # `--no-download`, `bank_balances` and `questrade_balance` can be `None`,
-    # and the step of each one does not run. Without `upload`, the task reads
-    # YNAB and reports the changes, but writes nothing to YNAB.
+    # Brings YNAB up to date with the statements, settles the Questrade
+    # transfer sides, then compares the cleared balances with `bank_balances`,
+    # then brings the YNAB account of Questrade to `questrade_balance`.
+    # Pre-reads the YNAB cleared balances of each managed account before any
+    # write when `bank_balances` exists, and of Questrade when
+    # `questrade_balance` exists, passes the pre-reads with the statement
+    # deltas and the Questrade settle delta to `report_balances` so the YNAB
+    # sides hold this run's writes, and reports again after a Questrade add
+    # so the final message holds all writes. Returns whether YNAB matches the
+    # statements, with the counts of added, cleared, deleted, memo-updated,
+    # and synced transactions. Because of `--no-download`, `bank_balances`
+    # and `questrade_balance` can be `None`, and the step of each one does
+    # not run. Without `upload`, the task reads YNAB and reports the changes,
+    # but writes nothing to YNAB.
     with ynab.ApiClient(
         ynab.Configuration(access_token=api_key)
     ) as api_client:
@@ -4435,6 +4443,14 @@ def save_to_ynab(
                 )
                 for account in YNAB_ACCOUNT_NAMES
             }
+        if questrade_balance is None:
+            pre_questrade = None
+        else:
+            pre_questrade = from_milliunits(
+                read_ynab_account(
+                    plan, plan.questrade_account_id
+                ).cleared_balance
+            )
         (
             matched,
             added_count,
@@ -4446,6 +4462,9 @@ def save_to_ynab(
         ) = update_from_statements(
             ctx, plan, transactions, decisions, start_date, upload
         )
+        questrade_delta = decimal.Decimal(0)
+        if matched and upload and questrade_balance is not None:
+            questrade_delta = settle_questrade_transfers(plan)
         questrade_state = report_balances(
             plan,
             bank_balances,
@@ -4453,6 +4472,8 @@ def save_to_ynab(
             matched,
             pre_balances,
             deltas,
+            pre_questrade,
+            questrade_delta,
         )
         if questrade_state is not None:
             questrade_added = reconcile_questrade(
@@ -4471,6 +4492,8 @@ def save_to_ynab(
                     matched,
                     pre_balances,
                     deltas,
+                    pre_questrade,
+                    questrade_delta + questrade_state[0],
                 )
     return (
         matched,
@@ -4489,13 +4512,17 @@ def report_balances(
     ynab_matches_statements,
     pre_balances=None,
     deltas=None,
+    pre_questrade=None,
+    questrade_delta=None,
 ):
     # Sends the bank and Questrade balances in one message, then returns the
     # Questrade difference and YNAB balance for `reconcile_questrade`, or
-    # None when Questrade is skipped. The YNAB sides hold this run's statement
-    # writes: `pre_balances` with `deltas` go to `build_bank_balance_lines`,
-    # which shows expected on a stale read. The caller reports again after a
-    # Questrade add, so the final message holds everything.
+    # None when Questrade is skipped. The YNAB sides hold this run's writes:
+    # `pre_balances` with `deltas` go to `build_bank_balance_lines`, and
+    # `pre_questrade` with `questrade_delta` go to
+    # `build_questrade_balance_line`, which shows expected on a stale read.
+    # The caller reports again after a Questrade add, so the final message
+    # holds everything.
     if bank_balances is None:
         bank_block = "Bank balances skipped."
         bank_differences = 0
@@ -4509,7 +4536,9 @@ def report_balances(
         questrade_state = None
     else:
         questrade_line, questrade_difference, questrade_ynab_balance = (
-            build_questrade_balance_line(plan, questrade_balance)
+            build_questrade_balance_line(
+                plan, questrade_balance, pre_questrade, questrade_delta
+            )
         )
         questrade_block = questrade_line
         questrade_state = (questrade_difference, questrade_ynab_balance)
@@ -5034,12 +5063,30 @@ def build_bank_balance_lines(
     return lines, differences
 
 
-def build_questrade_balance_line(plan, questrade_balance):
+def build_questrade_balance_line(
+    plan, questrade_balance, pre_balance=None, delta=None
+):
     # Returns the balance line of Questrade with the difference to the cleared
     # YNAB balance and the cleared YNAB balance, so the combined report can
-    # reuse them without reading YNAB twice.
+    # reuse them without reading YNAB twice. `pre_balance` holds the YNAB
+    # cleared balance from before this run wrote, and `delta` holds this
+    # run's cleared-balance changes from settled transfers, so expected holds
+    # pre plus delta. A fresh read follows, and when it differs from expected
+    # the task logs a warning and shows expected, which holds this run's
+    # writes by construction, else it shows the fresh read.
     ynab_account = read_ynab_account(plan, plan.questrade_account_id)
-    ynab_balance = from_milliunits(ynab_account.cleared_balance)
+    fresh_balance = from_milliunits(ynab_account.cleared_balance)
+    ynab_balance = fresh_balance
+    if pre_balance is not None and delta is not None:
+        expected = pre_balance + delta
+        if fresh_balance != expected:
+            _log(
+                "Warning: YNAB cleared balance for Questrade "
+                f"reads {format_amount(fresh_balance)} but expected "
+                f"{format_amount(expected)} with this run's writes. "
+                "Showing expected."
+            )
+            ynab_balance = expected
     difference = questrade_balance - ynab_balance
     mark = "OK" if difference == 0 else "DIFF"
     line = (
@@ -5047,6 +5094,82 @@ def build_questrade_balance_line(plan, questrade_balance):
         f"/ {format_amount(ynab_balance)} {mark}"
     )
     return line, difference, ynab_balance
+
+
+def settle_questrade_transfers(plan):
+    # Clears the uncleared Questrade sides of transfers and returns their
+    # total as the cleared-balance delta. Transfers into Questrade ask whether
+    # the money has landed, and clear on yes. Transfers out of Questrade to a
+    # managed account clear at once, since the statement arrival proves the
+    # departure. Transfers out to another account without a statement ask
+    # whether the money has left. Runs after the statement writes, so new
+    # other sides that YNAB added by itself join the old unsettled ones.
+    # Returns zero when nothing clears.
+    ynab_transactions = call_ynab(
+        "read the Questrade transactions",
+        ynab.TransactionsApi(plan.api_client).get_transactions_by_account,
+        plan.plan_id,
+        str(plan.questrade_account_id),
+        since_date=DEFAULT_FROM_DATE,
+    )
+    pending = [
+        ynab_transaction
+        for ynab_transaction in ynab_transactions.data.transactions
+        if not ynab_transaction.deleted
+        and ynab_transaction.cleared == ynab.TransactionClearedStatus.UNCLEARED
+        and ynab_transaction.transfer_account_id is not None
+    ]
+    if not pending:
+        return decimal.Decimal(0)
+    pending.sort(key=lambda item: (item.var_date, item.amount))
+    to_clear = []
+    for ynab_transaction in pending:
+        amount = from_milliunits(ynab_transaction.amount)
+        other_name = plan.account_names.get(
+            ynab_transaction.transfer_account_id,
+            str(ynab_transaction.transfer_account_id),
+        )
+        if amount > 0:
+            if ask_yes(
+                f"Transfer of {format_amount(amount)} on "
+                f"{ynab_transaction.var_date.strftime('%m-%d')} from "
+                f"{other_name} to Questrade. "
+                "Has it landed in Questrade?"
+            ):
+                to_clear.append(ynab_transaction)
+            else:
+                _log(
+                    f"Leaving Questrade transfer uncleared: "
+                    f"{describe_ynab_transaction(ynab_transaction)}."
+                )
+        else:
+            if other_name in ACCOUNTS_BY_YNAB_NAME:
+                _say(
+                    f"Clearing Questrade transfer of "
+                    f"{format_amount(amount)} to {other_name}, "
+                    "which the statement shows as arrived."
+                )
+                to_clear.append(ynab_transaction)
+            elif ask_yes(
+                f"Transfer of {format_amount(amount)} on "
+                f"{ynab_transaction.var_date.strftime('%m-%d')} from "
+                f"Questrade to {other_name}. Has it left Questrade?"
+            ):
+                to_clear.append(ynab_transaction)
+            else:
+                _log(
+                    "Leaving Questrade transfer uncleared: "
+                    f"{describe_ynab_transaction(ynab_transaction)}."
+                )
+    if not to_clear:
+        return decimal.Decimal(0)
+    clear_ynab_transactions(plan, to_clear)
+    cleared_total = sum(
+        (from_milliunits(item.amount) for item in to_clear),
+        decimal.Decimal(0),
+    )
+    _say(f"Cleared {len(to_clear)} Questrade transfer(s).")
+    return cleared_total
 
 
 def reconcile_questrade(
