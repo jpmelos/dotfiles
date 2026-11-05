@@ -82,7 +82,7 @@ Check prior decisions at the start.
 - Do not trust memory as truth.
 - Check each claim from memory against its source.
 - If the source differs, use the source.
-- List files in `jpenv-scratch/reviews` from the repository root.
+- List files in `jpenv-scratch/ai-memory/reviews` from the repository root.
 - Select files with names that match the review target.
 - For branch reviews, ref reviews, and PR reviews, use the ticket, the issue,
   the PR number, or the subject.
@@ -94,12 +94,12 @@ Check prior decisions at the start.
 - If you have confidence that a prior decision is wrong, push back against it.
 - When a different choice helps the project, push back.
 - Do not keep a bad decision because a prior review made it.
-- If `jpenv-scratch/reviews/index.md` exists, read it.
+- If `jpenv-scratch/ai-memory/reviews/index.md` exists, read it.
 - Apply its rules in the current review.
 
 Save decisions at the end.
 
-- If the folder does not exist, create `jpenv-scratch/reviews`.
+- If the folder does not exist, create `jpenv-scratch/ai-memory/reviews`.
 - Write decisions and facts that will help future review rounds to a file in
   that folder.
 - Record explicit user choices such as fix, ignore, or document in the PR
@@ -110,7 +110,8 @@ Save decisions at the end.
   or subject, for example `2026-10-30-comms-1698-local-presence.md`.
 - Update the same file on later runs.
 - Create a new dated file only for a distinct review.
-- Move facts that apply to all reviews to `jpenv-scratch/reviews/index.md`.
+- Move facts that apply to all reviews to
+  `jpenv-scratch/ai-memory/reviews/index.md`.
 - Keep only review-specific facts in the dated file.
 
 Report inherited decisions in the review.

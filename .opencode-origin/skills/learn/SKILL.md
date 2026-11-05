@@ -1,21 +1,37 @@
 ---
 name: learn
-description: Edit `AGENTS.md` for OpenCode and `CLAUDE.md` for Claude Code to learn new things.
-metadata:
-  opencode/autoinvoke: false
+description: Save project facts to `jpenv-scratch/ai-memory` for future runs.
 ---
 
-Edit `~/devel/dotfiles/.opencode-origin/AGENTS.md` for OpenCode and
-`~/devel/dotfiles/.claude-origin/CLAUDE.md` for Claude Code to learn the new
-things named in the user message after this skill block. Apply the same
-learning to both files, with identical wording except for tool-specific paths.
+Save the facts named in the user message after this skill block to project
+memory in `jpenv-scratch/ai-memory` from the repository root.
 
-You do not need to use those exact words. If the thing to be learned can be
-better expressed with different words or in a shorter way, feel free to rewrite
-the text.
+## Check current memory
 
-Re-review each file with your addition and edit to enforce these rules:
+- Read `jpenv-scratch/ai-memory/index.md`.
+- Read files from `jpenv-scratch/ai-memory/index.md` that overlap with the new
+  facts.
+- *NEVER* trust memory as truth. Check each overlapping claim against its
+  source. If the source differs, use the source.
+- Discard memory facts that the source contradicts.
 
-- Keep the file organized in some logical way.
-- Each piece of content must be orthogonal to every other.
-- The more important some thing is, the closer to the top it must appear.
+## Save facts
+
+- Save only durable facts that will help future runs.
+- Update the file that already holds related facts.
+- Create a new file only for a distinct topic.
+- Name files by topic, for example `testing.md`.
+- Keep each fact orthogonal to every other fact.
+- Merge facts that overlap instead of duplicating them.
+- Do not move review decisions out of `jpenv-scratch/ai-memory/reviews`.
+- If `jpenv-scratch/ai-memory/reviews/index.md` exists, link to it from
+  `index.md`. Do not list each review file in `index.md`.
+
+## Keep the index
+
+- Keep `index.md` as the entry point to all memory.
+- List every memory file in `index.md` except review files.
+- Add a short summary next to each entry that states what the file holds.
+- Keep entries organized by topic.
+- Put the most important entries first.
+- Remove entries for deleted files.

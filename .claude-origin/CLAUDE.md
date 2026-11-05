@@ -28,6 +28,24 @@
   - When referring to code outside the current working directory, use `..`
     prefixes as needed.
 
+# Project memory
+
+- Use `jpenv-scratch/ai-memory/index.md` from the repository root to learn
+  about the project.
+- Read it at the start of each task.
+- Follow its links to other files under `jpenv-scratch/ai-memory` that apply to
+  the current task and read them.
+- *NEVER* trust memory as truth.
+- Check each claim from memory against its source.
+- If the source differs, use the source.
+- Discard memory facts that the source contradicts.
+- When you learn a durable fact about the project, save it with the `learn`
+  skill.
+- You may create more files under `jpenv-scratch/ai-memory` to keep facts
+  organized.
+- Keep `index.md` as the entry point to all memory.
+- List every memory file in `index.md` with a short summary of what it holds.
+
 # Titles and Descriptions
 
 - Apply these rules to PRs, issues, and tickets.
