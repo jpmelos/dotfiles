@@ -43,8 +43,17 @@
   skill.
 - You may create more files under `jpenv-scratch/ai-memory` to keep facts
   organized.
+- Store task-specific memory in `jpenv-scratch/ai-memory/tasks`.
+- Name each task file with `YYYY-MM-DD-` prefix plus ticket, branch, or
+  subject, for example `2026-10-30-comms-1698-local-presence.md`.
+- Update the same file on later runs for the same task.
+- Create a new dated file only for a distinct task.
+- Keep only task-specific facts in the dated file.
 - Keep `index.md` as the entry point to all memory.
-- List every memory file in `index.md` with a short summary of what it holds.
+- List every memory file in `index.md` with a short summary of what it holds,
+  except task files.
+- If `jpenv-scratch/ai-memory/tasks/index.md` exists, link to it from
+  `index.md`. Do not list each task file in `index.md`.
 
 # Titles and Descriptions
 
