@@ -53,6 +53,9 @@
   optional parts. Never use a bare number or code.
   - For example, use `https://linear.app/close/issue/COMMS-1698`, not
     `COMMS-1698` or `https://linear.app/close/issue/COMMS-1698/issue-slug`.
+- Reference prior changes by the PR URL that introduced them, not by date. For
+  example, instead of "Since 2026-10-27, ...", use "Since
+  https://github.com/org/repo/pull/123, ...".
 - Keep each title short, at most 50 characters.
 - Describe in the title what the change does or what the issue requests.
 - Keep each body very concise and to the point.
