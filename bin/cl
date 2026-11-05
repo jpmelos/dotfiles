@@ -397,11 +397,15 @@ AGENT_BINARIES = (
 # behind, and the prefix lets the next launch recognize it.
 TEMP_FILE_PREFIX = ".launcher-tmp-"
 # Prefix and suffix of the per-run copy of the profile `settings.json`.
-# Each launch copies the profile file to one of these in the per-run
-# `/tmp` directory. The container mounts it over the profile file,
+# Each launch copies the profile file to one of these in the launcher
+# state directory. The container mounts it over the profile file,
 # so a `/fp` flip stays in that container.
 RUN_SETTINGS_PREFIX = "settings-run-"
 RUN_SETTINGS_SUFFIX = ".json"
+# How old a per-run copy gets before a launch removes it, in seconds. The
+# container of an old copy is long gone, and the copy is only there for the
+# mount that already ended.
+RUN_SETTINGS_MAX_AGE = 7 * 24 * 60 * 60
 # How old a per-run `/tmp` directory gets before a launch removes
 # it, in seconds. The container of an old directory is long gone.
 # A directory with the same container name dies at creation, even
@@ -584,7 +588,7 @@ def main():
 
     run_settings_path = prepare_run_settings(
         profile_paths.profile_dir,
-        container_tmp_dir,
+        profile_paths.state_dir,
     )
 
     run_config = RunConfig(
@@ -3014,12 +3018,13 @@ def profile_mount_args(run_config):
     ]
 
 
-def prepare_run_settings(profile_dir, container_tmp_dir):
+def prepare_run_settings(profile_dir, state_dir):
     # Returns the host path of the private copy of the profile
-    # `settings.json` in the per-run `/tmp` directory, or `None` when
+    # `settings.json` in the launcher state directory, or `None` when
     # the profile has none. The container mounts the copy over the
-    # profile file, so a `/fp` flip lands in the copy. The leaf dies
-    # with the container, so no prune runs.
+    # profile file, so a `/fp` flip lands in the copy. The copy lives
+    # outside every mount except the file mount itself, so the agent
+    # cannot reach the manifest or the lock. Age prunes old copies.
     base_path = f"{profile_dir}/settings.json"
     try:
         with open_regular_file(base_path) as handle:
@@ -3030,9 +3035,10 @@ def prepare_run_settings(profile_dir, container_tmp_dir):
     except OSError as error:
         log(f"Warning: cannot read {base_path}: {error}")
         return None
+    prune_stale_run_settings(state_dir)
     token = os.urandom(8).hex()
     run_path = (
-        f"{container_tmp_dir}/{RUN_SETTINGS_PREFIX}"
+        f"{state_dir}/{RUN_SETTINGS_PREFIX}"
         f"{token}{RUN_SETTINGS_SUFFIX}"
     )
     try:
@@ -3056,6 +3062,33 @@ def prepare_run_settings(profile_dir, container_tmp_dir):
             pass
         return None
     return run_path
+
+
+def prune_stale_run_settings(state_dir):
+    # Removes per-run copies older than `RUN_SETTINGS_MAX_AGE`. A failure
+    # only warns, because the launch can go on with the copies in place.
+    try:
+        names = os.listdir(state_dir)
+    except OSError as error:
+        log(f"Warning: cannot list {state_dir}: {error}")
+        return
+    now = time.time()
+    for name in names:
+        if not name.startswith(RUN_SETTINGS_PREFIX):
+            continue
+        if not name.endswith(RUN_SETTINGS_SUFFIX):
+            continue
+        path = f"{state_dir}/{name}"
+        try:
+            age = now - os.lstat(path).st_mtime
+        except OSError:
+            continue
+        if age < RUN_SETTINGS_MAX_AGE:
+            continue
+        try:
+            remove_file(path)
+        except OSError as error:
+            log(f"Warning: cannot remove {path}: {error}")
 
 
 def run_settings_mount_args(run_config):
