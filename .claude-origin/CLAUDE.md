@@ -68,9 +68,11 @@
 - If the PR has no link to an issue, omit this line.
 - If the PR holds several commits, add
   `Reviewing commit by commit may be easiest.` in a new paragraph directly
-  below that line, or as the first paragraph when no link line exists.
-- Start each body with a section named User Perspective or Business
-  Perspective, after any PR preamble lines above.
+  below the link line, or as the first paragraph when no link line exists.
+- Start each body with a section named "What" after any PR preamble lines
+  above. It should contain the change from the user perspective, or from the
+  business perspective when there's no user-facing change but the change still
+  has some internal business impact.
 - Explain in that section the change from a user and business view.
 - Omit function names, variable names, layer names, and database terms unless a
   term explains a business change.
