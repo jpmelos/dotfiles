@@ -95,12 +95,20 @@
   manager.
 - Focus in that section on architecture, performance, safety, and security.
 - Omit from that section function names, variable names, and layer names.
+- Use GitHub-flavored Markdown tables when a table scans faster than prose.
+  Prefer tables for timelines, event sequences, comparisons, and other
+  structured facts.
+- For a timeline taken from logs or another event source, list one event per
+  row in time order with exact timestamps. Label the time column with its zone,
+  for example `Time (UTC)`.
+- Link the logs or other event source directly below such a table. Logs are the
+  source of truth for timelines.
 - Emit each title and each body as raw Markdown, ready to paste into the
   tracker.
 - Put each title alone inside one code block.
 - Put each body inside a separate code block tagged as `markdown`.
 - Show raw Markdown syntax in the block for verbatim copy.
-- Include headings, lists, links, and inline code as raw syntax.
+- Include headings, lists, tables, links, and inline code as raw syntax.
 - Do not render bodies as formatted Markdown outside code blocks.
 - If a body holds code blocks of its own, use a fence of four backticks for the
   outer block.
