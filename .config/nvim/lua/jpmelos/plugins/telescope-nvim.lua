@@ -191,12 +191,57 @@ return {
         --
         -- Git.
         --
-        K(
-            "n",
-            "<leader>fg",
-            builtins.git_status,
-            { desc = "Find git modified files" }
-        )
+        K("n", "<leader>fg", function()
+            local status_output = vim.fn.systemlist({
+                "git",
+                "status",
+                "--porcelain",
+            })
+            if vim.v.shell_error ~= 0 then
+                builtins.git_status()
+                return
+            end
+
+            for _, line in ipairs(status_output) do
+                if line ~= "" then
+                    builtins.git_status()
+                    return
+                end
+            end
+
+            local toplevel_list = vim.fn.systemlist({
+                "git",
+                "rev-parse",
+                "--show-toplevel",
+            })
+            local toplevel = toplevel_list[1]
+            if
+                vim.v.shell_error ~= 0
+                or toplevel == nil
+                or toplevel == ""
+            then
+                builtins.git_status()
+                return
+            end
+
+            vim.fn.system({ "git", "rev-parse", "--verify", "HEAD" })
+            if vim.v.shell_error ~= 0 then
+                builtins.git_status()
+                return
+            end
+
+            builtins.find_files({
+                cwd = toplevel,
+                find_command = {
+                    "git",
+                    "show",
+                    "--pretty=format:",
+                    "--name-only",
+                    "HEAD",
+                },
+                prompt_title = "Files changed in latest commit",
+            })
+        end, { desc = "Find git modified files" })
         K(
             "n",
             "<leader>fr",
