@@ -76,6 +76,8 @@
       "Bash(head *)",
       "Bash(ls)",
       "Bash(ls *)",
+      "Bash(marp)",
+      "Bash(marp *)",
       "Bash(mkdir *)",
       "Bash(review *)",
       "Bash(rg *)",

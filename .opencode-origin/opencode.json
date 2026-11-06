@@ -279,6 +279,16 @@
     },
     {
       "action": "shell",
+      "resource": "marp",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "marp *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
       "resource": "mkdir *",
       "effect": "allow"
     },

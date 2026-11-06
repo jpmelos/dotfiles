@@ -73,6 +73,9 @@ RUN apt-get update && \
 RUN npm install -g agent-browser
 ENV AGENT_BROWSER_EXECUTABLE_PATH="/usr/bin/chromium"
 
+# Install Marp CLI.
+RUN npm install -g @marp-team/marp-cli
+
 # Define user and what `HOME` will be for the runtime. Build the image as the
 # same user that will run it. This avoids permission problems with mounts.
 ARG UID
