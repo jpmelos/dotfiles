@@ -2901,6 +2901,9 @@ def container_args(run_config):
         # Container name.
         "--name",
         run_config.container_name,
+        # Hostname matches the container name.
+        "--hostname",
+        run_config.container_name,
         # So that the agent can reach services running on the host via
         # `host.docker.internal`.
         "--add-host",
