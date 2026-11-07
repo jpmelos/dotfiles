@@ -436,9 +436,6 @@ PROFILE_JSON_WRITE_ATTEMPTS = 3
 # these lengths.
 IMAGE_NAME_USER_LENGTH = 64
 IMAGE_NAME_PROJECT_LENGTH = 128
-# The container name has a fixed prefix and a process ID suffix, so the
-# project name part is cut to this length.
-CONTAINER_NAME_PROJECT_LENGTH = 44
 # How many processes the container can hold at once. A fork bomb or a
 # subprocess that spawns without end stops at this count instead of at the
 # limit of the host.
@@ -475,7 +472,7 @@ def main():
     check_docker_is_running()
 
     profile = options.profile
-    container_name = generate_container_name(project_root)
+    container_name = generate_container_name()
     prune_stale_container_tmps()
     container_tmp_dir = create_container_tmp_dir(container_name)
     profile_paths = resolve_profile_paths(
@@ -2822,13 +2819,8 @@ class RunConfig:
     run_settings_path: str | None = None
 
 
-def generate_container_name(project_root):
-    basename = os.path.basename(project_root)
-    dir_basename = re.sub(r"[^A-Za-z0-9_.-]", "", basename)
-    return (
-        f"claude_code_{dir_basename[:CONTAINER_NAME_PROJECT_LENGTH]}_"
-        f"{os.getpid()}"
-    )
+def generate_container_name():
+    return f"claude_code_{os.getpid()}"
 
 
 def build_run_command(harness_args, run_config):
