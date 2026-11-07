@@ -53,22 +53,23 @@
 # /   --help, -h        Show this help
 # /
 # / Harness arguments:
-# /   Without harness arguments, the launcher runs the interactive
+# /   Without a subcommand, the launcher runs the interactive
 # /   OpenCode interface from a fresh session with no tabs, with
-# /   `--standalone` for a private server inside the container. Anything
-# /   else runs headless through `run`: the launcher puts
-# /   `run --standalone` before the arguments, plus `--model` with the
-# /   `model` of the profile, if any. File tools may read or edit anywhere
-# /   inside the container: the profile `opencode.json` allows
+# /   `--standalone` for a private server inside the container. TUI
+# /   flags such as `-s`, `--session`, `-c`, `--continue`, `--prompt`,
+# /   or a directory pass through to it. File tools may read or edit
+# /   anywhere inside the container: the profile `opencode.json` allows
 # /   every `external_directory` request, and the host trees the
 # /   container sees read-write are `~/devel` and the read-write
 # /   `--add-volume` mounts.
-# /   A `--model`, `--standalone`, or `--server` that you pass
-# /   wins. A first argument that names another subcommand (`serve`,
+# /   A `--standalone` or `--server` that you pass wins.
+# /   A first argument that names another subcommand (`run`, `serve`,
 # /   `auth`, `mcp`, and the rest) passes through verbatim, except that
-# /   `run` still gets `--standalone` and `--model` as above.
-# /   A prompt that starts with one of those words needs an explicit
-# /   `run` first.
+# /   `run` still gets `--standalone` and `--model` as below. Headless
+# /   runs need an explicit `run`: the launcher puts `run --standalone`
+# /   before its arguments, plus `--model` with the `model` of the
+# /   profile, if any. A `--model`, `--standalone`, or `--server` that
+# /   you pass to `run` wins.
 # /
 # / Projects:
 # /   A project is a directory that `list_project_dirs` reports. The
@@ -398,9 +399,9 @@ RESERVED_ENV_VARS = frozenset(
 )
 # Subcommands of the harness that take over its command line. A first harness
 # argument that names one passes through verbatim, except for `run`, which
-# still gets the profile settings. Anything else is the arguments of an
-# implied `run`. A prompt that starts with one of these words needs an
-# explicit `run` first.
+# still gets the profile settings. Anything else is TUI arguments, such as
+# `-s`, `--session`, `-c`, `--continue`, `--prompt`, or a directory.
+# Headless runs need an explicit `run` first.
 OPENCODE_SUBCOMMANDS = frozenset(
     {
         "run",
@@ -1034,11 +1035,12 @@ def parse_options(argv, project_name, username):
 
 
 def scan_harness_args(harness_args):
-    # Returns whether the harness arguments run headless through `run`, and
-    # whether they ask for JSON output. Without harness arguments the launcher
-    # runs the interactive TUI. The scan reads the arguments the way that the
-    # harness does: everything after a `--` is positional. A prompt that
-    # spells `--format` is a flag for the harness too.
+    # Returns whether the harness arguments run headless instead of through
+    # the interactive TUI, and whether they ask for JSON output. Without a
+    # subcommand the launcher runs the interactive TUI. The scan reads the
+    # arguments the way that the harness does: everything after a `--` is
+    # positional. A prompt that spells `--format` is a flag for the harness
+    # too.
     json_output = False
     previous_argument = ""
     for argument in harness_args:
@@ -1051,7 +1053,11 @@ def scan_harness_args(harness_args):
             json_output = True
 
         previous_argument = argument
-    return bool(harness_args), json_output
+    if not harness_args:
+        return False, json_output
+    if harness_args[0] in OPENCODE_SUBCOMMANDS:
+        return True, json_output
+    return False, json_output
 
 
 def detect_profile(project_name, username):
@@ -2664,17 +2670,17 @@ def parse_fast_permission_entry(entry):
 
 
 def build_harness_args(user_harness_args, model):
-    # Without harness arguments, the launcher runs the interactive TUI with a
+    # Without a subcommand, the launcher runs the interactive TUI with a
     # private in-process server, so that any number of containers can run at
     # once. A managed background service registers one file per profile below
     # the shared state directory, and two such services replace each other, so
     # each TUI keeps losing its server with a `Restarting service` notice.
-    # Anything else runs headless through `run`.
+    # TUI flags such as `-s`, `--session`, `-c`, `--continue`, `--prompt`,
+    # or a directory pass through to it.
     #
     # An explicit subcommand takes over the harness CLI and passes through
-    # verbatim, except that `run` gets the profile settings below. Anything
-    # else is the arguments of an implied `run`: message words and `run`
-    # flags.
+    # verbatim, except that `run` gets the profile settings below. Headless
+    # runs need an explicit `run`.
     if not user_harness_args:
         return ["--standalone"]
     if (
@@ -2682,11 +2688,14 @@ def build_harness_args(user_harness_args, model):
         and user_harness_args[0] != "run"
     ):
         return list(user_harness_args)
-    rest = (
-        user_harness_args[1:]
-        if user_harness_args[0] == "run"
-        else user_harness_args
-    )
+    if user_harness_args[0] != "run":
+        harness_args = []
+        if not has_cli_option(
+            user_harness_args, ("--standalone",)
+        ) and not has_cli_option(user_harness_args, ("--server",)):
+            harness_args.append("--standalone")
+        return harness_args + list(user_harness_args)
+    rest = user_harness_args[1:]
 
     # A private in-process server keeps no daemon state on the host and dies
     # with the run. An explicit `--server` talks to a shared server instead
