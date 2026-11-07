@@ -5,8 +5,8 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 # Function to round cost up to the next cent for display.
 round_up_cents() {
     local value=$1
-    local rounded=$(bc <<< "scale=0; tmp = $value * 100; tmp = tmp / 1; "\
-"if (tmp < $value * 100) tmp = tmp + 1; scale=2; tmp / 100")
+    local rounded=$(bc <<< "scale=0; tmp = $value * 100; tmp = tmp / 1; ""\
+if (tmp < $value * 100) tmp = tmp + 1; scale=2; tmp / 100")
     printf "%.2f" "$rounded"
 }
 
@@ -63,10 +63,11 @@ if [ -n "$SEVEN_D_PCT" ]; then
 fi
 
 PROFILE="${AGENT_PROFILE:-unknown}"
-PROJECT="${PROJECT_NAME:-}"
+PROJECT="${PROJECT_NAME:-unknown}"
+CONTAINER="${AGENT_CONTAINER_NAME:-unknown}"
 BRANCH="$(git branch --show-current 2> /dev/null || true)"
 
-first_line="👤 $PROFILE 📌 $PROJECT"
+first_line="👤 $PROFILE 📦 $CONTAINER 📌 $PROJECT"
 [ -n "$BRANCH" ] && first_line="$first_line 🌿 $BRANCH"
 echo "$first_line"
 

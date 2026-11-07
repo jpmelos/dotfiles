@@ -354,6 +354,7 @@ TMUX_PANE_STATES_DIR_PREFIX = "/tmp/tmux-pane-states-"
 RESERVED_ENV_VARS = frozenset(
     {
         "AGENT_BROWSER_EXECUTABLE_PATH",
+        "AGENT_CONTAINER_NAME",
         "AGENT_PROFILE",
         "AGENT_SHARED_DIR",
         "AI_DEFAULT_NEXT",
@@ -3095,6 +3096,9 @@ def agent_env_args(run_config):
         f"AGENT_PROFILE={run_config.profile}",
         "--env",
         f"PROJECT_NAME={run_config.project_name}",
+        # This is used to show the container name in the status line.
+        "--env",
+        f"AGENT_CONTAINER_NAME={run_config.container_name}",
         # Let the `pane-state` script mark the pane that runs the agent, and
         # let the `chime` script ring on the host. `TMUX_PANE` names the pane
         # that runs the launcher. Without it, the scripts do nothing.
