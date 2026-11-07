@@ -264,7 +264,7 @@
 # /   before you launch on a repository that you do not trust.
 # /
 # /   Each container gets its own `/tmp` directory. The launcher
-# /   mounts the host directory `/tmp/<container>-<rand>` at `/tmp`.
+# /   mounts the host directory `/tmp/<container>` at `/tmp`.
 # /   It holds the cache directories of the tools in the image. The
 # /   `XDG_CACHE_HOME` and `npm_config_cache` variables name them. The
 # /   `AGENT_SHARED_DIR` variable names the directory where the hook
@@ -1068,8 +1068,8 @@ class ProfilePaths:
     # The directory with the login, history, and credentials of the profile.
     profile_dir: str
     # The private host directory for one container run, under `/tmp`.
-    # The name holds the container name plus a random tail. No two
-    # runs share it. The container mounts it at `/tmp`.
+    # The name is the container name. No two runs share it. The
+    # container mounts it at `/tmp`.
     container_tmp_dir: str
     # The host path where the hook scripts write. The `AGENT_SHARED_DIR`
     # variable names the same basename under `/tmp` in the container.
@@ -1317,41 +1317,35 @@ def prepare_tmp_dirs(tmp_dirs):
 
 
 def create_container_tmp_dir(container_name):
-    # Creates a private host directory `/tmp/<container>-<rand>`
-    # with mode `0700` and returns the path. The random tail blocks
-    # squats on the predictable container name. Old directories with
-    # the same container name die first, even when young, so data
-    # from an old container never reaches a new one. The caller
-    # removes the directory after the run. A failure is fatal,
-    # because Docker will create an absent mount source owned by
-    # `root`.
-    remove_same_name_tmps(container_name)
-    while True:
-        token = os.urandom(8).hex()
-        path = f"/tmp/{container_name}-{token}"
-        try:
-            os.mkdir(path, 0o700)
-        except FileExistsError:
-            continue
-        except OSError as error:
-            die(f"cannot create {path}: {error}")
-        try:
-            info = os.lstat(path)
-        except OSError as error:
-            die(f"cannot read {path}: {error}")
-        if stat.S_ISLNK(info.st_mode):
-            die(f"{path} is a link, not a directory")
-        if not stat.S_ISDIR(info.st_mode):
-            die(f"{path} is not a directory")
-        if info.st_uid != os.getuid():
-            die(f"{path} is owned by another user")
-        try:
-            os.chmod(path, 0o700)
-        except OSError as error:
-            die(f"cannot set the mode of {path}: {error}")
-        if not os.access(path, os.W_OK | os.X_OK):
-            die(f"{path} is not writable")
-        return path
+    # Creates a private host directory `/tmp/<container>` with mode `0700`
+    # and returns the path. The directory has the name of the container, so
+    # a stale directory with the same name dies first, even when young, and
+    # data from an old container never reaches a new one. The caller removes
+    # the directory after the run. A failure is fatal, because Docker will
+    # create an absent mount source owned by `root`.
+    remove_same_name_tmp(container_name)
+    path = f"/tmp/{container_name}"
+    try:
+        os.mkdir(path, 0o700)
+    except OSError as error:
+        die(f"cannot create {path}: {error}")
+    try:
+        info = os.lstat(path)
+    except OSError as error:
+        die(f"cannot read {path}: {error}")
+    if stat.S_ISLNK(info.st_mode):
+        die(f"{path} is a link, not a directory")
+    if not stat.S_ISDIR(info.st_mode):
+        die(f"{path} is not a directory")
+    if info.st_uid != os.getuid():
+        die(f"{path} is owned by another user")
+    try:
+        os.chmod(path, 0o700)
+    except OSError as error:
+        die(f"cannot set the mode of {path}: {error}")
+    if not os.access(path, os.W_OK | os.X_OK):
+        die(f"{path} is not writable")
+    return path
 
 
 def prune_stale_container_tmps():
@@ -1391,50 +1385,33 @@ def prune_stale_container_tmps():
             log(f"Warning: cannot remove {path}: {error}")
 
 
-def remove_same_name_tmps(container_name):
-    # Removes per-run `/tmp` directories with the same container
-    # name, even when young. A new container with a repeated name
-    # must not see data from an old container. When a container with
-    # the same name still exists, it keeps its directories. A failure
-    # only warns, because the launch can go on with the old
-    # directories in place.
+def remove_same_name_tmp(container_name):
+    # Removes the per-run `/tmp` directory with the same name as the
+    # container, even when young. A new container with a repeated name must
+    # not see data from an old container. When a container with the same
+    # name still exists, it keeps its directory. A failure only warns,
+    # because the launch can go on with the old directory in place.
     if container_exists(container_name):
         log(f"Warning: container {container_name} still runs")
         return
-    prefix = f"{container_name}-"
+    path = f"/tmp/{container_name}"
     try:
-        names = os.listdir("/tmp")
-    except OSError as error:
-        log(f"Warning: cannot list /tmp: {error}")
+        info = os.lstat(path)
+    except FileNotFoundError:
         return
-    for name in names:
-        if not name.startswith(prefix):
-            continue
-        tail = name[len(prefix):]
-        if len(tail) != 16:
-            continue
-        valid = True
-        for character in tail:
-            if character not in "0123456789abcdef":
-                valid = False
-                break
-        if not valid:
-            continue
-        path = f"/tmp/{name}"
-        try:
-            info = os.lstat(path)
-        except OSError:
-            continue
-        if stat.S_ISLNK(info.st_mode):
-            continue
-        if not stat.S_ISDIR(info.st_mode):
-            continue
-        if info.st_uid != os.getuid():
-            continue
-        try:
-            remove_path(path)
-        except OSError as error:
-            log(f"Warning: cannot remove {path}: {error}")
+    except OSError as error:
+        log(f"Warning: cannot read {path}: {error}")
+        return
+    if stat.S_ISLNK(info.st_mode):
+        return
+    if not stat.S_ISDIR(info.st_mode):
+        return
+    if info.st_uid != os.getuid():
+        return
+    try:
+        remove_path(path)
+    except OSError as error:
+        log(f"Warning: cannot remove {path}: {error}")
 
 
 def remove_container_tmp(path):
