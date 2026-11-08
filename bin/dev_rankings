@@ -54,8 +54,8 @@ PERIODS = (
 )
 
 METRICS = (
-    ("merged", "PRs merged"),
     ("authored", "PRs authored"),
+    ("merged", "PRs merged"),
     ("reviewed", "PRs reviewed"),
     ("loc", "LOCs changed"),
 )
