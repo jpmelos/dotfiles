@@ -1280,12 +1280,32 @@ FILTER_JS = [
     "    }",
     "    return values;",
     "  }",
+    "  function handleCombinedWeekly(weeks) {",
+    "    var metrics = DATA.metrics || {};",
+    "    var mergedByHandle = metrics.merged || {};",
+    "    var authoredByHandle = metrics.authored || {};",
+    "    var mergedScope = mergedByHandle[DATA.handle] || {};",
+    "    var authoredScope = authoredByHandle[DATA.handle] || {};",
+    "    var mergedValues = weeklySums(keptPairs(mergedScope), weeks);",
+    "    var authoredValues = weeklySums(keptPairs(authoredScope), weeks);",
+    "    var values = [], i;",
+    "    for (i = 0; i < mergedValues.length; i++) {",
+    "      values.push(mergedValues[i] + authoredValues[i]);",
+    "    }",
+    "    return values;",
+    "  }",
     "  function refreshCard(card) {",
     "    var weeks = parseInt(card.getAttribute('data-weeks'), 10);",
     "    var metric = card.getAttribute('data-metric');",
     "    if (metric === 'org') {",
     "      var values = orgWeekly(weeks);",
     "      updateChart(card, [datasetFor('PRs merged', values, 0)]);",
+    "      return;",
+    "    }",
+    "    if (metric === 'combined' && DATA.handle) {",
+    "      var combined = handleCombinedWeekly(weeks);",
+    "      var label = 'PRs authored or merged';",
+    "      updateChart(card, [datasetFor(label, combined, 0)]);",
     "      return;",
     "    }",
     "    var scope = DATA.metrics[metric] || {};",
@@ -1304,8 +1324,16 @@ FILTER_JS = [
     "        return;",
     "      }",
     "      var weeks = parseInt(card.getAttribute('data-weeks'), 10);",
+    "      var metric = card.getAttribute('data-metric');",
     "      var total = 0, name, scope;",
     "      if (DATA.handle) {",
+    "        if (metric === 'combined') {",
+    "          total = handleCombinedWeekly(weeks).reduce(function (a, b) {",
+    "            return a + b;",
+    "          }, 0);",
+    "          span.textContent = total + ' authored or merged PRs.';",
+    "          return;",
+    "        }",
     "        scope = (DATA.metrics.merged || {})[DATA.handle] || {};",
     "        var start = periodStart(weeks);",
     "        for (name in scope) {",
@@ -1435,12 +1463,15 @@ def render_html(
         out.append('<section class="period" id="')
         out[-1] += section["anchor"] + '">'
         out.append("<h2>" + html.escape(section["label"]) + "</h2>")
+        total_unit = section.get("total_unit", "merged PRs.")
         out.append(
             '<p class="range">'
             + html.escape(section["range_text"])
             + ' - <span data-total>'
             + str(section["pr_total"])
-            + " merged PRs.</span></p>"
+            + " "
+            + html.escape(total_unit)
+            + "</span></p>"
         )
         out.append('<div class="grid">')
         for card in section["cards"]:
@@ -1550,8 +1581,46 @@ def sparse_detail(weekly, only=None):
 
 
 def build_handle_sections(handle, detail, week_starts):
-    """Build per-repository sections for one handle."""
+    """Build sections for one handle."""
     sections = []
+    start_all = week_starts[0]
+    end_all = week_starts[FETCH_WEEKS - 1]
+    end_all_day = end_all + datetime.timedelta(days=6)
+    range_all = start_all.date().isoformat()
+    range_all += " to " + end_all_day.date().isoformat()
+    labels_all = [week.date().isoformat() for week in week_starts]
+    combined_weekly = []
+    for index in range(FETCH_WEEKS):
+        authored_total = sum(
+            detail["authored"][index].get(handle, {}).values()
+        )
+        merged_total = sum(
+            detail["merged"][index].get(handle, {}).values()
+        )
+        combined_weekly.append(authored_total + merged_total)
+    sections.append(
+        {
+            "anchor": "authored-merged-total",
+            "label": "Authored or merged total",
+            "range_text": range_all,
+            "pr_total": sum(combined_weekly),
+            "total_unit": "authored or merged PRs.",
+            "cards": [
+                {
+                    "title": "PRs authored or merged per week (by "
+                    + handle
+                    + ")",
+                    "ranked": None,
+                    "weeks": FETCH_WEEKS,
+                    "metric": "combined",
+                    "labels": labels_all,
+                    "series": {"PRs authored or merged": combined_weekly},
+                    "unit": "PRs authored or merged",
+                    "chart_id": "chart-handle-combined-52",
+                }
+            ],
+        }
+    )
     for label, week_count in PERIODS:
         anchor = "last-" + str(week_count) + "-weeks"
         start = week_starts[FETCH_WEEKS - week_count]
@@ -1931,13 +2000,17 @@ def main(organization, repository):
                     "handle": handle,
                 }
             )
+            handle_notes = list(METHOD_NOTES)
+            handle_notes.append(
+                "The top chart sums authored and merged counts per week."
+            )
             handle_page = render_html(
                 handle_title,
                 scope_text,
                 made_text,
                 handle_sections,
                 link_for,
-                list(METHOD_NOTES),
+                handle_notes,
                 (back_link, "GitHub profile: " + profile_link),
                 sorted_repos,
                 sorted_handles,
