@@ -559,6 +559,28 @@ def bump_nested(weekly, index, handle, repo, amount=1):
     repos[repo] = repos.get(repo, 0) + amount
 
 
+MERGER_CREDITED_HANDLES = frozenset(
+    [
+        "dependabot",
+        "dependabot[bot]",
+        "dependabot-preview",
+        "dependabot-preview[bot]",
+    ]
+)
+
+
+def is_merger_credited(login):
+    """Check for a handle credited to the merger."""
+    return (login or "").lower() in MERGER_CREDITED_HANDLES
+
+
+def credited_author(author, merger):
+    """Credit listed handles to the merger."""
+    if is_merger_credited(author) and merger:
+        return merger
+    return author
+
+
 def summarize_period(weekly, week_count):
     """Sum the last week_count weeks into ranked totals."""
     totals = {}
@@ -1391,6 +1413,7 @@ METHOD_NOTES = [
     "Only pull requests merged in each week count.",
     "Weeks run Sunday 00:00 to Saturday 23:59 UTC.",
     "Lines changed credit both author and merger.",
+    "Listed handles count as authored by the merger.",
     "Reviews count distinct pull requests reviewed.",
     "Author self reviews do not count.",
     "Data comes from the GitHub API through gh.",
@@ -1804,8 +1827,9 @@ def main(organization, repository):
         org_weekly[index] += 1
         author = stored.get("author") or ""
         merger = stored.get("merged_by") or ""
-        if author:
-            all_handles.add(author)
+        credited = credited_author(author, merger)
+        if credited:
+            all_handles.add(credited)
         if merger:
             all_handles.add(merger)
         org_name = stored.get("organization") or ""
@@ -1814,21 +1838,21 @@ def main(organization, repository):
         if org_name and repo_name:
             repo_key = org_name + "/" + repo_name
         bump(merged_weekly[index], merger)
-        bump(authored_weekly[index], author)
+        bump(authored_weekly[index], credited)
         bump_nested(detail["merged"], index, merger, repo_key)
-        bump_nested(detail["authored"], index, author, repo_key)
+        bump_nested(detail["authored"], index, credited, repo_key)
         for reviewer in stored.get("reviewers") or []:
             bump(reviewed_weekly[index], reviewer)
             bump_nested(detail["reviewed"], index, reviewer, repo_key)
             if reviewer:
                 all_handles.add(reviewer)
         loc = stored.get("loc") or 0
-        for handle in {author, merger}:
+        for handle in {credited, merger}:
             bump(loc_weekly[index], handle, loc)
             bump_nested(detail["loc"], index, handle, repo_key, loc)
         if repo_key:
             all_repos.add(repo_key)
-            org_prs.append([index, author, merger, repo_key])
+            org_prs.append([index, credited, merger, repo_key])
 
     weeklies = {
         "merged": merged_weekly,
