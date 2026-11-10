@@ -52,9 +52,14 @@ __git_push_stack() {
     }
     local tip_state
     tip_state="$(gh pr view "$tip_branch" --json state \
-        --jq '.state')" || {
-        echo "Error: no PR found for '$tip_branch'." >&2
-        return 1
+        --jq '.state' 2>/dev/null)" || {
+        # No observable stack of PRs for the current branch. Push
+        # all local branches since the main branch instead. The
+        # checks below plus the confirmation keep this safe when
+        # the PR lookup failed for another reason. This only pushes
+        # branches. It creates no PRs.
+        __git_push_new_stack "$tip_branch" "$main_branch"
+        return $?
     }
     if [ "$tip_state" != "OPEN" ]; then
         echo "Error: PR for '$tip_branch' is not open." >&2
@@ -157,6 +162,136 @@ __git_push_stack() {
         echo "Pushing $branch..."
         git push --force-with-lease --set-upstream \
             origin "$branch" || return 1
+    done
+}
+
+__git_push_new_stack() {
+    # Push all local branches since the main branch. This only
+    # pushes branches. It creates no PRs. The user creates those
+    # manually.
+    local tip_branch="$1"
+    local main_branch="$2"
+    if [ "$tip_branch" = "$main_branch" ]; then
+        echo "Error: on '$main_branch'. Nothing to push." >&2
+        return 1
+    fi
+    if ! git merge-base --is-ancestor \
+        "$main_branch" "$tip_branch" 2>/dev/null; then
+        echo "Error: '$tip_branch' holds no commits" \
+            "since '$main_branch'." >&2
+        return 1
+    fi
+    git fetch origin --prune || return 1
+    # Push candidates are local branches that hold commits since
+    # the main branch and are in the history of the current branch.
+    # This keeps unrelated branches out of the push.
+    local -a stack=()
+    local branch
+    local branch_list
+    branch_list="$(mktemp)" || return 1
+    git for-each-ref \
+        --format='%(refname:short)' refs/heads \
+        > "$branch_list" || {
+        rm -f "$branch_list"
+        return 1
+    }
+    while IFS= read -r branch; do
+        if [ "$branch" = "$main_branch" ]; then
+            continue
+        fi
+        if ! git merge-base --is-ancestor \
+            "$main_branch" "$branch" 2>/dev/null; then
+            continue
+        fi
+        if ! git merge-base --is-ancestor \
+            "$branch" "$tip_branch" 2>/dev/null; then
+            continue
+        fi
+        if [ "$(git rev-parse "$branch")" = \
+            "$(git rev-parse "$main_branch")" ]; then
+            continue
+        fi
+        stack+=("$branch")
+    done < "$branch_list"
+    rm -f "$branch_list"
+    if [ "${#stack[@]}" -eq 0 ]; then
+        echo "Error: no local branches since '$main_branch'." >&2
+        return 1
+    fi
+    # Order bottom first, i.e. fewest commits since main first.
+    local ordered
+    ordered="$(mktemp)" || return 1
+    for branch in "${stack[@]}"; do
+        printf '%s\t%s\n' \
+            "$(git rev-list --count "$main_branch..$branch")" \
+            "$branch"
+    done | sort -n -k1,1 | cut -f2- > "$ordered" || {
+        rm -f "$ordered"
+        return 1
+    }
+    stack=()
+    while IFS= read -r branch; do
+        stack+=("$branch")
+    done < "$ordered"
+    rm -f "$ordered"
+    # The stack must be linear. Each branch must hold the branch
+    # below it in its history.
+    local index
+    for ((index = 0; index < ${#stack[@]} - 1; index++)); do
+        if ! git merge-base --is-ancestor \
+            "${stack[$index]}" "${stack[$index + 1]}"; then
+            echo "Error: '${stack[$index]}' is not in the history" \
+                "of '${stack[$index + 1]}'." >&2
+            echo "Error: branches since '$main_branch'" \
+                "do not form a linear stack." >&2
+            return 1
+        fi
+    done
+    # Each commit since the main branch must carry at most one
+    # branch. More than one branch on a commit is ambiguous.
+    local commit
+    local count
+    for commit in $(git rev-list "$main_branch..$tip_branch"); do
+        count="$(git for-each-ref --points-at "$commit" \
+            refs/heads | wc -l)"
+        if [ "$count" -gt 1 ]; then
+            echo "Error: commit '$(git rev-parse --short \
+                "$commit")' carries more than one branch:" >&2
+            git for-each-ref --points-at "$commit" \
+                --format='%(refname:short)' refs/heads >&2
+            return 1
+        fi
+    done
+    # No branch to push must already exist on the remote. Pushing
+    # over an existing remote branch is never intended here.
+    local -a existing=()
+    for branch in "${stack[@]}"; do
+        if git rev-parse --verify --quiet \
+            "refs/remotes/origin/$branch" >/dev/null; then
+            existing+=("$branch")
+        fi
+    done
+    if [ "${#existing[@]}" -gt 0 ]; then
+        echo "Error: remote branches already exist:" \
+            "${existing[*]}." >&2
+        echo "Error: push those branches normally instead." >&2
+        return 1
+    fi
+    echo "No stack found for '$tip_branch'."
+    echo "Branches to push (bottom first):"
+    for branch in "${stack[@]}"; do
+        echo "  $branch ($(git log -1 \
+            --format='%h %s' "$branch"))"
+    done
+    read -p "Push ${#stack[@]} branches to origin? [y/N] " -n 1 -r
+    echo
+    if [ "$REPLY" != "y" ] && [ "$REPLY" != "Y" ]; then
+        echo "Aborted."
+        return 1
+    fi
+    for branch in "${stack[@]}"; do
+        echo "Pushing $branch..."
+        git push --set-upstream origin "$branch" || return 1
     done
 }
 
