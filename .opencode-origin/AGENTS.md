@@ -103,16 +103,6 @@
   for example `Time (UTC)`.
 - Link the logs or other event source directly below such a table. Logs are the
   source of truth for timelines.
-- In PR bodies, link each factual claim about the codebase to the source code
-  that proves it.
-- Put the claim in Markdown link text, and the permanent source link in the
-  target. For example, write
-  `[The process stops every 4 to 8 hours](link), and on each deploy.`
-- Use a commit SHA in the link target, not a branch name, so the link stays
-  valid over time. For example, use
-  `https://github.com/org/repo/blob/<sha>/path/to/file#L10-L20`.
-- Do not link claims that source code cannot prove, such as user impact or
-  business value.
 - Emit each title and each body as raw Markdown, ready to paste into the
   tracker.
 - Put each title alone inside one code block.
