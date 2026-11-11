@@ -276,14 +276,15 @@
 # /
 # / tmux:
 # /   The `pane-state` and `chime` scripts write below
-# /   `/tmp/tmux-pane-states-<user>`, and `pane-state-sync` reads there.
-# /   Each user of the machine has a private directory, named after the
-# /   user, right below `/tmp`. Two users can have a pane with the same
-# /   tmux target, so the states of one user must not reach the tmux
-# /   server of another. The directory has no shared parent other than
-# /   `/tmp`, whose owner is `root`, so no other user can rename or
-# /   replace it. The container always gets the directory of the user at
-# /   the same path, and the `TMUX_PANE_STATES_DIR` variable names it.
+# /   `/tmp/tmux-pane-states-<user>` on the host, and `pane-state-sync`
+# /   reads there. Each user of the machine has a private directory,
+# /   named after the user, right below `/tmp`. Two users can have a pane
+# /   with the same tmux target, so the states of one user must not reach
+# /   the tmux server of another. The directory has no shared parent other
+# /   than `/tmp`, whose owner is `root`, so no other user can rename or
+# /   replace it. The container gets the directory of the user mounted at
+# /   `/run/tmux-pane-states-<user>`, outside of its private `/tmp` mount,
+# /   and the `TMUX_PANE_STATES_DIR` variable names that container path.
 # /   Every profile uses that one directory, so a pane has one state
 # /   file. When the launcher runs inside tmux, the container also gets
 # /   the `TMUX_PANE` variable. The `running`, `waiting`, `ready`, and
@@ -347,6 +348,11 @@ CONTAINER_SCRIPT_NAME = "jpenv-container.sh"
 # `chime` scripts write and `pane-state-sync` reads. The user name follows the
 # prefix. See the `tmux` section of the help for why the directory is there.
 TMUX_PANE_STATES_DIR_PREFIX = "/tmp/tmux-pane-states-"
+# Prefix of the container path where the launcher mounts that directory. The
+# user name follows the prefix. The path stays outside of the per-run `/tmp`
+# mount. A mount below another mount needs its mountpoint inside the parent
+# source, and the fresh per-run directory holds no such mountpoint.
+CONTAINER_TMUX_PANE_STATES_DIR_PREFIX = "/run/tmux-pane-states-"
 # Variables that the launcher or the image sets for the container, or that
 # the launcher relays on its own. A relay of one of these from
 # `AGENTS_ADDITIONAL_ENV_VARS` would replace the value that the container
@@ -1072,9 +1078,12 @@ class ProfilePaths:
     # The host path where the hook scripts write. The `AGENT_SHARED_DIR`
     # variable names the same basename under `/tmp` in the container.
     shared_dir: str
-    # The directory of the user, `TMUX_PANE_STATES_DIR_PREFIX` followed by the
-    # user name. See the `tmux` section of the help.
+    # The host directory of the user, `TMUX_PANE_STATES_DIR_PREFIX` followed by
+    # the user name. See the `tmux` section of the help.
     pane_states_dir: str
+    # The container path of that directory,
+    # `CONTAINER_TMUX_PANE_STATES_DIR_PREFIX` followed by the user name.
+    container_pane_states_dir: str
     # The directory of the profile below `LAUNCHER_STATE_DIR_NAME`, where the
     # launcher keeps what the agent must not touch: the manifest and the lock.
     state_dir: str
@@ -1086,6 +1095,9 @@ def resolve_profile_paths(home, username, profile, container_tmp_dir):
         container_tmp_dir=container_tmp_dir,
         shared_dir=f"{container_tmp_dir}/claude-code-shared",
         pane_states_dir=f"{TMUX_PANE_STATES_DIR_PREFIX}{username}",
+        container_pane_states_dir=(
+            f"{CONTAINER_TMUX_PANE_STATES_DIR_PREFIX}{username}"
+        ),
         state_dir=f"{home}/{LAUNCHER_STATE_DIR_NAME}/{profile}",
     )
 
@@ -2828,11 +2840,9 @@ def build_run_command(harness_args, run_config):
     # The mount sources under the home directory use resolved paths,
     # because Docker needs the real directory. Every target uses the
     # unresolved path, because the paths inside the container name
-    # `~/devel` as the user sees it on the host. The pane source under
-    # `/tmp` stays unresolved, so the path matches on both sides. The
-    # per-run source mounts at `/tmp`, so the container sees a private
-    # `/tmp`. On macOS `/tmp` links to `/private/tmp`, so a resolved
-    # source would not match.
+    # `~/devel` as the user sees it on the host. The per-run source mounts
+    # at `/tmp`, so the container sees a private `/tmp`. The pane states
+    # mount sits outside of it at its own container path.
     home = run_config.paths.home
     run_command = [
         "docker",
@@ -2936,11 +2946,16 @@ def scratch_space_args(profile_paths):
         "--env",
         "npm_config_cache=/tmp/npm_cache",
         # The pane directory stays shared with the host for `tmux`
-        # state. See the `tmux` section of the help.
+        # state. See the `tmux` section of the help. The target stays
+        # outside of the per-run `/tmp` mount above, so no mount sits
+        # below another mount.
         "--volume",
-        f"{profile_paths.pane_states_dir}:{profile_paths.pane_states_dir}",
+        (
+            f"{profile_paths.pane_states_dir}:"
+            f"{profile_paths.container_pane_states_dir}"
+        ),
         "--env",
-        f"TMUX_PANE_STATES_DIR={profile_paths.pane_states_dir}",
+        f"TMUX_PANE_STATES_DIR={profile_paths.container_pane_states_dir}",
         # Chromium, which `agent-browser` drives, keeps the memory of its
         # renderers in `/dev/shm`. Docker gives a container 64 MB there, and
         # large pages crash the renderers at that size.
@@ -3341,7 +3356,7 @@ def check_add_volume_target(spec, target, paths, profile_paths):
         os.path.normpath(claude_dir),
         os.path.normpath(git_config_dir),
         os.path.normpath(profile_paths.container_tmp_dir),
-        os.path.normpath(profile_paths.pane_states_dir),
+        os.path.normpath(profile_paths.container_pane_states_dir),
         os.path.normpath(f"/run/user/{os.getuid()}"),
         os.path.normpath("/var/run/docker.sock"),
     ]

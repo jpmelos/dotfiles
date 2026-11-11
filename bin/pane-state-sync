@@ -6,8 +6,9 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 # directory of the user to tmux, and play the chime requests under its chime
 # directory. That directory is `$TMUX_PANE_STATES_DIR` when set, and otherwise
 # `/tmp/tmux-pane-states-<user>`, named after the user. The AI launcher mounts
-# the directory of the host user into every container at the same path, so one
-# directory serves every profile and every pane has one state file.
+# the directory of the host user into every container at
+# `/run/tmux-pane-states-<user>`, so one directory serves every profile and
+# every pane has one state file.
 #
 # Each user has a directory of their own. Pane targets such as `%3` repeat
 # across tmux servers, and every user runs a server, so this script must only

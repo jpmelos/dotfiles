@@ -6,10 +6,10 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 # directory of the tmux directory of the user. That directory is
 # `$TMUX_PANE_STATES_DIR` when set, and otherwise
 # `/tmp/tmux-pane-states-<user>`, named after the user. The AI launcher mounts
-# the directory of the host user into its containers at the same path and sets
-# the variable, because the container user has another name. The
-# `pane-state-sync` script picks the request up and plays the sound on the
-# host.
+# the directory of the host user into its containers at
+# `/run/tmux-pane-states-<user>` and sets the variable, because the container
+# user has another name. The `pane-state-sync` script picks the request up and
+# plays the sound on the host.
 #
 # Each user has a directory of their own, so a request of one user never plays
 # on the tmux server of another. The directory sits right below `/tmp`, whose

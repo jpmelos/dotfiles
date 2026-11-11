@@ -6,9 +6,10 @@ trap 'echo "Exit status $? at line $LINENO from: $BASH_COMMAND" >&2' ERR
 # pane under the pane state directory of the tmux directory of the user. That
 # directory is `$TMUX_PANE_STATES_DIR` when set, and otherwise
 # `/tmp/tmux-pane-states-<user>`, named after the user. The AI launcher mounts
-# the directory of the host user into its containers at the same path and sets
-# the variable, because the container user has another name. The
-# `pane-state-sync` script reads the file from there.
+# the directory of the host user into its containers at
+# `/run/tmux-pane-states-<user>` and sets the variable, because the
+# container user has another name. The `pane-state-sync` script reads
+# the file from there.
 #
 # Each user has a directory of their own. Pane targets such as `%3` repeat
 # across tmux servers, and every user runs a server, so a shared directory
