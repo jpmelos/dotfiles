@@ -60,7 +60,12 @@ Apply these rules:
 
 - Prefer open and unblocked work over blocked work.
 - Prefer active work with recent comments or reviews over idle work.
-- Flag pull requests with failed checks or open review threads.
+- Flag open pull requests with failed checks or open review threads.
+- Ignore internal state of closed or merged pull requests.
+- Do not flag open threads or unresolved conversations on closed or merged pull
+  requests.
+- For closed or merged pull requests, flag only unfulfilled promises without an
+  issue or a follow-up pull request.
 - Flag issues with no assignee or with stale discussion.
 - Treat acceptance criteria as plain lists, not as checklists.
 - Never report an action to mark acceptance criteria as complete.
