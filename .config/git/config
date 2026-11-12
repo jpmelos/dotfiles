@@ -77,6 +77,7 @@
 [alias]
     main-branch = ! ~/devel/dotfiles/references/scripts/check-for-git-remote-head.sh && git symbolic-ref refs/remotes/origin/HEAD | cut -d'/' -f4
     main-branch-remote = ! git rev-parse --abbrev-ref $(git main-branch)@{upstream}
+    main-base = "! f() { main_branch=$(git main-branch) && main_remote=$(git main-branch-remote) && base=\"\" && for rev in $(git rev-list --topo-order HEAD); do if git merge-base --is-ancestor \"$rev\" \"$main_branch\" 2>/dev/null || git merge-base --is-ancestor \"$rev\" \"$main_remote\" 2>/dev/null; then base=\"$rev\"; break; fi; done; if [ -z \"$base\" ]; then echo \"No ancestor from $main_branch or $main_remote found\" >&2; return 1; fi; echo \"$base\"; }; f"
     root = rev-parse --show-toplevel
     nuke = "! f() { source "$HOME/devel/dotfiles/references/scripts/gitfunctions.sh"; __git_nuke; }; f"
     big-revert = "! f() { source "$HOME/devel/dotfiles/references/scripts/gitfunctions.sh"; __git_big_revert; }; f"
@@ -188,12 +189,13 @@
 
     # rs = reset
     rs = reset
-    rso = reset --hard @{upstream}
-    rsm = ! git reset --hard $(git main-branch)
+    rso = reset @{upstream}
+    rsho = reset --hard @{upstream}
+    # Reset to the first ancestor shared with main (local or remote), so the
+    # working tree keeps only this branch's own changes.
+    rsm = ! git reset $(git main-base)
+    rshm = ! git reset --hard $(git main-base)
     rsu = reset HEAD~1
-    # Merge the main branch first, so that the reset leaves only this branch's
-    # own changes in the working tree, not the reversal of newer main commits.
-    rsum = "! f() { main_branch=$(git main-branch) && git merge --no-ff --no-commit \"$main_branch\" && git reset \"$main_branch\"; }; f"
 
     # sh = show
     sh = "! f() { if [[ \"$1\" =~ ^- ]]; then HEADN=\"${1#-}\"; shift; git show \"HEAD~$HEADN\" $@; else git show \"$@\"; fi; }; f"

@@ -266,14 +266,16 @@ __git_complete grbi git_rebase
 
 alias grs='g rs'
 alias grso='g rso'
+alias grsho='g rsho'
 alias grsm='g rsm'
+alias grshm='g rshm'
 alias grsu='g rsu'
-alias grsum='g rsum'
 __git_complete grs git_reset
 __git_complete grso git_reset
+__git_complete grsho git_reset
 __git_complete grsm git_reset
+__git_complete grshm git_reset
 __git_complete grsu git_reset
-__git_complete grsum git_reset
 
 alias gsh='g sh'
 alias gshf='g shf'
