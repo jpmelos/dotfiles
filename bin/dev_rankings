@@ -1304,17 +1304,9 @@ FILTER_JS = [
     "  }",
     "  function handleCombinedWeekly(weeks) {",
     "    var metrics = DATA.metrics || {};",
-    "    var mergedByHandle = metrics.merged || {};",
-    "    var authoredByHandle = metrics.authored || {};",
-    "    var mergedScope = mergedByHandle[DATA.handle] || {};",
-    "    var authoredScope = authoredByHandle[DATA.handle] || {};",
-    "    var mergedValues = weeklySums(keptPairs(mergedScope), weeks);",
-    "    var authoredValues = weeklySums(keptPairs(authoredScope), weeks);",
-    "    var values = [], i;",
-    "    for (i = 0; i < mergedValues.length; i++) {",
-    "      values.push(mergedValues[i] + authoredValues[i]);",
-    "    }",
-    "    return values;",
+    "    var combinedByHandle = metrics.combined || {};",
+    "    var combinedScope = combinedByHandle[DATA.handle] || {};",
+    "    return weeklySums(keptPairs(combinedScope), weeks);",
     "  }",
     "  function refreshCard(card) {",
     "    var weeks = parseInt(card.getAttribute('data-weeks'), 10);",
@@ -1614,13 +1606,9 @@ def build_handle_sections(handle, detail, week_starts):
     labels_all = [week.date().isoformat() for week in week_starts]
     combined_weekly = []
     for index in range(FETCH_WEEKS):
-        authored_total = sum(
-            detail["authored"][index].get(handle, {}).values()
+        combined_weekly.append(
+            sum(detail["combined"][index].get(handle, {}).values())
         )
-        merged_total = sum(
-            detail["merged"][index].get(handle, {}).values()
-        )
-        combined_weekly.append(authored_total + merged_total)
     sections.append(
         {
             "anchor": "authored-merged-total",
@@ -1808,6 +1796,7 @@ def main(organization, repository):
         "authored": [{} for _ in range(FETCH_WEEKS)],
         "reviewed": [{} for _ in range(FETCH_WEEKS)],
         "loc": [{} for _ in range(FETCH_WEEKS)],
+        "combined": [{} for _ in range(FETCH_WEEKS)],
     }
     week_starts = []
     for index in range(FETCH_WEEKS):
@@ -1841,6 +1830,10 @@ def main(organization, repository):
         bump(authored_weekly[index], credited)
         bump_nested(detail["merged"], index, merger, repo_key)
         bump_nested(detail["authored"], index, credited, repo_key)
+        for handle in {credited, merger}:
+            if not handle:
+                continue
+            bump_nested(detail["combined"], index, handle, repo_key)
         for reviewer in stored.get("reviewers") or []:
             bump(reviewed_weekly[index], reviewer)
             bump_nested(detail["reviewed"], index, reviewer, repo_key)
@@ -1949,7 +1942,7 @@ def main(organization, repository):
             week_labels.append(week_starts[index].date().isoformat())
         filter_labels[str(label_weeks)] = week_labels
     filter_metrics = {}
-    for key in ("merged", "authored", "reviewed", "loc"):
+    for key in ("merged", "authored", "reviewed", "loc", "combined"):
         filter_metrics[key] = sparse_detail(detail[key])
     # org_prs already holds one entry per merged pull request.
     filter_json = json.dumps(
@@ -2009,7 +2002,7 @@ def main(organization, repository):
             back_link += "Back to org rankings</a>"
             profile_link = '<a href="' + profile + '">' + handle + "</a>"
             handle_metrics = {}
-            for key in ("merged", "authored", "reviewed", "loc"):
+            for key in ("merged", "authored", "reviewed", "loc", "combined"):
                 handle_metrics[key] = sparse_detail(detail[key], handle)
             handle_json = json.dumps(
                 {
@@ -2026,7 +2019,8 @@ def main(organization, repository):
             )
             handle_notes = list(METHOD_NOTES)
             handle_notes.append(
-                "The top chart sums authored and merged counts per week."
+                "The top chart counts each pull request once when"
+                + " the handle authored or merged it."
             )
             handle_page = render_html(
                 handle_title,
