@@ -1736,13 +1736,13 @@ def main(organization, repository):
     check_github_cli()
 
     now = datetime.datetime.now(datetime.UTC)
-    today = now.date()
     current_start = sunday_start_utc(now)
     latest_start = current_start - datetime.timedelta(days=DAYS_PER_WEEK)
     first_start = latest_start - datetime.timedelta(
         days=DAYS_PER_WEEK * (FETCH_WEEKS - 1)
     )
     oldest_day = first_start.date()
+    end_day = (latest_start + datetime.timedelta(days=6)).date()
 
     if repository:
         scope_text = organization + "/" + repository
@@ -1760,7 +1760,6 @@ def main(organization, repository):
 
     day = oldest_day
     step = datetime.timedelta(days=1)
-    end_day = today - step
     missing_days = []
     while day <= end_day:
         day_text = day.isoformat()
