@@ -127,6 +127,20 @@ Report inherited decisions in the review.
 
 ## Review
 
+Present the review in this exact order:
+
+1. Overview
+2. PR title and description
+3. Inherited decisions
+4. Critical issues
+5. Warnings
+6. Suggestions
+
+Omit PR title and description in a review of files. Include all other sections
+in every review.
+
+### Overview
+
 Provide a detailed explanation about what the changes are about, and if you can
 figure it out, also explain why the changes would be desirable. In a review of
 files, explain instead what the contents of the files are about, and why the
@@ -166,6 +180,18 @@ by it, still report it, but tag it as such. Add "[Pre-existent]" after the item
 number. Both tags can apply to the same item. Do not use this tag in a review
 of files.
 
+### PR title and description
+
+Except in a review of files, provide your own version of a PR title and a PR
+description.
+
+### Inherited decisions
+
+Report inherited decisions as defined in Review memory. Apply the rules there
+to each decision.
+
+### Critical issues, Warnings, Suggestions
+
 Present all findings as review requests. Output comments for the change author.
 Do not post comments to a forge. Emit each comment as raw Markdown ready to
 copy. The user will paste each comment to the right location in the PR.
@@ -195,9 +221,6 @@ For each review request:
   Where possible, explain the problem first, then propose a solution.
 - Where it helps, include code. Add complete code when reasonable, or partial
   snippets for inspiration.
-
-Except in a review of files, also provide your own version of a PR title and a
-PR description.
 
 ## Constraints and target
 
