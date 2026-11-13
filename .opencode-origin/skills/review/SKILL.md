@@ -65,6 +65,11 @@ The PR reference can be one of many things. Act accordingly:
 
 Before you review it, fetch the PR diff and metadata from the remote.
 
+Do not report that the PR is outdated. Do not report that the description is
+outdated. Assume that the author will update the branch with the latest changes
+from the target branch. Assume that the author will use your title and
+description. Do not mention this assumption.
+
 ## Files
 
 Obtain the files first. Before you review the files, read each listed file.
