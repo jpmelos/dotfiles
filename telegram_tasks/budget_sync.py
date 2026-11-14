@@ -371,6 +371,7 @@ def run(ctx, args=None):
         deleted_count,
         memo_count,
         sync_count,
+        questrade_added,
     ) = save_to_ynab(
         ctx,
         transactions,
@@ -382,7 +383,15 @@ def run(ctx, args=None):
         upload=not no_upload,
     )
     if not matched:
-        summary = "Done, preview only. YNAB unchanged."
+        if questrade_added or sync_count:
+            parts = []
+            if sync_count:
+                parts.append(f"{sync_count} payees and memos synced")
+            if questrade_added:
+                parts.append("Questrade reconciled")
+            summary = f"Done: statements unchanged, {', '.join(parts)}."
+        else:
+            summary = "Done, preview only. YNAB unchanged."
     else:
         summary = (
             f"Done: {added_count} added, {cleared_count} cleared, "
@@ -4417,17 +4426,19 @@ def save_to_ynab(
     # Brings YNAB up to date with the statements, settles the Questrade
     # transfer sides, then compares the cleared balances with `bank_balances`,
     # then brings the YNAB account of Questrade to `questrade_balance`.
-    # Pre-reads the YNAB cleared balances of each managed account before any
-    # write when `bank_balances` exists, and of Questrade when
-    # `questrade_balance` exists, passes the pre-reads with the statement
-    # deltas and the Questrade settle delta to `report_balances` so the YNAB
-    # sides hold this run's writes, and reports again after a Questrade add
-    # so the final message holds all writes. Returns whether YNAB matches the
-    # statements, with the counts of added, cleared, deleted, memo-updated,
-    # and synced transactions. Because of `--no-download`, `bank_balances`
-    # and `questrade_balance` can be `None`, and the step of each one does
-    # not run. Without `upload`, the task reads YNAB and reports the changes,
-    # but writes nothing to YNAB.
+    # The Questrade steps run even when YNAB still misses the statements,
+    # since the Questrade account stands apart from the statements. Pre-reads
+    # the YNAB cleared balances of each managed account before any write when
+    # `bank_balances` exists, and of Questrade when `questrade_balance`
+    # exists, passes the pre-reads with the statement deltas and the
+    # Questrade settle delta to `report_balances` so the YNAB sides hold this
+    # run's writes, and reports again after a Questrade add so the final
+    # message holds all writes. Returns whether YNAB matches the statements,
+    # with the counts of added, cleared, deleted, memo-updated, and synced
+    # transactions, plus whether the run added the Questrade reconciliation.
+    # Because of `--no-download`, `bank_balances` and `questrade_balance` can
+    # be `None`, and the step of each one does not run. Without `upload`, the
+    # task reads YNAB and reports the changes, but writes nothing to YNAB.
     with ynab.ApiClient(
         ynab.Configuration(access_token=api_key)
     ) as api_client:
@@ -4463,7 +4474,8 @@ def save_to_ynab(
             ctx, plan, transactions, decisions, start_date, upload
         )
         questrade_delta = decimal.Decimal(0)
-        if matched and upload and questrade_balance is not None:
+        questrade_added = False
+        if upload and questrade_balance is not None:
             questrade_delta = settle_questrade_transfers(plan)
         questrade_state = report_balances(
             plan,
@@ -4479,7 +4491,6 @@ def save_to_ynab(
             questrade_added = reconcile_questrade(
                 plan,
                 questrade_balance,
-                matched,
                 upload,
                 difference=questrade_state[0],
                 ynab_balance=questrade_state[1],
@@ -4502,6 +4513,7 @@ def save_to_ynab(
         deleted_count,
         memo_count,
         sync_count,
+        questrade_added,
     )
 
 
@@ -5102,9 +5114,11 @@ def settle_questrade_transfers(plan):
     # the money has landed, and clear on yes. Transfers out of Questrade to a
     # managed account clear at once, since the statement arrival proves the
     # departure. Transfers out to another account without a statement ask
-    # whether the money has left. Runs after the statement writes, so new
-    # other sides that YNAB added by itself join the old unsettled ones.
-    # Returns zero when nothing clears.
+    # whether the money has left. Runs after the statement step, so new
+    # other sides that YNAB added by itself join the old unsettled ones, and
+    # runs even when YNAB still misses the statements, since old unsettled
+    # legs still need their question each run. Returns zero when nothing
+    # clears.
     ynab_transactions = call_ynab(
         "read the Questrade transactions",
         ynab.TransactionsApi(plan.api_client).get_transactions_by_account,
@@ -5175,18 +5189,17 @@ def settle_questrade_transfers(plan):
 def reconcile_questrade(
     plan,
     questrade_balance,
-    ynab_matches_statements,
     upload,
     difference=None,
     ynab_balance=None,
 ):
     # Adds a transaction to the YNAB account of Questrade that brings its
     # cleared balance to `questrade_balance`. The cleared YNAB balance leaves
-    # out uncleared transactions, so it matches what the bank reports. The
-    # transaction waits until YNAB matches the statements, which
-    # `ynab_matches_statements` tells. Without `upload`, the task reports the
-    # difference, but changes nothing. The balance goes to YNAB only once a
-    # day: when the account already has a reconciliation transaction dated
+    # out uncleared transactions, so it matches what the bank reports. Runs
+    # even when YNAB still misses the statements, since the Questrade account
+    # stands apart from the statements. Without `upload`, the task reports
+    # the difference, but changes nothing. The balance goes to YNAB only once
+    # a day: when the account already has a reconciliation transaction dated
     # today, the task reports the difference, but changes nothing. The
     # combined balances message already reported the balances, so this only
     # sends the follow-ups. `difference` and `ynab_balance` reuse the values
@@ -5202,9 +5215,6 @@ def reconcile_questrade(
         return False
     if not upload:
         _say("Preview only. YNAB unchanged.")
-        return False
-    if not ynab_matches_statements:
-        _say("Skipped: YNAB missed the statement changes.")
         return False
     if questrade_reconciled_today(plan):
         _say("Skipped: Questrade already reconciled today.")
