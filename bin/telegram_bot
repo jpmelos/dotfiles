@@ -2521,9 +2521,10 @@ class Bot:
                 first_line, ERROR_PREVIEW_LIMIT
             )
         elif outcome == "timeout":
+            elapsed = time.monotonic() - record.start_mono
             text = (
                 f"Task {record.name} timed out after "
-                f"{format_duration(record.run_timeout)}. It was stopped."
+                f"{format_duration(elapsed)}. It was stopped."
             )
         else:
             text = None
