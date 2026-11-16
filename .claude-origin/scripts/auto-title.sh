@@ -53,7 +53,7 @@ if [ -n "${AUTO_TITLE_WORKER:-}" ]; then
       "still fits the whole conversation. Broaden it if the scope grew. "\
       "Replace it only if the main topic changed."
   fi
-  raw_title=$(claude -p --model haiku \
+  raw_title=$(AUTO_TITLE_NESTED=1 claude -p --model haiku \
     --max-turns 1 --output-format text "$instructions
 
 $combined" 2> /dev/null || true)
@@ -88,7 +88,7 @@ if [ -z "$session_id" ] || [ -z "$transcript_path" ]; then
   exit 0
 fi
 
-export AUTO_TITLE_NESTED=1
+# The worker starts without the nested flag.
 export AUTO_TITLE_WORKER=1
 export AUTO_TITLE_SESSION_ID="$session_id"
 export AUTO_TITLE_TRANSCRIPT="$transcript_path"
