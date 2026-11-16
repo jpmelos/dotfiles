@@ -1093,7 +1093,7 @@ def resolve_profile_paths(home, username, profile, container_tmp_dir):
     return ProfilePaths(
         profile_dir=f"{home}/.claude-{profile}",
         container_tmp_dir=container_tmp_dir,
-        shared_dir=f"{container_tmp_dir}/claude-code-shared",
+        shared_dir=f"{container_tmp_dir}/shared",
         pane_states_dir=f"{TMUX_PANE_STATES_DIR_PREFIX}{username}",
         container_pane_states_dir=(
             f"{CONTAINER_TMUX_PANE_STATES_DIR_PREFIX}{username}"
@@ -3127,7 +3127,7 @@ def agent_env_args(run_config):
         # and the container user is not the host user. The path names the
         # per-run `/tmp` directory in the container, not on the host.
         "--env",
-        "AGENT_SHARED_DIR=/tmp/claude-code-shared",
+        "AGENT_SHARED_DIR=/tmp/shared",
         # Terminal configuration.
         "--env",
         "TERM",
