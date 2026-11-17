@@ -46,12 +46,18 @@ NAME_PATTERN = r"[A-Za-z0-9_.\-]+"
 SERVER_HOST = "dev_rankings.local"
 SERVER_PORT = 59819
 
-PERIODS = (
+QUICK_PERIODS = (
     ("Last full week", 1),
+    ("Last 2 full weeks", 2),
     ("Last 4 full weeks", 4),
+    ("Last 8 full weeks", 8),
     ("Last 12 full weeks", 12),
     ("Last 52 full weeks", 52),
 )
+
+DEFAULT_PERIOD_WEEKS = 4
+
+WEEKLY_STATS_VERSION = 1
 
 METRICS = (
     ("authored", "PRs authored"),
@@ -167,11 +173,22 @@ def load_database(path):
         payload = {}
     pulls = payload.get("pull_requests")
     days = payload.get("days_fetched")
+    weekly = payload.get("weekly_stats")
+    version = payload.get("weekly_stats_version")
     if not isinstance(pulls, dict):
         pulls = {}
     if not isinstance(days, dict):
         days = {}
-    return {"pull_requests": pulls, "days_fetched": days}
+    if not isinstance(weekly, dict):
+        weekly = {}
+    if not isinstance(version, int):
+        version = 0
+    return {
+        "pull_requests": pulls,
+        "days_fetched": days,
+        "weekly_stats": weekly,
+        "weekly_stats_version": version,
+    }
 
 
 def save_database(path, database):
@@ -541,24 +558,6 @@ def download_missing_days(
             pool.shutdown(wait=False, cancel_futures=True)
 
 
-def bump(counter, handle, amount=1):
-    """Add the amount to the handle count in the counter."""
-    if not handle:
-        return
-    counter[handle] = counter.get(handle, 0) + amount
-
-
-def bump_nested(weekly, index, handle, repo, amount=1):
-    """Add the amount to the handle and repo count."""
-    if not handle or not repo:
-        return
-    repos = weekly[index].get(handle)
-    if repos is None:
-        repos = {}
-        weekly[index][handle] = repos
-    repos[repo] = repos.get(repo, 0) + amount
-
-
 MERGER_CREDITED_HANDLES = frozenset(
     [
         "dependabot",
@@ -581,6 +580,119 @@ def credited_author(author, merger):
     return author
 
 
+def weekly_slice_values(weekly, handles, start, end):
+    """Return week values for each handle in the range."""
+    series = {}
+    for handle in handles:
+        values = []
+        for index in range(start, end + 1):
+            values.append(weekly[index].get(handle, 0))
+        series[handle] = values
+    return series
+
+
+def dense_detail(weekly, only=None):
+    """Nest dense weekly arrays by handle and repo."""
+    by_handle = {}
+    for index, handles in enumerate(weekly):
+        for handle, repos in handles.items():
+            if only is not None and handle != only:
+                continue
+            target = by_handle.setdefault(handle, {})
+            for repo, value in repos.items():
+                if not value:
+                    continue
+                arr = target.get(repo)
+                if arr is None:
+                    arr = [0] * FETCH_WEEKS
+                    target[repo] = arr
+                arr[index] = value
+    return by_handle
+
+
+def add_nested_count(target, handle, repo, amount=1):
+    """Add the amount to a handle and repo count in one week."""
+    if not handle or not repo:
+        return
+    repos = target.get(handle)
+    if repos is None:
+        repos = {}
+        target[handle] = repos
+    repos[repo] = repos.get(repo, 0) + amount
+
+
+def compute_week_stats(records):
+    """Aggregate one full week of pull requests into cached stats."""
+    merged = {}
+    authored = {}
+    reviewed = {}
+    loc = {}
+    combined = {}
+    org_prs = []
+    for stored in records:
+        author = stored.get("author") or ""
+        merger = stored.get("merged_by") or ""
+        credited = credited_author(author, merger)
+        org_name = stored.get("organization") or ""
+        repo_name = stored.get("repository") or ""
+        repo_key = ""
+        if org_name and repo_name:
+            repo_key = org_name + "/" + repo_name
+        add_nested_count(merged, merger, repo_key)
+        add_nested_count(authored, credited, repo_key)
+        for handle in {credited, merger}:
+            add_nested_count(combined, handle, repo_key)
+        for reviewer in stored.get("reviewers") or []:
+            add_nested_count(reviewed, reviewer, repo_key)
+        loc_value = stored.get("loc") or 0
+        for handle in {credited, merger}:
+            add_nested_count(loc, handle, repo_key, loc_value)
+        org_prs.append([credited, merger, repo_key])
+    return {
+        "merged": merged,
+        "authored": authored,
+        "reviewed": reviewed,
+        "loc": loc,
+        "combined": combined,
+        "org_total": len(records),
+        "org_prs": org_prs,
+    }
+
+
+def week_entry_is_valid(entry):
+    """Check that a cached weekly entry has the expected shape."""
+    if not isinstance(entry, dict):
+        return False
+    for key in ("merged", "authored", "reviewed", "loc", "combined"):
+        if not isinstance(entry.get(key), dict):
+            return False
+    if not isinstance(entry.get("org_total"), int):
+        return False
+    if not isinstance(entry.get("org_prs"), list):
+        return False
+    return True
+
+
+def day_is_iso_date(text):
+    """Check that text looks like a YYYY-MM-DD date."""
+    if len(text) != 10:
+        return False
+    if text[4] != "-" or text[7] != "-":
+        return False
+    return text.replace("-", "").isdigit()
+
+
+def week_end_iso(week_start_text):
+    """Return the Saturday date for a Sunday week start."""
+    start_day = datetime.date.fromisoformat(week_start_text)
+    return (start_day + datetime.timedelta(days=6)).isoformat()
+
+
+def range_text_for(weeks_iso, start, end):
+    """Build a range string for weeks start to end inclusive."""
+    return weeks_iso[start] + " to " + week_end_iso(weeks_iso[end])
+
+
 def summarize_period(weekly, week_count):
     """Sum the last week_count weeks into ranked totals."""
     totals = {}
@@ -593,18 +705,6 @@ def summarize_period(weekly, week_count):
         key=lambda item: (-item[1], item[0].lower()),
     )
     return totals, ranked
-
-
-def weekly_values(weekly, handles, week_count):
-    """Return week values for each handle in order."""
-    start = FETCH_WEEKS - week_count
-    series = {}
-    for handle in handles:
-        values = []
-        for index in range(start, FETCH_WEEKS):
-            values.append(weekly[index].get(handle, 0))
-        series[handle] = values
-    return series
 
 
 def table_lines(ranked, limit, link_for, suffix=""):
@@ -847,16 +947,62 @@ def css_lines():
         "section#ignored-handles li {",
         "  margin: 0.25rem 0;",
         "}",
+        "section#period-picker {",
+        "  margin: 2.5rem 0 0 0;",
+        "}",
+        "div#quick-periods {",
+        "  display: flex;",
+        "  flex-wrap: wrap;",
+        "  gap: 0.5rem;",
+        "  margin: 0.75rem 0;",
+        "}",
+        "div#quick-periods button {",
+        "  font: inherit;",
+        "  padding: 0.35rem 0.75rem;",
+        "  border: 1px solid #d0d7de;",
+        "  border-radius: 999px;",
+        "  background: #ffffff;",
+        "  cursor: pointer;",
+        "}",
+        "div#quick-periods button.active {",
+        "  background: #0d1117;",
+        "  color: #f0f6fc;",
+        "  border-color: #0d1117;",
+        "}",
+        "@media (prefers-color-scheme: dark) {",
+        "  div#quick-periods button {",
+        "    background: #161b22;",
+        "    border-color: #30363d;",
+        "    color: #f0f6fc;",
+        "  }",
+        "  div#quick-periods button.active {",
+        "    background: #f0f6fc;",
+        "    color: #0d1117;",
+        "    border-color: #f0f6fc;",
+        "  }",
+        "}",
+        "div#custom-period {",
+        "  display: flex;",
+        "  flex-wrap: wrap;",
+        "  gap: 0.75rem;",
+        "  align-items: center;",
+        "}",
+        "div#custom-period select {",
+        "  font: inherit;",
+        "  padding: 0.25rem 0.5rem;",
+        "  border: 1px solid #d0d7de;",
+        "  border-radius: 6px;",
+        "}",
     ]
 
 
-FILTER_JS = [
+# Deprecated old JS kept unused; new FILTER_JS below replaces it.
+FILTER_JS_OLD = [
     "(function () {",
     "  'use strict';",
     "  var PALETTE = [",
     "    '#4e79a7',",
     "    '#f28e2b',",
-    "    '#e15759',",
     "    '#76b7b2',",
     "    '#59a14f',",
     "    '#edc948',",
@@ -1401,6 +1547,719 @@ FILTER_JS = [
 ]
 
 
+FILTER_JS = [
+    "(function () {",
+    "  'use strict';",
+    "  var PALETTE = [",
+    "    '#4e79a7',",
+    "    '#f28e2b',",
+    "    '#e15759',",
+    "    '#76b7b2',",
+    "    '#59a14f',",
+    "    '#edc948',",
+    "    '#b07aa1',",
+    "    '#ff9da7',",
+    "    '#9c755f',",
+    "    '#bab0ac'",
+    "  ];",
+    "  var TABLE_LIMIT = 20;",
+    "  var CHART_LIMIT = 10;",
+    "  var dataEl = document.getElementById('dr-data');",
+    "  var charts = window.__drCharts || {};",
+    "  if (!dataEl) {",
+    "    return;",
+    "  }",
+    "  var DATA = null;",
+    "  try {",
+    "    DATA = JSON.parse(dataEl.textContent);",
+    "  } catch (err) {",
+    "    return;",
+    "  }",
+    "  var WEEKS = DATA.weeks || [];",
+    "  var WEEKS_COUNT = WEEKS.length;",
+    "  if (WEEKS_COUNT === 0) {",
+    "    return;",
+    "  }",
+    "  var STORE_KEY = 'dev-rankings-' + DATA.meta.slug + '-v2';",
+    "  function sortNames(names) {",
+    "    return names.slice().sort(function (a, b) {",
+    "      var al = a.toLowerCase(), bl = b.toLowerCase();",
+    "      if (al < bl) {",
+    "        return -1;",
+    "      }",
+    "      if (al > bl) {",
+    "        return 1;",
+    "      }",
+    "      if (a < b) {",
+    "        return -1;",
+    "      }",
+    "      if (a > b) {",
+    "        return 1;",
+    "      }",
+    "      return 0;",
+    "    });",
+    "  }",
+    "  var currentRepos = sortNames(DATA.repos || []);",
+    "  var currentHandles = sortNames(DATA.handles || []);",
+    "  var storageOK = (function () {",
+    "    try {",
+    "      var probe = '__dr_probe__';",
+    "      window.localStorage.setItem(probe, '1');",
+    "      window.localStorage.removeItem(probe);",
+    "      return true;",
+    "    } catch (err) {",
+    "      return false;",
+    "    }",
+    "  })();",
+    "  function loadState() {",
+    "    if (!storageOK) {",
+    "      return null;",
+    "    }",
+    "    try {",
+    "      var raw = localStorage.getItem(STORE_KEY);",
+    "      return raw ? JSON.parse(raw) : null;",
+    "    } catch (err) {",
+    "      return null;",
+    "    }",
+    "  }",
+    "  function saveState(state) {",
+    "    if (!storageOK) {",
+    "      return;",
+    "    }",
+    "    try {",
+    "      localStorage.setItem(STORE_KEY, JSON.stringify(state));",
+    "    } catch (err) {}",
+    "  }",
+    "  var defaultStart = Math.max(0, WEEKS_COUNT - 4);",
+    "  var defaultEnd = WEEKS_COUNT - 1;",
+    "  var stored = loadState();",
+    "  var excluded = [];",
+    "  var excludedHandles = [];",
+    "  var highlighted = '';",
+    "  var periodStartIdx = defaultStart;",
+    "  var periodEndIdx = defaultEnd;",
+    "  function clampPeriod(start, end) {",
+    "    if (typeof start !== 'number' || isNaN(start)) {",
+    "      start = defaultStart;",
+    "    }",
+    "    if (typeof end !== 'number' || isNaN(end)) {",
+    "      end = defaultEnd;",
+    "    }",
+    "    start = Math.floor(start);",
+    "    end = Math.floor(end);",
+    "    if (start < 0) {",
+    "      start = 0;",
+    "    }",
+    "    if (end >= WEEKS_COUNT) {",
+    "      end = WEEKS_COUNT - 1;",
+    "    }",
+    "    if (start > end) {",
+    "      var tmp = start;",
+    "      start = end;",
+    "      end = tmp;",
+    "    }",
+    "    return [start, end];",
+    "  }",
+    "  function persistSelection() {",
+    "    saveState({",
+    "      repos: currentRepos,",
+    "      excluded: excluded,",
+    "      handles: currentHandles,",
+    "      excludedHandles: excludedHandles,",
+    "      highlight: highlighted,",
+    "      period: {start: periodStartIdx, end: periodEndIdx}",
+    "    });",
+    "  }",
+    "  function showStorageWarning() {",
+    "    var box = document.getElementById('alert-box');",
+    "    var group = document.getElementById('new-storage');",
+    "    if (!box || !group) {",
+    "      return;",
+    "    }",
+    "    group.hidden = false;",
+    "    box.hidden = false;",
+    "  }",
+    "  function showWarning(kind, fresh) {",
+    "    var box = document.getElementById('alert-box');",
+    "    if (!box) {",
+    "      return;",
+    "    }",
+    "    var ids = {",
+    "      repos: ['new-repos', 'new-repos-list'],",
+    "      handles: ['new-handles', 'new-handles-list']",
+    "    };",
+    "    var pair = ids[kind] || ids.repos;",
+    "    var group = document.getElementById(pair[0]);",
+    "    var list = document.getElementById(pair[1]);",
+    "    if (!group || !list) {",
+    "      return;",
+    "    }",
+    "    sortNames(fresh).forEach(function (name) {",
+    "      var item = document.createElement('li');",
+    "      item.textContent = name;",
+    "      list.appendChild(item);",
+    "    });",
+    "    group.hidden = false;",
+    "    box.hidden = false;",
+    "  }",
+    "  function applyHighlight() {",
+    "    var q = highlighted.trim().toLowerCase();",
+    "    var rows = document.querySelectorAll(",
+    "      'article.card[data-metric] tbody tr'",
+    "    );",
+    "    Array.prototype.forEach.call(rows, function (tr) {",
+    "      tr.classList.remove('highlight-match');",
+    "      if (!q) {",
+    "        return;",
+    "      }",
+    "      var link = tr.querySelector('td a');",
+    "      if (link && link.textContent.toLowerCase() === q) {",
+    "        tr.classList.add('highlight-match');",
+    "      }",
+    "    });",
+    "  }",
+    "  if (stored === null) {",
+    "    persistSelection();",
+    "  } else {",
+    "    var known = stored.repos || [];",
+    "    var fresh = currentRepos.filter(function (repo) {",
+    "      return known.indexOf(repo) === -1;",
+    "    });",
+    "    excluded = (stored.excluded || []).filter(function (repo) {",
+    "      return currentRepos.indexOf(repo) !== -1;",
+    "    });",
+    "    if (fresh.length > 0) {",
+    "      showWarning('repos', fresh);",
+    "    }",
+    "    var knownHandles = stored.handles || null;",
+    "    var freshHandles = [];",
+    "    if (knownHandles === null) {",
+    "      knownHandles = currentHandles;",
+    "    } else {",
+    "      freshHandles = currentHandles.filter(function (h) {",
+    "        return knownHandles.indexOf(h) === -1;",
+    "      });",
+    "      if (freshHandles.length > 0) {",
+    "        showWarning('handles', freshHandles);",
+    "      }",
+    "    }",
+    "    excludedHandles = (stored.excludedHandles || []).filter(",
+    "      function (h) {",
+    "        return currentHandles.indexOf(h) !== -1;",
+    "      }",
+    "    );",
+    "    if (typeof stored.highlight === 'string') {",
+    "      highlighted = stored.highlight;",
+    "    }",
+    "    if (stored.period) {",
+    "      var ps = stored.period.start;",
+    "      var pe = stored.period.end;",
+    "      if (typeof ps === 'number' && typeof pe === 'number') {",
+    "        var clamped = clampPeriod(ps, pe);",
+    "        periodStartIdx = clamped[0];",
+    "        periodEndIdx = clamped[1];",
+    "      }",
+    "    }",
+    "    persistSelection();",
+    "  }",
+    "  if (!storageOK) {",
+    "    showStorageWarning();",
+    "  }",
+    "  function isExcluded(repo) {",
+    "    return excluded.indexOf(repo) !== -1;",
+    "  }",
+    "  function isExcludedHandle(handle) {",
+    "    return excludedHandles.indexOf(handle) !== -1;",
+    "  }",
+    "  function applySelection() {",
+    "    boxes.forEach(function (box) {",
+    "      var repo = box.getAttribute('data-repo');",
+    "      if (repo) {",
+    "        box.checked = excluded.indexOf(repo) === -1;",
+    "      }",
+    "      var who = box.getAttribute('data-handle');",
+    "      if (who) {",
+    "        box.checked = excludedHandles.indexOf(who) === -1;",
+    "      }",
+    "    });",
+    "  }",
+    "  window.addEventListener('storage', function (e) {",
+    "    if (!e.key || e.key !== STORE_KEY) {",
+    "      return;",
+    "    }",
+    "    var state = loadState();",
+    "    if (!state) {",
+    "      return;",
+    "    }",
+    "    excluded = state.excluded || [];",
+    "    excludedHandles = state.excludedHandles || [];",
+    "    if (typeof state.highlight === 'string') {",
+    "      highlighted = state.highlight;",
+    "    }",
+    "    if (state.period) {",
+    "      var clamped = clampPeriod(state.period.start, state.period.end);",
+    "      periodStartIdx = clamped[0];",
+    "      periodEndIdx = clamped[1];",
+    "    }",
+    "    var highlightBox = document.getElementById('highlight-input');",
+    "    if (highlightBox) {",
+    "      highlightBox.value = highlighted;",
+    "    }",
+    "    applySelection();",
+    "    refreshAll();",
+    "  });",
+    "  var boxes = Array.prototype.slice.call(",
+    "    document.querySelectorAll('#filters input[type=\"checkbox\"]')",
+    "  );",
+    "  boxes.forEach(function (box) {",
+    "    var repo = box.getAttribute('data-repo');",
+    "    if (repo && isExcluded(repo)) {",
+    "      box.checked = false;",
+    "    }",
+    "    var who = box.getAttribute('data-handle');",
+    "    if (who && isExcludedHandle(who)) {",
+    "      box.checked = false;",
+    "    }",
+    "    box.addEventListener('change', function () {",
+    "      excluded = [];",
+    "      excludedHandles = [];",
+    "      boxes.forEach(function (other) {",
+    "        if (!other.checked) {",
+    "          var missing = other.getAttribute('data-repo');",
+    "          if (missing) {",
+    "            excluded.push(missing);",
+    "          }",
+    "          var gone = other.getAttribute('data-handle');",
+    "          if (gone) {",
+    "            excludedHandles.push(gone);",
+    "          }",
+    "        }",
+    "      });",
+    "      persistSelection();",
+    "      refreshAll();",
+    "    });",
+    "  });",
+    "  var highlightInput = document.getElementById('highlight-input');",
+    "  if (highlightInput) {",
+    "    highlightInput.value = highlighted;",
+    "    highlightInput.addEventListener('input', function () {",
+    "      highlighted = highlightInput.value;",
+    "      persistSelection();",
+    "      applyHighlight();",
+    "    });",
+    "  }",
+    "  var startSelect = document.getElementById('period-start');",
+    "  var endSelect = document.getElementById('period-end');",
+    "  var quickButtons = Array.prototype.slice.call(",
+    "    document.querySelectorAll('#quick-periods button[data-weeks]')",
+    "  );",
+    "  function refreshPeriodUI() {",
+    "    if (startSelect) {",
+    "      startSelect.value = String(periodStartIdx);",
+    "    }",
+    "    if (endSelect) {",
+    "      endSelect.value = String(periodEndIdx);",
+    "    }",
+    "    quickButtons.forEach(function (btn) {",
+    "      var n = parseInt(btn.getAttribute('data-weeks'), 10);",
+    "      var expStart = WEEKS_COUNT - n;",
+    "      var expEnd = WEEKS_COUNT - 1;",
+    "      if (periodStartIdx === expStart && periodEndIdx === expEnd) {",
+    "        btn.classList.add('active');",
+    "      } else {",
+    "        btn.classList.remove('active');",
+    "      }",
+    "    });",
+    "  }",
+    "  if (startSelect) {",
+    "    startSelect.addEventListener('change', function () {",
+    "      var s = parseInt(startSelect.value, 10);",
+    "      var clamped = clampPeriod(s, periodEndIdx);",
+    "      periodStartIdx = clamped[0];",
+    "      periodEndIdx = clamped[1];",
+    "      persistSelection();",
+    "      refreshAll();",
+    "    });",
+    "  }",
+    "  if (endSelect) {",
+    "    endSelect.addEventListener('change', function () {",
+    "      var e = parseInt(endSelect.value, 10);",
+    "      var clamped = clampPeriod(periodStartIdx, e);",
+    "      periodStartIdx = clamped[0];",
+    "      periodEndIdx = clamped[1];",
+    "      persistSelection();",
+    "      refreshAll();",
+    "    });",
+    "  }",
+    "  quickButtons.forEach(function (btn) {",
+    "    btn.addEventListener('click', function () {",
+    "      var n = parseInt(btn.getAttribute('data-weeks'), 10);",
+    "      if (isNaN(n) || n < 1) {",
+    "        return;",
+    "      }",
+    "      if (n > WEEKS_COUNT) {",
+    "        n = WEEKS_COUNT;",
+    "      }",
+    "      periodStartIdx = WEEKS_COUNT - n;",
+    "      periodEndIdx = WEEKS_COUNT - 1;",
+    "      persistSelection();",
+    "      refreshAll();",
+    "    });",
+    "  });",
+    "  function weekEndIso(startIso) {",
+    "    var parts = startIso.split('-');",
+    "    var y = parseInt(parts[0], 10);",
+    "    var m = parseInt(parts[1], 10) - 1;",
+    "    var d = parseInt(parts[2], 10);",
+    "    var dt = new Date(Date.UTC(y, m, d));",
+    "    dt.setUTCDate(dt.getUTCDate() + 6);",
+    "    var yy = dt.getUTCFullYear();",
+    "    var mm = ('0' + (dt.getUTCMonth() + 1)).slice(-2);",
+    "    var dd = ('0' + dt.getUTCDate()).slice(-2);",
+    "    return yy + '-' + mm + '-' + dd;",
+    "  }",
+    "  function rangeText(start, end) {",
+    "    return WEEKS[start] + ' to ' + weekEndIso(WEEKS[end]);",
+    "  }",
+    "  function sumRange(arr, start, end) {",
+    "    var sum = 0, w;",
+    "    if (!arr) {",
+    "      return 0;",
+    "    }",
+    "    for (w = start; w <= end; w++) {",
+    "      sum += arr[w] || 0;",
+    "    }",
+    "    return sum;",
+    "  }",
+    "  function sliceRange(arr, start, end) {",
+    "    var out = [], w;",
+    "    for (w = start; w <= end; w++) {",
+    "      out.push((arr && arr[w]) || 0);",
+    "    }",
+    "    return out;",
+    "  }",
+    "  function rankKeys(totals) {",
+    "    return Object.keys(totals).sort(function (a, b) {",
+    "      var diff = totals[b] - totals[a];",
+    "      if (diff !== 0) {",
+    "        return diff;",
+    "      }",
+    "      var al = a.toLowerCase(), bl = b.toLowerCase();",
+    "      if (al < bl) {",
+    "        return -1;",
+    "      }",
+    "      if (al > bl) {",
+    "        return 1;",
+    "      }",
+    "      return 0;",
+    "    });",
+    "  }",
+    "  function handleHref(handle) {",
+    "    if (!DATA.meta.orgMode) {",
+    "      return 'https://github.com/' + handle;",
+    "    }",
+    "    var safe = handle.toLowerCase().replace(/[^a-z0-9-]/g, '-');",
+    "    var href = './dev-rankings-' + DATA.meta.slug + '-handle-';",
+    "    href += safe + '.html';",
+    "    href += '#rankings';",
+    "    return href;",
+    "  }",
+    "  function repoHref(repo) {",
+    "    return 'https://github.com/' + repo;",
+    "  }",
+    "  function datasetFor(label, values, order) {",
+    "    var color = PALETTE[order % PALETTE.length];",
+    "    return {",
+    "      label: label,",
+    "      data: values,",
+    "      borderColor: color,",
+    "      backgroundColor: color,",
+    "      borderWidth: 2,",
+    "      pointRadius: 2,",
+    "      tension: 0.3,",
+    "      fill: false",
+    "    };",
+    "  }",
+    "  function fmtCount(value) {",
+    "    return value.toLocaleString('en-US');",
+    "  }",
+    "  function addRow(tbody, position, text, href, count) {",
+    "    var tr = document.createElement('tr');",
+    "    var rank = document.createElement('td');",
+    "    rank.textContent = String(position);",
+    "    tr.appendChild(rank);",
+    "    var name = document.createElement('td');",
+    "    var link = document.createElement('a');",
+    "    link.setAttribute('href', href);",
+    "    link.textContent = text;",
+    "    name.appendChild(link);",
+    "    tr.appendChild(name);",
+    "    var num = document.createElement('td');",
+    "    num.textContent = fmtCount(count);",
+    "    tr.appendChild(num);",
+    "    tbody.appendChild(tr);",
+    "  }",
+    "  function emptyRow(tbody) {",
+    "    var tr = document.createElement('tr');",
+    "    ['-', 'None', '0'].forEach(function (text) {",
+    "      var cell = document.createElement('td');",
+    "      cell.textContent = text;",
+    "      tr.appendChild(cell);",
+    "    });",
+    "    tbody.appendChild(tr);",
+    "  }",
+    "  function rebuildRows(tbody, ranked, totals, hrefFor) {",
+    "    while (tbody.firstChild) {",
+    "      tbody.removeChild(tbody.firstChild);",
+    "    }",
+    "    var shown = ranked.filter(function (name) {",
+    "      return totals[name] > 0;",
+    "    });",
+    "    if (shown.length === 0) {",
+    "      emptyRow(tbody);",
+    "      return;",
+    "    }",
+    "    shown.slice(0, TABLE_LIMIT).forEach(function (name, i) {",
+    "      addRow(tbody, i + 1, name, hrefFor(name), totals[name]);",
+    "    });",
+    "  }",
+    "  function updateChart(card, labels, datasets) {",
+    "    var canvas = card.querySelector('canvas');",
+    "    var chart = canvas ? charts[canvas.id] : null;",
+    "    if (chart) {",
+    "      chart.data.labels = labels;",
+    "      chart.data.datasets = datasets;",
+    "      chart.update();",
+    "    }",
+    "  }",
+    "  function refreshHandleCard(card, scope) {",
+    "    var start = periodStartIdx, end = periodEndIdx;",
+    "    var totals = {}, weeklies = {}, name, repoMap, repo, arr;",
+    "    var w, sum, weekly;",
+    "    for (name in scope) {",
+    "      if (isExcludedHandle(name)) {",
+    "        continue;",
+    "      }",
+    "      repoMap = scope[name] || {};",
+    "      sum = 0;",
+    "      weekly = [];",
+    "      for (w = start; w <= end; w++) {",
+    "        weekly.push(0);",
+    "      }",
+    "      for (repo in repoMap) {",
+    "        if (isExcluded(repo)) {",
+    "          continue;",
+    "        }",
+    "        arr = repoMap[repo];",
+    "        for (w = start; w <= end; w++) {",
+    "          var v = (arr && arr[w]) || 0;",
+    "          sum += v;",
+    "          weekly[w - start] += v;",
+    "        }",
+    "      }",
+    "      totals[name] = sum;",
+    "      weeklies[name] = weekly;",
+    "    }",
+    "    var ranked = rankKeys(totals).filter(function (n) {",
+    "      return totals[n] > 0;",
+    "    });",
+    "    var tbody = card.querySelector('tbody');",
+    "    if (tbody) {",
+    "      var hrefFor = function (n) {",
+    "        return handleHref(n);",
+    "      };",
+    "      rebuildRows(tbody, ranked, totals, hrefFor);",
+    "    }",
+    "    var labels = WEEKS.slice(start, end + 1);",
+    "    updateChart(card, labels, ranked.slice(0, CHART_LIMIT).map(",
+    "      function (name, i) {",
+    "        return datasetFor(name, weeklies[name], i);",
+    "      }",
+    "    ));",
+    "  }",
+    "  function refreshRepoCard(card, repoMap) {",
+    "    var start = periodStartIdx, end = periodEndIdx;",
+    "    var totals = {}, weeklies = {}, repo, arr;",
+    "    for (repo in repoMap) {",
+    "      if (isExcluded(repo)) {",
+    "        continue;",
+    "      }",
+    "      arr = repoMap[repo];",
+    "      totals[repo] = sumRange(arr, start, end);",
+    "      weeklies[repo] = sliceRange(arr, start, end);",
+    "    }",
+    "    var ranked = rankKeys(totals).filter(function (n) {",
+    "      return totals[n] > 0;",
+    "    });",
+    "    var tbody = card.querySelector('tbody');",
+    "    if (tbody) {",
+    "      rebuildRows(tbody, ranked, totals, repoHref);",
+    "    }",
+    "    var labels = WEEKS.slice(start, end + 1);",
+    "    updateChart(card, labels, ranked.slice(0, CHART_LIMIT).map(",
+    "      function (name, i) {",
+    "        return datasetFor(name, weeklies[name], i);",
+    "      }",
+    "    ));",
+    "  }",
+    "  function orgWeeklyFull() {",
+    "    var values = [], i, pr;",
+    "    for (i = 0; i < WEEKS_COUNT; i++) {",
+    "      values.push(0);",
+    "    }",
+    "    var prs = DATA.org || [];",
+    "    for (i = 0; i < prs.length; i++) {",
+    "      pr = prs[i];",
+    "      if (pr[0] < 0 || pr[0] >= WEEKS_COUNT) {",
+    "        continue;",
+    "      }",
+    "      if (isExcluded(pr[3])) {",
+    "        continue;",
+    "      }",
+    "      if (isExcludedHandle(pr[1]) || isExcludedHandle(pr[2])) {",
+    "        continue;",
+    "      }",
+    "      values[pr[0]] += 1;",
+    "    }",
+    "    return values;",
+    "  }",
+    "  function handleCombinedFull() {",
+    "    var values = [], i, repo, arr;",
+    "    for (i = 0; i < WEEKS_COUNT; i++) {",
+    "      values.push(0);",
+    "    }",
+    "    var metrics = DATA.metrics || {};",
+    "    var combinedByHandle = metrics.combined || {};",
+    "    var combinedScope = combinedByHandle[DATA.handle] || {};",
+    "    for (repo in combinedScope) {",
+    "      if (isExcluded(repo)) {",
+    "        continue;",
+    "      }",
+    "      arr = combinedScope[repo];",
+    "      for (i = 0; i < WEEKS_COUNT; i++) {",
+    "        values[i] += (arr && arr[i]) || 0;",
+    "      }",
+    "    }",
+    "    return values;",
+    "  }",
+    "  function refreshCard(card) {",
+    "    var metric = card.getAttribute('data-metric');",
+    "    if (metric === 'org') {",
+    "      var full = orgWeeklyFull();",
+    "      updateChart(card, WEEKS.slice(),",
+    "        [datasetFor('PRs merged', full, 0)]);",
+    "      return;",
+    "    }",
+    "    if (metric === 'combined' && DATA.handle) {",
+    "      var cfull = handleCombinedFull();",
+    "      var label = 'PRs authored or merged';",
+    "      updateChart(card, WEEKS.slice(), [datasetFor(label, cfull, 0)]);",
+    "      return;",
+    "    }",
+    "    var scope = (DATA.metrics || {})[metric] || {};",
+    "    if (DATA.handle) {",
+    "      refreshRepoCard(card, scope[DATA.handle] || {});",
+    "    } else {",
+    "      refreshHandleCard(card, scope);",
+    "    }",
+    "  }",
+    "  function refreshTotals() {",
+    "    var sections = document.querySelectorAll('section.period');",
+    "    Array.prototype.forEach.call(sections, function (sec) {",
+    "      var card = sec.querySelector('article.card[data-metric]');",
+    "      var rangeSpan = sec.querySelector('[data-range]');",
+    "      var totalSpan = sec.querySelector('[data-total]');",
+    "      if (!card || !totalSpan) {",
+    "        return;",
+    "      }",
+    "      var metric = card.getAttribute('data-metric');",
+    "      if (sec.id === 'rankings') {",
+    "        var start = periodStartIdx, end = periodEndIdx;",
+    "        var total = 0, repo, scope, w;",
+    "        if (rangeSpan) {",
+    "          rangeSpan.textContent = rangeText(start, end);",
+    "        }",
+    "        if (DATA.handle) {",
+    "          scope = ((DATA.metrics || {}).merged",
+    "            || {})[DATA.handle] || {};",
+    "          for (repo in scope) {",
+    "            if (!isExcluded(repo)) {",
+    "              total += sumRange(scope[repo], start, end);",
+    "            }",
+    "          }",
+    "        } else {",
+    "          var full = orgWeeklyFull();",
+    "          for (w = start; w <= end; w++) {",
+    "            total += full[w];",
+    "          }",
+    "        }",
+    "        totalSpan.textContent = total + ' merged PRs.';",
+    "        return;",
+    "      }",
+    "      if (DATA.handle) {",
+    "        if (metric === 'combined') {",
+    "          var cfull = handleCombinedFull();",
+    "          var ctotal = cfull.reduce(function (a, b) {",
+    "            return a + b;",
+    "          }, 0);",
+    "          totalSpan.textContent = ctotal + ' authored or merged PRs.';",
+    "          return;",
+    "        }",
+    "        var mscope = ((DATA.metrics || {}).merged",
+    "          || {})[DATA.handle] || {};",
+    "        var mtotal = 0, r;",
+    "        for (r in mscope) {",
+    "          if (!isExcluded(r)) {",
+    "            mtotal += sumRange(mscope[r], 0, WEEKS_COUNT - 1);",
+    "          }",
+    "        }",
+    "        totalSpan.textContent = mtotal + ' merged PRs.';",
+    "      } else {",
+    "        var ofull = orgWeeklyFull();",
+    "        var ototal = ofull.reduce(function (a, b) {",
+    "          return a + b;",
+    "        }, 0);",
+    "        totalSpan.textContent = ototal + ' merged PRs.';",
+    "      }",
+    "    });",
+    "  }",
+    "  function fillIgnored(listId, items) {",
+    "    var list = document.getElementById(listId);",
+    "    if (!list) {",
+    "      return;",
+    "    }",
+    "    while (list.firstChild) {",
+    "      list.removeChild(list.firstChild);",
+    "    }",
+    "    if (items.length === 0) {",
+    "      var none = document.createElement('li');",
+    "      none.textContent = 'None';",
+    "      list.appendChild(none);",
+    "      return;",
+    "    }",
+    "    sortNames(items.slice()).forEach(function (name) {",
+    "      var item = document.createElement('li');",
+    "      item.textContent = name;",
+    "      list.appendChild(item);",
+    "    });",
+    "  }",
+    "  function refreshIgnored() {",
+    "    fillIgnored('ignored-repos-list', excluded);",
+    "    fillIgnored('ignored-handles-list', excludedHandles);",
+    "  }",
+    "  function refreshAll() {",
+    "    refreshPeriodUI();",
+    "    var cards = document.querySelectorAll(",
+    "      'article.card[data-metric]'",
+    "    );",
+    "    Array.prototype.forEach.call(cards, refreshCard);",
+    "    refreshTotals();",
+    "    refreshIgnored();",
+    "    applyHighlight();",
+    "  }",
+    "  refreshAll();",
+    "})();",
+]
 METHOD_NOTES = [
     "Only pull requests merged in each week count.",
     "Weeks run Sunday 00:00 to Saturday 23:59 UTC.",
@@ -1410,15 +2269,76 @@ METHOD_NOTES = [
     "Author self reviews do not count.",
     "Data comes from the GitHub API through gh.",
     "Cached data lives under the state directory.",
+    "Weekly stats persist in the database once a week is complete;",
+    "complete weeks are reused without recalculation.",
     "Tables show the top 20 handles; charts show top 10.",
     "The org-wide chart sums all merged pull requests per week.",
+    "Python pre-calculates one value per full week;",
+    "the page sums the chosen weeks in the browser.",
+    "The period picker accepts any contiguous full weeks;",
+    "the choice persists in local storage.",
 ]
+
+
+def period_picker_lines(weeks_iso, default_start, default_end):
+    """Build picker markup for any contiguous weekly period."""
+    out = []
+    out.append('<section class="period" id="period-picker">')
+    out.append("<h2>Period</h2>")
+    out.append("<p>Choose any contiguous full weeks.</p>")
+    out.append('<div id="quick-periods">')
+    for label, count in QUICK_PERIODS:
+        out.append(
+            '<button type="button" data-weeks="'
+            + str(count)
+            + '">'
+            + html.escape(label)
+            + "</button>"
+        )
+    out.append("</div>")
+    out.append('<div id="custom-period">')
+    out.append('<label for="period-start">From:</label>')
+    out.append('<select id="period-start">')
+    for index, week in enumerate(weeks_iso):
+        selected = ""
+        if index == default_start:
+            selected = " selected"
+        out.append(
+            '<option value="'
+            + str(index)
+            + '"'
+            + selected
+            + ">"
+            + html.escape(week)
+            + "</option>"
+        )
+    out.append("</select>")
+    out.append('<label for="period-end">To:</label>')
+    out.append('<select id="period-end">')
+    for index, week in enumerate(weeks_iso):
+        selected = ""
+        if index == default_end:
+            selected = " selected"
+        out.append(
+            '<option value="'
+            + str(index)
+            + '"'
+            + selected
+            + ">"
+            + html.escape(week)
+            + "</option>"
+        )
+    out.append("</select>")
+    out.append("</div>")
+    out.append("</section>")
+    return out
 
 
 def render_html(
     title, scope_text, made_text, sections, link_for, notes,
     header_extra=(), filter_repos=None, filter_handles=None,
     filter_json=None, highlight_box=False,
+    weeks_iso=None, default_start=None, default_end=None,
 ):
     """Render the full report page and return it as text."""
     out = []
@@ -1475,14 +2395,20 @@ def render_html(
     out.append("</nav>")
     out.append("<main>")
     for section in sections:
+        if section.get("anchor") == "rankings" and weeks_iso is not None:
+            out.extend(
+                period_picker_lines(
+                    weeks_iso, default_start or 0, default_end or 0
+                )
+            )
         out.append('<section class="period" id="')
         out[-1] += section["anchor"] + '">'
         out.append("<h2>" + html.escape(section["label"]) + "</h2>")
         total_unit = section.get("total_unit", "merged PRs.")
         out.append(
-            '<p class="range">'
+            '<p class="range"><span data-range>'
             + html.escape(section["range_text"])
-            + ' - <span data-total>'
+            + '</span> - <span data-total>'
             + str(section["pr_total"])
             + " "
             + html.escape(total_unit)
@@ -1490,10 +2416,16 @@ def render_html(
         )
         out.append('<div class="grid">')
         for card in section["cards"]:
-            article_open = '<article class="card" id="card-'
-            article_open += card["metric"] + "-" + str(card["weeks"])
-            article_open += '" data-weeks="' + str(card["weeks"])
-            article_open += '" data-metric="' + card["metric"] + '">'
+            metric = card["metric"]
+            weeks_val = card.get("weeks")
+            if weeks_val is None:
+                article_open = '<article class="card" id="card-'
+                article_open += metric + '" data-metric="' + metric + '">'
+            else:
+                article_open = '<article class="card" id="card-'
+                article_open += metric + "-" + str(weeks_val)
+                article_open += '" data-weeks="' + str(weeks_val)
+                article_open += '" data-metric="' + metric + '">'
             out.append(article_open)
             out.append("<h3>" + html.escape(card["title"]) + "</h3>")
             if card.get("ranked") is not None:
@@ -1502,8 +2434,11 @@ def render_html(
                         card["ranked"], TABLE_LIMIT
                     )
                 else:
-                    fragment = "#card-" + card["metric"]
-                    fragment += "-" + str(card["weeks"])
+                    if weeks_val is None:
+                        fragment = "#rankings"
+                    else:
+                        fragment = "#card-" + metric
+                        fragment += "-" + str(weeks_val)
                     table_rows = table_lines(
                         card["ranked"], TABLE_LIMIT, link_for, fragment
                     )
@@ -1581,22 +2516,13 @@ def render_html(
     return "\n".join(out) + "\n"
 
 
-def sparse_detail(weekly, only=None):
-    """Nest sparse weekly pairs by handle and repo."""
-    by_handle = {}
-    for index, handles in enumerate(weekly):
-        for handle, repos in handles.items():
-            if only is not None and handle != only:
-                continue
-            target = by_handle.setdefault(handle, {})
-            for repo, value in repos.items():
-                if value:
-                    target.setdefault(repo, []).append([index, value])
-    return by_handle
-
-
 def build_handle_sections(handle, detail, week_starts):
-    """Build sections for one handle."""
+    """Build overview plus one dynamic ranking section."""
+    weeks_iso = [week.date().isoformat() for week in week_starts]
+    default_start = FETCH_WEEKS - DEFAULT_PERIOD_WEEKS
+    default_end = FETCH_WEEKS - 1
+    default_labels = weeks_iso[default_start:default_end + 1]
+    default_range = range_text_for(weeks_iso, default_start, default_end)
     sections = []
     start_all = week_starts[0]
     end_all = week_starts[FETCH_WEEKS - 1]
@@ -1632,65 +2558,50 @@ def build_handle_sections(handle, detail, week_starts):
             ],
         }
     )
-    for label, week_count in PERIODS:
-        anchor = "last-" + str(week_count) + "-weeks"
-        start = week_starts[FETCH_WEEKS - week_count]
-        end = week_starts[FETCH_WEEKS - 1]
-        end_day = end + datetime.timedelta(days=6)
-        range_text = start.date().isoformat()
-        range_text += " to " + end_day.date().isoformat()
-        labels = []
-        first = FETCH_WEEKS - week_count
-        for index in range(first, FETCH_WEEKS):
-            labels.append(week_starts[index].date().isoformat())
-        cards = []
-        merged_total = 0
-        for key, metric_title in METRICS:
-            card_title = (
-                metric_title + " (" + label.lower() + ", by " + handle + ")"
-            )
-            repo_totals = {}
-            for index in range(first, FETCH_WEEKS):
+    cards = []
+    merged_total = 0
+    for key, metric_title in METRICS:
+        repo_totals = {}
+        for index in range(default_start, default_end + 1):
+            repos = detail[key][index].get(handle, {})
+            for repo, value in repos.items():
+                repo_totals[repo] = repo_totals.get(repo, 0) + value
+        ranked = sorted(
+            repo_totals.items(),
+            key=lambda item: (-item[1], item[0].lower()),
+        )
+        if key == "merged":
+            merged_total = sum(repo_totals.values())
+        top_repos = [repo for repo, _ in ranked[:CHART_LIMIT]]
+        series = {}
+        for repo in top_repos:
+            values = []
+            for index in range(default_start, default_end + 1):
                 repos = detail[key][index].get(handle, {})
-                for repo, value in repos.items():
-                    repo_totals[repo] = repo_totals.get(repo, 0) + value
-            ranked = sorted(
-                repo_totals.items(),
-                key=lambda item: (-item[1], item[0].lower()),
-            )
-            if key == "merged":
-                merged_total = sum(repo_totals.values())
-            top_repos = [repo for repo, _ in ranked[:CHART_LIMIT]]
-            series = {}
-            for repo in top_repos:
-                values = []
-                for index in range(first, FETCH_WEEKS):
-                    repos = detail[key][index].get(handle, {})
-                    values.append(repos.get(repo, 0))
-                series[repo] = values
-            chart_id = "chart-handle-" + key + "-" + str(week_count)
-            cards.append(
-                {
-                    "title": card_title,
-                    "ranked": ranked,
-                    "table_kind": "repos",
-                    "weeks": week_count,
-                    "metric": key,
-                    "labels": labels,
-                    "series": series,
-                    "unit": metric_title,
-                    "chart_id": chart_id,
-                }
-            )
-        sections.append(
+                values.append(repos.get(repo, 0))
+            series[repo] = values
+        chart_id = "chart-handle-" + key
+        cards.append(
             {
-                "anchor": anchor,
-                "label": label,
-                "range_text": range_text,
-                "pr_total": merged_total,
-                "cards": cards,
+                "title": metric_title,
+                "ranked": ranked,
+                "table_kind": "repos",
+                "metric": key,
+                "labels": default_labels,
+                "series": series,
+                "unit": metric_title,
+                "chart_id": chart_id,
             }
         )
+    sections.append(
+        {
+            "anchor": "rankings",
+            "label": "Rankings",
+            "range_text": default_range,
+            "pr_total": merged_total,
+            "cards": cards,
+        }
+    )
     return sections
 
 
@@ -1782,6 +2693,72 @@ def main(organization, repository):
             total,
         )
 
+    week_starts = []
+    for index in range(FETCH_WEEKS):
+        week_starts.append(first_start + datetime.timedelta(days=index * 7))
+    weeks_iso = [w.date().isoformat() for w in week_starts]
+    day_to_week = {}
+    for week_iso, week_start in zip(weeks_iso, week_starts):
+        for offset in range(DAYS_PER_WEEK):
+            day_iso = (
+                week_start + datetime.timedelta(days=offset)
+            ).date().isoformat()
+            day_to_week[day_iso] = week_iso
+    cached_weeks = database.get("weekly_stats")
+    if not isinstance(cached_weeks, dict):
+        cached_weeks = {}
+    cached_version = database.get("weekly_stats_version")
+    if not isinstance(cached_version, int):
+        cached_version = 0
+    if cached_version != WEEKLY_STATS_VERSION:
+        dirty_weeks = set(weeks_iso)
+    else:
+        dirty_weeks = set()
+        for week_iso in weeks_iso:
+            if not week_entry_is_valid(cached_weeks.get(week_iso)):
+                dirty_weeks.add(week_iso)
+        for day_text in missing_days:
+            week_iso = day_to_week.get(day_text)
+            if week_iso is not None:
+                dirty_weeks.add(week_iso)
+    if dirty_weeks:
+        buckets = {week_iso: [] for week_iso in dirty_weeks}
+        for stored in database["pull_requests"].values():
+            raw_time = stored.get("merged_at") or ""
+            if len(raw_time) < 10:
+                continue
+            day_text = raw_time[:10]
+            if day_is_iso_date(day_text):
+                week_iso = day_to_week.get(day_text)
+                if week_iso is None or week_iso not in buckets:
+                    continue
+                buckets[week_iso].append(stored)
+                continue
+            try:
+                merged_time = parse_github_time(raw_time)
+            except ValueError:
+                continue
+            if merged_time < first_start or merged_time >= current_start:
+                continue
+            delta = (merged_time - first_start).total_seconds()
+            index = int(delta // SECONDS_PER_WEEK)
+            if index < 0 or index >= FETCH_WEEKS:
+                continue
+            week_iso = weeks_iso[index]
+            if week_iso in buckets:
+                buckets[week_iso].append(stored)
+        for week_iso in weeks_iso:
+            if week_iso in dirty_weeks:
+                cached_weeks[week_iso] = compute_week_stats(
+                    buckets.get(week_iso, [])
+                )
+    for week_iso in list(cached_weeks):
+        if week_iso not in weeks_iso:
+            del cached_weeks[week_iso]
+    database["weekly_stats"] = cached_weeks
+    database["weekly_stats_version"] = WEEKLY_STATS_VERSION
+    save_database(database_path, database)
+
     merged_weekly = [{} for _ in range(FETCH_WEEKS)]
     authored_weekly = [{} for _ in range(FETCH_WEEKS)]
     reviewed_weekly = [{} for _ in range(FETCH_WEEKS)]
@@ -1797,54 +2774,36 @@ def main(organization, repository):
         "loc": [{} for _ in range(FETCH_WEEKS)],
         "combined": [{} for _ in range(FETCH_WEEKS)],
     }
-    week_starts = []
-    for index in range(FETCH_WEEKS):
-        week_starts.append(first_start + datetime.timedelta(days=index * 7))
-    for stored in database["pull_requests"].values():
-        raw_time = stored.get("merged_at") or ""
-        if not raw_time:
-            continue
-        try:
-            merged_time = parse_github_time(raw_time)
-        except ValueError:
-            continue
-        delta = (merged_time - first_start).total_seconds()
-        index = int(delta // SECONDS_PER_WEEK)
-        if index < 0 or index >= FETCH_WEEKS:
-            continue
-        org_weekly[index] += 1
-        author = stored.get("author") or ""
-        merger = stored.get("merged_by") or ""
-        credited = credited_author(author, merger)
-        if credited:
-            all_handles.add(credited)
-        if merger:
-            all_handles.add(merger)
-        org_name = stored.get("organization") or ""
-        repo_name = stored.get("repository") or ""
-        repo_key = ""
-        if org_name and repo_name:
-            repo_key = org_name + "/" + repo_name
-        bump(merged_weekly[index], merger)
-        bump(authored_weekly[index], credited)
-        bump_nested(detail["merged"], index, merger, repo_key)
-        bump_nested(detail["authored"], index, credited, repo_key)
-        for handle in {credited, merger}:
-            if not handle:
-                continue
-            bump_nested(detail["combined"], index, handle, repo_key)
-        for reviewer in stored.get("reviewers") or []:
-            bump(reviewed_weekly[index], reviewer)
-            bump_nested(detail["reviewed"], index, reviewer, repo_key)
-            if reviewer:
-                all_handles.add(reviewer)
-        loc = stored.get("loc") or 0
-        for handle in {credited, merger}:
-            bump(loc_weekly[index], handle, loc)
-            bump_nested(detail["loc"], index, handle, repo_key, loc)
-        if repo_key:
-            all_repos.add(repo_key)
+    for index, week_iso in enumerate(weeks_iso):
+        entry = cached_weeks.get(week_iso) or {}
+        for key in ("merged", "authored", "reviewed", "loc", "combined"):
+            week_detail = entry.get(key)
+            if isinstance(week_detail, dict):
+                detail[key][index] = week_detail
+        for key, weekly in (
+            ("merged", merged_weekly),
+            ("authored", authored_weekly),
+            ("reviewed", reviewed_weekly),
+            ("loc", loc_weekly),
+        ):
+            totals = {}
+            for handle, repos in detail[key][index].items():
+                handle_total = sum(repos.values())
+                if handle_total:
+                    totals[handle] = handle_total
+            weekly[index] = totals
+        week_org_total = entry.get("org_total") or 0
+        org_weekly[index] = week_org_total
+        for credited, merger, repo_key in entry.get("org_prs") or []:
             org_prs.append([index, credited, merger, repo_key])
+    for metric in detail:
+        for index in range(FETCH_WEEKS):
+            for handle, repos in detail[metric][index].items():
+                if handle:
+                    all_handles.add(handle)
+                for repo_key in repos:
+                    if repo_key:
+                        all_repos.add(repo_key)
 
     weeklies = {
         "merged": merged_weekly,
@@ -1852,8 +2811,23 @@ def main(organization, repository):
         "reviewed": reviewed_weekly,
         "loc": loc_weekly,
     }
+    default_start = FETCH_WEEKS - DEFAULT_PERIOD_WEEKS
+    default_end = FETCH_WEEKS - 1
+    default_labels = weeks_iso[default_start:default_end + 1]
+    default_range = range_text_for(weeks_iso, default_start, default_end)
+    default_pr_total = sum(org_weekly[default_start:default_end + 1])
     org_labels = [w.date().isoformat() for w in week_starts]
     handles_with_pages = set()
+    for key in ("merged", "authored", "reviewed", "loc"):
+        _full_totals, full_ranked = summarize_period(weeklies[key], 52)
+        _def_totals, def_ranked = summarize_period(
+            weeklies[key], DEFAULT_PERIOD_WEEKS
+        )
+        if repository is None:
+            for handle, _ in full_ranked[:TABLE_LIMIT]:
+                handles_with_pages.add(handle)
+            for handle, _ in def_ranked[:TABLE_LIMIT]:
+                handles_with_pages.add(handle)
     org_end = week_starts[-1] + datetime.timedelta(days=6)
     org_range = week_starts[0].date().isoformat()
     org_range += " to " + org_end.date().isoformat()
@@ -1877,72 +2851,44 @@ def main(organization, repository):
             ],
         }
     ]
-    for label, week_count in PERIODS:
-        anchor = "last-" + str(week_count) + "-weeks"
-        start = week_starts[FETCH_WEEKS - week_count]
-        end = week_starts[FETCH_WEEKS - 1]
-        end_day = end + datetime.timedelta(days=6)
-        range_text = start.date().isoformat()
-        range_text += " to " + end_day.date().isoformat()
-        labels = []
-        for index in range(FETCH_WEEKS - week_count, FETCH_WEEKS):
-            labels.append(week_starts[index].date().isoformat())
-        pr_total = 0
-        for stored in database["pull_requests"].values():
-            raw_time = stored.get("merged_at") or ""
-            if not raw_time:
-                continue
-            try:
-                merged_time = parse_github_time(raw_time)
-            except ValueError:
-                continue
-            if start <= merged_time < current_start:
-                pr_total += 1
-        cards = []
-        for key, metric_title in METRICS:
-            _totals, ranked = summarize_period(weeklies[key], week_count)
-            card_title = metric_title + " (" + label.lower() + ")"
-            if repository is None:
-                for handle, _ in ranked[:TABLE_LIMIT]:
-                    handles_with_pages.add(handle)
-            top_handles = [h for h, _ in ranked[:CHART_LIMIT]]
-            series = weekly_values(weeklies[key], top_handles, week_count)
-            chart_id = "chart-" + key + "-" + str(week_count)
-            cards.append(
-                {
-                    "title": card_title,
-                    "ranked": ranked,
-                    "labels": labels,
-                    "weeks": week_count,
-                    "metric": key,
-                    "series": series,
-                    "unit": metric_title,
-                    "chart_id": chart_id,
-                }
-            )
-        sections.append(
+    ranking_cards = []
+    for key, metric_title in METRICS:
+        _totals, ranked = summarize_period(
+            weeklies[key], DEFAULT_PERIOD_WEEKS
+        )
+        top_handles = [h for h, _ in ranked[:CHART_LIMIT]]
+        series = weekly_slice_values(
+            weeklies[key], top_handles, default_start, default_end
+        )
+        chart_id = "chart-" + key
+        ranking_cards.append(
             {
-                "anchor": anchor,
-                "label": label,
-                "range_text": range_text,
-                "pr_total": pr_total,
-                "cards": cards,
+                "title": metric_title,
+                "ranked": ranked,
+                "labels": default_labels,
+                "metric": key,
+                "series": series,
+                "unit": metric_title,
+                "chart_id": chart_id,
             }
         )
+    sections.append(
+        {
+            "anchor": "rankings",
+            "label": "Rankings",
+            "range_text": default_range,
+            "pr_total": default_pr_total,
+            "cards": ranking_cards,
+        }
+    )
 
     title = "Dev rankings for " + scope_text
     made_text = now.strftime("%Y-%m-%d %H:%M UTC")
     sorted_repos = sorted(all_repos, key=lambda repo: (repo.lower(), repo))
     sorted_handles = sorted(all_handles, key=lambda h: (h.lower(), h))
-    filter_labels = {}
-    for label_weeks in (1, 4, 12, 52):
-        week_labels = []
-        for index in range(FETCH_WEEKS - label_weeks, FETCH_WEEKS):
-            week_labels.append(week_starts[index].date().isoformat())
-        filter_labels[str(label_weeks)] = week_labels
     filter_metrics = {}
     for key in ("merged", "authored", "reviewed", "loc", "combined"):
-        filter_metrics[key] = sparse_detail(detail[key])
+        filter_metrics[key] = dense_detail(detail[key])
     # org_prs already holds one entry per merged pull request.
     filter_json = json.dumps(
         {
@@ -1951,7 +2897,7 @@ def main(organization, repository):
                 "orgMode": repository is None,
             },
             "repos": sorted_repos,
-            "labels": filter_labels,
+            "weeks": weeks_iso,
             "metrics": filter_metrics,
             "handles": sorted_handles,
             "org": org_prs,
@@ -1981,6 +2927,9 @@ def main(organization, repository):
         sorted_handles,
         filter_json,
         highlight_box=True,
+        weeks_iso=weeks_iso,
+        default_start=default_start,
+        default_end=default_end,
     )
     file_name = "dev-rankings-" + slug + ".html"
     html_path = os.path.join(state_root, file_name)
@@ -2002,7 +2951,7 @@ def main(organization, repository):
             profile_link = '<a href="' + profile + '">' + handle + "</a>"
             handle_metrics = {}
             for key in ("merged", "authored", "reviewed", "loc", "combined"):
-                handle_metrics[key] = sparse_detail(detail[key], handle)
+                handle_metrics[key] = dense_detail(detail[key], handle)
             handle_json = json.dumps(
                 {
                     "meta": {
@@ -2010,7 +2959,7 @@ def main(organization, repository):
                         "orgMode": True,
                     },
                     "repos": sorted_repos,
-                    "labels": filter_labels,
+                    "weeks": weeks_iso,
                     "metrics": handle_metrics,
                     "handles": sorted_handles,
                     "handle": handle,
@@ -2032,6 +2981,9 @@ def main(organization, repository):
                 sorted_repos,
                 sorted_handles,
                 handle_json,
+                weeks_iso=weeks_iso,
+                default_start=default_start,
+                default_end=default_end,
             )
             handle_path = os.path.join(
                 state_root, handle_file_name(slug, handle)
