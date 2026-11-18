@@ -84,8 +84,10 @@
   business perspective when there's no user-facing change but the change still
   has some internal business impact.
 - Explain in that section the change from a user and business view.
-- Omit function names, variable names, layer names, and database terms unless a
-  term explains a business change.
+- Omit from that section symbols, file paths, line numbers, mathematical
+  operations, algorithm discussions, function names, variable names, layer
+  names, database terms, and other nitty-gritty details unless a term explains
+  a business change.
 - If the change alters what the user sees or does, state the current behavior
   and the new behavior after release.
 - If the change has no user effect, state the prior business problem and the
@@ -95,7 +97,18 @@
 - Explain in that section high-level technical choices of interest to a lead or
   manager.
 - Focus in that section on architecture, performance, safety, and security.
-- Omit from that section function names, variable names, and layer names.
+- Omit from that section symbols, file paths, line numbers, function names,
+  variable names, layer names, database terms, and other nitty-gritty details.
+- Keep in that section mathematical operations and algorithm discussions only
+  when an engineering manager needs them to review the change.
+- Add after the Technical Details section, or after the What section when there
+  is no Technical Details section, a collapsible section named Agent Notes if
+  the item holds nitty-gritty details of interest to a future agent or
+  reviewer.
+- Put in that section symbols, file paths, line numbers, mathematical
+  operations, algorithm discussions, and other implementation details.
+- Mark that section as collapsed or collapsible with the tracker's native
+  feature when the tracker supports it, so high-level sections stay in focus.
 - Use GitHub-flavored Markdown tables when a table scans faster than prose.
   Prefer tables for timelines, event sequences, comparisons, and other
   structured facts.
