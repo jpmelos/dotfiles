@@ -356,6 +356,35 @@ vim.api.nvim_exec2(
         function! StatusLineFileName() abort
             return expand("%:.")
         endfunction
+
+        " Format lines like `gq`, but with 'indentexpr' turned off. Filetype
+        " indent expressions can take a bracket in a comment or a docstring
+        " for code, and then align the next line with that bracket. This is a
+        " Vimscript function, so that Vim keeps the `gq` command for `.`.
+        function! FormatText() abort
+            " In Insert mode, Vim calls 'formatexpr' to wrap long lines. A
+            " non-zero value tells Vim to use its internal formatter.
+            if mode() =~# '^[iR]'
+                return 1
+            endif
+
+            let first_line = v:lnum
+            let line_count = v:count
+            let saved_indentexpr = &l:indentexpr
+            let saved_smartindent = &l:smartindent
+            try
+                setlocal indentexpr= nosmartindent
+                call cursor(first_line, 1)
+                " Unlike `gq`, `gw` does not call 'formatexpr'.
+                execute 'normal! ' .. line_count .. 'gww'
+                " Leave the cursor on the last formatted line, like `gq`.
+                call setpos('.', getpos("']"))
+            finally
+                let &l:indentexpr = saved_indentexpr
+                let &l:smartindent = saved_smartindent
+            endtry
+            return 0
+        endfunction
     ]],
     {}
 )

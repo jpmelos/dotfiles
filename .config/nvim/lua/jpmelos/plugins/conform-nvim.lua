@@ -355,12 +355,12 @@ return {
             end,
         })
 
-        -- Use Vim's internal formatter, instead of `conform.nvim` or an LSP's,
-        -- for `gq`. We already don't set this normally, but some LSPs will
-        -- change this when they attach to a buffer.
+        -- Use the global `formatexpr` from `options.lua`, instead of the one
+        -- from `conform.nvim` or an LSP, for `gq`. Some LSPs change this when
+        -- they attach to a buffer.
         api.nvim_create_autocmd("LspAttach", {
             callback = function(args)
-                bo[args.buf].formatexpr = ""
+                bo[args.buf].formatexpr = vim.go.formatexpr
             end,
         })
 

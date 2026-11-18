@@ -83,8 +83,8 @@ opt.textwidth = 79
 -- -p: Don't break lines at '.' followed by just one space. This is good for
 --     people who put two spaces after periods, which I don't.
 opt.formatoptions = "ro/qn]j"
--- Use Vim's default formatter.
-opt.formatexpr = ""
+-- Use Vim's internal formatter through `FormatText()`.
+opt.formatexpr = "FormatText()"
 -- Use Vim's default formatter.
 opt.formatprg = ""
 
