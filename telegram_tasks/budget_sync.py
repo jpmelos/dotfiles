@@ -555,7 +555,9 @@ def read_config_text(path):
 
 # The base of the OpenCode Go inference API for payee suggestions.
 OPENCODE_BASE_URL = "https://opencode.ai/inference/go/openai/v1"
-# Suggested YNAB payees by bank payee without case, so repeats skip the LLM.
+# Suggested YNAB payees by bank payee without case with the YNAB payees
+# and the history in scope, so repeats skip the LLM, while new payees from
+# the current session still trigger a fresh lookup.
 _PAYEE_SUGGESTION_CACHE = {}
 # The user agent of the payee suggestion client. OpenCode Go asks each client
 # to identify itself with its own name, not with a generic SDK name.
@@ -646,17 +648,51 @@ def build_payee_history(decisions):
     ]
 
 
+def record_session_choice(payee_history, payee_names, bank_payee, payee):
+    # Records one session bank to YNAB choice for later LLM suggestions.
+    # A new regular payee joins `payee_names` at once, so later prompts list
+    # it with the YNAB payees. The pair joins `payee_history` at once, so
+    # later prompts prefer session choices like past ones. Transfers never
+    # join `payee_names`, since they are not regular payees.
+    if not isinstance(payee, str) or not payee.strip():
+        return
+    if (
+        payee_names is not None
+        and transfer_target(payee) is None
+        and payee not in payee_names
+    ):
+        payee_names.append(payee)
+    if payee_history is None:
+        return
+    bank = (bank_payee or "").strip()
+    chosen = payee.strip()
+    if not bank or not chosen:
+        return
+    for index, (old_bank, old_payee, count) in enumerate(payee_history):
+        if old_bank == bank and old_payee == chosen:
+            payee_history[index] = (old_bank, old_payee, count + 1)
+            break
+    else:
+        payee_history.append((bank, chosen, 1))
+    payee_history.sort(key=lambda item: (-item[2], item[0], item[1]))
+
+
 def suggest_payees_with_llm(
     bank_payee, payee_names, api_key, model, payee_history=None
 ):
     # Returns up to three YNAB payee names most likely to match `bank_payee`,
     # via the LLM. Returns an empty list on any failure, so the caller falls
     # back to the manual question. `payee_history` holds the past bank to
-    # YNAB associations from the transaction database, so the LLM prefers
-    # past choices for the same or similar bank payee.
+    # YNAB associations from the transaction database with the choices of
+    # the current session, so the LLM prefers past choices for the same or
+    # similar bank payee. `payee_names` holds the YNAB payees with the new
+    # payees of the current session, so the LLM can suggest those too.
     if not bank_payee or not payee_names or not api_key or not model:
         return []
-    cache_key = bank_payee.strip().casefold()
+    bank_key = bank_payee.strip().casefold()
+    payee_key = tuple(sorted(name.casefold() for name in payee_names))
+    history_key = tuple(payee_history) if payee_history else ()
+    cache_key = (bank_key, payee_key, history_key)
     if cache_key in _PAYEE_SUGGESTION_CACHE:
         return _PAYEE_SUGGESTION_CACHE[cache_key]
     try:
@@ -1845,9 +1881,10 @@ def ask_all_payees(
 ):
     # Asks payees for sides still needing them, with transfer matching and
     # LLM suggestions. `payee_history` holds the past bank to YNAB
-    # associations for the LLM. A confirmed new payee joins `payee_names` at
-    # once, so reuse in the same session skips confirmation. Returns paired
-    # side ids with updated remembered keys.
+    # associations with the choices of the current session for the LLM. A
+    # confirmed new payee joins `payee_names` at once, so later prompts list
+    # it with the YNAB payees and reuse in the same session skips
+    # confirmation. Returns paired side ids with updated remembered keys.
     if payee_names is None:
         payee_names = []
     paired_ids = set()
@@ -1880,6 +1917,22 @@ def ask_all_payees(
                             sides, lookup, side_id, match_id
                         )
                     )
+                    record_session_choice(
+                        payee_history,
+                        payee_names,
+                        side["bank_payee"],
+                        sides[side_id]["payee"],
+                    )
+                    record_session_choice(
+                        payee_history,
+                        payee_names,
+                        sides[match_id]["bank_payee"],
+                        sides[match_id]["payee"],
+                    )
+                    continue
+            record_session_choice(
+                payee_history, payee_names, side["bank_payee"], side["payee"]
+            )
             continue
         payee = ask_payee_for_side(
             ctx,
@@ -1895,6 +1948,9 @@ def ask_all_payees(
         if not is_managed_transfer_side(side):
             side["memo"] = ask_memo_for_side(side)
             side["needs_payee"] = False
+            record_session_choice(
+                payee_history, payee_names, side["bank_payee"], side["payee"]
+            )
             continue
         match_id = pair_transfer_side(ctx, side_id, sides, paired_ids, groups)
         if match_id is not None:
@@ -1903,9 +1959,24 @@ def ask_all_payees(
             updated_keys.update(
                 write_paired_decisions(sides, lookup, side_id, match_id)
             )
+            record_session_choice(
+                payee_history,
+                payee_names,
+                side["bank_payee"],
+                sides[side_id]["payee"],
+            )
+            record_session_choice(
+                payee_history,
+                payee_names,
+                sides[match_id]["bank_payee"],
+                sides[match_id]["payee"],
+            )
         else:
             side["memo"] = ask_memo_for_side(side)
             side["needs_payee"] = False
+            record_session_choice(
+                payee_history, payee_names, side["bank_payee"], side["payee"]
+            )
     return paired_ids, updated_keys
 
 
