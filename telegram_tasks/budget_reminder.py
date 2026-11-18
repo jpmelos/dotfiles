@@ -8,8 +8,8 @@
 # Run it with `/budget_reminder` from the allowlisted chat. Optional words
 # after the name are `--skip`.
 #
-# With `--skip`, the task records today as skipped and stays silent. Later
-# runs stay silent for the rest of the day. They skip the check of the
+# With `--skip`, the task records today as skipped and replies to confirm.
+# Later runs stay silent for the rest of the day. They skip the check of the
 # last-run state.
 
 NAME = "budget_reminder"
@@ -34,6 +34,7 @@ LAST_RUN_ID = "last_run.json"
 # The state identifier where this task records a skipped day.
 SKIP_ID = "skip.json"
 REMINDER_MESSAGE = "Run `/budget_sync`, it's still pending today."
+SKIP_MESSAGE = "Skipping budget reminders for today."
 
 
 class TaskError(Exception):
@@ -68,12 +69,14 @@ def parse_task_args(args):
 
 
 def run(ctx, args=None):
-    """Remind when budget_sync has not run today. Stays silent otherwise."""
+    """Remind when budget_sync has not run today. Stays silent otherwise,
+    except `--skip` replies to confirm."""
     skip = parse_task_args(list(args or []))
     if skip:
         record_skip(ctx)
-        ctx.log("budget_sync already ran today, staying silent.")
-        return "budget_sync already ran today."
+        ctx.say(SKIP_MESSAGE)
+        ctx.log("Skipping budget reminders for today.")
+        return "Skipping budget reminders for today."
     if skipped_today(ctx):
         ctx.log("budget_sync already ran today, staying silent.")
         return "budget_sync already ran today."
@@ -87,8 +90,8 @@ def run(ctx, args=None):
 
 def record_skip(ctx):
     # Records today as skipped, so later runs stay silent for the rest of
-    # the day. A failure to store only warns, so the current run still stays
-    # silent.
+    # the day. A failure to store only warns, so the current run still
+    # replies to confirm.
     today = datetime.date.today().isoformat()
     try:
         ctx.save_state(SKIP_ID, {"date": today})
