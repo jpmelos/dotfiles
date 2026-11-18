@@ -214,7 +214,9 @@ def main(
     Chat commands:
       /<task> [...] - start a task; only one task runs at a time. The
       task name is its declared NAME, and any shorthand works too
-      (/budget_sync, /b, /br).
+      (/budget_sync, /b, /br). A task may also define extra menu
+      commands in MENU_COMMANDS, which start the same task with preset
+      words.
       /status - show uptime, the running task, and the last result
       /cancel - stop the running task; its shutdown hook still runs
       /help - show the commands
@@ -230,7 +232,8 @@ def main(
       letter or digit. The NAME is the task name in /<task>, /status,
       and the state directory. A task module must define NAME and run,
       and may define DESCRIPTION, TIMEOUT, SCHEDULE, SCHEDULE_ARGS,
-      SHORTHAND, SHORTHANDS, MENU, HELP, and shutdown. SHORTHAND holds
+      SHORTHAND, SHORTHANDS, MENU, MENU_COMMANDS, HELP, and shutdown.
+      SHORTHAND holds
       one shorthand string such as "bs", and SHORTHANDS holds a tuple
       or list of them; a shorthand works everywhere the task name
       works, including as
@@ -240,6 +243,15 @@ def main(
       the flags it accepts, shown under the task in /help. Set MENU to
       True to list the task in the Telegram menu; without it the task
       still runs as /<task> and appears in /help, but the menu omits it.
+      MENU_COMMANDS holds extra menu entries for the task as a tuple
+      or list of (command, description) or (command, description, args)
+      entries. Each command holds letters, digits, and _, starting with
+      a letter or digit, and runs the task with its args plus any words
+      after the command. Each description shows in the menu and /help.
+      Each args holds a tuple or list of words, or a single word. Set
+      it to offer a shortcut such as (("budget_reminder_skip",
+      "Skip today's reminders.", ("--skip",)),). Without it the task
+      has no extra menu entries.
       run takes run(ctx)
       or run(ctx, args) and may be async. shutdown is optional as
       shutdown(ctx) or shutdown(ctx, reason) and runs once after every
@@ -929,6 +941,7 @@ class TaskSpec:
     shorthands: tuple = ()
     menu: bool = False
     help: str = ""
+    menu_commands: tuple = ()
 
 
 def read_task_name(path):
@@ -984,9 +997,10 @@ def read_task_menu(path):
 
 def discover_tasks(tasks_dir):
     # Lists the tasks without executing their code. NAME, DESCRIPTION,
-    # HELP, SHORTHAND, SHORTHANDS, and MENU come from a syntax tree scan,
-    # so listing never runs task code. Files that start with _ or . are
-    # ignored. The file name is not the task name; NAME declares it.
+    # HELP, SHORTHAND, SHORTHANDS, MENU, and MENU_COMMANDS come from a
+    # syntax tree scan, so listing never runs task code. Files that
+    # start with _ or . are ignored. The file name is not the task
+    # name; NAME declares it.
     specs = {}
     if not os.path.isdir(tasks_dir):
         return specs
@@ -1017,6 +1031,7 @@ def discover_tasks(tasks_dir):
             shorthands=shorthands,
             menu=read_task_menu(path),
             help=read_task_help(path),
+            menu_commands=read_task_menu_commands(path),
         )
     return specs
 
@@ -1058,12 +1073,14 @@ def menu_command_for_task(name):
 
 
 def build_task_command_map(specs):
-    # Maps every accepted chat command to its task spec. Accepts the
-    # declared NAME (for example budget_sync) and every shorthand (for
-    # example b), plus their Telegram menu names. Keys are lowercased
-    # because incoming commands arrive lowercased. The first task in
-    # sorted order wins when several names share one command, so the
-    # choice stays deterministic.
+    # Maps every accepted chat command to its (task spec, preset args).
+    # Accepts the declared NAME (for example budget_sync) and every
+    # shorthand (for example b), plus their Telegram menu names, with no
+    # preset args. Also accepts each MENU_COMMANDS entry, with its preset
+    # args plus any words after the command. Keys are lowercased because
+    # incoming commands arrive lowercased. Task names win over custom
+    # commands, and the first task in sorted order wins otherwise, so
+    # the choice stays deterministic.
     mapping = {}
     for task_name in sorted(specs):
         spec = specs[task_name]
@@ -1075,7 +1092,12 @@ def build_task_command_map(specs):
             if not candidate:
                 continue
             if candidate not in mapping:
-                mapping[candidate] = spec
+                mapping[candidate] = (spec, ())
+    for task_name in sorted(specs):
+        spec = specs[task_name]
+        for command, _description, preset in spec.menu_commands:
+            if command not in mapping:
+                mapping[command] = (spec, preset)
     return mapping
 
 
@@ -1177,6 +1199,90 @@ def read_task_shorthands(path):
         if item not in seen:
             seen.add(item)
             result.append(item)
+    return tuple(result)
+
+
+def read_task_menu_commands(path):
+    # Returns the ((menu command, description, preset args), ...) tuple of
+    # the task file, or an empty tuple when the file defines none.
+    # MENU_COMMANDS holds a tuple or list of (command, description) or
+    # (command, description, args) entries. Each command holds letters,
+    # digits, and _, starting with a letter or digit; it becomes the
+    # Telegram menu command after lowercasing. Each description shows in
+    # the menu and /help. Each args holds a tuple or list of words, or a
+    # single word, passed to run before any words after the command. Only
+    # valid entries count, so an invalid entry never becomes a command.
+    # Read from the syntax tree, so no task code runs. Never raises, so
+    # listing stays quiet on bad values.
+    try:
+        with open(path, encoding="utf-8") as handle:
+            tree = ast.parse(handle.read(), filename=path)
+    except (OSError, SyntaxError, ValueError):
+        return ()
+    found = []
+    for node in tree.body:
+        if not (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id == "MENU_COMMANDS"
+        ):
+            continue
+        if not isinstance(node.value, (ast.List, ast.Tuple)):
+            continue
+        for entry in node.value.elts:
+            if not isinstance(entry, (ast.List, ast.Tuple)):
+                continue
+            if len(entry.elts) not in (2, 3):
+                continue
+            raw_command, raw_desc = entry.elts[0], entry.elts[1]
+            if not isinstance(
+                raw_command, ast.Constant
+            ) or not isinstance(raw_command.value, str):
+                continue
+            if not isinstance(
+                raw_desc, ast.Constant
+            ) or not isinstance(raw_desc.value, str):
+                continue
+            text = raw_command.value.strip()
+            if not TASK_NAME_PATTERN.fullmatch(text):
+                continue
+            command = menu_command_for_task(text)
+            if not command:
+                continue
+            description = raw_desc.value.strip()
+            preset = ()
+            if len(entry.elts) == 3:
+                raw_args = entry.elts[2]
+                if isinstance(raw_args, ast.Constant) and isinstance(
+                    raw_args.value, str
+                ):
+                    word = raw_args.value.strip()
+                    preset = (word,) if word else ()
+                elif isinstance(raw_args, (ast.List, ast.Tuple)):
+                    words = []
+                    valid = True
+                    for part in raw_args.elts:
+                        if not isinstance(
+                            part, ast.Constant
+                        ) or not isinstance(part.value, str):
+                            valid = False
+                            break
+                        word = part.value.strip()
+                        if word:
+                            words.append(word)
+                    if not valid:
+                        continue
+                    preset = tuple(words)
+                else:
+                    continue
+            found.append((command, description, preset))
+    seen = set()
+    result = []
+    for command, description, preset in found:
+        if command not in seen:
+            seen.add(command)
+            result.append((command, description, preset))
     return tuple(result)
 
 
@@ -2006,11 +2112,11 @@ class Bot:
     def register_commands(self):
         # Publishes the command menu via setMyCommands, so clients show
         # the commands in the menu and autocomplete. Only tasks that set
-        # MENU to True appear here; the rest still run as commands and
-        # appear in /help. Task commands come first, sorted
-        # alphabetically, then the other commands, also sorted
-        # alphabetically. A failure only warns, so polling still starts
-        # without a menu.
+        # MENU to True appear here, plus each MENU_COMMANDS entry; the
+        # rest still run as commands and appear in /help. Task commands
+        # come first, sorted alphabetically, then the other commands,
+        # also sorted alphabetically. A failure only warns, so polling
+        # still starts without a menu.
         specs = discover_tasks(self.tasks_dir)
         seen = {}
         for name in sorted(specs):
@@ -2032,7 +2138,35 @@ class Bot:
                 continue
             seen[menu_command] = name
         builtin_names = {name for name, _description in BOT_COMMANDS}
-        task_commands = []
+        custom_tasks = {}
+        custom_descs = {}
+        for name in sorted(specs):
+            for command, desc, preset in specs[name].menu_commands:
+                if command in seen:
+                    log(
+                        f"Warning: task {name!r} custom command "
+                        f"/{command} shares a task command, "
+                        "skipping it in the menu."
+                    )
+                    continue
+                if command in builtin_names:
+                    log(
+                        f"Warning: task {name!r} custom command "
+                        f"/{command} shares a built-in command, "
+                        "skipping it in the menu."
+                    )
+                    continue
+                if command in custom_tasks:
+                    log(
+                        f"Warning: tasks {custom_tasks[command]!r} "
+                        f"and {name!r} share the menu command "
+                        f"/{command}, keeping the first in "
+                        "sorted order."
+                    )
+                    continue
+                custom_tasks[command] = name
+                custom_descs[command] = (desc, preset)
+        entries = {}
         for menu_command in sorted(seen):
             if menu_command in builtin_names:
                 log(
@@ -2043,9 +2177,20 @@ class Bot:
                 continue
             task_name = seen[menu_command]
             description = specs[task_name].description or f"run {task_name}"
-            task_commands.append(
-                {"command": menu_command, "description": description[:256]}
-            )
+            entries[menu_command] = description[:256]
+        for menu_command in sorted(custom_tasks):
+            task_name = custom_tasks[menu_command]
+            desc, preset = custom_descs[menu_command]
+            if not desc:
+                if preset:
+                    desc = f"run {task_name} {' '.join(preset)}"
+                else:
+                    desc = f"run {task_name}"
+            entries[menu_command] = desc[:256]
+        task_commands = [
+            {"command": command, "description": entries[command]}
+            for command in sorted(entries)
+        ]
         other_commands = [
             {"command": name, "description": description}
             for name, description in sorted(BOT_COMMANDS)
@@ -2152,13 +2297,14 @@ class Bot:
             self.handle_cancel(chat_id)
         else:
             specs = discover_tasks(self.tasks_dir)
-            spec = build_task_command_map(specs).get(command)
-            if spec is None:
+            entry = build_task_command_map(specs).get(command)
+            if entry is None:
                 self.try_send(
                     chat_id, f"Unknown command /{command}. Try /help."
                 )
                 return
-            self.launch_task(chat_id, spec, arguments)
+            spec, preset = entry
+            self.launch_task(chat_id, spec, [*preset, *arguments])
 
     def help_text(self):
         specs = discover_tasks(self.tasks_dir)
@@ -2171,6 +2317,16 @@ class Bot:
             if menu_command not in seen:
                 seen[menu_command] = name
         builtin_names = {name for name, _description in BOT_COMMANDS}
+        custom_tasks = {}
+        custom_descs = {}
+        for name in sorted(specs):
+            for command, desc, preset in specs[name].menu_commands:
+                if command in seen or command in builtin_names:
+                    continue
+                if command in custom_tasks:
+                    continue
+                custom_tasks[command] = name
+                custom_descs[command] = (desc, preset)
         first = True
         for menu_command in sorted(seen):
             if menu_command in builtin_names:
@@ -2209,6 +2365,18 @@ class Bot:
                 help_line = help_line.strip()
                 if help_line:
                     lines.append(f"  {help_line}")
+        for menu_command in sorted(custom_tasks):
+            if not first:
+                lines.append("")
+            first = False
+            task_name = custom_tasks[menu_command]
+            desc, preset = custom_descs[menu_command]
+            if not desc:
+                if preset:
+                    desc = f"run {task_name} {' '.join(preset)}"
+                else:
+                    desc = f"run {task_name}"
+            lines.append(f"/{menu_command} - {desc}")
         for name, description in sorted(BOT_COMMANDS):
             if not first:
                 lines.append("")

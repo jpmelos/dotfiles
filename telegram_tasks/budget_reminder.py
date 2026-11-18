@@ -6,7 +6,8 @@
 # --no-download or --no-upload still counts as pending.
 #
 # Run it with `/budget_reminder` from the allowlisted chat. Optional words
-# after the name are `--skip`.
+# after the name are `--skip`. The menu also offers
+# `/budget_reminder_skip` as a shortcut for `--skip`.
 #
 # With `--skip`, the task records today as skipped and replies to confirm.
 # Later runs stay silent for the rest of the day. They skip the check of the
@@ -16,6 +17,9 @@ NAME = "budget_reminder"
 DESCRIPTION = "Remind to run /budget_sync when it hasn't run today."
 HELP = "Flags:\n--skip: skip reminders for the rest of the day.\n"
 SHORTHAND = "br"
+MENU_COMMANDS = (
+    ("budget_reminder_skip", "Skip today's budget reminders.", ("--skip",)),
+)
 TIMEOUT = 120
 SCHEDULE = "0 12-23 * * *"
 
