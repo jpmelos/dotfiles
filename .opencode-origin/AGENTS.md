@@ -71,6 +71,10 @@
 - Keep each body very concise and to the point.
 - Make each body complete in isolation from parent items and related items.
 - Write each body for a human reader in very plain and direct terms.
+- Write prose as regular English with standard capitalization only.
+- Do not capitalize a common word only because code uses it as a special term.
+- Avoid abbreviations. Use the full word (for example, use `organization`, not
+  `org`).
 - If the PR closes the issue, start the PR body with
   `Closes <issue tracker link>.` on the first line.
 - If the PR covers only part of the issue, start the PR body with
