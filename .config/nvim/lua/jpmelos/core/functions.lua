@@ -375,8 +375,10 @@ vim.api.nvim_exec2(
             try
                 setlocal indentexpr= nosmartindent
                 call cursor(first_line, 1)
-                " Unlike `gq`, `gw` does not call 'formatexpr'.
-                execute 'normal! ' .. line_count .. 'gww'
+                " Unlike `gq`, `gw` does not call 'formatexpr'. The count
+                " applies to lines only with `gwgw`. With `gww`, the count
+                " applies to the `w` motion and means words.
+                execute 'normal! ' .. line_count .. 'gwgw'
                 " Leave the cursor on the last formatted line, like `gq`.
                 call setpos('.', getpos("']"))
             finally
