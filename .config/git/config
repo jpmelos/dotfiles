@@ -142,8 +142,8 @@
     df = diff --stat
     dc = diff --cached
     dcf = diff --cached --stat
-    dm = ! git diff $(git main-branch)...HEAD
-    dmf = ! git diff $(git main-branch)...HEAD --stat
+    dm = ! git diff $(git main-base)...HEAD
+    dmf = ! git diff $(git main-base)...HEAD --stat
     dom = ! git diff $(git main-branch-remote)...HEAD
     domf = ! git diff $(git main-branch-remote)...HEAD --stat
 
