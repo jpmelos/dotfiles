@@ -196,6 +196,7 @@
     rsm = ! git reset $(git main-base)
     rshm = ! git reset --hard $(git main-base)
     rsu = reset HEAD~1
+    rshu = reset --hard HEAD~1
 
     # sh = show
     sh = "! f() { if [[ \"$1\" =~ ^- ]]; then HEADN=\"${1#-}\"; shift; git show \"HEAD~$HEADN\" $@; else git show \"$@\"; fi; }; f"

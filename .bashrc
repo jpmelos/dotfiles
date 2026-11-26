@@ -270,12 +270,14 @@ alias grsho='g rsho'
 alias grsm='g rsm'
 alias grshm='g rshm'
 alias grsu='g rsu'
+alias grshu='g rshu'
 __git_complete grs git_reset
 __git_complete grso git_reset
 __git_complete grsho git_reset
 __git_complete grsm git_reset
 __git_complete grshm git_reset
 __git_complete grsu git_reset
+__git_complete grshu git_reset
 
 alias gsh='g sh'
 alias gshf='g shf'
